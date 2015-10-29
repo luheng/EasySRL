@@ -436,12 +436,9 @@ class CompressedChart {
 				values.add(newVal);
 
 			}
-
-			result = new Key(key.getCategory(), spanStart, spanStart
-					+ spanLength - 1, key.getRuleType(), values);
+			result = new Key(key.getCategory(), spanStart, spanStart + spanLength - 1, key.getRuleType(), values);
 			cache.put(key, result);
 		}
-
 		return result;
 	}
 
@@ -453,14 +450,12 @@ class CompressedChart {
 		final Collection<Key> roots = new HashSet<>();
 		final Map<Object, Value> valueCache = new HashMap<>();
 		final Map<Object, Key> keyCache = new IdentityHashMap<>();
-
 		for (final EquivalenceClassKey entry : cell.getKeys()) {
 			if (rootCategories.contains(entry.getCategory())) {
 				roots.add(make(chart, 0, chart.length, entry, keyCache,
 						valueCache, cutoffs, unaryRules));
 			}
 		}
-
 		if (roots.size() == 0) {
 			return null;
 		}

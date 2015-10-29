@@ -34,37 +34,8 @@ import edu.uw.easysrl.util.Util;
 
 public class SRLEvaluation {
 
-	public static void main(final String[] args) throws IOException {
-
-		final String folder = Util.getHomeFolder() + "/Downloads/model2";
-		final String pipelineFolder = folder + "/pipeline";
-		final POSTagger posTagger = POSTagger.getStanfordTagger(new File(pipelineFolder, "posTagger"));
-		final PipelineSRLParser pipeline = new PipelineSRLParser(EasySRL.makeParser(pipelineFolder, 0.0001,
-				ParsingAlgorithm.ASTAR, 200000, false), Util.deserialize(new File(pipelineFolder, "labelClassifier")),
-				posTagger);
-
-		final SRLParser jointAstar = new BackoffSRLParser(new JointSRLParser(EasySRL.makeParser(folder, 0.01,
-				ParsingAlgorithm.ASTAR, 20000, true), posTagger), pipeline);
-
-		final SRLParser jointCKY = new BackoffSRLParser(new JointSRLParser(EasySRL.makeParser(folder, 0.01,
-				ParsingAlgorithm.CKY, 400000, true), posTagger), pipeline);
-
-		final SRLParser jointAST = new BackoffSRLParser(new JointSRLParser(EasySRL.makeParser(folder, 0.1,
-				ParsingAlgorithm.CKY, 400000, true), posTagger), new JointSRLParser(EasySRL.makeParser(folder, 0.01,
-						ParsingAlgorithm.CKY, 400000, true), posTagger), pipeline);
-
-		final SRLParser parser = new BackoffSRLParser(new JointSRLParser(EasySRL.makeParser(folder, 0.01,
-				ParsingAlgorithm.ASTAR, 20000, true), posTagger), pipeline);
-
-		evaluate(jointAstar,// BrownPropbankReader.readCorpus()//
-				// ParallelCorpusReader.getPropBank00()
-				ParallelCorpusReader.getPropBank23(), 70);
-		// CCGBankEvaluation.evaluate(jointAstar, false);
-
-	}
-
 	public static Results evaluate(final SRLParser parser, final Collection<SRLParse> iterator,
-			final int maxSentenceLength) throws FileNotFoundException {
+			final int maxSentenceLength, boolean verbatim) throws FileNotFoundException {
 		final List<String> autoOutput = new ArrayList<>();
 
 		final Results results = new Results();
@@ -89,59 +60,48 @@ public class SRLEvaluation {
 					failedToParse.add(srlParse.getWords());
 
 				}
-
 				results.add(new Results(0, 0, srlParse.getDependencies().size()));
-
 				continue;
 			}
-
 			parsed.getAndIncrement();
-
-			results.add(evaluate(srlParse, parse));
-
+			results.add(evaluate(srlParse, parse, verbatim));
 		}
 
 		if (!oneThread) {
 			Util.runJobsInParallel(jobs, Runtime.getRuntime().availableProcessors());
-
 		}
-
-		for (final List<String> cov : failedToParse) {
-			System.err.print("FAILED TO PARSE: ");
-			for (final String word : cov) {
-				System.err.print(word + " ");
+		if (verbatim) {
+			for (final List<String> cov : failedToParse) {
+				System.err.print("FAILED TO PARSE: ");
+				for (final String word : cov) {
+					System.err.print(word + " ");
+				}
+				System.err.println();
 			}
-			System.err.println();
 		}
-
 		System.out.println(results);
-
 		System.out.println("Coverage: " + Util.twoDP(100.0 * parsed.get() / shouldParse.get()));
 		System.out.println("Time: " + stopwatch.elapsed(TimeUnit.SECONDS));
-
 		return results;
 	}
 
-	private static Results evaluate(final SRLParse gold, final CCGandSRLparse parse) {
+	private static Results evaluate(final SRLParse gold, final CCGandSRLparse parse, boolean verbatim) {
 		final Collection<ResolvedDependency> predictedDeps = new HashSet<>(parse.getDependencyParse());
-
 		final Set<SRLDependency> goldDeps = new HashSet<>(gold.getDependencies());
 		final Iterator<ResolvedDependency> depsIt = predictedDeps.iterator();
 		// Remove non-SRL dependencies.
 		while (depsIt.hasNext()) {
 			final ResolvedDependency dep = depsIt.next();
-			if (((dep.getSemanticRole() == SRLFrame.NONE)) || dep.getOffset() == 0 // Unrealized
-			// arguments
-			) {
+			if (((dep.getSemanticRole() == SRLFrame.NONE)) || dep.getOffset() == 0 /* Unrealized arguments */) {
 				depsIt.remove();
 			}
 		}
-
-		for (final SyntaxTreeNodeLeaf leaf : parse.getCcgParse().getLeaves()) {
-			System.err.print(leaf.getWord() + "|" + leaf.getCategory() + " ");
+		if (verbatim) {
+			for (final SyntaxTreeNodeLeaf leaf : parse.getCcgParse().getLeaves()) {
+				System.err.print(leaf.getWord() + "|" + leaf.getCategory() + " ");
+			}
+			System.err.println();
 		}
-		System.err.println();
-
 		int correctCount = 0;
 		final int predictedCount = predictedDeps.size();
 		final int goldCount = goldDeps.size();
@@ -149,7 +109,6 @@ public class SRLEvaluation {
 			if (goldDep.getArgumentPositions().size() == 0) {
 				continue;
 			}
-
 			boolean found = false;
 			for (final ResolvedDependency predictedDep : predictedDeps) {
 				int predictedPropbankPredicate;
@@ -162,27 +121,52 @@ public class SRLEvaluation {
 					predictedPropbankArgument = predictedDep.getPredicateIndex();
 				}
 				// For adjuncts, the CCG functor is the Propbank argument
-
 				if (goldDep.getPredicateIndex() == predictedPropbankPredicate
 						&& (goldDep.getLabel() == predictedDep.getSemanticRole())
 						&& goldDep.getArgumentPositions().contains(predictedPropbankArgument)) {
-
 					predictedDeps.remove(predictedDep);
 					correctCount++;
 					found = true;
 					break;
 				}
 			}
-
-			if (!found) {
+			if (!found && verbatim) {
 				System.err.println("missing:" + goldDep.toString(gold.getWords()));
 			}
 		}
-		for (final ResolvedDependency wrong : predictedDeps) {
-			System.err.println("wrong:  " + wrong.toString(gold.getWords()));
+		if (verbatim) {
+			for (final ResolvedDependency wrong : predictedDeps) {
+				System.err.println("wrong:  " + wrong.toString(gold.getWords()));
+			}
 		}
-
 		return new Results(predictedCount, correctCount, goldCount);
 	}
 
+	public static void main(final String[] args) throws IOException {
+		final String folder = Util.getHomeFolder() + "/Downloads/model2";
+		final String pipelineFolder = folder + "/pipeline";
+		final POSTagger posTagger = POSTagger.getStanfordTagger(new File(pipelineFolder, "posTagger"));
+		final PipelineSRLParser pipeline = new PipelineSRLParser(EasySRL.makeParser(pipelineFolder, 0.0001,
+				ParsingAlgorithm.ASTAR, 200000, false), Util.deserialize(new File(pipelineFolder, "labelClassifier")),
+				posTagger);
+
+		final SRLParser jointAstar = new BackoffSRLParser(new JointSRLParser(EasySRL.makeParser(folder, 0.01,
+				ParsingAlgorithm.ASTAR, 20000, true), posTagger), pipeline);
+
+		final SRLParser jointCKY = new BackoffSRLParser(new JointSRLParser(EasySRL.makeParser(folder, 0.01,
+				ParsingAlgorithm.CKY, 400000, true), posTagger), pipeline);
+
+		final SRLParser jointAST = new BackoffSRLParser(new JointSRLParser(EasySRL.makeParser(folder, 0.1,
+				ParsingAlgorithm.CKY, 400000, true), posTagger), new JointSRLParser(EasySRL.makeParser(folder, 0.01,
+				ParsingAlgorithm.CKY, 400000, true), posTagger), pipeline);
+
+		final SRLParser parser = new BackoffSRLParser(new JointSRLParser(EasySRL.makeParser(folder, 0.01,
+				ParsingAlgorithm.ASTAR, 20000, true), posTagger), pipeline);
+
+		evaluate(jointAstar,
+				// BrownPropbankReader.readCorpus()//
+				// ParallelCorpusReader.getPropBank00()
+				ParallelCorpusReader.getPropBank23(), 70, true);
+		// CCGBankEvaluation.evaluate(jointAstar, false);
+	}
 }

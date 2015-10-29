@@ -296,19 +296,14 @@ public class Training {
 		while (sentenceIt.hasNext()) {
 			final Sentence sentence = sentenceIt.next();
 			final List<ResolvedDependency> goldDeps = getGoldDeps(sentence);
-
 			final List<Category> cats = sentence.getLexicalCategories();
-
 			for (int i = 0; i < cats.size(); i++) {
-
 				final FeatureKey key = trainingParameters.getFeatureSet().lexicalCategoryFeatures.getFeatureKey(
 						sentence.getInputWords(), i, cats.get(i));
 				if (key != null) {
 					keyCount.add(key);
 				}
-
 			}
-
 			for (final ResolvedDependency dep : goldDeps) {
 				final SRLLabel role = dep.getSemanticRole();
 				// if (cutoffsDictionary.isFrequentWithAnySRLLabel(
@@ -320,7 +315,6 @@ public class Training {
 							role, dep.getCategory(), dep.getArgNumber(), dep.getPreposition());
 					keyCount.add(key);
 				}
-
 				if (dep.getPreposition() != Preposition.NONE) {
 					for (final PrepositionFeature feature : trainingParameters.getFeatureSet().prepositionFeatures) {
 						final FeatureKey key = feature.getFeatureKey(sentence.getInputWords(), dep.getPredicateIndex(),
@@ -329,7 +323,6 @@ public class Training {
 					}
 				}
 				// }
-
 				if (dep.getSemanticRole() != SRLFrame.NONE) {
 					for (final BilexicalFeature feature : trainingParameters.getFeatureSet().dependencyFeatures) {
 						final FeatureKey key = feature.getFeatureKey(sentence.getInputWords(), dep.getSemanticRole(),
@@ -339,17 +332,14 @@ public class Training {
 				}
 
 			}
-
 			getFromDerivation(sentence.getCcgbankParse(), binaryFeatureCount, boundedFeatures,
 					sentence.getInputWords(), 0, sentence.getInputWords().size());
-
 			for (final RootCategoryFeature rootFeature : trainingParameters.getFeatureSet().rootFeatures) {
 				final FeatureKey key = rootFeature.getFeatureKey(sentence.getCcgbankParse().getCategory(),
 						sentence.getInputWords());
 				boundedFeatures.add(key);
 				keyCount.add(key);
 			}
-
 		}
 
 		result.put(trainingParameters.getFeatureSet().lexicalCategoryFeatures.getDefault(), result.size());
@@ -530,9 +520,8 @@ public class Training {
 				Util.deserialize(new File(dataParameters.getExistingModel(), "labelClassifier")), posTagger));
 
 		final Results results = SRLEvaluation
-				.evaluate(backoff, ParallelCorpusReader.getPropBank00(), maxSentenceLength);
+				.evaluate(backoff, ParallelCorpusReader.getPropBank00(), maxSentenceLength, true);
 
 		System.out.println("Final result: F1=" + results.getF1());
-
 	}
 }

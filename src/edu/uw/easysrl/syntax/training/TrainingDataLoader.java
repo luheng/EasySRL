@@ -76,6 +76,7 @@ class TrainingDataLoader {
 		final ExecutorService executor = Executors.newFixedThreadPool(singleThread ? 1 : Runtime.getRuntime()
 				.availableProcessors());
 		final List<TrainingExample> result = new ArrayList<>();
+		
 		while (sentences.hasNext()) {
 			final Sentence sentence = sentences.next();
 			executor.submit(new Runnable() {
@@ -86,6 +87,9 @@ class TrainingDataLoader {
 						if (trainingExample != null) {
 							synchronized (result) {
 								result.add(trainingExample);
+								if (result.size() % 100 == 0) {
+									System.out.println(String.format("Processed %d samples.\r", result.size()));
+								}
 							}
 						}
 					} catch (final Throwable t) {
@@ -129,6 +133,7 @@ class TrainingDataLoader {
 			if (smallChart == null) {
 				// Unable to parse sentence with restrictive supertagger beam.
 				// TODO I guess we could try backing off here.
+				/*
 				final StringBuilder message = new StringBuilder();
 				for (final String word : sentence.getWords()) {
 					message.append(word + " ");
@@ -138,6 +143,7 @@ class TrainingDataLoader {
 					message.append(supertag + " ");
 				}
 				System.err.println(message.toString());
+				*/
 				return null;
 			}
 			// Now find the parses which are maximally consistent with the SRL.

@@ -27,7 +27,7 @@ import java.util.*;
 /**
  * Created by luheng on 10/28/15.
  */
-public class QATraining {
+public class NewTraining {
 
     public static final List<Category> ROOT_CATEGORIES = Arrays.asList(
             Category.valueOf("S[dcl]"),
@@ -42,10 +42,10 @@ public class QATraining {
     private final TrainingDataLoader.TrainingDataParameters dataParameters;
     private final TrainingParameters trainingParameters;
     private final CutoffsDictionary cutoffsDictionary;
-    private final Map<FeatureKey, Integer> featureToIndex;
+    //private final Map<FeatureKey, Integer> featureToIndex;
 
-    private QATraining(final TrainingDataLoader.TrainingDataParameters dataParameters,
-                       final TrainingParameters parameters)
+    private NewTraining(final TrainingDataLoader.TrainingDataParameters dataParameters,
+                        final TrainingParameters parameters)
             throws IOException {
         super();
         this.dataParameters = dataParameters;
@@ -57,7 +57,7 @@ public class QATraining {
                 lexicalCategoriesList,
                 TagDict.readDict(dataParameters.getExistingModel(), new HashSet<>(lexicalCategoriesList)),
                 trainingParameters.getMaxDependencyLength());
-        this.featureToIndex =  Util.deserialize(new File(dataParameters.getExistingModel(), "../featureToIndex"));
+        //this.featureToIndex =  Util.deserialize(new File(dataParameters.getExistingModel(), "../featureToIndex"));
     }
 
     private List<Optimization.TrainingExample> makeTrainingData(final boolean small) throws IOException {
@@ -67,8 +67,10 @@ public class QATraining {
 
     private double[] trainLocal() throws IOException {
         final Set<Feature.FeatureKey> boundedFeatures = new HashSet<>();
+        final Map<FeatureKey, Integer> featureToIndex = (new TrainingFeatureHelper(trainingParameters, dataParameters))
+                .makeKeyToIndexMap(trainingParameters.getMinimumFeatureFrequency(), boundedFeatures);
         final List<Optimization.TrainingExample> data = makeTrainingData(false);
-        final Optimization.LossFunction lossFunction = Optimization.getLossFunction(data,  featureToIndex,
+        final Optimization.LossFunction lossFunction = Optimization.getLossFunction(data, featureToIndex,
                 trainingParameters, trainingLogger);
         final double[] weights = train(lossFunction, featureToIndex, boundedFeatures);
         return weights;
@@ -125,8 +127,8 @@ public class QATraining {
                                    0.0001,
                                    EasySRL.ParsingAlgorithm.ASTAR, 100000, false),
                 Util.deserialize(new File(dataParameters.getExistingModel(), "labelClassifier")), posTagger));
-        final Results results = SRLEvaluation
-                .evaluate(backoff, ParallelCorpusReader.getPropBank00(), maxSentenceLength);
+        final Results results = SRLEvaluation.evaluate(backoff, ParallelCorpusReader.getPropBank00(), maxSentenceLength,
+                false /* verbatim */);
         System.out.println("Final result: F1=" + results.getF1());
     }
 
@@ -182,7 +184,7 @@ public class QATraining {
                                         50, allFeatures,
                                         sigmaSquared, minFeatureCount, modelFolder, costFunctionWeight);
 
-                                final QATraining training = new QATraining(dataParameters, standard);
+                                final NewTraining training = new NewTraining(dataParameters, standard);
                                 training.trainLocal();
 
                                 for (final double beam : TrainingUtils.parseDoubles(trainingSettings, "beta_for_decoding")) {
