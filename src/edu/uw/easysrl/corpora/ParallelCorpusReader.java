@@ -215,10 +215,8 @@ public class ParallelCorpusReader {
 				srlParses = SRLParse
 						.parseCorpus(
 								PTB,
-								Util.readFileLineByLine(new File(propbank,
-										"prop.txt")),
-								nombank != null ? Util
-												.readFileLineByLine(nombank) : null);
+								Util.readFileLineByLine(new File(propbank,  "prop.txt")),
+								nombank != null ? Util.readFileLineByLine(nombank) : null);
 			}
 
 		}

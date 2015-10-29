@@ -125,7 +125,6 @@ public class Training {
 								final File pipeline = new File(modelFolder, "pipeline");
 								pipeline.mkdir();
 								for (final File f : baseModel.listFiles()) {
-
 									java.nio.file.Files.copy(f.toPath(), new File(pipeline, f.getName()).toPath(),
 											StandardCopyOption.REPLACE_EXISTING);
 								}

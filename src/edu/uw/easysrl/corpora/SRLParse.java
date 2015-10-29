@@ -55,8 +55,10 @@ public class SRLParse implements Serializable {
 		return result;
 	}
 
-	private static void parseFile(final Table<String, Integer, TreebankParse> parses, final Iterator<String> propbank,
-			final boolean isPropbank, final Table<String, Integer, SRLParse> result) {
+	private static void parseFile(
+			final Table<String, Integer, TreebankParse> parses,
+			final Iterator<String> propbank, final boolean isPropbank,
+			final Table<String, Integer, SRLParse> result) {
 		SRLParse srlparse;
 		String file;
 		int number;
@@ -67,7 +69,6 @@ public class SRLParse implements Serializable {
 			// 25:2-ARG2-to 27:6-ARGM-TMP 20:1,21:1,22:1,23:1-ARG1
 
 			final String[] fields = line.split(" ");
-
 			file = fields[0].substring(fields[0].lastIndexOf("/") + 1, fields[0].length() - 4);
 			number = Integer.valueOf(fields[1]);
 
