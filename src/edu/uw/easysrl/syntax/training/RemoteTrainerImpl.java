@@ -79,7 +79,7 @@ RemoteTrainer {
 			i++;
 		}
 
-		final Training.TrainingParameters trainingParameters = Util
+		final TrainingParameters trainingParameters = Util
 				.deserialize(new File(modelFolder, "parameters"));
 		final CutoffsDictionary cutoffs = Util.deserialize(new File(
 				modelFolder, "cutoffs"));
