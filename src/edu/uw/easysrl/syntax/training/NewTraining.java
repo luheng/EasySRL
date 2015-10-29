@@ -42,7 +42,6 @@ public class NewTraining {
     private final TrainingDataLoader.TrainingDataParameters dataParameters;
     private final TrainingParameters trainingParameters;
     private final CutoffsDictionary cutoffsDictionary;
-    //private final Map<FeatureKey, Integer> featureToIndex;
 
     private NewTraining(final TrainingDataLoader.TrainingDataParameters dataParameters,
                         final TrainingParameters parameters)
@@ -57,7 +56,6 @@ public class NewTraining {
                 lexicalCategoriesList,
                 TagDict.readDict(dataParameters.getExistingModel(), new HashSet<>(lexicalCategoriesList)),
                 trainingParameters.getMaxDependencyLength());
-        //this.featureToIndex =  Util.deserialize(new File(dataParameters.getExistingModel(), "../featureToIndex"));
     }
 
     private List<Optimization.TrainingExample> makeTrainingData(final boolean small) throws IOException {
@@ -67,8 +65,11 @@ public class NewTraining {
 
     private double[] trainLocal() throws IOException {
         final Set<Feature.FeatureKey> boundedFeatures = new HashSet<>();
-        final Map<FeatureKey, Integer> featureToIndex = (new TrainingFeatureHelper(trainingParameters, dataParameters))
-                .makeKeyToIndexMap(trainingParameters.getMinimumFeatureFrequency(), boundedFeatures);
+        //final Map<FeatureKey, Integer> featureToIndex = (new TrainingFeatureHelper(trainingParameters, dataParameters))
+        //        .makeKeyToIndexMap(trainingParameters.getMinimumFeatureFrequency(), boundedFeatures);
+        final Map<FeatureKey, Integer> featureToIndex = Util.deserialize(new File(dataParameters.getExistingModel(),
+                    "../featureToIndex"));
+        System.out.println("Number of features:\t" + featureToIndex.size());
         final List<Optimization.TrainingExample> data = makeTrainingData(false);
         final Optimization.LossFunction lossFunction = Optimization.getLossFunction(data, featureToIndex,
                 trainingParameters, trainingLogger);
@@ -104,14 +105,6 @@ public class NewTraining {
         Files.copy(new File(dataParameters.getExistingModel(), "seenRules"), new File(modelFolder, "seenRules"));
 
         return weights;
-    }
-
-    private void train(final DifferentiableFunction lossFunction,
-                       final Optimization.TrainingAlgorithm algorithm,
-                       final double[] weights) throws IOException {
-        trainingLogger.log("Starting Training");
-        algorithm.train(lossFunction, weights);
-        trainingLogger.log("Training Completed");
     }
 
     private void evaluate(final double testingSupertaggerBeam) throws IOException {

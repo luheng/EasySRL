@@ -76,7 +76,7 @@ class TrainingDataLoader {
 		final ExecutorService executor = Executors.newFixedThreadPool(singleThread ? 1 : Runtime.getRuntime()
 				.availableProcessors());
 		final List<TrainingExample> result = new ArrayList<>();
-		
+
 		while (sentences.hasNext()) {
 			final Sentence sentence = sentences.next();
 			executor.submit(new Runnable() {

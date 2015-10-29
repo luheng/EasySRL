@@ -153,7 +153,6 @@ public class TrainingFeatureHelper {
                 if (upperBound0) {
                     boundedFeatures.add(entry.getElement());
                 }
-
             }
         }
     }
