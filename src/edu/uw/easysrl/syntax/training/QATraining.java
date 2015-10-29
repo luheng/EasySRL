@@ -51,11 +51,11 @@ public class QATraining {
         this.dataParameters = dataParameters;
         this.trainingParameters = parameters;
         this.trainingLogger = new Util.Logger(trainingParameters.getLogFile());
-
-        final List<Category> lexicalCategoriesList = TaggerEmbeddings.loadCategories(new File(dataParameters
-                .getExistingModel(), "categories"));
-        this.cutoffsDictionary = new CutoffsDictionary(lexicalCategoriesList, TagDict.readDict(
-                dataParameters.getExistingModel(), new HashSet<>(lexicalCategoriesList)),
+        final List<Category> lexicalCategoriesList = TaggerEmbeddings.loadCategories(
+                new File(dataParameters.getExistingModel(), "categories"));
+        this.cutoffsDictionary = new CutoffsDictionary(
+                lexicalCategoriesList,
+                TagDict.readDict(dataParameters.getExistingModel(), new HashSet<>(lexicalCategoriesList)),
                 trainingParameters.getMaxDependencyLength());
         this.featureToIndex =  Util.deserialize(new File(dataParameters.getExistingModel(), "../featureToIndex"));
     }
@@ -202,5 +202,4 @@ public class QATraining {
             }
         }
     }
-
 }

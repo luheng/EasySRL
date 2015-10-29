@@ -42,7 +42,6 @@ public class GoldChartFinder {
 	private static class Scored<T> {
 		private final T object;
 		private final int matchedDependencies;
-
 		public Scored(final T object, final int matchedDependencies) {
 			this.object = object;
 			this.matchedDependencies = matchedDependencies;
@@ -51,9 +50,7 @@ public class GoldChartFinder {
 	}
 
 	CompressedChart goldChart(final Sentence sentence, final CutoffsDictionary cutoffs) {
-
 		final Set<SRLDependency> goldDeps = getTrainingDependencies(sentence);
-
 		return goldChart(sentence, goldDeps, cutoffs);
 	}
 
@@ -77,7 +74,6 @@ public class GoldChartFinder {
 						firstConstituent, srl.getLabel(), srl.getPreposition());
 
 				goldDeps.add(newDep);
-
 			}
 		}
 		return goldDeps;
@@ -86,17 +82,11 @@ public class GoldChartFinder {
 	private CompressedChart goldChart(final Sentence sentence, final Set<SRLDependency> goldDeps,
 			final CutoffsDictionary cutoffs) {
 		final Table<Key, Set<SRLDependency>, Scored<Key>> cache = HashBasedTable.create();
-
 		int bestScore = -1;
-
 		Collection<Key> bestKeys = null;
-
 		for (final Key root : completeChart.getRoots()) {
-			// Choose the value that maximizes the number of dependencies in
-			// GoldDeps
-
+			// Choose the value that maximizes the number of dependencies in GoldDeps
 			final Scored<Key> scoredKey = bestKey(root, goldDeps, cache, cutoffs);
-
 			if (scoredKey.matchedDependencies > bestScore) {
 				bestKeys = new HashSet<>();
 				bestKeys.add(scoredKey.object);
@@ -105,11 +95,10 @@ public class GoldChartFinder {
 				bestKeys.add(scoredKey.object);
 			}
 		}
-
 		if (bestScore > goldDeps.size()) {
 			throw new IllegalStateException();
 		}
-
+		/*
 		synchronized (this) {
 			System.out.println();
 			for (final InputWord word : sentence.getInputWords()) {
@@ -122,13 +111,11 @@ public class GoldChartFinder {
 			}
 			System.out.println();
 			System.out.println(bestScore + "/" + goldDeps.size());
-
 		}
-
+		*/
 		if (bestScore == 0) {
 			return null;
 		}
-
 		return new CompressedChart(completeChart.getWords(), bestKeys);
 	}
 

@@ -50,7 +50,6 @@ class CompressedChart {
 	static class Key {
 		final Category category;
 		final RuleType ruleClass;
-
 		final int startIndex;
 		final int lastIndex;
 		final Set<Value> values;
@@ -63,7 +62,6 @@ class CompressedChart {
 			this.ruleClass = ruleClass;
 			this.startIndex = startIndex;
 			this.lastIndex = lastIndex;
-
 		}
 
 		private Integer hashCode = null;
@@ -77,21 +75,17 @@ class CompressedChart {
 		}
 
 		private int hashCode2() {
-			return Objects.hash(values, category, ruleClass, startIndex,
-					lastIndex);
+			return Objects.hash(values, category, ruleClass, startIndex, lastIndex);
 		}
 
 		@Override
 		public boolean equals(final Object obj) {
-
 			final Key other = (Key) obj;
-
 			return this == other
 					|| (values.equals(other.values)
 							&& category == other.category
 							&& ruleClass.equals(other.ruleClass)
 							&& startIndex == other.startIndex && lastIndex == other.lastIndex);
-
 		}
 
 		public Collection<Value> getChildren() {
@@ -100,7 +94,6 @@ class CompressedChart {
 
 		public int getLastIndex() {
 			return lastIndex;
-
 		}
 
 		public int getStartIndex() {
@@ -118,7 +111,6 @@ class CompressedChart {
 
 		@Override
 		public final int hashCode() {
-
 			if (hashCode == null) {
 				hashCode = hashCode2();
 			}
@@ -463,7 +455,6 @@ class CompressedChart {
 		final Map<Object, Key> keyCache = new IdentityHashMap<>();
 
 		for (final EquivalenceClassKey entry : cell.getKeys()) {
-
 			if (rootCategories.contains(entry.getCategory())) {
 				roots.add(make(chart, 0, chart.length, entry, keyCache,
 						valueCache, cutoffs, unaryRules));
@@ -475,7 +466,6 @@ class CompressedChart {
 		}
 
 		return new CompressedChart(words, ImmutableSet.copyOf(roots));
-
 	}
 
 	public Collection<Key> getRoots() {
@@ -491,9 +481,7 @@ class CompressedChart {
 		final Map<Key, Integer> cache = new HashMap<>();
 		for (final Key root : roots) {
 			result += getNumberOfPossibleParses(root, cache);
-
 		}
-
 		return result;
 	}
 
@@ -505,13 +493,10 @@ class CompressedChart {
 			for (final Value value : key.getChildren()) {
 				int resultForValue = 1;
 				for (final Key child : value.getChildren()) {
-					resultForValue = resultForValue
-							* getNumberOfPossibleParses(child, cache);
+					resultForValue = resultForValue * getNumberOfPossibleParses(child, cache);
 				}
-
 				result += resultForValue;
 			}
-
 			cache.put(key, result);
 		}
 		return result;

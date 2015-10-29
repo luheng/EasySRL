@@ -51,17 +51,15 @@ class TrainingDataLoader {
 
 		try {
 			unaryRules = AbstractParser.loadUnaryRules(new File(this.dataParameters.getExistingModel(), "unaryRules"));
-
 			DependencyStructure.parseMarkedUpFile(new File(dataParameters.getExistingModel(), "markedup"));
 
 			// Build set of possible parses
 			this.parser = new CKY(dataParameters.getExistingModel(), dataParameters.maxTrainingSentenceLength,
 					dataParameters.maxChartSize);
 			this.tagger = new TaggerEmbeddings(dataParameters.getExistingModel(), dataParameters.supertaggerBeam, 50,
-					cutoffsDictionary// null
+					cutoffsDictionary // null
 			);
 			this.posTagger = POSTagger.getStanfordTagger(new File(dataParameters.getExistingModel(), "posTagger"));
-
 		} catch (final IOException e) {
 			throw new RuntimeException(e);
 		}
@@ -69,9 +67,7 @@ class TrainingDataLoader {
 
 	List<TrainingExample> makeTrainingData(final Iterator<Sentence> sentences, final boolean singleThread)
 			throws IOException {
-
 		return buildTrainingData(sentences, singleThread);
-
 	}
 
 	private List<TrainingExample> buildTrainingData(final Iterator<Sentence> sentences, final boolean singleThread)
@@ -79,12 +75,9 @@ class TrainingDataLoader {
 		// Iterate over training sentences
 		final ExecutorService executor = Executors.newFixedThreadPool(singleThread ? 1 : Runtime.getRuntime()
 				.availableProcessors());
-
 		final List<TrainingExample> result = new ArrayList<>();
-
 		while (sentences.hasNext()) {
 			final Sentence sentence = sentences.next();
-
 			executor.submit(new Runnable() {
 				@Override
 				public void run() {
@@ -95,16 +88,12 @@ class TrainingDataLoader {
 								result.add(trainingExample);
 							}
 						}
-
 					} catch (final Throwable t) {
 						t.printStackTrace();
 					}
-
 				}
 			});
-
 		}
-
 		executor.shutdown(); // always reclaim resources
 		try {
 			executor.awaitTermination(Integer.MAX_VALUE, TimeUnit.DAYS);
@@ -120,35 +109,26 @@ class TrainingDataLoader {
 	 * positive training examples
 	 */
 	private TrainingExample makeTrainingExample(final Sentence sentence) {
-
 		if (sentence.getLength() > dataParameters.maxTrainingSentenceLength) {
 			return null;
 		}
-
 		try {
-
 			// Build a complete chart for the training sentence.
 			final AtomicDouble beta = new AtomicDouble(dataParameters.supertaggerBeam);
 			final CompressedChart completeChart = parseSentence(sentence.getWords(), beta, Training.ROOT_CATEGORIES);
-
 			if (completeChart == null) {
 				// Unable to parse sentence
 				return null;
 			}
-
-			// Build a smaller chart, which will be used for identifying
-			// positive examples.
-			final CompressedChart smallChart = parseSentence(
-					sentence.getWords(),
-					// Make sure the value of the beam is at least the value
-					// used for parsing the training charts. Otherwise, the
-					// positive chart can be a superset of the complete chart.
+			// Build a smaller chart, which will be used for identifying positive examples.
+			final CompressedChart smallChart = parseSentence(sentence.getWords(),
+					// Make sure the value of the beam is at least the value used for parsing the training charts.
+					// Otherwise, the positive chart can be a superset of the complete chart.
 					new AtomicDouble(Math.max(dataParameters.supertaggerBeamForGoldCharts, beta.doubleValue())),
 					Training.ROOT_CATEGORIES);
 			if (smallChart == null) {
 				// Unable to parse sentence with restrictive supertagger beam.
 				// TODO I guess we could try backing off here.
-
 				final StringBuilder message = new StringBuilder();
 				for (final String word : sentence.getWords()) {
 					message.append(word + " ");
@@ -158,22 +138,16 @@ class TrainingDataLoader {
 					message.append(supertag + " ");
 				}
 				System.err.println(message.toString());
-
 				return null;
 			}
-
 			// Now find the parses which are maximally consistent with the SRL.
 			final CompressedChart goldChart = new GoldChartFinder(smallChart).goldChart(sentence, cutoffsDictionary);
-
 			if (goldChart == null) {
-				// No matched dependencies, so we can't learn against this
-				// chart.
+				// No matched dependencies, so we can't learn against this chart.
 				return null;
 			}
-
-			final TrainingExample ex = new TrainingExample(completeChart, goldChart, posTagger.tag(sentence
-					.getInputWords()), cutoffsDictionary);
-
+			final TrainingExample ex = new TrainingExample(completeChart, goldChart,
+					posTagger.tag(sentence.getInputWords()), cutoffsDictionary);
 			return ex;
 		} catch (final Exception e) {
 			e.printStackTrace();
@@ -217,7 +191,6 @@ class TrainingDataLoader {
 		private final Multimap<Category, UnaryRule> unaryRules;
 
 		public Multimap<Category, UnaryRule> getUnaryRules() {
-
 			return unaryRules;
 		}
 
@@ -228,7 +201,6 @@ class TrainingDataLoader {
 		public Collection<Category> getPossibleRootCategories() {
 			return possibleRootCategories;
 		}
-
 	}
 
 	/**
@@ -240,27 +212,21 @@ class TrainingDataLoader {
 	CompressedChart parseSentence(final List<String> sentence, final AtomicDouble beta,
 			final Collection<Category> rootCategories) {
 		final CompressedChart compressed;
-
 		final List<Collection<Category>> categories = new ArrayList<>();
 		final List<List<ScoredCategory>> tagsForSentence = tagger.tag(InputWord.listOf(sentence));
 		for (final List<ScoredCategory> tagsForWord : tagsForSentence) {
 			final List<Category> tagsForWord2 = new ArrayList<>();
-
 			final double threshold = beta.doubleValue() * Math.exp(tagsForWord.get(0).getScore());
-
 			for (final ScoredCategory leaf : tagsForWord) {
 				if (Math.exp(leaf.getScore()) < threshold) {
 					break;
 				}
 				tagsForWord2.add(leaf.getCategory());
 			}
-
 			categories.add(tagsForWord2);
 		}
-
 		// Find set of all parses
 		final ChartCell[][] chart = parser.parse(sentence, categories);
-
 		if (chart == null) {
 			if (beta.doubleValue() * 2 < 0.1 && backoff) {
 				beta.set(beta.doubleValue() * 2);
@@ -272,10 +238,8 @@ class TrainingDataLoader {
 		if (chart[0][chart.length - 1] == null || chart[0][chart.length - 1].getEntries().size() == 0) {
 			return null;
 		}
-
 		compressed = CompressedChart.make(InputWord.listOf(sentence), chart, cutoffsDictionary, unaryRules,
 				rootCategories);
-
 		return compressed;
 	}
 }
