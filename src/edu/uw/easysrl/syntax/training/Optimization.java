@@ -246,7 +246,7 @@ public class Optimization {
 	}
 
 	static LossFunction getUnregularizedLossFunction(final List<TrainingExample> data,
-			final Map<FeatureKey, Integer> featureToIndex, final Training.TrainingParameters trainingParameters,
+			final Map<FeatureKey, Integer> featureToIndex, final TrainingParameters trainingParameters,
 			final Logger trainingLogger) {
 		LossFunction lossFunction = new LogLossFunction(data, trainingParameters.getFeatureSet(), featureToIndex,
 				trainingLogger);
@@ -264,7 +264,7 @@ public class Optimization {
 	}
 
 	static LossFunction getLossFunction(final List<TrainingExample> data,
-			final Map<FeatureKey, Integer> featureToIndex, final Training.TrainingParameters trainingParameters,
+			final Map<FeatureKey, Integer> featureToIndex, final TrainingParameters trainingParameters,
 			final Logger trainingLogger) throws IOException {
 		LossFunction lossFunction = getUnregularizedLossFunction(data, featureToIndex, trainingParameters,
 				trainingLogger);
