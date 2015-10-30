@@ -1,9 +1,7 @@
 package edu.uw.easysrl.corpora.qa;
 
-import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
-import com.google.common.collect.Table;
 import edu.uw.easysrl.dependencies.QADependency;
 
 import java.io.Serializable;
@@ -18,6 +16,20 @@ public class QASentence implements Serializable {
     private final Collection<QADependency> dependencies = new ArrayList<>();
     private final int sentenceLength;
     private final List<String> words;
+    public String sentenceId;
+
+    private final Map<Integer, String> indexToFrame = new HashMap<>();
+    private final Multimap<Integer, QADependency> indexToDep = HashMultimap.create();
+
+    private static final AnswerAligner defaultAlinger = new AnswerAligner();
+
+    public QASentence(final String[] words) {
+        this.words = new ArrayList<>();
+        for (String w : words) {
+            this.words.add(w);
+        }
+        this.sentenceLength = this.words.size();
+    }
 
     public QASentence(final List<String> words) {
         this.sentenceLength = words.size();
@@ -29,15 +41,25 @@ public class QASentence implements Serializable {
         add(qaPairs);
     }
 
-    private final Map<Integer, String> indexToFrame = new HashMap<>();
-    private final Multimap<Integer, QADependency> indexToDep = HashMultimap.create();
+    public void addDependencyFromLine(int predIdx, String line) {
+        String[] info = line.split("?");
+        String[] question = info[0].split("\\s+");
+        List<String[]> answers = new ArrayList<>();
+        for (String answerStr : info[1].split("###")) {
+            answers.add(answerStr.trim().split("\\s+"));
+        }
+        List<Integer> answerIndices = defaultAlinger.align(answers, words);
+        add(new QADependency(words.get(predIdx), predIdx, question, answerIndices));
+    }
+
+    private void add(QADependency qaPair) {
+        dependencies.add(qaPair);
+        indexToFrame.put(qaPair.getPredicateIndex(), qaPair.getPredicate());
+        indexToDep.put(qaPair.getPredicateIndex(), qaPair);
+    }
 
     private void add(final Collection<QADependency> qaPairs) {
-        dependencies.addAll(qaPairs);
-        for (final QADependency qa : qaPairs) {
-            indexToFrame.put(qa.getPredicateIndex(), qa.getPredicate());
-            indexToDep.put(qa.getPredicateIndex(), qa);
-        }
+        qaPairs.forEach(qa -> add(qa));
     }
 
     public Collection<QADependency> getDependenciesAtPredicateIndex(final int index) {

@@ -65,10 +65,10 @@ public class NewTraining {
 
     private double[] trainLocal() throws IOException {
         final Set<Feature.FeatureKey> boundedFeatures = new HashSet<>();
-        //final Map<FeatureKey, Integer> featureToIndex = (new TrainingFeatureHelper(trainingParameters, dataParameters))
-        //        .makeKeyToIndexMap(trainingParameters.getMinimumFeatureFrequency(), boundedFeatures);
-        final Map<FeatureKey, Integer> featureToIndex = Util.deserialize(new File(dataParameters.getExistingModel(),
-                    "../featureToIndex"));
+        final Map<FeatureKey, Integer> featureToIndex = (new TrainingFeatureHelper(trainingParameters, dataParameters))
+                .makeKeyToIndexMap(trainingParameters.getMinimumFeatureFrequency(), boundedFeatures);
+        //final Map<FeatureKey, Integer> featureToIndex = Util.deserialize(new File(dataParameters.getExistingModel(),
+            //           "../featureToIndex"));
         System.out.println("Number of features:\t" + featureToIndex.size());
         final List<Optimization.TrainingExample> data = makeTrainingData(false);
         final Optimization.LossFunction lossFunction = Optimization.getLossFunction(data, featureToIndex,
