@@ -1,8 +1,5 @@
 package edu.uw.easysrl.corpora.qa;
 
-import com.google.common.collect.Table;
-import com.google.common.collect.TreeBasedTable;
-import edu.uw.easysrl.dependencies.QADependency;
 import edu.uw.easysrl.util.Util;
 
 import java.io.BufferedReader;
@@ -84,8 +81,28 @@ public class QACorpusReader {
                 }
             }
             parses.add(newSent);
+            reader.readLine(); // skip empty line.
         }
         reader.close();
         return parses;
+    }
+
+    /**
+     * Test ...
+     */
+    private static void testQAReader() {
+        Iterator<QASentence> iter1 = null, iter2 = null;
+        try {
+            iter1 = QACorpusReader.READER.readCorpus(false /* is dev */);
+            iter2 = QACorpusReader.READER.readCorpus(true  /* is dev */);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        iter1.forEachRemaining(s -> System.out.println(s.toString()));
+        iter2.forEachRemaining(s -> System.out.println(s.toString()));
+    }
+
+    public static void main(final String[] args) {
+        testQAReader();
     }
 }

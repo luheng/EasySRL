@@ -1,5 +1,7 @@
 package edu.uw.easysrl.corpora.qa;
 
+import edu.stanford.nlp.util.StringUtils;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -15,6 +17,7 @@ public class AnswerAligner {
         Arrays.fill(aligned, 0);
         for (String[] answer : answers) {
             // Try to find the longest match ...
+            // System.out.println(StringUtils.join(answer, " "));
             int answerLength = answer.length;
             int[][] f = new int[answerLength + 1][sentenceLength + 1];
             int[][][] a = new int[answerLength + 1][sentenceLength + 1][2];
@@ -22,18 +25,22 @@ public class AnswerAligner {
                 Arrays.fill(f[i], -1);
             }
             f[0][0] = 0;
-            for (int i = 0; i < answerLength; i++) {
-                for (int j = 0; j < sentenceLength; j++) {
-                    if (answer[i].equalsIgnoreCase(words.get(j))) {
+            for (int i = 0; i <= answerLength; i++) {
+                for (int j = 0; j <= sentenceLength; j++) {
+                    if (i < answerLength && j < sentenceLength && answer[i].equalsIgnoreCase(words.get(j))) {
                         update(f, a, i, j, i + 1, j + 1, 1);
                     }
-                    update(f, a, i, j, i + 1, j, 0);
-                    update(f, a, i, j, i, j + 1, 0);
+                    if (i < answerLength) {
+                        update(f, a, i, j, i + 1, j, 0);
+                    }
+                    if (j < sentenceLength) {
+                        update(f, a, i, j, i, j + 1, 0);
+                    }
                 }
             }
             for (int i = answerLength, j = sentenceLength; i > 0 || j > 0; ) {
                 int i0 = a[i][j][0], j0 = a[i][j][1];
-                if (i0 < i && j0 < j) {
+                if (f[i0][j0] < f[i][j]) {
                     aligned[j0] ++;
                 }
                 i = i0;
@@ -46,6 +53,7 @@ public class AnswerAligner {
                 indices.add(i);
             }
         }
+        assert (indices.size() > 0);
         return indices;
     }
 

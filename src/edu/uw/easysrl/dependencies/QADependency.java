@@ -65,19 +65,22 @@ public class QADependency {
         return question;
     }
 
-    public String toString(final List<String> words) {
-        final StringBuilder result = new StringBuilder();
-        result.append(words.get(predicateIndex));
-        result.append(" " + question + "?\t");
+    @Override
+    public String toString() {
+        return predicate + ":" + question + "-->" + answerIndices;
+    }
+
+    public String toString(List<String> words) {
+        StringBuilder result = new StringBuilder();
+        result.append(words.get(predicateIndex) + "\t:\t");
+        for (String qw : question) {
+            result.append(qw + " ");
+        }
+        result.append("?");
         for (final int i : answerIndices) {
             result.append(" " + words.get(i));
         }
         return result.toString();
-    }
-
-    @Override
-    public String toString() {
-        return predicate + ":" + question + "-->" + answerIndices;
     }
 
     public Integer getLastAnswerPosition() {

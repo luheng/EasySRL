@@ -21,7 +21,7 @@ public class QASentence implements Serializable {
     private final Map<Integer, String> indexToFrame = new HashMap<>();
     private final Multimap<Integer, QADependency> indexToDep = HashMultimap.create();
 
-    private static final AnswerAligner defaultAlinger = new AnswerAligner();
+    private static final AnswerAligner defaultAligner = new AnswerAligner();
 
     public QASentence(final String[] words) {
         this.words = new ArrayList<>();
@@ -42,13 +42,13 @@ public class QASentence implements Serializable {
     }
 
     public void addDependencyFromLine(int predIdx, String line) {
-        String[] info = line.split("?");
+        String[] info = line.split("\\?");
         String[] question = info[0].split("\\s+");
         List<String[]> answers = new ArrayList<>();
         for (String answerStr : info[1].split("###")) {
             answers.add(answerStr.trim().split("\\s+"));
         }
-        List<Integer> answerIndices = defaultAlinger.align(answers, words);
+        List<Integer> answerIndices = defaultAligner.align(answers, words);
         add(new QADependency(words.get(predIdx), predIdx, question, answerIndices));
     }
 

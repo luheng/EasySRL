@@ -93,7 +93,8 @@ public class TrainingFeatureHelper {
             }
         }
         result.put(trainingParameters.getFeatureSet().lexicalCategoryFeatures.getDefault(), result.size());
-        addFrequentFeatures(30 /* minimum feature frequencey */, binaryFeatureCount, result, boundedFeatures, true);
+        // This is never used, actually.
+        //addFrequentFeatures(30 /* minimum feature frequency */, binaryFeatureCount, result, boundedFeatures, true);
         addFrequentFeatures(minimumFeatureFrequency, keyCount, result, boundedFeatures, false);
         addFrequentFeatures(minimumFeatureFrequency, bilexicalKeyCount, result, boundedFeatures, false);
         for (final Feature.BinaryFeature feature : trainingParameters.getFeatureSet().binaryFeatures) {
