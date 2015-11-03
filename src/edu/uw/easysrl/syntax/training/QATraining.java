@@ -2,13 +2,13 @@ package edu.uw.easysrl.syntax.training;
 
 import com.google.common.io.Files;
 import edu.uw.easysrl.corpora.ParallelCorpusReader;
+import edu.uw.easysrl.corpora.qa.QACorpusReader;
 import edu.uw.easysrl.main.EasySRL;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.evaluation.SRLEvaluation;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.model.CutoffsDictionary;
 import edu.uw.easysrl.syntax.model.feature.*;
-import edu.uw.easysrl.syntax.model.feature.Feature.FeatureKey;
 import edu.uw.easysrl.syntax.parser.SRLParser;
 import edu.uw.easysrl.syntax.tagger.POSTagger;
 import edu.uw.easysrl.syntax.tagger.TagDict;
@@ -25,28 +25,18 @@ import java.rmi.registry.LocateRegistry;
 import java.util.*;
 
 /**
- * Created by luheng on 10/28/15.
+ * Created by luheng on 11/2/15.
+ * Training with QA-SRL data. (yeah)
  */
-public class NewTraining {
-
-    public static final List<Category> ROOT_CATEGORIES = Arrays.asList(
-            Category.valueOf("S[dcl]"),
-            Category.valueOf("S[q]"),
-            Category.valueOf("S[wq]"),
-            Category.valueOf("NP"),
-            Category.valueOf("S[qem]")// ,
-            // Category.valueOf("S[b]\\NP")
-    );
-
+public class QATraining {
+    public static final List<Category> ROOT_CATEGORIES = NewTraining.ROOT_CATEGORIES;
     private final Util.Logger trainingLogger;
     private final TrainingDataParameters dataParameters;
     private final TrainingParameters trainingParameters;
     private final CutoffsDictionary cutoffsDictionary;
 
-    private NewTraining(final TrainingDataParameters dataParameters,
-                        final TrainingParameters parameters)
-            throws IOException {
-        super();
+    private QATraining(final TrainingDataParameters dataParameters,
+                       final TrainingParameters parameters) throws IOException {
         this.dataParameters = dataParameters;
         this.trainingParameters = parameters;
         this.trainingLogger = new Util.Logger(trainingParameters.getLogFile());
@@ -58,19 +48,15 @@ public class NewTraining {
                 trainingParameters.getMaxDependencyLength());
     }
 
-    private List<Optimization.TrainingExample> makeTrainingData(final boolean small) throws IOException {
-        return new TrainingDataLoader(cutoffsDictionary, dataParameters, true).makeTrainingData(
-                ParallelCorpusReader.READER.readCorpus(small), small);
-    }
-
     private double[] trainLocal() throws IOException {
         final Set<Feature.FeatureKey> boundedFeatures = new HashSet<>();
-        //final Map<FeatureKey, Integer> featureToIndex = (new TrainingFeatureHelper(trainingParameters, dataParameters))
-        //        .makeKeyToIndexMap(trainingParameters.getMinimumFeatureFrequency(), boundedFeatures);
-        final Map<FeatureKey, Integer> featureToIndex = Util.deserialize(new File(dataParameters.getExistingModel(),
-                       "../featureToIndex"));
+        final Map<Feature.FeatureKey, Integer> featureToIndex = Util.deserialize(
+                new File(dataParameters.getExistingModel(), "../featureToIndex"));
         System.out.println("Number of features:\t" + featureToIndex.size());
-        final List<Optimization.TrainingExample> data = makeTrainingData(false);
+        boolean small = true;
+        final List<Optimization.TrainingExample> data =
+                new QATrainingDataLoader(cutoffsDictionary, dataParameters, true)
+                        .makeTrainingData(QACorpusReader.READER.readCorpus(small), small);
         final Optimization.LossFunction lossFunction = Optimization.getLossFunction(data, featureToIndex,
                 trainingParameters, trainingLogger);
         final double[] weights = train(lossFunction, featureToIndex, boundedFeatures);
@@ -103,10 +89,10 @@ public class NewTraining {
         Files.copy(new File(dataParameters.getExistingModel(), "unaryRules"), new File(modelFolder, "unaryRules"));
         Files.copy(new File(dataParameters.getExistingModel(), "markedup"), new File(modelFolder, "markedup"));
         Files.copy(new File(dataParameters.getExistingModel(), "seenRules"), new File(modelFolder, "seenRules"));
-
         return weights;
     }
 
+    // FIXME: fix this .. lol
     private void evaluate(final double testingSupertaggerBeam) throws IOException {
         final int maxSentenceLength = 70;
         final POSTagger posTagger = POSTagger
@@ -117,8 +103,8 @@ public class NewTraining {
 
         final SRLParser backoff = new SRLParser.BackoffSRLParser(parser, new SRLParser.PipelineSRLParser(
                 EasySRL.makeParser(dataParameters.getExistingModel().getAbsolutePath(),
-                                   0.0001,
-                                   EasySRL.ParsingAlgorithm.ASTAR, 100000, false),
+                        0.0001,
+                        EasySRL.ParsingAlgorithm.ASTAR, 100000, false),
                 Util.deserialize(new File(dataParameters.getExistingModel(), "labelClassifier")), posTagger));
         final Results results = SRLEvaluation.evaluate(backoff, ParallelCorpusReader.getPropBank00(), maxSentenceLength,
                 false /* verbatim */);
@@ -130,7 +116,6 @@ public class NewTraining {
             System.out.println("Please supply a file containing training settings");
             System.exit(0);
         }
-
         final File propertiesFile = new File(args[0]);
         final Properties trainingSettings = Util.loadProperties(propertiesFile);
         LocateRegistry.createRegistry(1099);
@@ -138,6 +123,7 @@ public class NewTraining {
         // Dummy clustering (i.e. words)
         clusterings.add(null);
 
+        // FIXME: make it look better?
         for (final int minFeatureCount : TrainingUtils.parseIntegers(trainingSettings, "minimum_feature_frequency")) {
             for (final int maxChart : TrainingUtils.parseIntegers(trainingSettings, "max_chart_size")) {
                 for (final double sigmaSquared : TrainingUtils.parseDoubles(trainingSettings, "sigma_squared")) {
@@ -147,7 +133,6 @@ public class NewTraining {
 
                                 final File modelFolder = new File(trainingSettings.getProperty("output_folder")
                                         .replaceAll("~", Util.getHomeFolder().getAbsolutePath()));
-
                                 modelFolder.mkdirs();
                                 Files.copy(propertiesFile, new File(modelFolder, "training.properties"));
 
@@ -155,7 +140,6 @@ public class NewTraining {
                                 final File baseModel = new File(trainingSettings.getProperty(
                                         "supertagging_model_folder").replaceAll("~",
                                         Util.getHomeFolder().getAbsolutePath()));
-
                                 final File pipeline = new File(modelFolder, "pipeline");
                                 pipeline.mkdir();
                                 for (final File f : baseModel.listFiles()) {
@@ -163,7 +147,7 @@ public class NewTraining {
                                             StandardCopyOption.REPLACE_EXISTING);
                                 }
                                 final TrainingDataParameters dataParameters = new TrainingDataParameters(
-                                        beta, 70, ROOT_CATEGORIES, baseModel, maxChart, goldBeam);
+                                                beta, 70, ROOT_CATEGORIES, baseModel, maxChart, goldBeam);
 
                                 // Features to use
                                 final FeatureSet allFeatures = new FeatureSet(new DenseLexicalFeature(pipeline),
@@ -176,7 +160,7 @@ public class NewTraining {
                                         50, allFeatures,
                                         sigmaSquared, minFeatureCount, modelFolder, costFunctionWeight);
 
-                                final NewTraining training = new NewTraining(dataParameters, standard);
+                                final QATraining training = new QATraining(dataParameters, standard);
                                 training.trainLocal();
 
                                 for (final double beam : TrainingUtils.parseDoubles(trainingSettings, "beta_for_decoding")) {
@@ -197,3 +181,4 @@ public class NewTraining {
         }
     }
 }
+

@@ -46,8 +46,7 @@ public class SRLFrame implements Serializable {
 		private static final long serialVersionUID = 1L;
 		private final String name;
 		private final boolean isCoreArgument;
-		private final static Map<String, SRLLabel> cache = Collections
-				.synchronizedMap(new HashMap<String, SRLLabel>());
+		private final static Map<String, SRLLabel> cache = Collections.synchronizedMap(new HashMap<>());
 		private final int id;
 		private final static AtomicInteger numRoles = new AtomicInteger();
 
@@ -98,7 +97,6 @@ public class SRLFrame implements Serializable {
 				result = new SRLLabel(name, isCoreArgument);
 				cache.put(name, result);
 			}
-
 			return result;
 		}
 

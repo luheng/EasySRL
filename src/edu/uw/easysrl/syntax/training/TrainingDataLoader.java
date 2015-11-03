@@ -2,7 +2,6 @@ package edu.uw.easysrl.syntax.training;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
@@ -33,7 +32,6 @@ import edu.uw.easysrl.syntax.training.Optimization.TrainingExample;
  *
  */
 class TrainingDataLoader {
-
 	private final CutoffsDictionary cutoffsDictionary;
 	private final TrainingDataParameters dataParameters;
 	private final Multimap<Category, UnaryRule> unaryRules;
@@ -54,9 +52,14 @@ class TrainingDataLoader {
 			DependencyStructure.parseMarkedUpFile(new File(dataParameters.getExistingModel(), "markedup"));
 
 			// Build set of possible parses
-			this.parser = new CKY(dataParameters.getExistingModel(), dataParameters.maxTrainingSentenceLength,
-					dataParameters.maxChartSize);
-			this.tagger = new TaggerEmbeddings(dataParameters.getExistingModel(), dataParameters.supertaggerBeam, 50,
+			this.parser = new CKY(
+					dataParameters.getExistingModel(),
+					dataParameters.getMaxTrainingSentenceLength(),
+					dataParameters.getMaxChartSize());
+			this.tagger = new TaggerEmbeddings(
+					dataParameters.getExistingModel(),
+					dataParameters.getSupertaggerBeam(),
+					50,
 					cutoffsDictionary // null
 			);
 			this.posTagger = POSTagger.getStanfordTagger(new File(dataParameters.getExistingModel(), "posTagger"));
@@ -104,7 +107,6 @@ class TrainingDataLoader {
 		} catch (final InterruptedException e) {
 			throw new RuntimeException(e);
 		}
-
 		return result;
 	}
 
@@ -113,12 +115,12 @@ class TrainingDataLoader {
 	 * positive training examples
 	 */
 	private TrainingExample makeTrainingExample(final Sentence sentence) {
-		if (sentence.getLength() > dataParameters.maxTrainingSentenceLength) {
+		if (sentence.getLength() > dataParameters.getMaxTrainingSentenceLength()) {
 			return null;
 		}
 		try {
 			// Build a complete chart for the training sentence.
-			final AtomicDouble beta = new AtomicDouble(dataParameters.supertaggerBeam);
+			final AtomicDouble beta = new AtomicDouble(dataParameters.getSupertaggerBeam());
 			final CompressedChart completeChart = parseSentence(sentence.getWords(), beta, Training.ROOT_CATEGORIES);
 			if (completeChart == null) {
 				// Unable to parse sentence
@@ -128,7 +130,7 @@ class TrainingDataLoader {
 			final CompressedChart smallChart = parseSentence(sentence.getWords(),
 					// Make sure the value of the beam is at least the value used for parsing the training charts.
 					// Otherwise, the positive chart can be a superset of the complete chart.
-					new AtomicDouble(Math.max(dataParameters.supertaggerBeamForGoldCharts, beta.doubleValue())),
+					new AtomicDouble(Math.max(dataParameters.getSupertaggerBeamForGoldCharts(), beta.doubleValue())),
 					Training.ROOT_CATEGORIES);
 			if (smallChart == null) {
 				// Unable to parse sentence with restrictive supertagger beam.
@@ -158,54 +160,6 @@ class TrainingDataLoader {
 		} catch (final Exception e) {
 			e.printStackTrace();
 			return null;
-		}
-
-	}
-
-	static class TrainingDataParameters implements Serializable {
-		private final double supertaggerBeamForGoldCharts;
-		/**
-		 *
-		 */
-		private static final long serialVersionUID = 1L;
-		private final int maxChartSize;
-		private final double supertaggerBeam;
-		private final int maxTrainingSentenceLength;
-		private final Collection<Category> possibleRootCategories;
-		private final File existingModel;
-
-		TrainingDataParameters(final double supertaggerBeam, final int maxTrainingSentenceLength,
-				final Collection<Category> possibleRootCategories, final File existingModel, final int maxChartSize,
-				final double supertaggerBeamForGoldCharts) {
-			super();
-			this.supertaggerBeam = supertaggerBeam;
-			this.maxTrainingSentenceLength = maxTrainingSentenceLength;
-			this.possibleRootCategories = possibleRootCategories;
-			this.existingModel = existingModel;
-			this.supertaggerBeamForGoldCharts = supertaggerBeamForGoldCharts;
-
-			this.maxChartSize = maxChartSize;
-
-			try {
-				this.unaryRules = AbstractParser.loadUnaryRules(new File(existingModel, "unaryRules"));
-			} catch (final IOException e) {
-				throw new RuntimeException();
-			}
-
-		}
-
-		private final Multimap<Category, UnaryRule> unaryRules;
-
-		public Multimap<Category, UnaryRule> getUnaryRules() {
-			return unaryRules;
-		}
-
-		public File getExistingModel() {
-			return existingModel;
-		}
-
-		public Collection<Category> getPossibleRootCategories() {
-			return possibleRootCategories;
 		}
 	}
 

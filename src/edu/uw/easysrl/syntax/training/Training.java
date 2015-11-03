@@ -67,7 +67,6 @@ import edu.uw.easysrl.syntax.tagger.TaggerEmbeddings;
 import edu.uw.easysrl.syntax.training.Optimization.LossFunction;
 import edu.uw.easysrl.syntax.training.Optimization.TrainingAlgorithm;
 import edu.uw.easysrl.syntax.training.Optimization.TrainingExample;
-import edu.uw.easysrl.syntax.training.TrainingDataLoader.TrainingDataParameters;
 import edu.uw.easysrl.util.Util;
 import edu.uw.easysrl.util.Util.Logger;
 

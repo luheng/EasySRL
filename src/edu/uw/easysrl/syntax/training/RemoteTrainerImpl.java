@@ -21,12 +21,11 @@ import edu.uw.easysrl.syntax.model.CutoffsDictionary;
 import edu.uw.easysrl.syntax.model.feature.Feature.FeatureKey;
 import edu.uw.easysrl.syntax.training.Optimization.LossFunction;
 import edu.uw.easysrl.syntax.training.Optimization.TrainingExample;
-import edu.uw.easysrl.syntax.training.TrainingDataLoader.TrainingDataParameters;
+import edu.uw.easysrl.syntax.training.TrainingDataParameters;
 import edu.uw.easysrl.util.Util;
 import edu.uw.easysrl.util.Util.Logger;
 
-public class RemoteTrainerImpl extends UnicastRemoteObject implements
-RemoteTrainer {
+public class RemoteTrainerImpl extends UnicastRemoteObject implements RemoteTrainer {
 	/**
 	 *
 	 */

@@ -17,7 +17,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-import edu.uw.easysrl.syntax.training.TrainingDataLoader.TrainingDataParameters;
 import edu.uw.easysrl.util.Util;
 import edu.uw.easysrl.util.Util.Logger;
 import lbfgsb.DifferentiableFunction;

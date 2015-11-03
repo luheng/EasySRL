@@ -27,10 +27,9 @@ import java.util.*;
  */
 public class TrainingFeatureHelper {
     private TrainingParameters trainingParameters;
-    private TrainingDataLoader.TrainingDataParameters dataParameters;
+    private TrainingDataParameters dataParameters;
 
-    public TrainingFeatureHelper(TrainingParameters trainingParameters,
-                                 TrainingDataLoader.TrainingDataParameters dataParameters) {
+    public TrainingFeatureHelper(TrainingParameters trainingParameters, TrainingDataParameters dataParameters) {
         this.trainingParameters = trainingParameters;
         this.dataParameters = dataParameters;
     }

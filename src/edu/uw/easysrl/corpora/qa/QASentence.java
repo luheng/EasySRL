@@ -3,6 +3,9 @@ package edu.uw.easysrl.corpora.qa;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import edu.uw.easysrl.dependencies.QADependency;
+import edu.uw.easysrl.main.InputReader;
+import edu.uw.easysrl.main.InputReader.InputWord;
+import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 
 import java.io.Serializable;
 import java.util.*;
@@ -17,6 +20,8 @@ public class QASentence implements Serializable {
     private final int sentenceLength;
     private final List<String> words;
     public String sentenceId;
+
+    private List<InputWord> inputWords;
 
     private final Map<Integer, String> indexToFrame = new HashMap<>();
     private final Multimap<Integer, QADependency> indexToDep = HashMultimap.create();
@@ -72,6 +77,17 @@ public class QASentence implements Serializable {
 
     public int getSentenceLength() {
         return sentenceLength;
+    }
+
+
+    public List<InputReader.InputWord> getInputWords() {
+        if (inputWords == null) {
+            inputWords = new ArrayList<>(words.size());
+            for (String word : words) {
+                inputWords.add(new InputWord(word, "", ""));
+            }
+        }
+        return inputWords;
     }
 
     public Collection<Integer> getPredicatePositions() {
