@@ -1,6 +1,7 @@
 package edu.uw.easysrl.dependencies;
 
 
+import edu.uw.easysrl.corpora.qa.QASlots;
 import edu.uw.easysrl.dependencies.SRLFrame.SRLLabel;
 
 import com.google.common.collect.ImmutableSortedSet;
@@ -50,8 +51,8 @@ public class QADependency implements Serializable {
             firstConstituent.add(i);
         }
         this.firstConstituent = ImmutableSortedSet.copyOf(firstConstituent);
-        // FIXME
-        this.preposition = "";
+        String pp = question[QASlots.PPSlotId];
+        this.preposition = pp.equals("_") ? null : pp;
         this.label = makeSRLLabel(question);
     }
 

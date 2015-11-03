@@ -222,8 +222,9 @@ public class QAGoldChartFinder {
                                        final int argumentIndex,
                                        final QADependency qa,
                                        final Preposition preposition) {
+        System.out.println(Preposition.fromString(qa.getPreposition()) + "\t" + preposition);
         return ((qa.getPredicateIndex() == predicateIndex && qa.getAnswerPositions().contains(argumentIndex)) ||
-                (qa.getPredicateIndex() == argumentIndex && qa.getAnswerPositions().contains(predicateIndex)))
-                && Preposition.fromString(qa.getPreposition()) == preposition;
+                (qa.getPredicateIndex() == argumentIndex && qa.getAnswerPositions().contains(predicateIndex)) &&
+                Preposition.fromString(qa.getPreposition()) == preposition);
     }
 }

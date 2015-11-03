@@ -131,7 +131,6 @@ class FeatureForest {
 			}
 		} else {
 			// Gold labels.
-
 			if (!cutoffsDictionary.getRoles(words.get(dep.getHead()).word, dep.getCategory(), dep.getPreposition(),
 					dep.getArgNumber()).contains(dep.getSemanticRole())) {
 				throw new RuntimeException("Role " + dep.getSemanticRole() + " should have been pruned:"

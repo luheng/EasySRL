@@ -33,7 +33,6 @@ public class SRLDependency implements Serializable {
 			firstConstituent.add(i);
 		}
 		this.firstConstituent = ImmutableSortedSet.copyOf(firstConstituent);
-
 		this.preposition = preposition;
 		this.label = label;
 	}

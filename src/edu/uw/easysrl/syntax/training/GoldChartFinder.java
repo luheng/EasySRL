@@ -33,6 +33,7 @@ import edu.uw.easysrl.syntax.training.CompressedChart.Value;
 public class GoldChartFinder {
 
 	private final CompressedChart completeChart;
+	public final boolean verbose = true;
 
 	public GoldChartFinder(final CompressedChart completeChart) {
 		super();
@@ -98,21 +99,21 @@ public class GoldChartFinder {
 		if (bestScore > goldDeps.size()) {
 			throw new IllegalStateException();
 		}
-		/*
-		synchronized (this) {
-			System.out.println();
-			for (final InputWord word : sentence.getInputWords()) {
-				System.out.print(word.word + " ");
+		if (verbose) {
+			synchronized (this) {
+				System.out.println();
+				for (final InputWord word : sentence.getInputWords()) {
+					System.out.print(word.word + " ");
+				}
+				System.out.println();
+				final List<Category> goldCategories = sentence.getLexicalCategories();
+				for (final Category category : goldCategories) {
+					System.out.print(category + " ");
+				}
+				System.out.println();
+				System.out.println(bestScore + "/" + goldDeps.size());
 			}
-			System.out.println();
-			final List<Category> goldCategories = sentence.getLexicalCategories();
-			for (final Category category : goldCategories) {
-				System.out.print(category + " ");
-			}
-			System.out.println();
-			System.out.println(bestScore + "/" + goldDeps.size());
 		}
-		*/
 		if (bestScore == 0) {
 			return null;
 		}
