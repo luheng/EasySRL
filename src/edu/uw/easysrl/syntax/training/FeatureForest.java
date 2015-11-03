@@ -109,6 +109,7 @@ class FeatureForest {
 		return result;
 	}
 
+	// FIXME: ????
 	private DisjunctiveNode parseDependency(final ResolvedDependency dep) {
 		final DisjunctiveNode parent = new DisjunctiveNode();
 		final Collection<ConjunctiveDependencyNode> possibleLabels = new ArrayList<>();
@@ -117,17 +118,14 @@ class FeatureForest {
 				// Unlabelled arguments are those which are under-specified from
 				// the training charts
 				dep.getSemanticRole() == SRLFrame.UNLABELLED_ARGUMENT) {
-
 			// Underspecified labels.
 			for (final SRLLabel label : cutoffsDictionary.getRoles(words.get(dep.getHead()).word, dep.getCategory(),
 					dep.getPreposition(), dep.getArgNumber())) {
 				if (cutoffsDictionary.isFrequent(dep.getCategory(), dep.getArgNumber(), label)) {
 					final ResolvedDependency labelledDep = dep.overwriteLabel(label);
-
 					possibleLabels.add(new ConjunctiveDependencyNode(labelledDep, parent, cutoffsDictionary.isFrequent(
 							label, dep.getOffset())));
 				}
-
 			}
 		} else {
 			// Gold labels.
@@ -137,10 +135,7 @@ class FeatureForest {
 						+ words.get(dep.getHead()).word + " " + dep.getCategory() + " " + dep.getPreposition() + " "
 						+ dep.getArgNumber());
 			}
-
-			Preconditions.checkState(cutoffsDictionary.isFrequent(dep.getCategory(), dep.getArgNumber(),
-					dep.getSemanticRole()));
-
+			Preconditions.checkState(cutoffsDictionary.isFrequent(dep.getCategory(), dep.getArgNumber(), dep.getSemanticRole()));
 			possibleLabels.add(new ConjunctiveDependencyNode(dep, parent, cutoffsDictionary.isFrequent(
 					dep.getSemanticRole(), dep.getOffset())));
 		}

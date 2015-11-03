@@ -246,14 +246,12 @@ public class GoldChartFinder {
 						&& cutoffs.getRoles(completeChart.getWords().get(dep.getPredicateIndex()).word,
 								dep.getCategory(), dep.getPreposition(), dep.getArgNumber()).contains(srl.getLabel())
 						&& matches(predicateIndex, argumentIndex, srl, dep.getPreposition())) {
-
 					matchedDeps.add(srl);
 					newDeps.add(dep.overwriteLabel(srl.getLabel()));
 					isSRL = true;
 					break;
 				}
 			}
-
 			if (!isSRL) {
 				newDeps.add(dep.overwriteLabel(SRLFrame.NONE));
 			}

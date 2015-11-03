@@ -7,7 +7,7 @@ import edu.uw.easysrl.main.EasySRL;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.evaluation.SRLEvaluation;
 import edu.uw.easysrl.syntax.grammar.Category;
-import edu.uw.easysrl.syntax.model.CutoffsDictionary;
+import edu.uw.easysrl.syntax.model.DummyCutoffsDictionary;
 import edu.uw.easysrl.syntax.model.feature.*;
 import edu.uw.easysrl.syntax.parser.SRLParser;
 import edu.uw.easysrl.syntax.tagger.POSTagger;
@@ -33,7 +33,7 @@ public class QATraining {
     private final Util.Logger trainingLogger;
     private final TrainingDataParameters dataParameters;
     private final TrainingParameters trainingParameters;
-    private final CutoffsDictionary cutoffsDictionary;
+    private final DummyCutoffsDictionary cutoffsDictionary;
 
     private QATraining(final TrainingDataParameters dataParameters,
                        final TrainingParameters parameters) throws IOException {
@@ -42,7 +42,7 @@ public class QATraining {
         this.trainingLogger = new Util.Logger(trainingParameters.getLogFile());
         final List<Category> lexicalCategoriesList = TaggerEmbeddings.loadCategories(
                 new File(dataParameters.getExistingModel(), "categories"));
-        this.cutoffsDictionary = new CutoffsDictionary(
+        this.cutoffsDictionary = new DummyCutoffsDictionary(
                 lexicalCategoriesList,
                 TagDict.readDict(dataParameters.getExistingModel(), new HashSet<>(lexicalCategoriesList)),
                 trainingParameters.getMaxDependencyLength());

@@ -39,6 +39,17 @@ public class SRLFrame implements Serializable {
 	public final static SRLLabel MOD = SRLLabel.make("MOD", false);
 	public final static SRLLabel NEG = SRLLabel.make("NEG", false);
 
+	// FIXME: why???
+	// QA stuff ..
+	public final static SRLLabel WHO = SRLLabel.make("WHO", true);
+	public final static SRLLabel WHAT = SRLLabel.make("WHAT", true);
+	public final static SRLLabel WHERE = SRLLabel.make("WHERE", false);
+	public final static SRLLabel WHEN = SRLLabel.make("WHEN", false);
+	public final static SRLLabel HOW = SRLLabel.make("HOW", false);
+	public final static SRLLabel HOWMUCH = SRLLabel.make("HOW MUCH", false);
+	public final static SRLLabel WHY = SRLLabel.make("WHY", false);
+
+
 	public static class SRLLabel implements Serializable {
 
 		// Not using an enum because hash codes don't persist on serialization.
