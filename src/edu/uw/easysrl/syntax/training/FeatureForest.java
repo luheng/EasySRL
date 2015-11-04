@@ -233,7 +233,6 @@ class FeatureForest {
 			for (final int featureIndex : getFeatureIndicesCached(words, featureSet, featureToIndexMap)) {
 				result += featureWeights[featureIndex];
 			}
-
 			return result;
 		}
 
@@ -280,7 +279,6 @@ class FeatureForest {
 				cachedValue = featureSet.lexicalCategoryFeatures.getValue(words, index, category);
 
 			}
-
 			return cachedValue;
 		}
 
@@ -332,7 +330,6 @@ class FeatureForest {
 		@Override
 		public Category getCategory() {
 			return category;
-
 		}
 
 		@Override
@@ -348,7 +345,6 @@ class FeatureForest {
 		@Override
 		public int getIndex() {
 			throw new UnsupportedOperationException();
-
 		}
 
 		@Override

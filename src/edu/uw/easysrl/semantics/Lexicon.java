@@ -191,8 +191,10 @@ public class Lexicon {
 			labels.set(1, SRLFrame.NONE);
 		}
 
+		// FIXME: why
 		// A label for this argument, either a semantic role or "ARG".
-		final String argumentLabel = (label == SRLFrame.NONE) ? ARG : label.toString();
+		//final String argumentLabel = (label == SRLFrame.NONE) ? ARG : label.toString();
+		final String argumentLabel = (label == SRLFrame.NONE) ? "WHAT" : label.toString();
 
 		if (category.getNumberOfArguments() == 0) {
 			// Base case. N, S, NP etc.

@@ -62,6 +62,13 @@ public class QACorpusReader {
         };
     }
 
+    public Collection<QASentence> getDepCorpus() throws IOException {
+        if (parsesDev == null) {
+            parsesDev = QACorpusReader.loadCorpus(qaFileDev);
+        }
+        return parsesDev;
+    }
+
     private static List<QASentence> loadCorpus(File qaFile) throws IOException {
         List<QASentence> parses = new ArrayList<>();
         BufferedReader reader = new BufferedReader(new FileReader(qaFile));

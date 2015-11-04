@@ -17,6 +17,7 @@ public class SRLFrame implements Serializable {
 	public final static SRLLabel UNLABELLED_ARGUMENT = SRLLabel.make(
 			"UNLABELLED", false);
 
+	/*
 	public final static SRLLabel ARG0 = SRLLabel.make("ARG0", true);
 	public final static SRLLabel ARG1 = SRLLabel.make("ARG1", true);
 	public final static SRLLabel ARG2 = SRLLabel.make("ARG2", true);
@@ -37,6 +38,8 @@ public class SRLFrame implements Serializable {
 	public final static SRLLabel DIS = SRLLabel.make("DIS", false);
 	public final static SRLLabel ADV = SRLLabel.make("ADV", false);
 	public final static SRLLabel MOD = SRLLabel.make("MOD", false);
+	*/
+	// Speical hard coded symbols..
 	public final static SRLLabel NEG = SRLLabel.make("NEG", false);
 
 	// FIXME: why???

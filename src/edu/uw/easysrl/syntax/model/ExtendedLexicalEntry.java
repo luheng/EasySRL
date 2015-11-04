@@ -505,18 +505,14 @@ class ExtendedLexicalEntry {
 		@Override
 		double getLogScore(final List<InputWord> words, final int functorIndex, final FeatureSet featureSet,
 				final ObjectDoubleHashMap<FeatureKey> featureToScore, final FeatureCache featureCache) {
-
 			if (offset == 0) {
 				// null attachment
 				return 0;
 			}
-
 			final int argumentIndex = functorIndex + offset;
-
 			if (argumentIndex < 0 || argumentIndex >= words.size()) {
 				throw new RuntimeException();
 			}
-
 			return featureCache.getScore(functorIndex, label, argumentIndex);
 		}
 

@@ -200,12 +200,12 @@ public class QAGoldChartFinder {
             boolean isSRL = false;
             for (final QADependency qa : goldDeps) {
                 // TODO: double-check ...
-                System.out.println(dep.getCategory() + ", " + dep.getArgNumber() + ", " + qa.getLabel());
+                // System.out.println(dep.getCategory() + ", " + dep.getArgNumber() + ", " + qa.getLabel());
                 if (!matchedDeps.contains(qa)
-                        //&& cutoffs.isFrequent(dep.getCategory(), dep.getArgNumber(), qa.getLabel())
-                        //&& cutoffs.getRoles(completeChart.getWords().get(dep.getPredicateIndex()).word,
-                        //                    dep.getCategory(), dep.getPreposition(),
-                        //                    dep.getArgNumber()).contains(qa.getLabel())
+                        && cutoffs.isFrequent(dep.getCategory(), dep.getArgNumber(), qa.getLabel())
+                        && cutoffs.getRoles(completeChart.getWords().get(dep.getPredicateIndex()).word,
+                                            dep.getCategory(), dep.getPreposition(),
+                                            dep.getArgNumber()).contains(qa.getLabel())
                         && undirectedMatching(predicateIndex, argumentIndex, qa, dep.getPreposition())) {
                     matchedDeps.add(qa);
                     newDeps.add(dep.overwriteLabel(qa.getLabel()));

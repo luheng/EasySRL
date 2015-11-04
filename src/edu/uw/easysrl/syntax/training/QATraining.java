@@ -1,9 +1,9 @@
 package edu.uw.easysrl.syntax.training;
 
 import com.google.common.io.Files;
-import edu.uw.easysrl.corpora.ParallelCorpusReader;
 import edu.uw.easysrl.corpora.qa.QACorpusReader;
 import edu.uw.easysrl.main.EasySRL;
+import edu.uw.easysrl.syntax.evaluation.QAEvaluation;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.evaluation.SRLEvaluation;
 import edu.uw.easysrl.syntax.grammar.Category;
@@ -92,22 +92,18 @@ public class QATraining {
         return weights;
     }
 
-    // FIXME: fix this .. lol
     private void evaluate(final double testingSupertaggerBeam) throws IOException {
         final int maxSentenceLength = 70;
-        final POSTagger posTagger = POSTagger
-                .getStanfordTagger(new File(dataParameters.getExistingModel(), "posTagger"));
-
-        final SRLParser parser = new SRLParser.JointSRLParser(EasySRL.makeParser(trainingParameters.getModelFolder()
-                .getAbsolutePath(), testingSupertaggerBeam, EasySRL.ParsingAlgorithm.ASTAR, 20000, true), posTagger);
-
+        final POSTagger posTagger = POSTagger.getStanfordTagger(new File(dataParameters.getExistingModel(), "posTagger"));
+        final SRLParser parser = new SRLParser.JointSRLParser(
+                EasySRL.makeParser(trainingParameters.getModelFolder().getAbsolutePath(),
+                                   testingSupertaggerBeam, EasySRL.ParsingAlgorithm.ASTAR, 20000, true), posTagger);
         final SRLParser backoff = new SRLParser.BackoffSRLParser(parser, new SRLParser.PipelineSRLParser(
                 EasySRL.makeParser(dataParameters.getExistingModel().getAbsolutePath(),
-                        0.0001,
-                        EasySRL.ParsingAlgorithm.ASTAR, 100000, false),
+                                   0.0001, EasySRL.ParsingAlgorithm.ASTAR, 100000, false),
                 Util.deserialize(new File(dataParameters.getExistingModel(), "labelClassifier")), posTagger));
-        final Results results = SRLEvaluation.evaluate(backoff, ParallelCorpusReader.getPropBank00(), maxSentenceLength,
-                false /* verbatim */);
+        final Results results = QAEvaluation.evaluate(
+                backoff, QACorpusReader.READER.getDepCorpus(), maxSentenceLength, true /* verbose */);
         System.out.println("Final result: F1=" + results.getF1());
     }
 
