@@ -274,15 +274,12 @@ public class ParallelCorpusReader {
 			if (dep != null) {
 				return dep;
 			}
-
 		}
-
 		return null;
 	}
 
 	public static Collection<SRLParse> getPropBank23() throws IOException {
 		return getPropbankSection("23");
-
 	}
 
 }

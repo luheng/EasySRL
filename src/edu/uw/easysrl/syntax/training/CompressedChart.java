@@ -226,18 +226,12 @@ class CompressedChart {
 
 		@Override
 		public boolean equals(final Object obj) {
-
 			if (!(obj instanceof TreeValueBinary)) {
 				return false;
 			}
-
 			final TreeValueBinary other = (TreeValueBinary) obj;
-
-			return left.equals(other.left) && right.equals(other.right)
-					&& super.equals(other);
-
+			return left.equals(other.left) && right.equals(other.right) && super.equals(other);
 		}
-
 	}
 
 	static class TreeValueUnary extends TreeValue {

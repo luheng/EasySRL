@@ -5,10 +5,10 @@ import edu.uw.easysrl.corpora.qa.QACorpusReader;
 import edu.uw.easysrl.main.EasySRL;
 import edu.uw.easysrl.syntax.evaluation.QAEvaluation;
 import edu.uw.easysrl.syntax.evaluation.Results;
-import edu.uw.easysrl.syntax.evaluation.SRLEvaluation;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.model.DummyCutoffsDictionary;
 import edu.uw.easysrl.syntax.model.feature.*;
+import edu.uw.easysrl.syntax.model.feature.Feature.FeatureKey;
 import edu.uw.easysrl.syntax.parser.SRLParser;
 import edu.uw.easysrl.syntax.tagger.POSTagger;
 import edu.uw.easysrl.syntax.tagger.TagDict;
@@ -49,14 +49,19 @@ public class QATraining {
     }
 
     private double[] trainLocal() throws IOException {
+        QATrainingDataLoader dataLoader = new QATrainingDataLoader(cutoffsDictionary, dataParameters, true);
         final Set<Feature.FeatureKey> boundedFeatures = new HashSet<>();
-        final Map<Feature.FeatureKey, Integer> featureToIndex = Util.deserialize(
-                new File(dataParameters.getExistingModel(), "../featureToIndex"));
+        //final Map<Feature.FeatureKey, Integer> featureToIndex = Util.deserialize(
+        //        new File(dataParameters.getExistingModel(), "../featureToIndex"));
+        TrainingFeatureHelper featureHelper = new TrainingFeatureHelper(trainingParameters, dataParameters);
+        final Map<FeatureKey, Integer> featureToIndex = featureHelper
+                .makeKeyToIndexMap(QACorpusReader.READER.readCorpus(false),
+                                   trainingParameters.getMinimumFeatureFrequency(),
+                                   boundedFeatures, dataLoader);
         System.out.println("Number of features:\t" + featureToIndex.size());
         boolean small = true;
         final List<Optimization.TrainingExample> data =
-                new QATrainingDataLoader(cutoffsDictionary, dataParameters, true)
-                        .makeTrainingData(QACorpusReader.READER.readCorpus(small), small);
+                dataLoader.makeTrainingData(QACorpusReader.READER.readCorpus(small), small);
         final Optimization.LossFunction lossFunction = Optimization.getLossFunction(data, featureToIndex,
                 trainingParameters, trainingLogger);
         final double[] weights = train(lossFunction, featureToIndex, boundedFeatures);

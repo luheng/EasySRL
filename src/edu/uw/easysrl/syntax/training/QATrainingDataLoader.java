@@ -14,7 +14,6 @@ import edu.uw.easysrl.syntax.tagger.Tagger;
 import edu.uw.easysrl.syntax.tagger.TaggerEmbeddings;
 import edu.uw.easysrl.syntax.tagger.TaggerEmbeddings.ScoredCategory;
 import edu.uw.easysrl.syntax.training.CKY.ChartCell;
-import edu.uw.easysrl.syntax.training.Optimization.TrainingExample;
 
 
 import java.io.IOException;
@@ -124,7 +123,7 @@ public class QATrainingDataLoader {
                 // TODO I guess we could try backing off here.
                 return null;
             }
-            // Now find the parses which are maximally consistent with the SRL.
+            // Now find the parses which are maximally consistent with the Q/A Pairs.
             final CompressedChart goldChart = new QAGoldChartFinder(smallChart).goldChart(sentence, cutoffsDictionary);
             if (goldChart == null) {
                 // No matched dependencies, so we can't learn against this chart.
@@ -143,10 +142,9 @@ public class QATrainingDataLoader {
      * Build a chart for the sentence using the specified supertagger beam. If the chart exceeds the maximum size, beta
      * is doubled and the parser will re-try. When the function returns, beta will contain the value of the beam used
      * for the returned chart.
-     *
      */
-    CompressedChart parseSentence(final List<String> sentence, final AtomicDouble beta,
-                                  final Collection<Category> rootCategories) {
+    public CompressedChart parseSentence(final List<String> sentence, final AtomicDouble beta,
+                                         final Collection<Category> rootCategories) {
         final CompressedChart compressed;
         final List<Collection<Category>> categories = new ArrayList<>();
         final List<List<ScoredCategory>> tagsForSentence = tagger.tag(InputWord.listOf(sentence));
