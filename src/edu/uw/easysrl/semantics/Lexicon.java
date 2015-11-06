@@ -195,7 +195,6 @@ public class Lexicon {
 		// A label for this argument, either a semantic role or "ARG".
 		//final String argumentLabel = (label == SRLFrame.NONE) ? ARG : label.toString();
 		final String argumentLabel = (label == SRLFrame.NONE) ? "WHAT" : label.toString();
-
 		if (category.getNumberOfArguments() == 0) {
 			// Base case. N, S, NP etc.
 			if (category.equals(Category.N) || Category.S.matches(category.getArgument(0))) {
@@ -207,7 +206,6 @@ public class Lexicon {
 					// Pronouns, named-entities, etc. are just constants.
 					return new Constant(word, SemanticType.E);
 				}
-
 				// NP/N --> sk(#x . p(x))
 				return new SkolemTerm(new LambdaExpression(resultSoFar, head));
 			} else if (category == Category.PR) {
@@ -247,9 +245,7 @@ public class Lexicon {
 				// Semantic role: TMP(yesterday, e)
 				modifier = new AtomicSentence(argumentLabel, new Constant(word, SemanticType.E), head);
 			}
-
 			return ConnectiveSentence.make(Connective.AND, px, modifier, resultSoFar);
-
 		} else {
 			// Other complex categories.
 			final Category argument = category.getRight();

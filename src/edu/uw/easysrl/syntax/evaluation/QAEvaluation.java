@@ -37,7 +37,6 @@ public class QAEvaluation {
 
         int id = 0;
         int numErrors = 0;
-
         for (final QASentence sentence : sentences) {
             id++;
             SRLParser.CCGandSRLparse parse;
@@ -54,7 +53,6 @@ public class QAEvaluation {
             if (parse == null) {
                 if (words.size() < maxSentenceLength) {
                     failedToParse.add(sentence.getWords());
-
                 }
                 results.add(new Results(0, 0, sentence.getDependencies().size()));
                 continue;

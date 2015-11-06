@@ -89,7 +89,6 @@ public class DependencyStructure implements Serializable {
 			this.argNumber = argNumber;
 			this.semanticRole = semanticRole;
 			this.category = category;
-
 			if (category.getArgument(argNumber) == Category.PP) {
 				this.preposition = preposition;
 			} else {
@@ -102,7 +101,6 @@ public class DependencyStructure implements Serializable {
 		@Override
 		public int hashCode() {
 			return Objects.hash(argNumber, head, semanticRole, category, preposition);
-
 		}
 
 		@Override
@@ -129,7 +127,6 @@ public class DependencyStructure implements Serializable {
 		}
 
 		public abstract int getOffset();
-
 	}
 
 	public static class UnresolvedDependency extends Dependency {
@@ -147,7 +144,6 @@ public class DependencyStructure implements Serializable {
 		}
 
 		private Dependency resolve(final int id) {
-
 			return new UnresolvedDependency(super.head, super.category, super.argNumber, id, super.semanticRole,
 					super.preposition);
 		}
@@ -161,7 +157,6 @@ public class DependencyStructure implements Serializable {
 			if (super.preposition == preposition) {
 				return this;
 			}
-
 			return new UnresolvedDependency(super.head, super.category, super.argNumber, argumentID,
 					super.semanticRole, preposition);
 		}
@@ -184,7 +179,6 @@ public class DependencyStructure implements Serializable {
 			if (hashCode == 0) {
 				hashCode = Objects.hash(this.argumentID, super.hashCode());
 			}
-
 			return hashCode;
 		}
 
@@ -212,7 +206,6 @@ public class DependencyStructure implements Serializable {
 				final List<Integer> argument, final SRLLabel semanticRole, final Preposition preposition) {
 			super(head, argNumber, category, semanticRole, preposition);
 			this.argument = argument;
-
 		}
 
 		private final List<Integer> argument;
@@ -235,7 +228,6 @@ public class DependencyStructure implements Serializable {
 		@Override
 		public int hashCode() {
 			return Objects.hash(argument, super.hashCode());
-
 		}
 
 		@Override
@@ -249,7 +241,6 @@ public class DependencyStructure implements Serializable {
 			if (getSemanticRole() != SRLFrame.UNLABELLED_ARGUMENT) {
 				throw new RuntimeException("Trying to label already non-SRL dependency");
 			}
-
 			List<ResolvedDependency> result;
 			// Handle the inconsistent annotation of
 			// "I cooked and ate fish and chips"
@@ -263,7 +254,6 @@ public class DependencyStructure implements Serializable {
 							super.preposition));
 				}
 			}
-
 			return result;
 		}
 
@@ -289,7 +279,6 @@ public class DependencyStructure implements Serializable {
 				final SRLLabel semanticRole, final Preposition preposition) {
 			super(head, argNumber, category, semanticRole, preposition);
 			this.argument = argument;
-
 		}
 
 		private final int argument;
@@ -326,7 +315,6 @@ public class DependencyStructure implements Serializable {
 
 		public Object toStringUnlabelled() {
 			return super.head + "." + super.argNumber + " = " + argument;
-
 		}
 
 		@Override

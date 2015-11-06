@@ -180,8 +180,10 @@ public class ParallelCorpusReader {
 	private Table<String, Integer, SyntacticDependencyParse> CoNLL;
 	private Table<String, Integer, SRLParse> srlParses;
 
-	public Iterator<Sentence> readCorpus(final boolean isDev)
-			throws IOException {
+	public Iterator<Sentence> readCorpus(final boolean isDev) throws IOException {
+		System.err.println("I am reading the Propbank, which I shouldnt ...");
+		return null;
+		/*
 		synchronized (this) {
 			if (PTB == null) {
 				PTB = new PennTreebank().readCorpus(treebank);
@@ -196,7 +198,6 @@ public class ParallelCorpusReader {
 								nombank != null ? Util.readFileLineByLine(nombank) : null);
 			}
 		}
-
 		List<SyntaxTreeNode> parses;
 		List<DependencyParse> depParses;
 		if (isDev) {
@@ -262,6 +263,7 @@ public class ParallelCorpusReader {
 				return words;
 			}
 		};
+		*/
 	}
 
 	private static CCGBankDependency getCorrespondingCCGBankDependency(

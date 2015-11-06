@@ -46,7 +46,7 @@ public class CutoffsDictionary implements Serializable {
 
 	public CutoffsDictionary(final Collection<Category> lexicalCategories,
 							 final Map<String, Collection<Category>> tagDict,
-							   final int maxDependencyLength) {
+							 final int maxDependencyLength) {
 		try {
 			this.maxDependencyLength = maxDependencyLength;
 			make();
@@ -74,7 +74,7 @@ public class CutoffsDictionary implements Serializable {
 		}
 	}
 
-	private void make() throws IOException {
+	protected void make() throws IOException {
 		final Map<String, Multiset<SRLLabel>> keyToRole = new HashMap<>();
 		for (final SRLLabel label : SRLFrame.getAllSrlLabels()) {
 			srlToOffset.put(label, HashMultiset.create());

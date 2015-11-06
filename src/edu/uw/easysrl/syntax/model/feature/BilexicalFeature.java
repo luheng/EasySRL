@@ -32,18 +32,14 @@ public abstract class BilexicalFeature extends Feature {
 		return defaultKey;
 	}
 
-	public int getFeatureIndex(final List<InputWord> words,
-			final SRLLabel role, final int predicateIndex,
-			final int argumentIndex,
-			final Map<FeatureKey, Integer> featureToIndex) {
-		final FeatureKey featureKey = getFeatureKey(words, role,
-				predicateIndex, argumentIndex);
+	public int getFeatureIndex(final List<InputWord> words, final SRLLabel role, final int predicateIndex,
+							   final int argumentIndex, final Map<FeatureKey, Integer> featureToIndex) {
+		final FeatureKey featureKey = getFeatureKey(words, role, predicateIndex, argumentIndex);
 		final Integer result = featureToIndex.get(featureKey);
 		if (result == null) {
 			if (defaultIndex == 0) {
 				defaultIndex = featureToIndex.get(defaultKey);
 			}
-
 			return defaultIndex;
 		}
 		return result;
@@ -214,7 +210,6 @@ public abstract class BilexicalFeature extends Feature {
 	}
 
 	private static class DistanceDependencyFeature extends BilexicalFeature {
-
 		private static final long serialVersionUID = -2198134192575922596L;
 		private final int maxValue;
 		private final Integer includeWordAtOffset;
@@ -252,24 +247,21 @@ public abstract class BilexicalFeature extends Feature {
 	}
 
 	// eat.ARG1-->cluster47
-	private static class LemmaAndRoleAndArgCapitalization extends
-			BilexicalFeature {
+	private static class LemmaAndRoleAndArgCapitalization extends BilexicalFeature {
 		/**
 		 *
 		 */
 		private static final long serialVersionUID = 2787707266221162597L;
-
 		public LemmaAndRoleAndArgCapitalization() {
 			super();
 		}
 
 		@Override
-		FeatureKey getFeatureKey2(final List<InputWord> words,
-				final SRLLabel role, final int predicateIndex,
+		FeatureKey getFeatureKey2(final List<InputWord> words, final SRLLabel role, final int predicateIndex,
 				final int argumentIndex) {
 			return hash(super.id,
-					MorphaStemmer.stemToken(words.get(predicateIndex).word)
-							.hashCode(), role.hashCode(),
+					MorphaStemmer.stemToken(words.get(predicateIndex).word).hashCode(),
+					role.hashCode(),
 					Util.isCapitalized(words.get(argumentIndex).word) ? 7 : 13);
 		}
 	}

@@ -17,28 +17,41 @@ public class DummyCutoffsDictionary extends CutoffsDictionary {
         super(lexicalCategories, tagDict, maxDependencyLength);
     }
 
+    @Override
+    protected void make() {
+        // do nothing
+    }
+
+    @Override
     public Collection<Category> getCategoriesForWord(final String word) {
         return lexicalCategories;
     }
 
+    @Override
     public Collection<SRLFrame.SRLLabel> getRoles(final String word, final Category category,
                                                   final Preposition preposition,
                                                   final int argumentNumber) {
         return SRLFrame.getAllSrlLabels();
     }
 
+    @Override
     public boolean isFrequentWithAnySRLLabel(final Category category, final int argumentNumber) {
-        return true;
+        // If this is a verb ...
+        return category.isFunctionInto(Category.valueOf("S\\NP"));
     }
 
+    @Override
     public boolean isFrequent(final Category category, final int argumentNumber, final SRLFrame.SRLLabel label) {
-        return true;
+        // If this is a verb ...
+        return category.isFunctionInto(Category.valueOf("S\\NP"));
     }
 
+    @Override
     public boolean isFrequent(final SRLFrame.SRLLabel label, final int offset) {
         return true;
     }
 
+    @Override
     public Map<String, Collection<Category>> getTagDict() {
         return wordToCategory;
     }

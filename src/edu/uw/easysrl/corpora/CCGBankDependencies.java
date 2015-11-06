@@ -293,21 +293,16 @@ public class CCGBankDependencies implements Serializable {
 				: partition == Partition.TRAIN ? CCGBankParseReader.trainRegex : CCGBankParseReader.testRegex;
 		final List<File> autoFiles = Util.findAllFiles(folder, regex + ".*.auto");
 		Collections.sort(autoFiles);
-
 		final List<File> pargFiles = Util.findAllFiles(folder, regex + ".*.parg");
 		Collections.sort(pargFiles);
-
 		if (pargFiles.size() == 0) {
 			return null;
 		}
-
 		final List<DependencyParse> result = new ArrayList<>();
 		// Preconditions.checkArgument(pargFiles.size() == autoFiles.size());
 		for (int i = 0; i < autoFiles.size(); i++) {
-
 			final File autoFile = autoFiles.get(i);
 			final File pargFile = pargFiles.get(i);
-
 			Preconditions.checkState(
 					Files.getNameWithoutExtension(autoFile.getName()).equals(
 							Files.getNameWithoutExtension(pargFile.getName())),
@@ -315,7 +310,6 @@ public class CCGBankDependencies implements Serializable {
 
 			result.addAll(getDependencyParses(autoFile, pargFile));
 		}
-
 		return result;
 	}
 
@@ -324,15 +318,12 @@ public class CCGBankDependencies implements Serializable {
 		final Iterator<String> autoLines = Util.readFileLineByLine(autoFile);
 		final Iterator<String> pargLines = Util.readFileLineByLine(pargFile);
 		final List<DependencyParse> result = new ArrayList<>();
-
 		while (autoLines.hasNext()) {
-
 			final SyntaxTreeNode autoParse = Rebanker.getParse(autoLines);
 			final DependencyParse depParse = CCGBankDependencies.getDependencyParseCCGBank(pargLines,
 					autoParse.getLeaves());
 			result.add(depParse);
 		}
-
 		return result;
 	}
 
@@ -343,24 +334,19 @@ public class CCGBankDependencies implements Serializable {
 	 */
 	private static DependencyParse getDependencyParseCCGBank(final Iterator<String> lines,
 			final List<SyntaxTreeNodeLeaf> words) {
-
 		// Header line
 		String line = lines.next();
-
 		final int quote1 = line.indexOf("\"");
 		final int quote2 = line.indexOf("\"", quote1 + 1);
 		final int period = line.indexOf(".");
 		final String file = line.substring(quote1 + 1, period);
 		final int sentenceNumber = Integer.valueOf(line.substring(period + 1, quote2)) - 1;
 		final DependencyParse result = new DependencyParse(file, sentenceNumber, InputWord.fromLeaves(words));
-
 		while (lines.hasNext()) {
 			line = lines.next();
-
 			if (line.startsWith("<\\s>")) {
 				break;
 			}
-
 			final String[] fields = line.split("\t");
 			final int argument = Integer.valueOf(fields[0].trim());
 			final int predicate = Integer.valueOf(fields[1].trim());
@@ -368,7 +354,6 @@ public class CCGBankDependencies implements Serializable {
 			result.addDependency(new CCGBankDependency(words.get(predicate), words.get(argument), argIndex, predicate,
 					argument));
 		}
-
 		return result;
 	}
 }

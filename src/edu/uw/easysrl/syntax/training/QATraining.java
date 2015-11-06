@@ -98,6 +98,7 @@ public class QATraining {
     }
 
     private void evaluate(final double testingSupertaggerBeam) throws IOException {
+        // FIXME: can we increase this??
         final int maxSentenceLength = 70;
         final POSTagger posTagger = POSTagger.getStanfordTagger(new File(dataParameters.getExistingModel(), "posTagger"));
         final SRLParser parser = new SRLParser.JointSRLParser(

@@ -37,7 +37,6 @@ import edu.uw.easysrl.syntax.training.CKY.EquivalenceClassValue;
  *
  */
 class CompressedChart {
-
 	private final List<InputWord> words;
 	private final Collection<Key> roots;
 
@@ -308,9 +307,7 @@ class CompressedChart {
 			if (!(obj instanceof TreeValue)) {
 				return false;
 			}
-
 			final TreeValue other = (TreeValue) obj;
-
 			return deps.equals(other.deps);
 		}
 
@@ -334,19 +331,15 @@ class CompressedChart {
 		if (visited.contains(key)) {
 			return;
 		}
-
 		visited.add(key);
-
 		for (final Value value : key.getChildren()) {
 			for (final ResolvedDependency dep : value.getDependencies()) {
 				result.add(dep);
 			}
-
 			for (final Key child : value.getChildren()) {
 				getAllDependencies(child, result, visited);
 			}
 		}
-
 	}
 
 	private static Key make(final ChartCell[][] chart, final int spanStart,
@@ -354,57 +347,40 @@ class CompressedChart {
 			final Map<Object, Key> cache, final Map<Object, Value> valueCache,
 			final CutoffsDictionary cutoffs,
 			final Multimap<Category, UnaryRule> unaryRules) {
-
 		final ChartCell cell = chart[spanStart][spanLength - 1];
-
 		Key result = cache.get(key);
 		if (result == null) {
-
-			final Collection<EquivalenceClassValue> entries = cell
-					.getEntries(key);
+			final Collection<EquivalenceClassValue> entries = cell.getEntries(key);
 			final Set<Value> values = new HashSet<>(entries.size());
-
 			for (final EquivalenceClassValue value : entries) {
-				final Set<ResolvedDependency> deps = new HashSet<>(value
-						.getResolvedDependencies().size());
-				for (final UnlabelledDependency dependency : value
-						.getResolvedDependencies()) {
-					if (cutoffs != null
-							&& !cutoffs.isFrequentWithAnySRLLabel(
-									dependency.getCategory(),
-									dependency.getArgNumber())) {
+				final Set<ResolvedDependency> deps = new HashSet<>(value.getResolvedDependencies().size());
+				for (final UnlabelledDependency dependency : value.getResolvedDependencies()) {
+					if (cutoffs != null &&
+						!cutoffs.isFrequentWithAnySRLLabel(dependency.getCategory(), dependency.getArgNumber())) {
 						continue;
 					}
-
-					// Because we only model
-					deps.add(new ResolvedDependency(dependency.getHead(),
-							dependency.getCategory(),
-							dependency.getArgNumber(), dependency
-									.getArguments().get(0),
-							SRLFrame.UNLABELLED_ARGUMENT, dependency
-									.getPreposition()));
+					// FIXME: there's a bug here ...
+					if (dependency.getArguments().get(0) < 0) {
+						System.err.println("[dependency with negative argument index]:\t" + dependency);
+						continue;
+					}
+					deps.add(new ResolvedDependency(dependency.getHead(), dependency.getCategory(),
+							dependency.getArgNumber(), dependency.getArguments().get(0),
+							SRLFrame.UNLABELLED_ARGUMENT, dependency.getPreposition()));
 				}
-
 				int start = spanStart;
-				final List<EquivalenceClassKey> uncompressedChildren = value
-						.getChildren();
-				final List<Key> children = new ArrayList<>(
-						uncompressedChildren.size());
+				final List<EquivalenceClassKey> uncompressedChildren = value.getChildren();
+				final List<Key> children = new ArrayList<>(uncompressedChildren.size());
 				for (final EquivalenceClassKey child : uncompressedChildren) {
-					children.add(make(chart, start, child.length(), child,
-							cache, valueCache, cutoffs, unaryRules));
+					children.add(make(chart, start, child.length(), child, cache, valueCache, cutoffs, unaryRules));
 					start += child.length();
 				}
-
 				Value newVal;
 				if (children.isEmpty()) {
 					newVal = new CategoryValue(key.getCategory(), spanStart);
-
 				} else if (children.size() == 1) {
 					Preconditions.checkState(uncompressedChildren.size() == 1);
-					final Category from = uncompressedChildren.get(0)
-							.getCategory();
-
+					final Category from = uncompressedChildren.get(0).getCategory();
 					final Category to = key.getCategory();
 					Integer ruleID = null;
 					for (final UnaryRule unary : unaryRules.get(from)) {
@@ -412,23 +388,17 @@ class CompressedChart {
 							ruleID = unary.getID();
 						}
 					}
-
 					newVal = new TreeValueUnary(children.get(0), ruleID, deps);
-
 				} else {
-					newVal = new TreeValueBinary(children.get(0),
-							children.get(1), deps);
+					newVal = new TreeValueBinary(children.get(0), children.get(1), deps);
 				}
-
 				final Value existing = valueCache.get(newVal);
 				if (existing != null) {
 					newVal = existing;
 				} else {
 					valueCache.put(newVal, newVal);
 				}
-
 				values.add(newVal);
-
 			}
 			result = new Key(key.getCategory(), spanStart, spanStart + spanLength - 1, key.getRuleType(), values);
 			cache.put(key, result);
@@ -446,14 +416,12 @@ class CompressedChart {
 		final Map<Object, Key> keyCache = new IdentityHashMap<>();
 		for (final EquivalenceClassKey entry : cell.getKeys()) {
 			if (rootCategories.contains(entry.getCategory())) {
-				roots.add(make(chart, 0, chart.length, entry, keyCache,
-						valueCache, cutoffs, unaryRules));
+				roots.add(make(chart, 0, chart.length, entry, keyCache, valueCache, cutoffs, unaryRules));
 			}
 		}
 		if (roots.size() == 0) {
 			return null;
 		}
-
 		return new CompressedChart(words, ImmutableSet.copyOf(roots));
 	}
 

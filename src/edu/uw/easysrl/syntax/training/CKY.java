@@ -36,7 +36,6 @@ class CKY {
 	private final Multimap<Category, UnaryRule> unaryRules;
 	private final SeenRules seenRules;
 	private final int maxLength;
-
 	private final int maxChartSize;
 
 	CKY(final File modelFolder, final int maxSentenceLength, final int maxChartSize) throws IOException {

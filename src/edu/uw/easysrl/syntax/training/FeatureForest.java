@@ -372,7 +372,6 @@ class FeatureForest {
 	}
 
 	private static class ConjunctiveBinaryNode extends CachedConjunctiveNode {
-
 		private final DisjunctiveTreeNode left;
 		private final DisjunctiveTreeNode right;
 		private final DisjunctiveTreeNode parent;
@@ -382,7 +381,6 @@ class FeatureForest {
 			this.left = (DisjunctiveTreeNode) children.get(0); // TODO
 			this.right = (DisjunctiveTreeNode) children.get(1); // TODO
 			this.parent = parent;
-
 		}
 
 		@Override
@@ -433,7 +431,6 @@ class FeatureForest {
 		public int getStartIndex() {
 			return left.startIndex;
 		}
-
 	}
 
 	private static class ConjunctiveDependencyNode extends CachedConjunctiveNode {
@@ -483,14 +480,12 @@ class FeatureForest {
 					result.add(index);
 				}
 			}
-
 			for (final ArgumentSlotFeature feature : featureSet.argumentSlotFeatures) {
 				final int index = feature.getFeatureIndex(words, dependency.getPredicateIndex(),
 						dependency.getSemanticRole(), dependency.getCategory(), dependency.getArgNumber(),
 						dependency.getPreposition(), featureToIndexMap);
 				result.add(index);
 			}
-
 			if (dependency.getPreposition() != Preposition.NONE) {
 				for (final PrepositionFeature feature : featureSet.prepositionFeatures) {
 					final int index = feature.getFeatureIndex(words, dependency.getPredicateIndex(),
@@ -499,7 +494,6 @@ class FeatureForest {
 					result.add(index);
 				}
 			}
-
 			return result;
 		}
 	}
