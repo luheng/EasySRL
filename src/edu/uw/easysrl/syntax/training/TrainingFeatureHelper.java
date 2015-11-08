@@ -1,12 +1,8 @@
 package edu.uw.easysrl.syntax.training;
 
 import com.google.common.collect.HashMultiset;
-import com.google.common.collect.Multimap;
 import com.google.common.collect.Multiset;
-import com.google.common.util.concurrent.AtomicDouble;
-import com.sun.org.apache.xpath.internal.operations.Mult;
 import edu.uw.easysrl.corpora.CCGBankDependencies;
-import edu.uw.easysrl.corpora.CCGBankDependencies.CCGBankDependency;
 import edu.uw.easysrl.corpora.ParallelCorpusReader;
 import edu.uw.easysrl.corpora.qa.QASentence;
 import edu.uw.easysrl.dependencies.DependencyStructure;
@@ -48,16 +44,11 @@ public class TrainingFeatureHelper {
     public Map<FeatureKey, Integer> makeKeyToIndexMap(
             final int minimumFeatureFrequency,
             final Set<FeatureKey> boundedFeatures) throws IOException {
-
         final Multiset<FeatureKey> keyCount = HashMultiset.create();
         final Multiset<FeatureKey> bilexicalKeyCount = HashMultiset.create();
         final Multiset<FeatureKey> binaryFeatureCount = HashMultiset.create();
-
         final Map<FeatureKey, Integer> result = new HashMap<>();
-
-        // TODO: change this
         final Iterator<ParallelCorpusReader.Sentence> sentenceIt = ParallelCorpusReader.READER.readCorpus(false);
-
         while (sentenceIt.hasNext()) {
             final ParallelCorpusReader.Sentence sentence = sentenceIt.next();
             final List<DependencyStructure.ResolvedDependency> goldDeps = getGoldDeps(sentence);
@@ -123,75 +114,25 @@ public class TrainingFeatureHelper {
         return result;
     }
 
-    // FIXME:
-    private List<Set<Category>> getAllCategories(QASentence sentence, Collection<CompressedChart.Key> roots) {
-        Deque<CompressedChart.Key> cache = new ArrayDeque<>();
-        List<Set<Category>> result = new ArrayList<>();
-        for (int i = 0; i < sentence.getSentenceLength(); i++) {
-            result.add(new HashSet<>());
-        }
-        cache.addAll(roots);
-        while (cache.size() > 0) {
-            CompressedChart.Key key = cache.pop();
-            if (key.getStartIndex() == key.getLastIndex()) {
-                int index = key.getStartIndex();
-                result.get(index).add(key.category);
-            }
-            for (CompressedChart.Value value : key.getChildren()) {
-                try {
-                    if (CompressedChart.CategoryValue.class.isInstance(value) &&
-                            (value.getStartIndex() == value.getLastIndex())) {
-                        int index = value.getStartIndex();
-                        result.get(index).add(value.getCategory());
-                    }
-                } catch (UnsupportedOperationException e) {
-                    // FIXME: how to avoid this?
-                    //System.err.println("[value]:\tnull");
-                }
-                cache.addAll(value.getChildren());
-            }
-        }
-        /*
-        for (int index : result.keySet()) {
-            System.out.print(index + "\t" + sentence.getWords().get(index) + "\t");
-            for (Category cat : result.get(index)) {
-                System.out.print(cat + "\t");
-            }
-            System.out.println();
-        }
-        */
-        return result;
-    }
-
     /**
      * Creates a map from (sufficiently frequent) features to integers
      */
     public Map<FeatureKey, Integer> makeKeyToIndexMap(
             Iterator<QASentence> sentenceIt,
             final int minimumFeatureFrequency,
-            final Set<FeatureKey> boundedFeatures,
-            QATrainingDataLoader ccgHelper) throws IOException {
-
+            final Set<FeatureKey> boundedFeatures) throws IOException {
+        CCGHelper ccgHelper = new CCGHelper(dataParameters, true /* backoff */);
         final Multiset<FeatureKey> keyCount = HashMultiset.create();
         final Multiset<FeatureKey> bilexicalKeyCount = HashMultiset.create();
-        final Multiset<FeatureKey> binaryFeatureCount = HashMultiset.create();
-
         final Map<FeatureKey, Integer> result = new HashMap<>();
-
         while (sentenceIt.hasNext()) {
             final QASentence sentence = sentenceIt.next();
-            final AtomicDouble beta = new AtomicDouble(dataParameters.getSupertaggerBeam());
-            final CompressedChart smallChart = ccgHelper.parseSentence(
-                    sentence.getWords(),
-                    new AtomicDouble(Math.max(dataParameters.getSupertaggerBeamForGoldCharts(),
-                            beta.doubleValue())),
-                    Training.ROOT_CATEGORIES);
+            final CompressedChart smallChart = ccgHelper.parseSentence(sentence.getWords());
             if (smallChart == null) {
                 continue;
             }
-            List<Set<Category>> allCategories = getAllCategories(sentence, smallChart.getRoots());
+            List<Set<Category>> allCategories = ccgHelper.getAllCategories(sentence, smallChart);
             List<ResolvedDependency> goldDeps = getGoldDeps(sentence, smallChart, allCategories);
-
             for (int index = 0; index < allCategories.size(); index++) {
                 for (Category category : allCategories.get(index)) {
                     final FeatureKey key = trainingParameters.getFeatureSet().lexicalCategoryFeatures.getFeatureKey(
@@ -226,17 +167,10 @@ public class TrainingFeatureHelper {
                     }
                 }
             }
-            /*getFromDerivation(
-                    sentence.getCcgbankParse(),
-                    binaryFeatureCount,
-                    boundedFeatures,
-                    sentence.getInputWords(),
-                    0,
-                    sentence.getInputWords().size());*/
             for (final Feature.RootCategoryFeature rootFeature : trainingParameters.getFeatureSet().rootFeatures) {
                 for (CompressedChart.Key root : smallChart.getRoots()) {
                     Category rootCategory = root.category;
-                    System.out.println(rootCategory);
+                    System.out.println("[root category]:\t" + rootCategory);
                     final FeatureKey key = rootFeature.getFeatureKey(rootCategory, sentence.getInputWords());
                     boundedFeatures.add(key);
                     keyCount.add(key);
@@ -363,60 +297,15 @@ public class TrainingFeatureHelper {
         return goldDeps;
     }
 
-    /**
-     * QA stuff ...
-     */
-/*
-    private void getFromDerivation(final CompressedChart.Key key,
-                                   final Multiset<Feature.FeatureKey> binaryFeatureCount,
-                                   final Set<Feature.FeatureKey> boundedFeatures,
-                                   final List<InputReader.InputWord> words, final int startIndex, final int endIndex) {
-        if (key.getChildren().size() == 2) {
-            final SyntaxTreeNode left = key.
-            final SyntaxTreeNode right = node.getChild(1);
-            for (final Combinator.RuleProduction rule :
-                    Combinator.getRules(left.getCategory(), right.getCategory(), Combinator.STANDARD_COMBINATORS)) {
-                if (rule.getCategory().equals(key.category)) {
-                    for (final Feature.BinaryFeature feature : trainingParameters.getFeatureSet().binaryFeatures) {
-                        final Feature.FeatureKey featureKey = feature.getFeatureKey(
-                                node.getCategory(), node.getRuleType(),
-                                left.getCategory(), left.getRuleType().getNormalFormClassForRule(), 0,
-                                right.getCategory(), right.getRuleType().getNormalFormClassForRule(), 0, null);
-                        binaryFeatureCount.add(featureKey);
-                    }
-                }
-            }
-        }
-        if (node.getChildren().size() == 1) {
-            for (final AbstractParser.UnaryRule rule : dataParameters.getUnaryRules().values()) {
-                for (final Feature.UnaryRuleFeature feature : trainingParameters.getFeatureSet().unaryRuleFeatures) {
-                    final Feature.FeatureKey key = feature.getFeatureKey(rule.getID(), words, startIndex, endIndex);
-                    binaryFeatureCount.add(key);
-                }
-            }
-            Util.debugHook();
-        }
-        int start = startIndex;
-        for (final SyntaxTreeNode child : node.getChildren()) {
-            final int end = start + child.getLength();
-            getFromDerivation(child, binaryFeatureCount, boundedFeatures, words, start, end);
-            start = end;
-        }
-    }
-*/
-
     static List<DependencyStructure.ResolvedDependency> getGoldDeps(
             final QASentence sentence,
             final CompressedChart smallChart,
             final List<Set<Category>> allCategories) {
         final List<DependencyStructure.ResolvedDependency> goldDeps = new ArrayList<>();
-        Set<ResolvedDependency> ccgDependencies = smallChart.getAllDependencies();
-        Collection<QADependency> qaDependencies = sentence.getDependencies();
-        for (ResolvedDependency dep : ccgDependencies) {
+        for (ResolvedDependency dep : smallChart.getAllDependencies()) {
             List<QADependency> matchedQA = new ArrayList<>();
-            for (QADependency qa : qaDependencies) {
-                if (qa.getPredicateIndex() == dep.getPredicateIndex() &&
-                        qa.getAnswerPositions().contains(dep.getArgumentIndex())) {
+            for (QADependency qa : sentence.getDependencies()) {
+                if (CCGHelper.undirectDependencyMatch(dep, qa)) {
                     matchedQA.add(qa);
                 }
             }

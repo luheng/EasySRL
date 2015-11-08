@@ -13,7 +13,7 @@ import java.util.Collection;
  * Created by luheng on 11/2/15.
  */
 
-class TrainingDataParameters implements Serializable {
+public class TrainingDataParameters implements Serializable {
     private static final long serialVersionUID = 1L;
     private final int maxChartSize;
     private final double supertaggerBeam;
@@ -71,6 +71,4 @@ class TrainingDataParameters implements Serializable {
     public double getSupertaggerBeamForGoldCharts() {
         return supertaggerBeamForGoldCharts;
     }
-
-
 }

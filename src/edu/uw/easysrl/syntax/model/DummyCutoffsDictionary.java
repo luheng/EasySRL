@@ -3,7 +3,6 @@ package edu.uw.easysrl.syntax.model;
 import edu.uw.easysrl.dependencies.SRLFrame;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.Preposition;
-import edu.uw.easysrl.syntax.model.CutoffsDictionary;
 
 import java.util.*;
 

@@ -17,7 +17,6 @@ import com.google.common.collect.TreeBasedTable;
 
 import edu.uw.easysrl.corpora.CCGBankDependencies.CCGBankDependency;
 import edu.uw.easysrl.corpora.CCGBankDependencies.DependencyParse;
-import edu.uw.easysrl.corpora.CCGBankDependencies.Partition;
 import edu.uw.easysrl.corpora.DependencyTreebank.SyntacticDependencyParse;
 import edu.uw.easysrl.corpora.PennTreebank.TreebankParse;
 import edu.uw.easysrl.dependencies.SRLDependency;

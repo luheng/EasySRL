@@ -79,7 +79,6 @@ public class QASentence implements Serializable {
         return sentenceLength;
     }
 
-
     public List<InputReader.InputWord> getInputWords() {
         if (inputWords == null) {
             inputWords = new ArrayList<>(words.size());

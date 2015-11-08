@@ -6,7 +6,9 @@ import edu.uw.easysrl.main.EasySRL;
 import edu.uw.easysrl.syntax.evaluation.QAEvaluation;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.syntax.model.CutoffsDictionary;
 import edu.uw.easysrl.syntax.model.DummyCutoffsDictionary;
+import edu.uw.easysrl.syntax.model.QACutoffsDictionary;
 import edu.uw.easysrl.syntax.model.feature.*;
 import edu.uw.easysrl.syntax.model.feature.Feature.FeatureKey;
 import edu.uw.easysrl.syntax.parser.SRLParser;
@@ -33,7 +35,7 @@ public class QATraining {
     private final Util.Logger trainingLogger;
     private final TrainingDataParameters dataParameters;
     private final TrainingParameters trainingParameters;
-    private final DummyCutoffsDictionary cutoffsDictionary;
+    private final CutoffsDictionary cutoffsDictionary;
 
     private QATraining(final TrainingDataParameters dataParameters,
                        final TrainingParameters parameters) throws IOException {
@@ -49,7 +51,7 @@ public class QATraining {
     }
 
     private double[] trainLocal() throws IOException {
-        QATrainingDataLoader dataLoader = new QATrainingDataLoader(cutoffsDictionary, dataParameters, true);
+        QATrainingDataLoader dataLoader = new QATrainingDataLoader(cutoffsDictionary, dataParameters, true /* backoff */);
         final Set<Feature.FeatureKey> boundedFeatures = new HashSet<>();
         //final Map<Feature.FeatureKey, Integer> featureToIndex = Util.deserialize(
         //        new File(dataParameters.getExistingModel(), "../featureToIndex"));
@@ -57,7 +59,7 @@ public class QATraining {
         final Map<FeatureKey, Integer> featureToIndex = featureHelper
                 .makeKeyToIndexMap(QACorpusReader.READER.readCorpus(false),
                                    trainingParameters.getMinimumFeatureFrequency(),
-                                   boundedFeatures, dataLoader);
+                                   boundedFeatures);
         System.out.println("Number of features:\t" + featureToIndex.size());
         boolean small = true;
         final List<Optimization.TrainingExample> data =

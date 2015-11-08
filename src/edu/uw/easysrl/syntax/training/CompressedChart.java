@@ -36,7 +36,7 @@ import edu.uw.easysrl.syntax.training.CKY.EquivalenceClassValue;
  * FeatureForest
  *
  */
-class CompressedChart {
+public class CompressedChart {
 	private final List<InputWord> words;
 	private final Collection<Key> roots;
 
@@ -98,7 +98,6 @@ class CompressedChart {
 		public int getStartIndex() {
 			return startIndex;
 		}
-
 	}
 
 	static abstract class Value {
@@ -147,7 +146,6 @@ class CompressedChart {
 		public int getRuleID() {
 			throw new UnsupportedOperationException();
 		}
-
 	}
 
 	static class CategoryValue extends Value {
@@ -194,7 +192,6 @@ class CompressedChart {
 		public List<Key> getChildren() {
 			return Collections.emptyList();
 		}
-
 	}
 
 	static class TreeValueBinary extends TreeValue {
@@ -274,7 +271,6 @@ class CompressedChart {
 			return ruleID == other.ruleID && child.equals(other.child)
 					&& super.equals(other);
 		}
-
 	}
 
 	static abstract class TreeValue extends Value {

@@ -33,11 +33,11 @@ import edu.uw.easysrl.util.Util;
  * Keeps track of various thresholds used for pruning.
  */
 public class CutoffsDictionary implements Serializable {
-	private static final long serialVersionUID = -5507993310910756162L;
-	private final int minSlotRole = 2;
-	private final int minRoleDistance = 2;
-	private final int minSlotSRL = 2;
-	private final int maxDependencyLength;
+	protected static final long serialVersionUID = -5507993310910756162L;
+	protected final int minSlotRole = 2;
+	protected final int minRoleDistance = 2;
+	protected final int minSlotSRL = 2;
+	protected final int maxDependencyLength;
 
 	protected final Table<Category, Integer, Multiset<SRLLabel>> categoryToArgumentToSRLs = HashBasedTable.create();
 	protected final Map<String, Collection<Category>> wordToCategory;
@@ -110,9 +110,7 @@ public class CutoffsDictionary implements Serializable {
 						}
 						roles.add(dep.getKey().getLabel());
 					}
-
 				}
-
 			}
 		}
 		for (final Entry<String, Multiset<SRLLabel>> entry : keyToRole.entrySet()) {
@@ -120,14 +118,14 @@ public class CutoffsDictionary implements Serializable {
 		}
 	}
 
-	private static String makeKey(final String word, final Category category, final Preposition preposition,
+	protected static String makeKey(final String word, final Category category, final Preposition preposition,
 			final int argumentNumber) {
 		final String lemma = MorphaStemmer.stemToken(word).toLowerCase();
 		final String key = lemma + ArgumentSlotFeature.makeKey(preposition, argumentNumber, category);
 		return key;
 	}
 
-	private final Map<String, Set<SRLLabel>> keyToRole = new HashMap<>();
+	protected final Map<String, Set<SRLLabel>> keyToRole = new HashMap<>();
 
 	public Collection<SRLLabel> getRoles(final String word, final Category category, final Preposition preposition,
 			final int argumentNumber) {
