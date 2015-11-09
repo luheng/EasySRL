@@ -9,8 +9,9 @@ import java.util.List;
 /**
  * Created by luheng on 10/29/15.
  */
-public class AnswerAligner {
-
+@SuppressWarnings("unused")
+public class LongestSubsequenceAnswerAligner implements AbstractAnswerAligner {
+    @Override
     public List<Integer> align(List<String[]> answers, List<String> words) {
         int sentenceLength = words.size();
         int[] aligned = new int[sentenceLength];

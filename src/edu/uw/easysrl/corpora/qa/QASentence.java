@@ -5,7 +5,6 @@ import com.google.common.collect.Multimap;
 import edu.uw.easysrl.dependencies.QADependency;
 import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.main.InputReader.InputWord;
-import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 
 import java.io.Serializable;
 import java.util.*;
@@ -13,20 +12,16 @@ import java.util.*;
 /**
  * Created by luheng on 10/29/15.
  */
-
 public class QASentence implements Serializable {
     private static final long serialVersionUID = 1L;
     private final Collection<QADependency> dependencies = new ArrayList<>();
     private final int sentenceLength;
     private final List<String> words;
     public String sentenceId;
-
     private List<InputWord> inputWords;
-
     private final Map<Integer, String> indexToFrame = new HashMap<>();
     private final Multimap<Integer, QADependency> indexToDep = HashMultimap.create();
-
-    private static final AnswerAligner defaultAligner = new AnswerAligner();
+    private static final AbstractAnswerAligner defaultAligner = new GreedyAnswerAligner();
 
     public QASentence(final String[] words) {
         this.words = new ArrayList<>();

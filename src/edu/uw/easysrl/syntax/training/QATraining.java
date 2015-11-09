@@ -8,7 +8,6 @@ import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.model.CutoffsDictionary;
 import edu.uw.easysrl.syntax.model.DummyCutoffsDictionary;
-import edu.uw.easysrl.syntax.model.QACutoffsDictionary;
 import edu.uw.easysrl.syntax.model.feature.*;
 import edu.uw.easysrl.syntax.model.feature.Feature.FeatureKey;
 import edu.uw.easysrl.syntax.parser.SRLParser;
