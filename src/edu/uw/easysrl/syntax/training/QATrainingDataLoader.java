@@ -10,11 +10,9 @@ import edu.uw.easysrl.syntax.model.CutoffsDictionary;
 import edu.uw.easysrl.syntax.parser.AbstractParser;
 import edu.uw.easysrl.syntax.parser.AbstractParser.UnaryRule;
 import edu.uw.easysrl.syntax.tagger.POSTagger;
+import edu.uw.easysrl.syntax.tagger.Tagger.ScoredCategory;
 import edu.uw.easysrl.syntax.tagger.Tagger;
-import edu.uw.easysrl.syntax.tagger.TaggerEmbeddings;
-import edu.uw.easysrl.syntax.tagger.TaggerEmbeddings.ScoredCategory;
 import edu.uw.easysrl.syntax.training.CKY.ChartCell;
-
 
 import java.io.IOException;
 import java.io.File;
@@ -52,7 +50,7 @@ public class QATrainingDataLoader {
                     dataParameters.getExistingModel(),
                     dataParameters.getMaxTrainingSentenceLength(),
                     dataParameters.getMaxChartSize());
-            this.tagger = new TaggerEmbeddings(
+            this.tagger = Tagger.make(
                     dataParameters.getExistingModel(),
                     dataParameters.getSupertaggerBeam(),
                     50,

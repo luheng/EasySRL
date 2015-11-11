@@ -98,17 +98,18 @@ public class QATraining {
         return weights;
     }
 
-    private void evaluate(final double testingSupertaggerBeam) throws IOException {
-        // FIXME: can we increase this??
+    private void evaluate(final double testingSupertaggerBeam, final Optional<Double> supertaggerWeight)
+            throws IOException{
         final int maxSentenceLength = 70;
         final POSTagger posTagger = POSTagger.getStanfordTagger(new File(dataParameters.getExistingModel(), "posTagger"));
-        final SRLParser parser = new SRLParser.JointSRLParser(
-                EasySRL.makeParser(trainingParameters.getModelFolder().getAbsolutePath(),
-                                   testingSupertaggerBeam, EasySRL.ParsingAlgorithm.ASTAR, 20000, true), posTagger);
+        final SRLParser parser = new SRLParser.JointSRLParser(EasySRL.makeParser(trainingParameters.getModelFolder()
+                .getAbsolutePath(), testingSupertaggerBeam, EasySRL.ParsingAlgorithm.ASTAR, 20000, true,
+                supertaggerWeight, 1), posTagger);
         final SRLParser backoff = new SRLParser.BackoffSRLParser(parser, new SRLParser.PipelineSRLParser(
-                EasySRL.makeParser(dataParameters.getExistingModel().getAbsolutePath(),
-                                   0.0001, EasySRL.ParsingAlgorithm.ASTAR, 100000, false),
+                EasySRL.makeParser(dataParameters.getExistingModel().getAbsolutePath(), 0.0001,
+                        EasySRL.ParsingAlgorithm.ASTAR, 100000, false, Optional.empty(), 1),
                 Util.deserialize(new File(dataParameters.getExistingModel(), "labelClassifier")), posTagger));
+
         final Results results = QAEvaluation.evaluate(
                 backoff, QACorpusReader.READER.getDepCorpus(), maxSentenceLength, true /* verbose */);
         System.out.println("Final result: F1=" + results.getF1());
@@ -174,7 +175,14 @@ public class QATraining {
                                             .add("cost_function_weight", costFunctionWeight)
                                             .add("beta_for_positive_charts", goldBeam)
                                             .add("beta_for_training_charts", beta).toString());
-                                    training.evaluate(beam);
+
+                                    for (final Double supertaggerWeight : Arrays.asList(null, 0.5, 0.6, 0.7, 0.8, 0.9,
+                                            1.0)) {
+                                        training.evaluate(
+                                                beam,
+                                                supertaggerWeight == null ? Optional.empty() : Optional
+                                                        .of(supertaggerWeight));
+                                    }
                                 }
                             }
                         }

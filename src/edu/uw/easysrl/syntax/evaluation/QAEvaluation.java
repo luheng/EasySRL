@@ -10,6 +10,7 @@ import edu.uw.easysrl.main.InputReader.InputWord;
 import edu.uw.easysrl.main.ParsePrinter;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.syntax.parser.SRLParser;
+import edu.uw.easysrl.syntax.parser.SRLParser.CCGandSRLparse;
 import edu.uw.easysrl.util.Util;
 
 import java.io.FileNotFoundException;
@@ -39,26 +40,21 @@ public class QAEvaluation {
         int numErrors = 0;
         for (final QASentence sentence : sentences) {
             id++;
-            SRLParser.CCGandSRLparse parse;
             List<InputWord> words = InputWord.listOf(sentence.getWords());
             System.err.println(StringUtils.join(words, " "));
-            try {
-                parse = parser.parseTokens(words);
-            } catch (RuntimeException e) {
-                e.printStackTrace();
-                numErrors ++;
-                continue;
-            }
-            autoOutput.add(ParsePrinter.CCGBANK_PRINTER.print(parse != null ? parse.getCcgParse() : null, id));
-            if (parse == null) {
+            final List<CCGandSRLparse> parses = parser.parseTokens(words);
+            if (parses == null || parses.size() == 0) {
                 if (words.size() < maxSentenceLength) {
                     failedToParse.add(sentence.getWords());
                 }
                 results.add(new Results(0, 0, sentence.getDependencies().size()));
                 continue;
+            } else {
+                final CCGandSRLparse parse = parses.get(0);
+                autoOutput.add(ParsePrinter.CCGBANK_PRINTER.print(parse != null ? parse.getCcgParse() : null, id));
+                parsed.getAndIncrement();
+                results.add(evaluate(sentence, parse, verbose));
             }
-            parsed.getAndIncrement();
-            results.add(evaluate(sentence, parse, verbose));
         }
         if (!oneThread) {
             Util.runJobsInParallel(jobs, Runtime.getRuntime().availableProcessors());

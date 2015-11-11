@@ -533,8 +533,7 @@ public class Training {
 				.getExistingModel().getAbsolutePath(), 0.0001, ParsingAlgorithm.ASTAR, 100000, false, Optional.empty(),
 				1), Util.deserialize(new File(dataParameters.getExistingModel(), "labelClassifier")), posTagger));
 
-		final Results results = SRLEvaluation
-				.evaluate(backoff, ParallelCorpusReader.getPropBank00(), maxSentenceLength, true);
+		final Results results = SRLEvaluation.evaluate(backoff, ParallelCorpusReader.getPropBank00(), maxSentenceLength);
 
 		System.out.println("Final result: F1=" + results.getF1());
 	}
