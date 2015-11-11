@@ -29,8 +29,7 @@ public class SeenRules {
 		makeFromCorpus(ParallelCorpusReader.READER);
 	}
 
-	private static void makeFromCorpus(final ParallelCorpusReader corpus)
-			throws IOException {
+	private static void makeFromCorpus(final ParallelCorpusReader corpus) throws IOException {
 		final Iterator<Sentence> sentences = corpus.readCorpus(false);
 		final Multiset<String> result = HashMultiset.create();
 		while (sentences.hasNext()) {
@@ -42,8 +41,7 @@ public class SeenRules {
 		}
 	}
 
-	private static void getRulesFromParse(final SyntaxTreeNode parse,
-			final Multiset<String> result) {
+	private static void getRulesFromParse(final SyntaxTreeNode parse, final Multiset<String> result) {
 		if (parse.getChildren().size() == 2) {
 			result.add(parse.getChild(0).getCategory().toString() + " " + parse.getChild(1).getCategory().toString());
 		}
@@ -74,13 +72,11 @@ public class SeenRules {
 		}
 		left = simplify(left);
 		right = simplify(right);
-		return left.getID() < numberOfSeenCategories
-				&& right.getID() < numberOfSeenCategories
+		return left.getID() < numberOfSeenCategories && right.getID() < numberOfSeenCategories
 				&& seen[left.getID()][right.getID()];
 	}
 
-	public SeenRules(final File file,
-			final Collection<Category> lexicalCategories) throws IOException {
+	public SeenRules(final File file, final Collection<Category> lexicalCategories) throws IOException {
 		if (file == null) {
 			seen = null;
 			numberOfSeenCategories = 0;
@@ -90,7 +86,11 @@ public class SeenRules {
 			numberOfSeenCategories = 0;
 		} else {
 			final Table<Category, Category, Boolean> tab = HashBasedTable.create();
+
 			int maxID = 0;
+			// Hack way of dealing with conjunctions of declarative and embedded sentences:
+			// "He said he'll win and that she'll lose"
+			maxID = addToTable(tab, maxID, Category.Sdcl, Category.valueOf("S[em]\\S[em]"));
 			for (final String line : Util.readFile(file)) {
 				// Assumes the file has the format:
 				// cat1 cat2
@@ -132,7 +132,7 @@ public class SeenRules {
 	}
 
 	private int addToTable(final Table<Category, Category, Boolean> tab, int maxID, final Category left,
-						   final Category right) {
+			final Category right) {
 		maxID = Math.max(left.getID(), maxID);
 		maxID = Math.max(right.getID(), maxID);
 		tab.put(left, right, true);

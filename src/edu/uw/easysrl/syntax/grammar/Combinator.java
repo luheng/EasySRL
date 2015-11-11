@@ -14,12 +14,15 @@ import edu.uw.easysrl.dependencies.DependencyStructure;
 import edu.uw.easysrl.dependencies.DependencyStructure.UnlabelledDependency;
 import edu.uw.easysrl.semantics.AtomicSentence;
 import edu.uw.easysrl.semantics.ConnectiveSentence;
+import edu.uw.easysrl.semantics.ConnectiveSentence.Connective;
+import edu.uw.easysrl.semantics.Function;
 import edu.uw.easysrl.semantics.LambdaExpression;
 import edu.uw.easysrl.semantics.Logic;
+import edu.uw.easysrl.semantics.LogicParser;
+import edu.uw.easysrl.semantics.SemanticType;
 import edu.uw.easysrl.semantics.Sentence;
 import edu.uw.easysrl.semantics.Set;
 import edu.uw.easysrl.semantics.Variable;
-import edu.uw.easysrl.semantics.ConnectiveSentence.Connective;
 import edu.uw.easysrl.syntax.grammar.Category.Slash;
 import edu.uw.easysrl.util.Util;
 
@@ -42,7 +45,9 @@ public abstract class Combinator {
 	}
 
 	public enum RuleClass {
-		FC, BX, GFC, GBX, FORWARD_TYPERAISE, BACKWARD_TYPE_RAISE, CONJ, LEXICON, OTHER, LP, RP
+		FC, BX, GFC, GBX, FORWARD_TYPERAISE, BACKWARD_TYPE_RAISE, CONJ, LEXICON, OTHER, LP, RP,
+		// Forward and backward modifiers, e.g. N/N N --> N
+		F_MOD, B_MOD
 	}
 
 	// TODO Can we get rid of RuleType altogether?
@@ -167,8 +172,11 @@ public abstract class Combinator {
 				Category.valueOf("S[adj]\\NP") // PV, 59 years old,
 				, Category.valueOf("S[to]\\NP")));
 		private final Category result = Category.valueOf("NP\\NP");
+		private final Logic semantics = LogicParser.fromString("#p#y . sk(#x . eq(x, y) & \\exists e[p(x, e)])",
+				Category.valueOf("(NP\\NP)/(S\\NP)"));
+
 		private final DependencyStructure dependencyStructure = DependencyStructure.makeUnaryRuleTransformation(
-				"S\\NP_1", "NP_1\\NP_1");
+				"(S_2\\NP_1)_2", "(NP_1\\NP_1)_2");
 
 		private CommaAndVPtoNPmodifier() {
 			super(RuleType.NOISE);
@@ -197,7 +205,7 @@ public abstract class Combinator {
 
 		@Override
 		public Logic apply(final Logic left, final Logic right) {
-			throw new RuntimeException("TODO");
+			return semantics.alphaReduce().apply(right);
 		}
 	}
 
@@ -255,8 +263,19 @@ public abstract class Combinator {
 				// NP conjunctions
 				final Variable x = new Variable(right.getType());
 				return LambdaExpression.make(new Set(x, right), x);
-			} else {
-				// Other conjunctions
+			} else if (right.getType().isFunctionInto(SemanticType.E)) {
+				// Other sets
+				final Variable f = new Variable(right.getType());
+				final List<Variable> vars = new ArrayList<>();
+				vars.add(f);
+				vars.addAll(right.getArguments());
+				return LambdaExpression.make(
+						new Set(Function.make(f, right.getArguments()), ((LambdaExpression) right).getStatement()),
+						vars);
+			}
+
+			else {
+				// Boolean conjunctions
 				// conj + S\NP
 				// conj + #x#e.foo(x,e) --> #p#x#e . foo(x,e) & p(x,e)
 				final Variable p = new Variable(right.getType());
@@ -401,9 +420,17 @@ public abstract class Combinator {
 			super(RuleType.BA);
 		}
 
+		private final Category SemConj = Category.valueOf("S[em]\\S[em]");
+
 		@Override
 		public boolean canApply(final Category left, final Category right) {
-			return right.isFunctor() && right.getSlash() == Slash.BWD && right.getRight().matches(left);
+			if (right == SemConj && left == Category.Sdcl) {
+				// Hack special case for when we have: "X said he'll win and that she'll lose". Training data has the
+				// first conjunct as S[dcl] and the second as S[em]
+				return true;
+			}
+
+			return right.isFunctor() && right.getSlash() == Slash.BWD && (right.getRight().matches(left));
 		}
 
 		@Override
@@ -615,9 +642,11 @@ public abstract class Combinator {
 
 		private final Category ngVP = Category.valueOf("S[ng]\\NP");
 		private final Category pssVP = Category.valueOf("S[pss]\\NP");
+		private final Logic semantics = LogicParser.fromString("#p#q#x#e . q(x,e) & p(x,e)",
+				Category.make(Category.ADVERB, Slash.FWD, ngVP));
 
-		// private final Category adjVP = Category.valueOf("S[adj]\\NP");
-		// private final Category toVP = Category.valueOf("S[to]\\NP");
+		private final DependencyStructure dependencyStructure = DependencyStructure.makeUnaryRuleTransformation(
+				"(S_2\\NP_1)_2", "((S_3\\NP_1)_3\\(S_3\\NP_1)_3)_2");
 
 		@Override
 		public boolean canApply(final Category left, final Category right) {
@@ -639,12 +668,12 @@ public abstract class Combinator {
 		@Override
 		public DependencyStructure apply(final DependencyStructure left, final DependencyStructure right,
 				final List<UnlabelledDependency> resolvedDependencies) {
-			return right.conjunction();
+			return dependencyStructure.apply(right, resolvedDependencies);
 		}
 
 		@Override
 		public Logic apply(final Logic left, final Logic right) {
-			throw new RuntimeException("TODO");
+			return semantics.alphaReduce().apply(right);
 		}
 	}
 

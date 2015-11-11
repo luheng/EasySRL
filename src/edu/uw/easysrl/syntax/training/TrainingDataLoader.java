@@ -22,8 +22,7 @@ import edu.uw.easysrl.syntax.parser.AbstractParser;
 import edu.uw.easysrl.syntax.parser.AbstractParser.UnaryRule;
 import edu.uw.easysrl.syntax.tagger.POSTagger;
 import edu.uw.easysrl.syntax.tagger.Tagger;
-import edu.uw.easysrl.syntax.tagger.TaggerEmbeddings;
-import edu.uw.easysrl.syntax.tagger.TaggerEmbeddings.ScoredCategory;
+import edu.uw.easysrl.syntax.tagger.Tagger.ScoredCategory;
 import edu.uw.easysrl.syntax.training.CKY.ChartCell;
 import edu.uw.easysrl.syntax.training.Optimization.TrainingExample;
 

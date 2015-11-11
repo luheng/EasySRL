@@ -3,7 +3,6 @@ package edu.uw.easysrl.syntax.model;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
@@ -27,7 +26,6 @@ import edu.uw.easysrl.syntax.model.feature.FeatureCache;
 import edu.uw.easysrl.syntax.model.feature.FeatureCache.SlotFeatureCache;
 import edu.uw.easysrl.syntax.model.feature.FeatureSet;
 import edu.uw.easysrl.syntax.parser.AbstractParser.UnaryRule;
-import edu.uw.easysrl.util.Util;
 import edu.uw.easysrl.util.Util.Scored;
 
 public class SRLFactoredModel extends Model {
@@ -153,7 +151,6 @@ public class SRLFactoredModel extends Model {
 			for (final RootCategoryFeature feature : rootFeatures) {
 				rootScore += feature.getFeatureScore(sentence, node.getCategory(), featureToScore);
 			}
-			Util.debugHook();
 		}
 
 		final double newInsideScore = leftChild.getInsideScore() + rightChild.getInsideScore() + binaryRuleScore
@@ -161,11 +158,13 @@ public class SRLFactoredModel extends Model {
 
 		final AgendaItem result = new AgendaItem(node, newInsideScore, leftChild.outsideScoreUpperbound
 				+ rightChild.outsideScoreUpperbound - globalUpperBound, leftChild.getStartOfSpan(), length, true);
-		final AgendaItem withLabelledDependencieds = labelDependencies(result, node);
 
-		return withLabelledDependencieds;
+		return labelDependencies(result, node);
 	}
 
+	/**
+	 * Creates a new AgendaItem by labelling the dependencies in the old one
+	 */
 	private AgendaItem labelDependencies(AgendaItem result, final SyntaxTreeNode node) {
 
 		final List<UnlabelledDependency> resolvedUnlabelledDependencies = node.getResolvedUnlabelledDependencies();
@@ -173,11 +172,10 @@ public class SRLFactoredModel extends Model {
 		for (final UnlabelledDependency dep : resolvedUnlabelledDependencies) {
 
 			final ExtendedLexicalEntry forest = forests.get(dep.getPredicateIndex());
-			final Scored<SRLLabel> scoredLabel = forest.getBestLabel(dep);
+			final Scored<SRLLabel> scoredLabel = forest.getBestLabels(dep);
 
 			final double newInsideScore = result.getInsideScore() + scoredLabel.getScore();
 
-			// System.out.println(dep.setLabel(scoredLabel.getObject()));
 			final SyntaxTreeNode labelling = new SyntaxTreeNodeLabelling(result.getParse(), dep.setLabel(scoredLabel
 					.getObject()), resolvedUnlabelledDependencies.subList(i + 1, resolvedUnlabelledDependencies.size()));
 
@@ -216,14 +214,13 @@ public class SRLFactoredModel extends Model {
 		return agendaItem;
 	}
 
+	// Worst class name EVER.
 	public static class SRLFactoredModelFactory extends ModelFactory {
 		private final CutoffsDictionary cutoffsDictionary;
-		private final Map<String, Forest> frequentWordToForestMap = new HashMap<>();
 		private final FeatureSet featureSet;
 		private final Collection<Category> lexicalCategories;
 		private final boolean usingDependencyFeatures;
 		private final boolean usingSlotFeatures;
-		// private final double[] unaryRuleScores;
 		private final double supertaggerBeam;
 		private final SlotFeatureCache slotFeatureCache;
 		private final double supertaggingFeatureScore;
@@ -255,20 +252,14 @@ public class SRLFactoredModel extends Model {
 
 		@Override
 		public Model make(final List<InputWord> sentence) {
-			final FeatureCache featureCache = new FeatureCache(sentence, featureToScore, featureSet, cutoffsDictionary,
-					supertaggingFeatureScore, lexicalCategories, slotFeatureCache);
+			final FeatureCache featureCache = new FeatureCache(sentence, featureToScore, featureSet,
+					supertaggingFeatureScore, slotFeatureCache);
 
 			final List<ExtendedLexicalEntry> forests = new ArrayList<>(sentence.size());
 			int wordIndex = 0;
 			for (final InputWord word : sentence) {
-				Forest forest;
-
-				forest = frequentWordToForestMap.get(word.word);
-				if (forest == null) {
-					forest = ExtendedLexicalEntry.makeUnlexicalizedForest(word.word, lexicalCategories, 50,
-							cutoffsDictionary, usingSlotFeatures, usingDependencyFeatures);
-					frequentWordToForestMap.put(word.word, forest);
-				}
+				final Forest forest = ExtendedLexicalEntry.makeUnlexicalizedForest(word.word, lexicalCategories, 50,
+						cutoffsDictionary, usingSlotFeatures, usingDependencyFeatures);
 
 				forests.add(new ExtendedLexicalEntry(featureSet, wordIndex, sentence, forest, featureToScore,
 						featureCache));

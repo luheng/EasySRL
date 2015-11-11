@@ -85,7 +85,7 @@ public class ParserCKY extends AbstractParser {
 
 		final List<Scored<SyntaxTreeNode>> result = parses.stream()
 				.filter(a -> super.possibleRootCategories.contains(a.getParse().getCategory()))
-						.map(a -> new Scored<>(a.getParse(), a.getInsideScore())).collect(Collectors.toList());
+				.map(a -> new Scored<>(a.getParse(), a.getInsideScore())).collect(Collectors.toList());
 		return result.size() == 0 ? null : result;
 	}
 
@@ -130,7 +130,7 @@ public class ParserCKY extends AbstractParser {
 					final RuleClass rightRuleClass = r.getParse().getRuleType().getNormalFormClassForRule();
 
 					if (!NormalForm.isOk(leftRuleClass, rightRuleClass, ruleType, l.getParse().getCategory(), r
-							.getParse().getCategory())) {
+							.getParse().getCategory(), rule.getCategory(), l.getStartOfSpan() == 0)) {
 						continue;
 					}
 
