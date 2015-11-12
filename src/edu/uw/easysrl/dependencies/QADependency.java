@@ -1,7 +1,9 @@
 package edu.uw.easysrl.dependencies;
 
 
+import edu.stanford.nlp.util.StringUtils;
 import edu.uw.easysrl.corpora.qa.QASlots;
+import edu.uw.easysrl.corpora.qa.QuestionEncoder;
 import edu.uw.easysrl.dependencies.SRLFrame.SRLLabel;
 
 import com.google.common.collect.ImmutableSortedSet;
@@ -50,7 +52,10 @@ public class QADependency implements Serializable {
 
     // TODO: use more fine-grained heuristic labels
     private static SRLLabel makeLabel(String[] question) {
-        boolean isCore = question[0].equalsIgnoreCase("who") || question[0].equalsIgnoreCase("what");
+        String label = QuestionEncoder.getLabels(question)[0];
+        // System.out.println(StringUtils.join(question, " ") + "\n" + StringUtils.join(labels, " ") + "\n");
+        // boolean isCore = question[0].equalsIgnoreCase("who") || question[0].equalsIgnoreCase("what");
+        boolean isCore = label.startsWith("W0") || label.startsWith("W1") || label.startsWith("W2");
         return SRLLabel.make(question[0].toUpperCase(), isCore);
     }
 

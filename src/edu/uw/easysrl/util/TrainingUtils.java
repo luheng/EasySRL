@@ -13,8 +13,6 @@ import java.util.stream.Collectors;
  * Created by luheng on 10/28/15.
  */
 public class TrainingUtils {
-
-
     public static List<String> parseStrings(final Properties settings, final String field) {
         return Arrays.asList(settings.getProperty(field).split(";"));
     }
@@ -26,7 +24,4 @@ public class TrainingUtils {
     public static List<Double> parseDoubles(final Properties settings, final String field) {
         return parseStrings(settings, field).stream().map(x -> Double.valueOf(x)).collect(Collectors.toList());
     }
-
-
-
 }
