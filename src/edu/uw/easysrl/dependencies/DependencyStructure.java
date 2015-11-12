@@ -452,6 +452,7 @@ public class DependencyStructure implements Serializable {
 	}
 
 	public int getArbitraryHead() {
+		// FIXME: null pointer exception
 		return coindexation.idOrHead.head.get(0);
 	}
 

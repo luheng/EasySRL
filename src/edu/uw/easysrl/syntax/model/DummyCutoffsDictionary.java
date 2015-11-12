@@ -36,13 +36,14 @@ public class DummyCutoffsDictionary extends CutoffsDictionary {
     @Override
     public boolean isFrequentWithAnySRLLabel(final Category category, final int argumentNumber) {
         // If this is a verb ...
-        return category.isFunctionInto(Category.valueOf("S\\NP"));
+        return category.isFunctionInto(Category.valueOf("S|NP")) || category.isFunctionInto(Category.valueOf("S|S"));
     }
 
     @Override
     public boolean isFrequent(final Category category, final int argumentNumber, final SRLFrame.SRLLabel label) {
         // If this is a verb ...
-        return category.isFunctionInto(Category.valueOf("S\\NP"));
+        //return category.isFunctionInto(Category.valueOf("S\\NP"));
+        return category.isFunctionInto(Category.valueOf("S|NP")) || category.isFunctionInto(Category.valueOf("S|S"));
     }
 
     @Override

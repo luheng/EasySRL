@@ -281,14 +281,16 @@ class FeatureForest {
 
 		private double getPretrainedValue(final List<InputWord> words, final FeatureSet featureSet) {
 			if (cachedValue == null) {
-
 				List<Map<Category, Double>> tags = cache.get(words);
 				if (tags == null) {
 					tags = featureSet.lexicalCategoryFeatures.getCategoryScores(words, 1.0);
-					cache.put(words, tags);
 				}
-
 				cachedValue = tags.get(index).get(category);
+			}
+			// FIXME: null cached value
+			if (cachedValue == null) {
+				System.err.println("null cached value!!!");
+				return Double.NEGATIVE_INFINITY;
 			}
 			return cachedValue;
 		}
@@ -299,7 +301,6 @@ class FeatureForest {
 
 			final int featureIndex = featureToIndexMap.get(featureSet.lexicalCategoryFeatures.getDefault());
 			result[featureIndex] += nodeScore * getPretrainedValue(words, featureSet);
-
 		}
 
 		@Override
@@ -308,7 +309,6 @@ class FeatureForest {
 			double result = 0.0;
 			final int featureIndex = featureToIndexMap.get(featureSet.lexicalCategoryFeatures.getDefault());
 			result += getPretrainedValue(words, featureSet) * featureWeights[featureIndex];
-
 			return result;
 		}
 
