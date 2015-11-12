@@ -28,14 +28,6 @@ public class QADependency implements Serializable {
     private final Set<Integer> firstConstituent;
     private final SRLLabel label;
 
-    public final static SRLLabel WHO = SRLLabel.make("WHO", true);
-    public final static SRLLabel WHAT = SRLLabel.make("WHAT", true);
-    public final static SRLLabel WHERE = SRLLabel.make("WHERE", false);
-    public final static SRLLabel WHEN = SRLLabel.make("WHEN", false);
-    public final static SRLLabel HOW = SRLLabel.make("HOW", false);
-    public final static SRLLabel HOWMUCH = SRLLabel.make("HOW MUCH", false);
-    public final static SRLLabel WHY = SRLLabel.make("WHY", false);
-
     public QADependency(final String predicate, final int predicateIndex,
                         final String[] question, final List<Integer> answerIndices) {
         super();
@@ -53,10 +45,11 @@ public class QADependency implements Serializable {
         this.firstConstituent = ImmutableSortedSet.copyOf(firstConstituent);
         String pp = question[QASlots.PPSlotId];
         this.preposition = pp.equals("_") ? null : pp;
-        this.label = makeSRLLabel(question);
+        this.label = makeLabel(question);
     }
 
-    private static SRLLabel makeSRLLabel(String[] question) {
+    // TODO: use more fine-grained heuristic labels
+    private static SRLLabel makeLabel(String[] question) {
         boolean isCore = question[0].equalsIgnoreCase("who") || question[0].equalsIgnoreCase("what");
         return SRLLabel.make(question[0].toUpperCase(), isCore);
     }

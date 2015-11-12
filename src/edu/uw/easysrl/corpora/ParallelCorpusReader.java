@@ -17,6 +17,7 @@ import com.google.common.collect.TreeBasedTable;
 
 import edu.uw.easysrl.corpora.CCGBankDependencies.CCGBankDependency;
 import edu.uw.easysrl.corpora.CCGBankDependencies.DependencyParse;
+import edu.uw.easysrl.corpora.CCGBankDependencies.Partition;
 import edu.uw.easysrl.corpora.DependencyTreebank.SyntacticDependencyParse;
 import edu.uw.easysrl.corpora.PennTreebank.TreebankParse;
 import edu.uw.easysrl.dependencies.SRLDependency;
@@ -25,6 +26,7 @@ import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeLeaf;
 import edu.uw.easysrl.util.Util;
+
 
 public class ParallelCorpusReader {
 	private final static boolean USING_NOMBANK = false;
@@ -180,9 +182,7 @@ public class ParallelCorpusReader {
 	private Table<String, Integer, SRLParse> srlParses;
 
 	public Iterator<Sentence> readCorpus(final boolean isDev) throws IOException {
-		System.err.println("I am reading the Propbank, which I shouldnt ...");
-		return null;
-		/*
+		System.err.println("I am reading the Propbank.");
 		synchronized (this) {
 			if (PTB == null) {
 				PTB = new PennTreebank().readCorpus(treebank);
@@ -262,7 +262,6 @@ public class ParallelCorpusReader {
 				return words;
 			}
 		};
-		*/
 	}
 
 	private static CCGBankDependency getCorrespondingCCGBankDependency(

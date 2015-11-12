@@ -287,11 +287,6 @@ class FeatureForest {
 				}
 				cachedValue = tags.get(index).get(category);
 			}
-			// FIXME: null cached value
-			if (cachedValue == null) {
-				System.err.println("null cached value!!!");
-				return Double.NEGATIVE_INFINITY;
-			}
 			return cachedValue;
 		}
 

@@ -37,7 +37,7 @@ public class CCGHelper {
                     dataParameters.getExistingModel(),
                     dataParameters.getMaxTrainingSentenceLength(),
                     dataParameters.getMaxChartSize());
-            this.tagger = new TaggerEmbeddings(
+            this.tagger = Tagger.make(
                     dataParameters.getExistingModel(),
                     dataParameters.getSupertaggerBeam(),
                     50,
