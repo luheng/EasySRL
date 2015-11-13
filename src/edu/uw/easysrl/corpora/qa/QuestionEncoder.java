@@ -24,9 +24,10 @@ public class QuestionEncoder {
         return label + "=" + qval;
     }
 
+    // W0, W1, W2, WHEN, WHERE, WHY, HOW, HOWMUCH
     public static String getHeuristicSrlLabel(String[] question) {
         String label = getLabels(question)[0];
-        return label.split("=")[0];
+        return label.split("=")[0].split("_")[0];
     }
 
     public static String[] getLabels(String[] question) {

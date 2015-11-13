@@ -75,6 +75,7 @@ public class QAEvaluation {
         return results;
     }
 
+    // Doing labeled but undirected match.
     private static Results evaluate(QASentence gold,
                                     final SRLParser.CCGandSRLparse parse,
                                     boolean verbose) {
