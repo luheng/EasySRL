@@ -43,7 +43,8 @@ public class QASentence implements Serializable {
 
     public void addDependencyFromLine(int predIdx, String line) {
         String[] info = line.split("\\?");
-        String[] question = info[0].split("\\s+");
+        String[] question = info[0].split("\\t");
+        assert (question.length == QASlots.numSlots);
         List<String[]> answers = new ArrayList<>();
         for (String answerStr : info[1].split("###")) {
             answers.add(answerStr.trim().split("\\s+"));

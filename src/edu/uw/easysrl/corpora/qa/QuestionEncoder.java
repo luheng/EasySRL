@@ -24,15 +24,20 @@ public class QuestionEncoder {
         return label + "=" + qval;
     }
 
+    public static String getHeuristicSrlLabel(String[] question) {
+        String label = getLabels(question)[0];
+        return label.split("=")[0];
+    }
+
     public static String[] getLabels(String[] question) {
         assert (question.length == 7);
-        String wh  = question[0],
-               aux = question[1],
-               ph1 = question[2],
-               trg = question[3],
-               ph2 = question[4],
-               pp  = question[5],
-               ph3 = question[6];
+        String wh  = question[QASlots.WHSlotId],
+               aux = question[QASlots.AUXSlotId],
+               ph1 = question[QASlots.PH1SlotId],
+               trg = question[QASlots.TRGSlotId],
+               ph2 = question[QASlots.PH2SlotId],
+               pp  = question[QASlots.PPSlotId],
+               ph3 = question[QASlots.PH3SlotId];
         boolean nullPh1 = isEmpty(ph1),
                 nullPh2 = isEmpty(ph2),
                 nullPh3 = isEmpty(ph3),
