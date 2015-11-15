@@ -1,7 +1,5 @@
 package edu.uw.easysrl.dependencies;
 
-
-import edu.stanford.nlp.util.StringUtils;
 import edu.uw.easysrl.corpora.qa.QASlots;
 import edu.uw.easysrl.corpora.qa.QuestionEncoder;
 import edu.uw.easysrl.dependencies.SRLFrame.SRLLabel;
@@ -9,10 +7,7 @@ import edu.uw.easysrl.dependencies.SRLFrame.SRLLabel;
 import com.google.common.collect.ImmutableSortedSet;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Created by luheng on 10/5/15.
@@ -27,7 +22,9 @@ public class QADependency implements Serializable {
     private final Integer firstAnswerPosition;
     private final Integer lastAnswerPosition;
     private final Set<Integer> answerIndices;
-    private final Set<Integer> firstConstituent;
+    private final List<List<Integer>> constituents;
+    private final int closestConstituent;
+    //private final List<Set<Integer> firstConstituent;
     private final SRLLabel label;
 
     public QADependency(final String predicate, final int predicateIndex,
@@ -40,11 +37,20 @@ public class QADependency implements Serializable {
         firstAnswerPosition = answerIndices.size() == 0 ? null : answerIndices.get(0);
         lastAnswerPosition = answerIndices.size() == 0 ? null : answerIndices.get(answerIndices.size() - 1);
 
-        final List<Integer> firstConstituent = new ArrayList<>();
-        for (int i = firstAnswerPosition; i <= lastAnswerPosition && answerIndices.contains(i); i++) {
-            firstConstituent.add(i);
+        constituents = new ArrayList<>();
+        int lastIndex = Integer.MIN_VALUE, closestConstituent = -1, minDistanceToPredicate = Integer.MAX_VALUE;
+        for (int index : answerIndices) {
+            if (lastIndex + 1 < index) {
+                constituents.add(new ArrayList<>());
+                if (minDistanceToPredicate > Math.abs(predicateIndex - index)) {
+                    minDistanceToPredicate = Math.abs(predicateIndex - index);
+                    closestConstituent = constituents.size() - 1;
+                }
+            }
+            constituents.get(constituents.size() - 1).add(index);
+            lastIndex = index;
         }
-        this.firstConstituent = ImmutableSortedSet.copyOf(firstConstituent);
+        this.closestConstituent = closestConstituent;
         String pp = question[QASlots.PPSlotId];
         this.preposition = pp.equals("_") ? null : pp;
         this.label = makeLabel(question);
@@ -74,8 +80,14 @@ public class QADependency implements Serializable {
         return answerIndices;
     }
 
-    public Collection<Integer> getFirstAnswerConstituent() {
-        return firstConstituent;
+    public List<List<Integer>> getConstituents() { return constituents; }
+
+    public List<Integer> getFirstConstituent() {
+        return constituents.get(0);
+    }
+
+    public List<Integer> getConstituentClosesToPredicate() {
+        return constituents.get(closestConstituent);
     }
 
     public String[] getQuestion() {

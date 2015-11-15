@@ -31,9 +31,7 @@ import edu.uw.easysrl.syntax.training.CompressedChart.Key;
 import edu.uw.easysrl.syntax.training.CompressedChart.Value;
 
 class FeatureForest {
-
 	private final Collection<ConjunctiveNode> conjunctiveNodes = new ArrayList<>();
-
 	private final Collection<DisjunctiveNode> roots;
 	private final CutoffsDictionary cutoffsDictionary;
 	private final List<InputWord> words;
@@ -41,7 +39,6 @@ class FeatureForest {
 	FeatureForest(final List<InputWord> words, final CompressedChart allParses,
 			final CutoffsDictionary cutoffsDictionary) {
 		final Collection<DisjunctiveNode> result = new ArrayList<>();
-
 		this.words = words;
 		this.cutoffsDictionary = cutoffsDictionary;
 		final Map<Key, DisjunctiveNode> cache1 = new HashMap<>();
@@ -50,14 +47,12 @@ class FeatureForest {
 		for (final Key key : allParses.getRoots()) {
 			result.add(parseDisjunctive(key, cache1, dependencyNodeCache, conjuctiveNodeCache));
 		}
-
 		this.roots = result;
 	}
 
 	private ConjunctiveNode parseConjunctive(final Value value, final Map<Key, DisjunctiveNode> disjuctiveNodeCache,
 			final Map<Value, ConjunctiveNode> conjuctiveNodeCache,
 			final Map<ResolvedDependency, DisjunctiveNode> dependencyNodeCache, final DisjunctiveTreeNode parent) {
-
 		if (conjuctiveNodeCache.containsKey(value)) {
 			return conjuctiveNodeCache.get(value);
 		}

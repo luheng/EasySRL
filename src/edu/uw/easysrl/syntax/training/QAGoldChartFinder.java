@@ -47,13 +47,16 @@ public class QAGoldChartFinder {
         for (final QADependency qa : sentence.getDependencies()) {
             if (qa.getAnswerPositions().size() > 0) {
                 // FIXME: get closest answer constituent to the verb?
+                /*
                 final List<Integer> firstConstituent = new ArrayList<>();
                 for (int i = qa.getFirstAnswerPosition(); i <= qa.getLastAnswerPosition() &&
                         qa.getAnswerPositions().contains(i); i++) {
                     firstConstituent.add(i);
                 }
+                */
                 final QADependency newDep = new QADependency(qa.getPredicate(), qa.getPredicateIndex(),
-                                                             qa.getQuestion(), firstConstituent);
+                                                             qa.getQuestion(), qa.getConstituentClosesToPredicate());
+                                                             //qa.getFirstConstituent());
                 goldDeps.add(newDep);
             }
         }
@@ -113,9 +116,8 @@ public class QAGoldChartFinder {
                     bestValues.add(scoredValue.object);
                 }
             }
-            result = new Scored<>(
-                    new CompressedChart.Key(key.category, key.startIndex, key.lastIndex, key.ruleClass, bestValues),
-                    bestScore);
+            result = new Scored<>(new CompressedChart.Key(
+                        key.category, key.startIndex, key.lastIndex, key.ruleClass, bestValues), bestScore);
             cache.put(key, goldDeps, result);
         }
         return result;
@@ -199,8 +201,6 @@ public class QAGoldChartFinder {
             final int argumentIndex = predicateIndex + dep.getOffset();
             boolean isSRL = false;
             for (final QADependency qa : goldDeps) {
-                // TODO: double-check ...
-                // System.out.println(dep.getCategory() + ", " + dep.getArgNumber() + ", " + qa.getLabel());
                 if (!matchedDeps.contains(qa)
                         && cutoffs.isFrequent(dep.getCategory(), dep.getArgNumber(), qa.getLabel())
                         && cutoffs.getRoles(completeChart.getWords().get(dep.getPredicateIndex()).word,
@@ -225,7 +225,6 @@ public class QAGoldChartFinder {
                                        final int argumentIndex,
                                        final QADependency qa,
                                        final Preposition preposition) {
-        //System.out.println(Preposition.fromString(qa.getPreposition()) + "\t" + preposition);
         return ((qa.getPredicateIndex() == predicateIndex && qa.getAnswerPositions().contains(argumentIndex)) ||
                 (qa.getPredicateIndex() == argumentIndex && qa.getAnswerPositions().contains(predicateIndex)) &&
                 Preposition.fromString(qa.getPreposition()) == preposition);
