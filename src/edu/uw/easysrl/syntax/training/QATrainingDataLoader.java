@@ -53,7 +53,7 @@ public class QATrainingDataLoader {
             this.tagger = Tagger.make(
                     dataParameters.getExistingModel(),
                     dataParameters.getSupertaggerBeam(),
-                    50,
+                    50, /* maximum number of tags per word */
                     cutoffsDictionary // null
             );
             this.posTagger = POSTagger.getStanfordTagger(new File(dataParameters.getExistingModel(), "posTagger"));
@@ -127,9 +127,9 @@ public class QATrainingDataLoader {
                 // No matched dependencies, so we can't learn against this chart.
                 return null;
             }
-            final Optimization.TrainingExample ex = new Optimization.TrainingExample(completeChart, goldChart,
+            final Optimization.TrainingExample example = new Optimization.TrainingExample(completeChart, goldChart,
                     posTagger.tag(sentence.getInputWords()), cutoffsDictionary);
-            return ex;
+            return example;
         } catch (final Exception e) {
             e.printStackTrace();
             return null;

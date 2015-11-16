@@ -56,6 +56,10 @@ public class TrainingParameters implements Serializable {
         return new File(getModelFolder(), "log");
     }
 
+    public File getResultsFile() {
+        return new File(getModelFolder(), "results");
+    }
+
     public File getModelFolder() {
         return modelFolder;
     }

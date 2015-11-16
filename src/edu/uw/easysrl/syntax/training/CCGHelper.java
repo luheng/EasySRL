@@ -40,7 +40,7 @@ public class CCGHelper {
             this.tagger = Tagger.make(
                     dataParameters.getExistingModel(),
                     dataParameters.getSupertaggerBeam(),
-                    50,
+                    50, /* maximum number of super tags per word */
                     null /* cutoffs dictionary */);
             //this.posTagger = POSTagger.getStanfordTagger(new File(dataParameters.getExistingModel(), "posTagger"));
         } catch (final IOException e) {
@@ -89,6 +89,7 @@ public class CCGHelper {
         return compressed;
     }
 
+    // FIXME: do the keys and values really work that way ???
     public List<Set<Category>> getAllCategories(QASentence sentence, CompressedChart smallChart) {
         Deque<CompressedChart.Key> cache = new ArrayDeque<>();
         List<Set<Category>> result = new ArrayList<>();
@@ -124,5 +125,4 @@ public class CCGHelper {
                 (ccgDep.getArgumentIndex() == qaDep.getPredicateIndex() &&
                         qaDep.getAnswerPositions().contains(ccgDep.getArgumentIndex())));
     }
-
 }

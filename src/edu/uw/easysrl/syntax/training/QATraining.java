@@ -111,7 +111,7 @@ public class QATraining {
                 Util.deserialize(new File(dataParameters.getExistingModel(), "labelClassifier")), posTagger));
 
         final Results results = QAEvaluation.evaluate(
-                backoff, QACorpusReader.READER.getDepCorpus(), maxSentenceLength, true /* verbose */);
+                backoff, QACorpusReader.READER.getDepCorpus(), maxSentenceLength, trainingParameters.getResultsFile());
         System.out.println("Final result: F1=" + results.getF1());
     }
 

@@ -5,7 +5,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import edu.uw.easysrl.util.Util;
 
 public class Results {
-
 	private final AtomicInteger parseDependencies;
 	private final AtomicInteger correctDependencies;
 	private final AtomicInteger goldDependencies;
