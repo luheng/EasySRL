@@ -5,6 +5,7 @@ import edu.uw.easysrl.corpora.qa.QuestionEncoder;
 import edu.uw.easysrl.dependencies.SRLFrame.SRLLabel;
 
 import com.google.common.collect.ImmutableSortedSet;
+import edu.uw.easysrl.syntax.grammar.Preposition;
 
 import java.io.Serializable;
 import java.util.*;
@@ -24,8 +25,9 @@ public class QADependency implements Serializable {
     private final Set<Integer> answerIndices;
     private final List<List<Integer>> constituents;
     private final int closestConstituent;
-    //private final List<Set<Integer> firstConstituent;
     private final SRLLabel label;
+
+    public static boolean directedMatch;
 
     public QADependency(final String predicate, final int predicateIndex,
                         final String[] question, final List<Integer> answerIndices) {
@@ -56,11 +58,8 @@ public class QADependency implements Serializable {
         this.label = makeLabel(question);
     }
 
-    // TODO: use more fine-grained heuristic labels
     private static SRLLabel makeLabel(String[] question) {
         String label = QuestionEncoder.getHeuristicSrlLabel(question);
-        //boolean isCore = question[0].equalsIgnoreCase("who") || question[0].equalsIgnoreCase("what");
-        //return SRLLabel.make(question[0].toUpperCase(), isCore);
         return SRLLabel.make(label, QALabels.isCore(label));
     }
 
@@ -122,5 +121,30 @@ public class QADependency implements Serializable {
 
     public Integer getFirstAnswerPosition() {
         return firstAnswerPosition;
+    }
+
+    /** Below: various matching functions ... **/
+
+    public boolean labeledMatch(DependencyStructure.ResolvedDependency ccgDep) {
+        return ccgDep.getSemanticRole().equals(label) && unlabeledMatch(ccgDep);
+    }
+
+    public boolean unlabeledMatch(DependencyStructure.ResolvedDependency ccgDep) {
+        return unlabeledMatch(ccgDep.getPredicateIndex(), ccgDep.getArgumentIndex());
+    }
+
+    public boolean match(final int predicateIndex, final int argumentIndex, final Preposition preposition) {
+        return unlabeledMatch(predicateIndex, argumentIndex) &&
+                Preposition.fromString(this.getPreposition()) == preposition;
+    }
+
+    private boolean unlabeledMatch(final int predicateIndex, final int argumentIndex) {
+        boolean forwardMatch  = this.predicateIndex == predicateIndex && answerIndices.contains(argumentIndex),
+                reversedMatch = this.predicateIndex == argumentIndex && answerIndices.contains(predicateIndex);
+        if (directedMatch) {
+            return (label.isCoreArgument() && forwardMatch) || !label.isCoreArgument() && reversedMatch;
+        } else {
+            return forwardMatch || reversedMatch;
+        }
     }
 }

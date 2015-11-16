@@ -19,6 +19,8 @@ import edu.uw.easysrl.util.Util;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collector;
+import java.util.stream.Collectors;
 
 /**
  * Created by luheng on 10/28/15.
@@ -295,22 +297,19 @@ public class TrainingFeatureHelper {
             final QASentence sentence,
             final CompressedChart smallChart,
             final List<Set<Category>> allCategories) {
-        final List<DependencyStructure.ResolvedDependency> goldDeps = new ArrayList<>();
+        final List<ResolvedDependency> goldDeps = new ArrayList<>();
         for (ResolvedDependency dep : smallChart.getAllDependencies()) {
-            List<QADependency> matchedQA = new ArrayList<>();
-            sentence.getDependencies().stream()
-                    .filter(qa -> CCGHelper.undirectDependencyMatch(dep, qa))
-                    .forEach(qa -> matchedQA.add(qa));
+            List<QADependency> matchedQA = sentence.getDependencies().stream().filter(qa -> qa.unlabeledMatch(dep))
+                    .collect(Collectors.toList());
             final Set<Category> predicateCategories = allCategories.get(dep.getPredicateIndex());
             for (Category category : predicateCategories) {
                 if (dep.getArgNumber() > category.getNumberOfArguments()) {
                     continue;
                 }
-                matchedQA.stream().forEach(
-                        qa -> goldDeps.add(new ResolvedDependency(
-                                dep.getPredicateIndex(), category, dep.getArgNumber(), dep.getArgumentIndex(),
-                                qa.getLabel(), Preposition.fromString(qa.getPreposition()))));
-                //final Preposition preposition = Preposition.NONE;
+                matchedQA.stream().forEach(qa ->
+                        goldDeps.add(new ResolvedDependency(dep.getPredicateIndex(), category,
+                            dep.getArgNumber(), dep.getArgumentIndex(), qa.getLabel(),
+                            Preposition.fromString(qa.getPreposition()))));
                 goldDeps.add(new ResolvedDependency(
                         dep.getPredicateIndex(), category, dep.getArgNumber(), dep.getArgumentIndex(),
                         SRLFrame.NONE, Preposition.NONE));

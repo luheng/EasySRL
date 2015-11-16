@@ -38,6 +38,12 @@ public class EvaluationAndAnalysisHelper {
         SRLFrame.getAllSrlLabels().forEach(label->labelResults.put(label.toString(), new Results()));
     }
 
+    public void close() throws IOException {
+        if (outputWriter != null) {
+            outputWriter.close();
+        }
+    }
+
     public void addResults(Results results) {
         this.results.add(results);
     }
@@ -91,5 +97,15 @@ public class EvaluationAndAnalysisHelper {
 
     public Results getResults() {
         return results;
+    }
+
+    // TODO
+    public void outputResults() {
+        addOutput("[results]:\n" + results.toString());
+        labelResults.forEach((label, results1) -> {
+            if (results1.getFrequency() > 0) {
+                addOutput(String.format("[%s] freq=%d:\n%s", label, results1.getFrequency(), results1.toString()));
+            }
+        });
     }
 }

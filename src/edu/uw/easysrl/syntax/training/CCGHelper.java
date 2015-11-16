@@ -118,11 +118,4 @@ public class CCGHelper {
         }
         return result;
     }
-
-    public static boolean undirectDependencyMatch(DependencyStructure.ResolvedDependency ccgDep, QADependency qaDep) {
-        return ((ccgDep.getPredicateIndex() == qaDep.getPredicateIndex() &&
-                        qaDep.getAnswerPositions().contains(ccgDep.getArgumentIndex())) ||
-                (ccgDep.getArgumentIndex() == qaDep.getPredicateIndex() &&
-                        qaDep.getAnswerPositions().contains(ccgDep.getArgumentIndex())));
-    }
 }

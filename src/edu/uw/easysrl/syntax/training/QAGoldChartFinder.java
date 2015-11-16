@@ -206,7 +206,7 @@ public class QAGoldChartFinder {
                         && cutoffs.getRoles(completeChart.getWords().get(dep.getPredicateIndex()).word,
                                             dep.getCategory(), dep.getPreposition(),
                                             dep.getArgNumber()).contains(qa.getLabel())
-                        && undirectedMatching(predicateIndex, argumentIndex, qa, dep.getPreposition())) {
+                        && qa.match(predicateIndex, argumentIndex, dep.getPreposition())) {
                     matchedDeps.add(qa);
                     newDeps.add(dep.overwriteLabel(qa.getLabel()));
                     isSRL = true;
@@ -219,14 +219,5 @@ public class QAGoldChartFinder {
 
         }
         return matchedDeps;
-    }
-
-    private boolean undirectedMatching(final int predicateIndex,
-                                       final int argumentIndex,
-                                       final QADependency qa,
-                                       final Preposition preposition) {
-        return ((qa.getPredicateIndex() == predicateIndex && qa.getAnswerPositions().contains(argumentIndex)) ||
-                (qa.getPredicateIndex() == argumentIndex && qa.getAnswerPositions().contains(predicateIndex)) &&
-                Preposition.fromString(qa.getPreposition()) == preposition);
     }
 }

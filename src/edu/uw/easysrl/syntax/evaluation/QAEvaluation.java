@@ -30,18 +30,17 @@ public class QAEvaluation {
                                    final int maxSentenceLength, File resultsFile) throws IOException {
         final EvaluationAndAnalysisHelper evaluationHelper = new EvaluationAndAnalysisHelper(resultsFile,
                 true /* output to console */, false /* output to err */);
-        // FIXME: what does it do?
-        final List<String> autoOutput = new ArrayList<>();
+        //final List<String> autoOutput = new ArrayList<>();
         final Collection<List<String>> failedToParse = new ArrayList<>();
         final AtomicInteger shouldParse = new AtomicInteger();
         final AtomicInteger parsed = new AtomicInteger();
         final Collection<Runnable> jobs = new ArrayList<>();
         final boolean oneThread = true;
         final Stopwatch stopwatch = Stopwatch.createStarted();
-        int id = 0;
+        //int id = 0;
         int numErrors = 0;
         for (final QASentence sentence : sentences) {
-            id++;
+            //id++;
             List<InputWord> words = InputWord.listOf(sentence.getWords());
             final List<CCGandSRLparse> parses = parser.parseTokens(words);
             evaluationHelper.processNewParse(sentence, parses);
@@ -52,7 +51,7 @@ public class QAEvaluation {
                 evaluationHelper.addResults(new Results(0, 0, sentence.getDependencies().size()));
             } else {
                 final CCGandSRLparse parse = parses.get(0);
-                autoOutput.add(ParsePrinter.CCGBANK_PRINTER.print(parse != null ? parse.getCcgParse() : null, id));
+                //autoOutput.add(ParsePrinter.CCGBANK_PRINTER.print(parse != null ? parse.getCcgParse() : null, id));
                 parsed.getAndIncrement();
                 evaluationHelper.addResults(evaluate(sentence, parse, evaluationHelper));
             }
@@ -71,6 +70,8 @@ public class QAEvaluation {
         System.out.println("Coverage: " + Util.twoDP(100.0 * parsed.get() / shouldParse.get()));
         System.out.println("Time: " + stopwatch.elapsed(TimeUnit.SECONDS));
         System.out.println("Number of sentences that go runtime error:\t" + numErrors);
+        evaluationHelper.outputResults();
+        evaluationHelper.close();
         return evaluationHelper.getResults();
     }
 
@@ -100,7 +101,7 @@ public class QAEvaluation {
             }
             boolean found = false;
             for (final ResolvedDependency predictedDep : predictedDeps) {
-                if (match(goldDep, predictedDep)) {
+                if (goldDep.labeledMatch(predictedDep)) {
                     predictedDeps.remove(predictedDep);
                     correctCount++;
                     found = true;
@@ -114,18 +115,5 @@ public class QAEvaluation {
         }
         predictedDeps.forEach(wrong -> evaluationHelper.processWrongDependency(gold, wrong));
         return new Results(predictedCount, correctCount, goldCount);
-    }
-
-    private static boolean match(QADependency goldDep, ResolvedDependency predictedDep) {
-        int predictedPredicate = predictedDep.getPredicateIndex();
-        int predictedArgument = predictedDep.getArgumentIndex();
-        int reversedPredicate = predictedDep.getArgumentIndex();
-        int reversedArgument = predictedDep.getPredicateIndex();
-        boolean match = goldDep.getPredicateIndex() == predictedPredicate
-                && goldDep.getAnswerPositions().contains(predictedArgument);
-        boolean reversedMatch = goldDep.getPredicateIndex() == reversedPredicate
-                && goldDep.getAnswerPositions().contains(reversedArgument);
-        boolean labelMatch = goldDep.getLabel() == predictedDep.getSemanticRole();
-        return (match || reversedMatch) && labelMatch;
     }
 }

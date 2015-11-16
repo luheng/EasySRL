@@ -63,7 +63,7 @@ public class QACutoffsDictionary extends CutoffsDictionary {
                         }
                         QADependency qaDep = null;
                         for (QADependency qa : sentence.getDependencies()) {
-                            if (ccgHelper.undirectDependencyMatch(ccgDep, qa)) {
+                            if (qa.unlabeledMatch(ccgDep)) {
                                 // If CCG dependency agrees with the Q/A pair.
                                 qaDep = qa;
                                 break;
