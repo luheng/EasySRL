@@ -154,11 +154,14 @@ public class QATraining {
                                                 beta, 70, ROOT_CATEGORIES, baseModel, maxChart, goldBeam);
 
                                 // Features to use
-                                final FeatureSet allFeatures = new FeatureSet(new DenseLexicalFeature(pipeline),
+                                final FeatureSet allFeatures = new FeatureSet(
+                                        new DenseLexicalFeature(pipeline),
                                         BilexicalFeature.getBilexicalFeatures(clusterings, 3),
-                                        ArgumentSlotFeature.argumentSlotFeatures, Feature.unaryRules,
-                                        PrepositionFeature.prepositionFeaures, Collections.emptyList(),
-                                        Collections.emptyList());
+                                        ArgumentSlotFeature.argumentSlotFeatures,
+                                        Feature.unaryRules,
+                                        PrepositionFeature.prepositionFeaures,
+                                        Collections.emptyList(), /* root features */
+                                        Collections.emptyList()  /* binary features */);
 
                                 final TrainingParameters standard = new TrainingParameters(
                                         50, allFeatures,

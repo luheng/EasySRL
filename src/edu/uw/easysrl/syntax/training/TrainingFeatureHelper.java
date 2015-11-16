@@ -12,11 +12,8 @@ import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.Combinator;
 import edu.uw.easysrl.syntax.grammar.Preposition;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
-import edu.uw.easysrl.syntax.model.feature.ArgumentSlotFeature;
-import edu.uw.easysrl.syntax.model.feature.BilexicalFeature;
-import edu.uw.easysrl.syntax.model.feature.Feature;
+import edu.uw.easysrl.syntax.model.feature.*;
 import edu.uw.easysrl.syntax.model.feature.Feature.FeatureKey;
-import edu.uw.easysrl.syntax.model.feature.PrepositionFeature;
 import edu.uw.easysrl.syntax.parser.AbstractParser;
 import edu.uw.easysrl.util.Util;
 
@@ -85,8 +82,8 @@ public class TrainingFeatureHelper {
                 }
 
             }
-            getFromDerivation(sentence.getCcgbankParse(), binaryFeatureCount, boundedFeatures,
-                    sentence.getInputWords(), 0, sentence.getInputWords().size());
+            getFromDerivation(sentence.getCcgbankParse(), binaryFeatureCount, sentence.getInputWords(), 0,
+                    sentence.getInputWords().size());
             for (final Feature.RootCategoryFeature rootFeature : trainingParameters.getFeatureSet().rootFeatures) {
                 final Feature.FeatureKey key = rootFeature.getFeatureKey(sentence.getCcgbankParse().getCategory(),
                         sentence.getInputWords());
@@ -119,6 +116,7 @@ public class TrainingFeatureHelper {
             final int minimumFeatureFrequency,
             final Set<FeatureKey> boundedFeatures) throws IOException {
         CCGHelper ccgHelper = new CCGHelper(dataParameters, true /* backoff */);
+        FeatureSet featureSet = trainingParameters.getFeatureSet();
         final Multiset<FeatureKey> keyCount = HashMultiset.create();
         final Multiset<FeatureKey> bilexicalKeyCount = HashMultiset.create();
         final Map<FeatureKey, Integer> result = new HashMap<>();
@@ -132,7 +130,7 @@ public class TrainingFeatureHelper {
             List<ResolvedDependency> goldDeps = getGoldDeps(sentence, smallChart, allCategories);
             for (int index = 0; index < allCategories.size(); index++) {
                 for (Category category : allCategories.get(index)) {
-                    final FeatureKey key = trainingParameters.getFeatureSet().lexicalCategoryFeatures.getFeatureKey(
+                    final FeatureKey key = featureSet.lexicalCategoryFeatures.getFeatureKey(
                             sentence.getInputWords(), index, category);
                     if (key != null) {
                         keyCount.add(key);
@@ -141,14 +139,14 @@ public class TrainingFeatureHelper {
             }
             for (final DependencyStructure.ResolvedDependency dep : goldDeps) {
                 final SRLFrame.SRLLabel role = dep.getSemanticRole();
-                for (final ArgumentSlotFeature feature : trainingParameters.getFeatureSet().argumentSlotFeatures) {
+                for (final ArgumentSlotFeature feature : featureSet.argumentSlotFeatures) {
                     final FeatureKey key = feature.getFeatureKey(
                             sentence.getInputWords(), dep.getPredicateIndex(), role,
                             dep.getCategory(), dep.getArgNumber(), dep.getPreposition());
                     keyCount.add(key);
                 }
                 if (dep.getPreposition() != Preposition.NONE) {
-                    for (final PrepositionFeature feature : trainingParameters.getFeatureSet().prepositionFeatures) {
+                    for (final PrepositionFeature feature : featureSet.prepositionFeatures) {
                         final FeatureKey key = feature.getFeatureKey(
                                 sentence.getInputWords(), dep.getPredicateIndex(),
                                 dep.getCategory(), dep.getPreposition(), dep.getArgNumber());
@@ -156,7 +154,7 @@ public class TrainingFeatureHelper {
                     }
                 }
                 if (dep.getSemanticRole() != SRLFrame.NONE) {
-                    for (final BilexicalFeature feature : trainingParameters.getFeatureSet().dependencyFeatures) {
+                    for (final BilexicalFeature feature : featureSet.dependencyFeatures) {
                         final FeatureKey key = feature.getFeatureKey(
                                 sentence.getInputWords(), dep.getSemanticRole(),
                                 dep.getPredicateIndex(), dep.getArgumentIndex());
@@ -164,6 +162,7 @@ public class TrainingFeatureHelper {
                     }
                 }
             }
+            /*
             for (final Feature.RootCategoryFeature rootFeature : trainingParameters.getFeatureSet().rootFeatures) {
                 for (CompressedChart.Key root : smallChart.getRoots()) {
                     Category rootCategory = root.category;
@@ -173,14 +172,13 @@ public class TrainingFeatureHelper {
                     keyCount.add(key);
                 }
             }
+            */
         }
-        result.put(trainingParameters.getFeatureSet().lexicalCategoryFeatures.getDefault(), result.size());
+        result.put(featureSet.lexicalCategoryFeatures.getDefault(), result.size());
         addFrequentFeatures(minimumFeatureFrequency, keyCount, result, boundedFeatures, false);
         addFrequentFeatures(minimumFeatureFrequency, bilexicalKeyCount, result, boundedFeatures, false);
-        for (final Feature.BinaryFeature feature : trainingParameters.getFeatureSet().binaryFeatures) {
-            boundedFeatures.add(feature.getDefault());
-        }
-        for (final Feature feature : trainingParameters.getFeatureSet().getAllFeatures()) {
+        featureSet.binaryFeatures.forEach(feature -> boundedFeatures.add(feature.getDefault()));
+        for (final Feature feature : featureSet.getAllFeatures()) {
             if (!result.containsKey(feature.getDefault())) {
                 result.put(feature.getDefault(), result.size());
             }
@@ -190,7 +188,6 @@ public class TrainingFeatureHelper {
     }
 
     private void getFromDerivation(final SyntaxTreeNode node, final Multiset<Feature.FeatureKey> binaryFeatureCount,
-                                   final Set<Feature.FeatureKey> boundedFeatures,
                                    final List<InputReader.InputWord> words, final int startIndex, final int endIndex) {
         if (node.getChildren().size() == 2) {
             final SyntaxTreeNode left = node.getChild(0);
@@ -219,7 +216,7 @@ public class TrainingFeatureHelper {
         int start = startIndex;
         for (final SyntaxTreeNode child : node.getChildren()) {
             final int end = start + child.getLength();
-            getFromDerivation(child, binaryFeatureCount, boundedFeatures, words, start, end);
+            getFromDerivation(child, binaryFeatureCount, words, start, end);
             start = end;
         }
     }
@@ -301,33 +298,22 @@ public class TrainingFeatureHelper {
         final List<DependencyStructure.ResolvedDependency> goldDeps = new ArrayList<>();
         for (ResolvedDependency dep : smallChart.getAllDependencies()) {
             List<QADependency> matchedQA = new ArrayList<>();
-            for (QADependency qa : sentence.getDependencies()) {
-                if (CCGHelper.undirectDependencyMatch(dep, qa)) {
-                    matchedQA.add(qa);
-                }
-            }
-            final Set<Category> predCategories = allCategories.get(dep.getPredicateIndex());
-            for (Category category : predCategories) {
+            sentence.getDependencies().stream()
+                    .filter(qa -> CCGHelper.undirectDependencyMatch(dep, qa))
+                    .forEach(qa -> matchedQA.add(qa));
+            final Set<Category> predicateCategories = allCategories.get(dep.getPredicateIndex());
+            for (Category category : predicateCategories) {
                 if (dep.getArgNumber() > category.getNumberOfArguments()) {
                     continue;
                 }
-                for (QADependency qa : matchedQA) {
-                    goldDeps.add(new ResolvedDependency(
-                            dep.getPredicateIndex(),
-                            category,
-                            dep.getArgNumber(),
-                            dep.getArgumentIndex(),
-                            qa.getLabel(),
-                            Preposition.fromString(qa.getPreposition())));
-                }
-                final Preposition preposition = Preposition.NONE;
+                matchedQA.stream().forEach(
+                        qa -> goldDeps.add(new ResolvedDependency(
+                                dep.getPredicateIndex(), category, dep.getArgNumber(), dep.getArgumentIndex(),
+                                qa.getLabel(), Preposition.fromString(qa.getPreposition()))));
+                //final Preposition preposition = Preposition.NONE;
                 goldDeps.add(new ResolvedDependency(
-                        dep.getPredicateIndex(),
-                        category,
-                        dep.getArgNumber(),
-                        dep.getArgumentIndex(),
-                        SRLFrame.NONE,
-                        preposition));
+                        dep.getPredicateIndex(), category, dep.getArgNumber(), dep.getArgumentIndex(),
+                        SRLFrame.NONE, Preposition.NONE));
             }
         }
         return goldDeps;
