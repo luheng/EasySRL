@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * Created by luheng on 11/2/15.
  */
+// TODO: merge with CCG helper
 public class QATrainingDataLoader {
     private final CutoffsDictionary cutoffsDictionary;
     private final TrainingDataParameters dataParameters;

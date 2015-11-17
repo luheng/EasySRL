@@ -164,17 +164,14 @@ public class TrainingFeatureHelper {
                     }
                 }
             }
-            /*
             for (final Feature.RootCategoryFeature rootFeature : trainingParameters.getFeatureSet().rootFeatures) {
                 for (CompressedChart.Key root : smallChart.getRoots()) {
                     Category rootCategory = root.category;
-                    System.out.println("[root category]:\t" + rootCategory);
                     final FeatureKey key = rootFeature.getFeatureKey(rootCategory, sentence.getInputWords());
                     boundedFeatures.add(key);
                     keyCount.add(key);
                 }
             }
-            */
         }
         result.put(featureSet.lexicalCategoryFeatures.getDefault(), result.size());
         addFrequentFeatures(minimumFeatureFrequency, keyCount, result, boundedFeatures, false);
@@ -271,21 +268,6 @@ public class TrainingFeatureHelper {
             }
 
             Preposition preposition = Preposition.NONE;
-            /*
-            if (dep.getCategory().getArgument(dep.getArgNumber()) == Category.PP) {
-                // If appropriate, figure out what the preposition should be.
-                preposition = Preposition.OTHER;
-                for (final CCGBankDependency prepDep : unlabelledDeps) {
-                    if (prepDep != dep &&
-                            prepDep.getSentencePositionOfArgument() == dep.getSentencePositionOfArgument() &&
-                            Preposition.isPrepositionCategory(prepDep.getCategory())) {
-                        preposition = Preposition.fromString(dep.getPredicateWord());
-                    }
-                }
-            } else {
-                preposition = Preposition.NONE;
-            }
-            */
             goldDeps.add(new DependencyStructure.ResolvedDependency(
                         dep.getSentencePositionOfPredicate(), goldCategory, dep.getArgNumber(),
                         dep.getSentencePositionOfArgument(), SRLFrame.NONE, preposition));
@@ -299,7 +281,11 @@ public class TrainingFeatureHelper {
             final List<Set<Category>> allCategories) {
         final List<ResolvedDependency> goldDeps = new ArrayList<>();
         for (ResolvedDependency dep : smallChart.getAllDependencies()) {
-            List<QADependency> matchedQA = sentence.getDependencies().stream().filter(qa -> qa.unlabeledMatch(dep))
+            List<QADependency> matchedQA = sentence.getDependencies().stream()
+                    //.filter(qa -> qa.unlabeledMatch(dep))
+                    .filter(qa ->
+                        (dep.getPredicateIndex() == qa.getPredicateIndex() && qa.getAnswerPositions().contains(dep.getArgumentIndex())) ||
+                         (dep.getArgumentIndex() == qa.getPredicateIndex() && qa.getAnswerPositions().contains(dep.getArgumentIndex())))
                     .collect(Collectors.toList());
             final Set<Category> predicateCategories = allCategories.get(dep.getPredicateIndex());
             for (Category category : predicateCategories) {
@@ -307,12 +293,10 @@ public class TrainingFeatureHelper {
                     continue;
                 }
                 matchedQA.stream().forEach(qa ->
-                        goldDeps.add(new ResolvedDependency(dep.getPredicateIndex(), category,
-                            dep.getArgNumber(), dep.getArgumentIndex(), qa.getLabel(),
-                            Preposition.fromString(qa.getPreposition()))));
-                goldDeps.add(new ResolvedDependency(
-                        dep.getPredicateIndex(), category, dep.getArgNumber(), dep.getArgumentIndex(),
-                        SRLFrame.NONE, Preposition.NONE));
+                        goldDeps.add(new ResolvedDependency(dep.getPredicateIndex(), category, dep.getArgNumber(),
+                                dep.getArgumentIndex(), qa.getLabel(), Preposition.fromString(qa.getPreposition()))));
+                goldDeps.add(new ResolvedDependency(dep.getPredicateIndex(), category, dep.getArgNumber(),
+                        dep.getArgumentIndex(), SRLFrame.NONE, Preposition.NONE));
             }
         }
         return goldDeps;

@@ -13,6 +13,7 @@ import edu.uw.easysrl.syntax.model.CutoffsDictionary;
 
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Created by luheng on 11/2/15.
@@ -43,24 +44,11 @@ public class QAGoldChartFinder {
     }
 
     public static Set<QADependency> getTrainingDependencies(final QASentence sentence) {
-        final Set<QADependency> goldDeps = new HashSet<>();
-        for (final QADependency qa : sentence.getDependencies()) {
-            if (qa.getAnswerPositions().size() > 0) {
-                // FIXME: get closest answer constituent to the verb?
-                /*
-                final List<Integer> firstConstituent = new ArrayList<>();
-                for (int i = qa.getFirstAnswerPosition(); i <= qa.getLastAnswerPosition() &&
-                        qa.getAnswerPositions().contains(i); i++) {
-                    firstConstituent.add(i);
-                }
-                */
-                final QADependency newDep = new QADependency(qa.getPredicate(), qa.getPredicateIndex(),
-                                                             qa.getQuestion(), qa.getConstituentClosesToPredicate());
-                                                             //qa.getFirstConstituent());
-                goldDeps.add(newDep);
-            }
-        }
-        return goldDeps;
+        return sentence.getDependencies().stream()
+                .filter(qa -> qa.getAnswerPositions().size() > 0)
+                .map(qa -> new QADependency(qa.getPredicate(), qa.getPredicateIndex(), qa.getQuestion(),
+                        qa.getConstituentClosesToPredicate()))
+                .collect(Collectors.toSet());
     }
 
     private CompressedChart goldChart(final QASentence sentence, final Set<QADependency> goldDeps,
@@ -216,7 +204,6 @@ public class QAGoldChartFinder {
             if (!isSRL) {
                 newDeps.add(dep.overwriteLabel(SRLFrame.NONE));
             }
-
         }
         return matchedDeps;
     }

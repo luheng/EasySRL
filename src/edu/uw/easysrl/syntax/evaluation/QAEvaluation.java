@@ -6,7 +6,6 @@ import edu.uw.easysrl.dependencies.DependencyStructure.ResolvedDependency;
 import edu.uw.easysrl.dependencies.QADependency;
 import edu.uw.easysrl.dependencies.SRLFrame;
 import edu.uw.easysrl.main.InputReader.InputWord;
-import edu.uw.easysrl.main.ParsePrinter;
 import edu.uw.easysrl.syntax.parser.SRLParser;
 import edu.uw.easysrl.syntax.parser.SRLParser.CCGandSRLparse;
 import edu.uw.easysrl.util.Util;
@@ -29,18 +28,15 @@ public class QAEvaluation {
     public static Results evaluate(final SRLParser parser, final Collection<QASentence> sentences,
                                    final int maxSentenceLength, File resultsFile) throws IOException {
         final EvaluationAndAnalysisHelper evaluationHelper = new EvaluationAndAnalysisHelper(resultsFile,
-                true /* output to console */, false /* output to err */);
-        //final List<String> autoOutput = new ArrayList<>();
+                false /* output to console */, false /* output to err */);
         final Collection<List<String>> failedToParse = new ArrayList<>();
         final AtomicInteger shouldParse = new AtomicInteger();
         final AtomicInteger parsed = new AtomicInteger();
         final Collection<Runnable> jobs = new ArrayList<>();
         final boolean oneThread = true;
         final Stopwatch stopwatch = Stopwatch.createStarted();
-        //int id = 0;
         int numErrors = 0;
         for (final QASentence sentence : sentences) {
-            //id++;
             List<InputWord> words = InputWord.listOf(sentence.getWords());
             final List<CCGandSRLparse> parses = parser.parseTokens(words);
             evaluationHelper.processNewParse(sentence, parses);
@@ -51,7 +47,6 @@ public class QAEvaluation {
                 evaluationHelper.addResults(new Results(0, 0, sentence.getDependencies().size()));
             } else {
                 final CCGandSRLparse parse = parses.get(0);
-                //autoOutput.add(ParsePrinter.CCGBANK_PRINTER.print(parse != null ? parse.getCcgParse() : null, id));
                 parsed.getAndIncrement();
                 evaluationHelper.addResults(evaluate(sentence, parse, evaluationHelper));
             }
@@ -75,22 +70,12 @@ public class QAEvaluation {
         return evaluationHelper.getResults();
     }
 
-    // Doing labeled but undirected match.
     private static Results evaluate(QASentence gold, final SRLParser.CCGandSRLparse parse,
                                     EvaluationAndAnalysisHelper evaluationHelper) {
-        //Collection<DependencyStructure.ResolvedDependency> predictedDeps
-        // = new HashSet<>(parse.getDependencyParse());
-        // final Iterator<DependencyStructure.ResolvedDependency> depsIt = predictedDeps.iterator();
-        /*while (depsIt.hasNext()) {
-            final DependencyStructure.ResolvedDependency dep = depsIt.next();
-            if (((dep.getSemanticRole() == SRLFrame.NONE)) || dep.getOffset() == 0) {
-                depsIt.remove();
-            }
-        }*/
         final Set<QADependency> goldDeps = new HashSet<>(gold.getDependencies());
         Collection<ResolvedDependency> predictedDeps = parse.getDependencyParse().stream()
                 .filter(dep -> dep.getSemanticRole() != SRLFrame.NONE && dep.getOffset() != 0) // unrealized arguments
-                .collect(Collectors.toCollection(HashSet::new));
+                .collect(Collectors.toSet());
         int correctCount = 0;
         final int predictedCount = predictedDeps.size();
         final int goldCount = goldDeps.size();

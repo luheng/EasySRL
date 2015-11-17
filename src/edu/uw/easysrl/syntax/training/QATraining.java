@@ -132,7 +132,7 @@ public class QATraining {
 
         QADependency.directedMatch = TrainingUtils.parseIntegers(trainingSettings, "directed_match").get(0) == 1 ?
                 true : false;
-        System.out.println("Labeled match:\t" + QADependency.directedMatch);
+        System.out.println("Directed match:\t" + QADependency.directedMatch);
 
         // FIXME: make it look better?
         for (final int minFeatureCount : TrainingUtils.parseIntegers(trainingSettings, "minimum_feature_frequency")) {
@@ -149,17 +149,16 @@ public class QATraining {
 
                                 // Pre-trained EasyCCG model
                                 final File baseModel = new File(trainingSettings.getProperty(
-                                        "supertagging_model_folder").replaceAll("~",
-                                        Util.getHomeFolder().getAbsolutePath()));
+                                        "supertagging_model_folder").replaceAll("~", Util.getHomeFolder().getAbsolutePath()));
                                 final File pipeline = new File(modelFolder, "pipeline");
                                 pipeline.mkdir();
                                 for (final File f : baseModel.listFiles()) {
                                     java.nio.file.Files.copy(f.toPath(), new File(pipeline, f.getName()).toPath(),
                                             StandardCopyOption.REPLACE_EXISTING);
                                 }
+
                                 final TrainingDataParameters dataParameters = new TrainingDataParameters(
                                                 beta, 70, ROOT_CATEGORIES, baseModel, maxChart, goldBeam);
-                                // Features to use
                                 final FeatureSet allFeatures = new FeatureSet(
                                         new DenseLexicalFeature(pipeline),
                                         BilexicalFeature.getBilexicalFeatures(clusterings, 3),
@@ -174,7 +173,6 @@ public class QATraining {
 
                                 final QATraining training = new QATraining(dataParameters, standard);
                                 training.trainLocal();
-
                                 for (final double beam : TrainingUtils.parseDoubles(trainingSettings, "beta_for_decoding")) {
                                     System.out.println(com.google.common.base.Objects.toStringHelper("Settings")
                                             .add("DecodingBeam", beam)
@@ -183,11 +181,11 @@ public class QATraining {
                                             .add("cost_function_weight", costFunctionWeight)
                                             .add("beta_for_positive_charts", goldBeam)
                                             .add("beta_for_training_charts", beta).toString());
-                                    for (final Double supertaggerWeight : Arrays.asList(null, 0.5, 0.6, 0.7, 0.8, 0.9,
-                                            1.0)) {
-                                        training.evaluate(beam, supertaggerWeight == null ? Optional.empty() :
-                                                Optional.of(supertaggerWeight));
-                                    }
+                                   // for (final Double supertaggerWeight : Arrays.asList(null, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)) {
+                                        double supertaggerWeight = 0.9;
+                                        System.out.println("\nsupertaggerWeight:\t" + supertaggerWeight);
+                                        training.evaluate(beam, Optional.of(supertaggerWeight));
+                                   // }
                                 }
                             }
                         }
