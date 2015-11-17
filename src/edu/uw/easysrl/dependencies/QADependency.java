@@ -127,25 +127,25 @@ public class QADependency implements Serializable {
     /** Below: various matching functions ... **/
 
     public boolean labeledMatch(DependencyStructure.ResolvedDependency ccgDep) {
-        return ccgDep.getSemanticRole() == label && unlabeledMatch(ccgDep);
+        return label == ccgDep.getSemanticRole() && unlabeledMatch(ccgDep);
     }
 
     public boolean unlabeledMatch(DependencyStructure.ResolvedDependency ccgDep) {
         return unlabeledMatch(ccgDep.getPredicateIndex(), ccgDep.getArgumentIndex());
     }
 
-    public boolean match(final int predicateIndex, final int argumentIndex, final Preposition preposition) {
-        return unlabeledMatch(predicateIndex, argumentIndex) &&
-                Preposition.fromString(this.getPreposition()) == preposition;
+    public boolean match(final int otherPredicate, final int otherArgument, final Preposition otherPreposition) {
+        return unlabeledMatch(otherPredicate, otherArgument) &&
+                Preposition.fromString(preposition) == otherPreposition;
     }
 
     public boolean forwardUnlabeledMatch(DependencyStructure.ResolvedDependency ccgDep) {
-        return this.predicateIndex == ccgDep.getPredicateIndex() && answerIndices.contains(ccgDep.getArgumentIndex());
+        return predicateIndex == ccgDep.getPredicateIndex() && answerIndices.contains(ccgDep.getArgumentIndex());
     }
 
-    private boolean unlabeledMatch(final int predicateIndex, final int argumentIndex) {
-        boolean forwardMatch  = (this.predicateIndex == predicateIndex && answerIndices.contains(argumentIndex)),
-                reversedMatch = (this.predicateIndex == argumentIndex && answerIndices.contains(predicateIndex));
+    private boolean unlabeledMatch(final int otherPredicate, final int otherArgument) {
+        boolean forwardMatch  = (predicateIndex == otherPredicate && answerIndices.contains(otherArgument)),
+                reversedMatch = (predicateIndex == otherArgument && answerIndices.contains(otherPredicate));
         if (directedMatch) {
             return (label.isCoreArgument() && forwardMatch) || (!label.isCoreArgument() && reversedMatch);
         } else {

@@ -20,8 +20,9 @@ public class QuestionEncoder {
         if (qval == null || isEmpty(qval)) {
             return "";
         }
-        String label = (isEmpty(pp) ? qlabel : qlabel + "_" + pp);
-        return label + "=" + qval;
+        String labelPrefix = qlabel.toUpperCase().replaceAll("\\s","");
+        return isEmpty(pp) ? String.format("%s=%s", labelPrefix, qval) :
+                             String.format("%s_%s=%s", labelPrefix, pp, qval);
     }
 
     // W0, W1, W2, WHEN, WHERE, WHY, HOW, HOWMUCH
@@ -83,9 +84,9 @@ public class QuestionEncoder {
                 template[3] = getLabel("W2", pp, ph3);
             }
         } else {
-            template[0] = getLabel(wh.toUpperCase(), "", ".");
+            template[0] = getLabel(wh, "", ".");
             if (!nullPP && nullPh3) {
-                template[0] = getLabel(wh.toUpperCase(), pp, ".");
+                template[0] = getLabel(wh, pp, ".");
             }
             if (activeVoice) {
                 template[1] = getLabel("W0", "", ph1);

@@ -282,10 +282,7 @@ public class TrainingFeatureHelper {
         final List<ResolvedDependency> goldDeps = new ArrayList<>();
         for (ResolvedDependency dep : smallChart.getAllDependencies()) {
             List<QADependency> matchedQA = sentence.getDependencies().stream()
-                    //.filter(qa -> qa.unlabeledMatch(dep))
-                    .filter(qa ->
-                        (dep.getPredicateIndex() == qa.getPredicateIndex() && qa.getAnswerPositions().contains(dep.getArgumentIndex())) ||
-                         (dep.getArgumentIndex() == qa.getPredicateIndex() && qa.getAnswerPositions().contains(dep.getArgumentIndex())))
+                    .filter(qa -> qa.unlabeledMatch(dep))
                     .collect(Collectors.toList());
             final Set<Category> predicateCategories = allCategories.get(dep.getPredicateIndex());
             for (Category category : predicateCategories) {

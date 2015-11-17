@@ -92,11 +92,13 @@ public class CCGHelper {
     // FIXME: do the keys and values really work that way ???
     public List<Set<Category>> getAllCategories(QASentence sentence, CompressedChart smallChart) {
         Deque<CompressedChart.Key> cache = new ArrayDeque<>();
+        HashSet<CompressedChart.Key> visited = new HashSet<>();
         List<Set<Category>> result = new ArrayList<>();
         for (int i = 0; i < sentence.getSentenceLength(); i++) {
             result.add(new HashSet<>());
         }
         cache.addAll(smallChart.getRoots());
+        visited.addAll(smallChart.getRoots());
         while (cache.size() > 0) {
             CompressedChart.Key key = cache.pop();
             if (key.getStartIndex() == key.getLastIndex()) {
@@ -113,7 +115,9 @@ public class CCGHelper {
                 } catch (UnsupportedOperationException e) {
                     e.printStackTrace();
                 }
-                cache.addAll(value.getChildren());
+                value.getChildren().stream()
+                        .filter(newKey -> !visited.contains(newKey))
+                        .forEach(newKey -> { cache.add(newKey); visited.add(newKey); });
             }
         }
         return result;
