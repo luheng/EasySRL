@@ -50,7 +50,7 @@ public class EvaluationAndAnalysisHelper {
 
     public void processNewParse(QASentence sentence, List<SRLParser.CCGandSRLparse> parses) {
         String output = "";
-        output += "sentence:\t" + StringUtils.join(sentence.getWords(), " ");
+        output += "\nsentence:\t" + StringUtils.join(sentence.getWords(), " ");
         if (parses == null || parses.size() == 0) {
             output += "\nparse:\t[failed to parse]";
         } else {
@@ -63,8 +63,9 @@ public class EvaluationAndAnalysisHelper {
     }
 
     public void processMatchedDependency(QASentence sentence, QADependency gold, ResolvedDependency predicted) {
-        String output = "matched:\t" + gold.toString(sentence.getWords()) + "\t" + predicted.toString();
-        addOutput(output);
+        // String output = "matched:\t" + gold.toString(sentence.getWords()) + "\t" +
+        //        predicted.toString(sentence.getWords());
+        // addOutput(output);
         labelResults.get(gold.getLabel().toString()).add(new Results(1, 1, 1));
     }
 
@@ -75,7 +76,7 @@ public class EvaluationAndAnalysisHelper {
     }
 
     public void processWrongDependency(QASentence sentence, ResolvedDependency predicted) {
-        String output = "wrong:\t" + "\t\t" + predicted.toString();
+        String output = "wrong:\t" + "\t\t" + predicted.toString(sentence.getWords());
         addOutput(output);
         labelResults.get(predicted.getSemanticRole().toString()).add(new Results(1, 0, 0));
     }

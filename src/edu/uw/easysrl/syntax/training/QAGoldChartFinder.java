@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 
 public class QAGoldChartFinder {
     private final CompressedChart completeChart;
-    public static boolean verbose = true;
+    public static boolean verbose = false;
 
     public QAGoldChartFinder(final CompressedChart completeChart) {
         this.completeChart = completeChart;

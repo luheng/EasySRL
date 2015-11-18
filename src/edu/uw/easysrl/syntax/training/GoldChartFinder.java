@@ -28,9 +28,7 @@ import edu.uw.easysrl.syntax.training.CompressedChart.Value;
  *
  */
 public class GoldChartFinder {
-
 	private final CompressedChart completeChart;
-	public final boolean verbose = true;
 
 	public GoldChartFinder(final CompressedChart completeChart) {
 		super();

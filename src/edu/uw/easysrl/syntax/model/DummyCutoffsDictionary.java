@@ -61,8 +61,8 @@ public class DummyCutoffsDictionary extends CutoffsDictionary {
         if (qaLabels == null) {
             cacheQALabels();
         }
-        return qaLabels.containsKey(label.toString()) && (category.isFunctionInto(Category.valueOf("S|NP")) ||
-                category.isFunctionInto(Category.valueOf("S|S")));
+        return //qaLabels.containsKey(label.toString()) &&
+                (category.isFunctionInto(Category.valueOf("S|NP")) || category.isFunctionInto(Category.valueOf("S|S")));
     }
 
     @Override

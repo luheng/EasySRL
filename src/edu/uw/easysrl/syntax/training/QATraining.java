@@ -9,6 +9,7 @@ import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.model.CutoffsDictionary;
 import edu.uw.easysrl.syntax.model.DummyCutoffsDictionary;
+import edu.uw.easysrl.syntax.model.QACutoffsDictionary;
 import edu.uw.easysrl.syntax.model.feature.*;
 import edu.uw.easysrl.syntax.model.feature.Feature.FeatureKey;
 import edu.uw.easysrl.syntax.parser.SRLParser;
@@ -44,10 +45,15 @@ public class QATraining {
         this.trainingLogger = new Util.Logger(trainingParameters.getLogFile());
         final List<Category> lexicalCategoriesList = TaggerEmbeddings.loadCategories(
                 new File(dataParameters.getExistingModel(), "categories"));
-        this.cutoffsDictionary = new DummyCutoffsDictionary(
+        /*this.cutoffsDictionary = new DummyCutoffsDictionary(
                 lexicalCategoriesList,
                 TagDict.readDict(dataParameters.getExistingModel(), new HashSet<>(lexicalCategoriesList)),
-                trainingParameters.getMaxDependencyLength());
+                trainingParameters.getMaxDependencyLength());*/
+        this.cutoffsDictionary = new QACutoffsDictionary(
+                lexicalCategoriesList,
+                TagDict.readDict(dataParameters.getExistingModel(), new HashSet<>(lexicalCategoriesList)),
+                trainingParameters.getMaxDependencyLength(),
+                dataParameters);
     }
 
     private double[] trainLocal() throws IOException {
@@ -181,8 +187,8 @@ public class QATraining {
                                             .add("cost_function_weight", costFunctionWeight)
                                             .add("beta_for_positive_charts", goldBeam)
                                             .add("beta_for_training_charts", beta).toString());
-                                   // for (final Double supertaggerWeight : Arrays.asList(null, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)) {
-                                        double supertaggerWeight = 0.9;
+                                    //for (final Double supertaggerWeight : Arrays.asList(0.5, 0.6, 0.7, 0.8, 0.9, 1.0)) {
+                                        double supertaggerWeight = 0.8;
                                         System.out.println("\nsupertaggerWeight:\t" + supertaggerWeight);
                                         training.evaluate(beam, Optional.of(supertaggerWeight));
                                    // }

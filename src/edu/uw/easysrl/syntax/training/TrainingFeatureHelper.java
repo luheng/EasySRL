@@ -266,7 +266,6 @@ public class TrainingFeatureHelper {
                 // SRL_rebank categories are out of sync with Rebank deps
                 continue;
             }
-
             Preposition preposition = Preposition.NONE;
             goldDeps.add(new DependencyStructure.ResolvedDependency(
                         dep.getSentencePositionOfPredicate(), goldCategory, dep.getArgNumber(),

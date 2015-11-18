@@ -15,6 +15,7 @@ import edu.uw.easysrl.util.Util;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Created by luheng on 11/6/15.
@@ -57,38 +58,36 @@ public class QACutoffsDictionary extends CutoffsDictionary {
                 for (Category category : allCategories.get(wordIndex)) {
                     for (ResolvedDependency ccgDep : smallChart.getAllDependencies()) {
                         if (ccgDep.getPredicateIndex() != wordIndex ||
-                                ccgDep.getArgNumber() >= category.getNumberOfArguments()) {
+                                ccgDep.getArgNumber() > category.getNumberOfArguments()) {
                             // If CCG dependency corresponds to the category.
                             continue;
                         }
-                        QADependency qaDep = null;
-                        for (QADependency qa : sentence.getDependencies()) {
-                            if (qa.unlabeledMatch(ccgDep)) {
-                                // If CCG dependency agrees with the Q/A pair.
-                                qaDep = qa;
-                                break;
-                            }
-                        }
-                        if (qaDep == null) {
+                        Collection<QADependency> matchedQADependencies = sentence.getDependencies().stream()
+                                .filter(qa -> qa.unlabeledMatch(ccgDep))
+                                .collect(Collectors.toSet());
+                        if (matchedQADependencies == null || matchedQADependencies.size() == 0) {
                             continue;
                         }
-                        final int offset = ccgDep.getArgumentIndex() - ccgDep.getPredicateIndex();
-                        for (int i = Math.min(offset, 0); i <= Math.max(offset, 0); i++) {
-                            if (i != 0 && Math.abs(offset) <= maxDependencyLength) {
-                                // For a word at -5, also at -4,-3,-2,-1
-                                Util.add(srlToOffset, qaDep.getLabel(), i);
+                        for (QADependency qaDep : matchedQADependencies) {
+                            final int offset = ccgDep.getArgumentIndex() - ccgDep.getPredicateIndex();
+                            for (int i = Math.min(offset, 0); i <= Math.max(offset, 0); i++) {
+                                if (i != 0 && Math.abs(offset) <= maxDependencyLength) {
+                                    // For a word at -5, also at -4,-3,-2,-1
+                                    Util.add(srlToOffset, qaDep.getLabel(), i);
+                                }
                             }
+                            Util.add(categoryToArgumentToSRLs, category, ccgDep.getArgNumber(), qaDep.getLabel());
+                            final Preposition preposition = Preposition.fromString(qaDep.getPreposition());
+                            final String key = makeKey(words.get(wordIndex).word, category, preposition,
+                                    ccgDep.getArgNumber());
+                            Multiset<SRLFrame.SRLLabel> roles = keyToRole.get(key);
+                            if (roles == null) {
+                                roles = HashMultiset.create();
+                                roles.add(SRLFrame.NONE);
+                                keyToRole.put(key, roles);
+                            }
+                            roles.add(qaDep.getLabel());
                         }
-                        Util.add(categoryToArgumentToSRLs, category, ccgDep.getArgNumber(), qaDep.getLabel());
-                        final Preposition preposition = Preposition.fromString(qaDep.getPreposition());
-                        final String key = makeKey(words.get(wordIndex).word, category, preposition, ccgDep.getArgNumber());
-                        Multiset<SRLFrame.SRLLabel> roles = keyToRole.get(key);
-                        if (roles == null) {
-                            roles = HashMultiset.create();
-                            roles.add(SRLFrame.NONE);
-                            keyToRole.put(key, roles);
-                        }
-                        roles.add(qaDep.getLabel());
                     }
                 }
             }
