@@ -45,7 +45,7 @@ public class QACutoffsDictionary extends CutoffsDictionary {
         for (final SRLFrame.SRLLabel label : SRLFrame.getAllSrlLabels()) {
             srlToOffset.put(label, HashMultiset.create());
         }
-        final Iterator<QASentence> sentences = QACorpusReader.READER.readCorpus(false /* is not dev */);
+        final Iterator<QASentence> sentences = QACorpusReader.getReader(QATraining.trainingDomain).readTrainingCorpus();
         while (sentences.hasNext()) {
             final QASentence sentence = sentences.next();
             final List<InputReader.InputWord> words = sentence.getInputWords();

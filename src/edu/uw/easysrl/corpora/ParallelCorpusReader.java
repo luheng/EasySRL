@@ -154,8 +154,7 @@ public class ParallelCorpusReader {
 						Util.readFileLineByLine(new File(PROPBANK, "prop.txt")),
 						USING_NOMBANK ? Util.readFileLineByLine(NOMBANK) : null);
 
-		final Table<String, Integer, SRLParse> goldParses = TreeBasedTable
-				.create();
+		final Table<String, Integer, SRLParse> goldParses = TreeBasedTable.create();
 		for (final Cell<String, Integer, TreebankParse> cell : PTB.cellSet()) {
 			// Propbank files skip sentences with no SRL deps. Add a default empty parse for all sentences.
 			goldParses.put(cell.getRowKey(), cell.getColumnKey(), new SRLParse(cell.getValue().getWords()));
@@ -209,7 +208,6 @@ public class ParallelCorpusReader {
 				}
 				parses = parsesDev;
 				depParses = depParsesDev;
-
 			}
 		} else {
 			synchronized (ccgbank) {

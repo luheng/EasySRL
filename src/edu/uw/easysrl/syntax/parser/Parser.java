@@ -10,15 +10,14 @@ import edu.uw.easysrl.syntax.parser.AbstractParser.SuperTaggingResults;
 import edu.uw.easysrl.util.Util.Scored;
 
 public interface Parser {
-
 	/**
 	 * Ignores the InputReader and parses the supplied list of words.
 	 */
-	public abstract List<Scored<SyntaxTreeNode>> parseTokens(List<String> words);
+	List<Scored<SyntaxTreeNode>> parseTokens(List<String> words);
 
-	public abstract List<Scored<SyntaxTreeNode>> parseSentence(SuperTaggingResults results, InputToParser input);
+	List<Scored<SyntaxTreeNode>> parseSentence(SuperTaggingResults results, InputToParser input);
 
-	public abstract List<Scored<SyntaxTreeNode>> doParsing(InputToParser input);
+	List<Scored<SyntaxTreeNode>> doParsing(InputToParser input);
 
 	List<Scored<SyntaxTreeNode>> parse(SuperTaggingResults results, String line);
 
@@ -28,5 +27,5 @@ public interface Parser {
 
 	long getTaggingTimeOnlyInMillis();
 
-	public abstract int getMaxSentenceLength();
+	int getMaxSentenceLength();
 }

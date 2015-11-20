@@ -1,9 +1,5 @@
 package edu.uw.easysrl.util;
 
-import edu.uw.easysrl.corpora.ParallelCorpusReader;
-import edu.uw.easysrl.syntax.training.Optimization;
-
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;

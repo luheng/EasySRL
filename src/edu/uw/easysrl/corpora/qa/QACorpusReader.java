@@ -14,14 +14,16 @@ import java.util.*;
 public class QACorpusReader {
 
     private final static Properties PROPERTIES = Util.loadProperties(new File("corpora.properties"));
-    // TODO: add QA-SRL train and test files, respectively ...
-    public static final File QASRL_TRAIN = new File(PROPERTIES.getProperty("qasrl") + ".train.qa");
-    public static final File QASRL_DEV = new File(PROPERTIES.getProperty("qasrl") + ".dev.qa");
-    public static final File QASRL_TEST = new File(PROPERTIES.getProperty("qasrl") + ".test.qa");
+    public static final File QASRL_NEWSWIRE_TRAIN = new File(PROPERTIES.getProperty("qa-newswire") + ".train.qa");
+    public static final File QASRL_NEWSWIRE_DEV = new File(PROPERTIES.getProperty("qa-newswire") + ".dev.qa");
+    public static final File QASRL_WIKI_TRAIN = new File(PROPERTIES.getProperty("qa-wiki") + ".train.qa");
+    public static final File QASRL_WIKI_DEV = new File(PROPERTIES.getProperty("qa-wiki") + ".dev.qa");
+    //public static final File QASRL_TEST = new File(PROPERTIES.getProperty("qasrl") + ".test.qa");
 
     private final File qaFileTrain, qaFileDev;
     private List<QASentence> parsesTrain, parsesDev;
-    public final static QACorpusReader READER = new QACorpusReader(QASRL_TRAIN, QASRL_DEV);
+    private final static QACorpusReader NEWSWIRE_READER = new QACorpusReader(QASRL_NEWSWIRE_TRAIN, QASRL_NEWSWIRE_DEV);
+    private final static QACorpusReader WIKIPEDIA_READER = new QACorpusReader(QASRL_WIKI_TRAIN, QASRL_WIKI_DEV);
 
     private QACorpusReader(final File qaFileTrain, final File qaFileDev) {
         super();
@@ -29,7 +31,28 @@ public class QACorpusReader {
         this.qaFileDev = qaFileDev;
     }
 
-    public Iterator<QASentence> readCorpus(final boolean isDev) throws IOException {
+    public static QACorpusReader getReader(String domain) {
+        switch (domain.toLowerCase()) {
+            case "newswire" :
+                return NEWSWIRE_READER;
+            case "wikipedia" :
+                return WIKIPEDIA_READER;
+            default:
+                System.err.println("Unrecognized domain name:\t" + domain);
+                System.err.println("Try ``newswire\'\' or ``wikipedia\'\'.");
+                return null;
+        }
+    }
+
+    public Iterator<QASentence> readTrainingCorpus() throws IOException {
+        return readCorpus(false);
+    }
+
+    public Iterator<QASentence> readEvaluationCorpus() throws IOException {
+        return readCorpus(true);
+    }
+
+    private Iterator<QASentence> readCorpus(final boolean isDev) throws IOException {
         List<QASentence> parses;
         if (isDev) {
             if (parsesDev == null) {
@@ -43,7 +66,6 @@ public class QACorpusReader {
             parses = parsesTrain;
         }
         System.out.println("Total QA-SRL Sentences: " + parses.size());
-        // System.out.println("Total PTB: " + PTB.size());
 
         return new Iterator<QASentence>() {
             int i = 0;
@@ -62,7 +84,7 @@ public class QACorpusReader {
         };
     }
 
-    public Collection<QASentence> getDepCorpus() throws IOException {
+    public Collection<QASentence> getDevCorpus() throws IOException {
         if (parsesDev == null) {
             parsesDev = QACorpusReader.loadCorpus(qaFileDev);
         }
@@ -78,7 +100,7 @@ public class QACorpusReader {
             int numPredicates = Integer.parseInt(sentInfo[1]);
             String[] words = reader.readLine().split("\\s+");
             QASentence newSent = new QASentence(words);
-            newSent.sentenceId = sentId;
+            newSent.referenceId = sentId;
             for (int i = 0; i < numPredicates; i++) {
                 String[] predInfo = reader.readLine().split("\\s+");
                 int predIndex = Integer.parseInt(predInfo[0]);
@@ -100,8 +122,8 @@ public class QACorpusReader {
     private static void testQAReader() {
         Iterator<QASentence> iter1 = null, iter2 = null;
         try {
-            iter1 = QACorpusReader.READER.readCorpus(false /* is dev */);
-            iter2 = QACorpusReader.READER.readCorpus(true  /* is dev */);
+            iter1 = QACorpusReader.WIKIPEDIA_READER.readCorpus(false /* is dev */);
+            iter2 = QACorpusReader.NEWSWIRE_READER.readCorpus(true  /* is dev */);
         } catch (IOException e) {
             e.printStackTrace();
         }

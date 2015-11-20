@@ -8,7 +8,6 @@ import edu.uw.easysrl.syntax.evaluation.QAEvaluation;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.model.CutoffsDictionary;
-import edu.uw.easysrl.syntax.model.DummyCutoffsDictionary;
 import edu.uw.easysrl.syntax.model.QACutoffsDictionary;
 import edu.uw.easysrl.syntax.model.feature.*;
 import edu.uw.easysrl.syntax.model.feature.Feature.FeatureKey;
@@ -37,6 +36,7 @@ public class QATraining {
     private final TrainingDataParameters dataParameters;
     private final TrainingParameters trainingParameters;
     private final CutoffsDictionary cutoffsDictionary;
+    public static String trainingDomain, evaluationDomain;
 
     private QATraining(final TrainingDataParameters dataParameters,
                        final TrainingParameters parameters) throws IOException {
@@ -56,19 +56,19 @@ public class QATraining {
                 dataParameters);
     }
 
+    // Fixme: QASRL-reader
     private double[] trainLocal() throws IOException {
         QATrainingDataLoader dataLoader = new QATrainingDataLoader(cutoffsDictionary, dataParameters,
                 true /* backoff */);
         final Set<Feature.FeatureKey> boundedFeatures = new HashSet<>();
         TrainingFeatureHelper featureHelper = new TrainingFeatureHelper(trainingParameters, dataParameters);
         final Map<FeatureKey, Integer> featureToIndex = featureHelper
-                .makeKeyToIndexMap(QACorpusReader.READER.readCorpus(false),
+                .makeKeyToIndexMap(QACorpusReader.getReader(trainingDomain).readTrainingCorpus(),
                                    trainingParameters.getMinimumFeatureFrequency(),
                                    boundedFeatures);
         System.out.println("Number of features:\t" + featureToIndex.size());
-        boolean small = true;
         final List<Optimization.TrainingExample> data =
-                dataLoader.makeTrainingData(QACorpusReader.READER.readCorpus(small), small);
+                dataLoader.makeTrainingData(QACorpusReader.getReader(trainingDomain).readEvaluationCorpus(), true);
         final Optimization.LossFunction lossFunction = Optimization.getLossFunction(data, featureToIndex,
                 trainingParameters, trainingLogger);
         final double[] weights = train(lossFunction, featureToIndex, boundedFeatures);
@@ -120,7 +120,10 @@ public class QATraining {
                 Util.deserialize(new File(dataParameters.getExistingModel(), "labelClassifier")), posTagger));
 
         final Results results = QAEvaluation.evaluate(
-                backoff, QACorpusReader.READER.getDepCorpus(), maxSentenceLength, trainingParameters.getResultsFile());
+                backoff,
+                QACorpusReader.getReader(evaluationDomain).getDevCorpus(),
+                maxSentenceLength,
+                trainingParameters.getResultsFile());
         System.out.println("Final result: F1=" + results.getF1());
     }
 
@@ -139,6 +142,8 @@ public class QATraining {
         QADependency.directedMatch = TrainingUtils.parseIntegers(trainingSettings, "directed_match").get(0) == 1 ?
                 true : false;
         System.out.println("Directed match:\t" + QADependency.directedMatch);
+        trainingDomain = TrainingUtils.parseStrings(trainingSettings, "train_domain").get(0);
+        evaluationDomain = TrainingUtils.parseStrings(trainingSettings, "eval_domain").get(0);
 
         // FIXME: make it look better?
         for (final int minFeatureCount : TrainingUtils.parseIntegers(trainingSettings, "minimum_feature_frequency")) {

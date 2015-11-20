@@ -13,11 +13,12 @@ import java.util.*;
  * Created by luheng on 10/29/15.
  */
 public class QASentence implements Serializable {
+    public String referenceId; // To align with PropBank sentences.
+
     private static final long serialVersionUID = 1L;
     private final Collection<QADependency> dependencies = new ArrayList<>();
     private final int sentenceLength;
     private final List<String> words;
-    public String sentenceId;
     private List<InputWord> inputWords;
     private final Map<Integer, String> indexToFrame = new HashMap<>();
     private final Multimap<Integer, QADependency> indexToDep = HashMultimap.create();
@@ -95,7 +96,6 @@ public class QASentence implements Serializable {
 
     @Override
     public String toString() {
-        // FIXME
         final StringBuilder result = new StringBuilder();
         for (final String word : words) {
             result.append(word);
