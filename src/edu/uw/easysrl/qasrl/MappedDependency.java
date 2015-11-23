@@ -1,6 +1,7 @@
 package edu.uw.easysrl.qasrl;
 
 import edu.uw.easysrl.corpora.ParallelCorpusReader;
+import edu.uw.easysrl.corpora.qa.QASentence;
 import edu.uw.easysrl.dependencies.QADependency;
 import edu.uw.easysrl.dependencies.SRLDependency;
 
@@ -9,14 +10,14 @@ import edu.uw.easysrl.dependencies.SRLDependency;
  * Mapped SRL and QA dependency
  */
 public class MappedDependency {
-    public final ParallelCorpusReader.Sentence sentence;
+    public final ParallelCorpusReader.Sentence pbSentence;
     public final SRLDependency srlDependency;
     public final QADependency qaDependency;
     public final int numSRLtoQAMaps, numQAtoSRLMaps;
 
-    public MappedDependency(ParallelCorpusReader.Sentence sentence, SRLDependency srlDependency,
+    public MappedDependency(ParallelCorpusReader.Sentence pbSentence, SRLDependency srlDependency,
                             QADependency qaDependency, int numSRLtoQAMaps, int numQAtoSRLMaps) {
-        this.sentence = sentence;
+        this.pbSentence = pbSentence;
         this.srlDependency = srlDependency;
         this.qaDependency = qaDependency;
         this.numSRLtoQAMaps = numSRLtoQAMaps;
