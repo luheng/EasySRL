@@ -68,7 +68,7 @@ public class QATraining {
                                    boundedFeatures);
         System.out.println("Number of features:\t" + featureToIndex.size());
         final List<Optimization.TrainingExample> data =
-                dataLoader.makeTrainingData(QACorpusReader.getReader(trainingDomain).readEvaluationCorpus(), true);
+                dataLoader.makeTrainingData(QACorpusReader.getReader(trainingDomain).readTrainingCorpus(), true);
         final Optimization.LossFunction lossFunction = Optimization.getLossFunction(data, featureToIndex,
                 trainingParameters, trainingLogger);
         final double[] weights = train(lossFunction, featureToIndex, boundedFeatures);
