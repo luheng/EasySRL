@@ -61,36 +61,44 @@ public class QATraining {
         QATrainingDataLoader dataLoader = new QATrainingDataLoader(cutoffsDictionary, dataParameters,
                 true /* backoff */);
         final Set<Feature.FeatureKey> boundedFeatures = new HashSet<>();
+        /**
+         * Extract features.
+         */
         TrainingFeatureHelper featureHelper = new TrainingFeatureHelper(trainingParameters, dataParameters);
         final Map<FeatureKey, Integer> featureToIndex = featureHelper
                 .makeKeyToIndexMap(QACorpusReader.getReader(trainingDomain).readTrainingCorpus(),
                                    trainingParameters.getMinimumFeatureFrequency(),
                                    boundedFeatures);
         System.out.println("Number of features:\t" + featureToIndex.size());
-        final List<Optimization.TrainingExample> data =
-                dataLoader.makeTrainingData(QACorpusReader.getReader(trainingDomain).readTrainingCorpus(), true);
+
+        /**
+         * Load training data.
+         */
+        final List<Optimization.TrainingExample> data = dataLoader.makeTrainingData(
+                QACorpusReader.getReader(trainingDomain).readTrainingCorpus(), true);
+
+        /**
+         * Create loss function.
+         */
         final Optimization.LossFunction lossFunction = Optimization.getLossFunction(data, featureToIndex,
                 trainingParameters, trainingLogger);
-        final double[] weights = train(lossFunction, featureToIndex, boundedFeatures);
-        return weights;
-    }
 
-    private double[] train(final DifferentiableFunction lossFunction,
-                           final Map<Feature.FeatureKey, Integer> featureToIndex,
-                           final Set<Feature.FeatureKey> boundedFeatures) throws IOException {
         trainingParameters.getModelFolder().mkdirs();
         final double[] weights = new double[featureToIndex.size()];
-        // Do training
+        /**
+         * Train!
+         */
         trainingLogger.log("Starting Training");
         Optimization.TrainingAlgorithm algorithm = Optimization.makeLBFGS(featureToIndex, boundedFeatures);
         algorithm.train(lossFunction, weights);
         trainingLogger.log("Training Completed");
 
-        // Save model
+        /**
+         * Save model.
+         */
         Util.serialize(weights, trainingParameters.getWeightsFile());
         Util.serialize(trainingParameters.getFeatureSet(), trainingParameters.getFeaturesFile());
         Util.serialize(featureToIndex, trainingParameters.getFeatureToIndexFile());
-
         final File modelFolder = trainingParameters.getModelFolder();
         modelFolder.mkdirs();
         Files.copy(new File(dataParameters.getExistingModel(), "categories"), new File(modelFolder, "categories"));
@@ -99,6 +107,7 @@ public class QATraining {
         Files.copy(new File(dataParameters.getExistingModel(), "unaryRules"), new File(modelFolder, "unaryRules"));
         Files.copy(new File(dataParameters.getExistingModel(), "markedup"), new File(modelFolder, "markedup"));
         Files.copy(new File(dataParameters.getExistingModel(), "seenRules"), new File(modelFolder, "seenRules"));
+
         return weights;
     }
 
