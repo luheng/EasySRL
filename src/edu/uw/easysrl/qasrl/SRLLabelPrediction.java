@@ -32,6 +32,10 @@ public class SRLLabelPrediction {
                 sigmaSquared, trainingLogger);
 
         final double[] weights = new double[numFeatures];
+        Random random = new Random(12345);
+        for (int i = 0; i < numFeatures; i++) {
+            weights[i] = random.nextDouble() / 100.0;
+        }
         /**
          * Train!
          */
@@ -42,7 +46,21 @@ public class SRLLabelPrediction {
     }
 
     private static void evaluate(List<MappedDependency> testDependencies, double[] weights) {
-        // TODO
+        double accuracy = .0;
+        for (MappedDependency dependency : testDependencies) {
+            Structure.LabelPredictionInstance testInstance = Structure.newLabelPredictionInstance(dependency,
+                    featureHelper);
+            testInstance.updateScores(weights);
+            int bestLabel = testInstance.getBest();
+            String goldSrlLabel = Structure.LabelPredictionInstance.classes[testInstance.goldCliqueId].toString();
+            String predSrlLabel = Structure.LabelPredictionInstance.classes[bestLabel].toString();
+            List<String> words = dependency.pbSentence.getWords();
+            System.out.println(goldSrlLabel + "\t" + predSrlLabel + "\t" + dependency.qaDependency.toString(words));
+            if (testInstance.goldCliqueId == bestLabel) {
+                accuracy += 1.0;
+            }
+        }
+        System.out.println("accuracy:\t" + accuracy / testDependencies.size());
     }
 
     private static void jackknife(Map<Integer, List<MappedDependency>> allDependencies,

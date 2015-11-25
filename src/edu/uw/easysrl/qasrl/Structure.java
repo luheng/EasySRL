@@ -6,6 +6,8 @@ import edu.uw.easysrl.util.CompUtils;
 
 import java.util.*;
 
+import edu.stanford.nlp.util.StringUtils;
+
 /**
  * Created by luheng on 11/23/15.
  * For structured prediction ...
@@ -80,17 +82,22 @@ public class Structure {
         Clique goldClique;
         Clique[] allCliques;
         double[] cliqueScores;
+        protected int goldCliqueId;
+        // TODO: fixme
+        static final double backoff = 1e-8;
 
-        public MultiClassStructure(Clique goldClique, Clique[] allCliques) {
+        public MultiClassStructure(int goldCliqueId, Clique goldClique, Clique[] allCliques) {
             this.goldClique = goldClique;
             this.allCliques = allCliques;
             this.cliqueScores = new double[allCliques.length];
+            this.goldCliqueId = goldCliqueId;
         }
 
         @Override
         public void updateScores(double[] featureWeights) {
             logLikelihood = goldClique.getLogScore(featureWeights);
             for (int c = 0; c < cliqueScores.length; c++) {
+                //cliqueScores[c] = Math.log(allCliques[c].getScore(featureWeights) + backoff);
                 cliqueScores[c] = allCliques[c].getLogScore(featureWeights);
             }
             logNorm = CompUtils.logSumExp(cliqueScores, cliqueScores.length);
@@ -107,15 +114,24 @@ public class Structure {
                 allCliques[c].countFeatures(counts, cliqueScores[c] - logNorm);
             }
         }
+
+        public int getBest() {
+            int best = 0;
+            for (int c = 1; c < allCliques.length; c++) {
+                if (cliqueScores[c] > cliqueScores[best]) {
+                    best = c;
+                }
+            }
+            return best;
+        }
     }
 
     public static class LabelPredictionInstance extends MultiClassStructure {
         public static int numClasses = SRLFrame.getAllSrlLabels().size();
         public static SRLFrame.SRLLabel[] classes = SRLFrame.getAllSrlLabels()
                 .toArray(new SRLFrame.SRLLabel[numClasses]);
-
-        public LabelPredictionInstance(Clique goldClique, Clique[] allCliques) {
-            super(goldClique, allCliques);
+        public LabelPredictionInstance(int goldCliqueId, Clique goldClique, Clique[] allCliques) {
+            super(goldCliqueId, goldClique, allCliques);
         }
     }
 
@@ -124,17 +140,22 @@ public class Structure {
         SRLDependency srlDep  = dependency.srlDependency;
         List<Integer> argumentIndices = new ArrayList<>(srlDep.getArgumentPositions());
         Collections.sort(argumentIndices);
-        int numClasses = SRLFrame.SRLLabel.numberOfLabels();
-        Clique[] allCliques = new Clique[numClasses];
+        Clique[] allCliques = new Clique[LabelPredictionInstance.numClasses];
+        int goldCliqueId = 0;
         for (int c = 0; c < LabelPredictionInstance.numClasses; c++) {
             SRLFrame.SRLLabel role = LabelPredictionInstance.classes[c];
             allCliques[c] = featureHelper.getClique(
                     dependency.pbSentence,
-                    new SRLDependency(srlDep.getPredicate(), srlDep.getPredicateIndex(), argumentIndices, role,
+                    new SRLDependency(srlDep.getPredicate(), srlDep.getPredicateIndex(),
+                                      argumentIndices, role,
                                       srlDep.getPreposition()),
                     dependency.qaDependency);
+            if (role == srlDep.getLabel()) {
+                goldCliqueId = c;
+            }
         }
+
         Clique goldClique = featureHelper.getClique(dependency.pbSentence, srlDep, dependency.qaDependency);
-        return new Structure.LabelPredictionInstance(goldClique, allCliques);
+        return new Structure.LabelPredictionInstance(goldCliqueId, goldClique, allCliques);
     }
 }
