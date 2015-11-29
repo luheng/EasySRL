@@ -41,23 +41,33 @@ public class QASrlFeatureHelper {
                                           QADependency qaDependency) {
         TIntIntHashMap featureVector = new TIntIntHashMap();
         String[] qwords = qaDependency.getQuestion();
+        String isPassive = String.valueOf(QuestionEncoder.isPassiveVoice(qwords));
 
         // SRL Label features
         final String[] srlFeatures = {
                 "srl=" + srlDependency.getLabel(),
                 "core=" + String.valueOf(srlDependency.getLabel().isCoreArgument())
         };
+        String qstr = "";
+        for (int sid = 0; sid < QASlots.numSlots; sid++) {
+            if (sid != QASlots.AUXSlotId && sid != QASlots.TRGSlotId) {
+                qstr += qwords[sid] + " ";
+            }
+        }
+        qstr += isPassive;
+
         for (String srlFeature : srlFeatures) {
             // Label mapping
             String qaLabel = qaDependency.getLabel().toString();
             featureVector.adjustOrPutValue(featureDictionary.addString(srlFeature + "_qalb=" + qaLabel), 1, 1);
             // Question voice.
-            String isPassive = String.valueOf(QuestionEncoder.isPassiveVoice(qwords));
             featureVector.adjustOrPutValue(featureDictionary.addString(srlFeature + "_voice=" + isPassive), 1, 1);
             for (int slotId = 0; slotId < QASlots.numSlots; slotId++) {
                 String prefix = QASlots.slotNames[slotId] + "=";
                 featureVector.adjustOrPutValue(featureDictionary.addString(srlFeature + "_" + prefix + qwords[slotId]), 1, 1);
             }
+            // Almost the entire question
+            featureVector.adjustOrPutValue(featureDictionary.addString(srlFeature + "_qstr=" + qstr), 1, 1);
             // bias feature
             featureVector.adjustOrPutValue(featureDictionary.addString(srlFeature), 1, 1);
         }

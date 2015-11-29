@@ -80,12 +80,12 @@ public class Structure {
      * All scores are in log scale.
      * p(y|x) = exp(w.f(x,y)) / sum_y' (exp(w.f(x,y')))
      */
+    // FIXME: clique structure and clique ID
     public static class MultiClassStructure extends AbstractStructure {
         Clique goldClique;
         Clique[] allCliques;
         double[] cliqueScores;
         protected int goldCliqueId;
-        // TODO: fixme
         static double backoff = 1e-8;
 
         public static final void setBackoff(double backoff) {
