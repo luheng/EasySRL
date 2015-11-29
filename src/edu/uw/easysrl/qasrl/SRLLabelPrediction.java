@@ -45,7 +45,7 @@ public class SRLLabelPrediction {
         return weights;
     }
 
-    private static void evaluate(List<MappedDependency> testDependencies, double[] weights) {
+    private static double evaluate(List<MappedDependency> testDependencies, double[] weights) {
         double accuracy = .0;
         for (MappedDependency dependency : testDependencies) {
             Structure.LabelPredictionInstance testInstance = Structure.newLabelPredictionInstance(dependency,
@@ -55,12 +55,14 @@ public class SRLLabelPrediction {
             String goldSrlLabel = Structure.LabelPredictionInstance.classes[testInstance.goldCliqueId].toString();
             String predSrlLabel = Structure.LabelPredictionInstance.classes[bestLabel].toString();
             List<String> words = dependency.pbSentence.getWords();
-            System.out.println(goldSrlLabel + "\t" + predSrlLabel + "\t" + dependency.qaDependency.toString(words));
+            //System.out.println(goldSrlLabel + "\t" + predSrlLabel + "\t" + dependency.qaDependency.toString(words));
             if (testInstance.goldCliqueId == bestLabel) {
                 accuracy += 1.0;
             }
         }
-        System.out.println("accuracy:\t" + accuracy / testDependencies.size());
+        accuracy /= testDependencies.size();
+        System.out.println("accuracy:\t" + accuracy);
+        return accuracy;
     }
 
     private static void jackknife(Map<Integer, List<MappedDependency>> allDependencies,
@@ -92,14 +94,27 @@ public class SRLLabelPrediction {
     }
 
     public static void main(String[] args) {
-        final double sigmaSquared = 0.5;
+        // TODO: tune sigmaSquared
+        final double[] sigmaSquaredValues = {0.001, 0.01, 0.1, 1, 10, 100};
+        List<Double> results = new ArrayList<>();
         Map<Integer, List<MappedDependency>> allDependencies = PropBankAligner.getMappedDependencies();
         List<MappedDependency> trainingDependencies = new ArrayList<>(),
                                testDependencies = new ArrayList<>();
-        for (int i = 0; i < 5; i++) {
-            jackknife(allDependencies, trainingDependencies, testDependencies, 0.2, i);
-            double[] weights = train(trainingDependencies, sigmaSquared, new Util.Logger(new File("log")));
-            evaluate(testDependencies, weights);
+        // TODO: average accuracy in cross-validation
+        for (double sigmaSquared : sigmaSquaredValues) {
+            double avgAccuracy = .0;
+            for (int i = 0; i < 5; i++) {
+                jackknife(allDependencies, trainingDependencies, testDependencies, 0.2, i);
+                double[] weights = train(trainingDependencies, sigmaSquared, new Util.Logger(new File("log")));
+                evaluate(trainingDependencies, weights);
+                avgAccuracy += evaluate(testDependencies, weights);
+                System.out.println();
+            }
+            results.add(avgAccuracy / 5.0);
+            //System.out.println(sigmaSquared + "\t" + avgAccuracy / 5.0);
+        }
+        for (int i = 0; i < sigmaSquaredValues.length; i++) {
+            System.out.println(sigmaSquaredValues[i] + "\t" + results.get(i));
         }
     }
 }

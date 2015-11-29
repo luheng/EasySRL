@@ -6,8 +6,6 @@ import edu.uw.easysrl.util.CompUtils;
 
 import java.util.*;
 
-import edu.stanford.nlp.util.StringUtils;
-
 /**
  * Created by luheng on 11/23/15.
  * For structured prediction ...

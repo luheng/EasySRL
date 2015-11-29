@@ -2,10 +2,7 @@ package edu.uw.easysrl.qasrl;
 
 import edu.uw.easysrl.dependencies.QADependency;
 import edu.uw.easysrl.dependencies.SRLDependency;
-import edu.uw.easysrl.dependencies.SRLFrame;
 import edu.uw.easysrl.main.InputReader;
-import edu.uw.easysrl.syntax.model.CutoffsDictionary;
-import edu.uw.easysrl.syntax.training.CompressedChart;
 
 import java.util.List;
 

@@ -1,23 +1,13 @@
 package edu.uw.easysrl.qasrl;
 
-import com.google.common.collect.HashMultiset;
-import com.google.common.collect.Multiset;
 import edu.uw.easysrl.corpora.ParallelCorpusReader;
 import edu.uw.easysrl.corpora.qa.QASlots;
 import edu.uw.easysrl.corpora.qa.QuestionEncoder;
-import edu.uw.easysrl.dependencies.DependencyStructure;
 import edu.uw.easysrl.dependencies.QADependency;
 import edu.uw.easysrl.dependencies.SRLDependency;
-import edu.uw.easysrl.dependencies.SRLFrame;
-import edu.uw.easysrl.syntax.grammar.Category;
-import edu.uw.easysrl.syntax.grammar.Preposition;
-import edu.uw.easysrl.syntax.model.feature.*;
-import edu.uw.easysrl.syntax.model.feature.Feature.FeatureKey;
-import edu.uw.easysrl.syntax.training.CompressedChart;
 import edu.uw.easysrl.util.CountDictionary;
 import gnu.trove.map.hash.TIntIntHashMap;
 
-import java.io.IOException;
 import java.util.*;
 
 /**
@@ -50,21 +40,27 @@ public class QASrlFeatureHelper {
     public TIntIntHashMap extractFeatures(ParallelCorpusReader.Sentence sentence, SRLDependency srlDependency,
                                           QADependency qaDependency) {
         TIntIntHashMap featureVector = new TIntIntHashMap();
-        String pbLabel = srlDependency.getLabel().toString();
         String[] qwords = qaDependency.getQuestion();
 
-        // Label mapping
-        String qaLabel = qaDependency.getLabel().toString();
-        featureVector.adjustOrPutValue(featureDictionary.addString("lb_lb=" + pbLabel + "_" + qaLabel), 1, 1);
-        // Question voice.
-        String isPassive = String.valueOf(QuestionEncoder.isPassiveVoice(qwords));
-        featureVector.adjustOrPutValue(featureDictionary.addString("lb_voice=" + pbLabel + "_" + isPassive), 1, 1);
-        for (int slotId = 0; slotId < QASlots.numSlots; slotId ++) {
-            String prefix = "lb_" + QASlots.slotNames[slotId] + "=";
-            featureVector.adjustOrPutValue(featureDictionary.addString(prefix + pbLabel + "_" + qwords[slotId]), 1, 1);
+        // SRL Label features
+        final String[] srlFeatures = {
+                "srl=" + srlDependency.getLabel(),
+                "core=" + String.valueOf(srlDependency.getLabel().isCoreArgument())
+        };
+        for (String srlFeature : srlFeatures) {
+            // Label mapping
+            String qaLabel = qaDependency.getLabel().toString();
+            featureVector.adjustOrPutValue(featureDictionary.addString(srlFeature + "_qalb=" + qaLabel), 1, 1);
+            // Question voice.
+            String isPassive = String.valueOf(QuestionEncoder.isPassiveVoice(qwords));
+            featureVector.adjustOrPutValue(featureDictionary.addString(srlFeature + "_voice=" + isPassive), 1, 1);
+            for (int slotId = 0; slotId < QASlots.numSlots; slotId++) {
+                String prefix = QASlots.slotNames[slotId] + "=";
+                featureVector.adjustOrPutValue(featureDictionary.addString(srlFeature + "_" + prefix + qwords[slotId]), 1, 1);
+            }
+            // bias feature
+            featureVector.adjustOrPutValue(featureDictionary.addString(srlFeature), 1, 1);
         }
-        // bias feature
-        featureVector.adjustOrPutValue(featureDictionary.addString("lb=" + pbLabel), 1, 1);
         featureVector.remove(-1);
         return featureVector;
     }
