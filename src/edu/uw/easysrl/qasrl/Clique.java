@@ -23,16 +23,12 @@ public class Clique {
         this.numFeatures = featureIndices.length;
     }
 
-    public double getScore(double[] featureWeights) {
+    public double getLogScore(double[] featureWeights) {
         double score = .0;
         for (int i = 0; i < numFeatures; i++) {
             score += featureWeights[featureIndices[i]] * featureValues[i];
         }
         return score;
-    }
-
-    public double getLogScore(double[] featureWeights) {
-        return Math.log(getScore(featureWeights));
     }
 
     public void countFeatures(double[] counts, double weight) {

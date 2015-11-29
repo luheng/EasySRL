@@ -94,13 +94,11 @@ public class SRLLabelPrediction {
     }
 
     public static void main(String[] args) {
-        // TODO: tune sigmaSquared
-        final double[] sigmaSquaredValues = {0.001, 0.01, 0.1, 1, 10, 100};
+        final double[] sigmaSquaredValues = {0.01, 0.1, 1, 10, 100};
         List<Double> results = new ArrayList<>();
         Map<Integer, List<MappedDependency>> allDependencies = PropBankAligner.getMappedDependencies();
         List<MappedDependency> trainingDependencies = new ArrayList<>(),
                                testDependencies = new ArrayList<>();
-        // TODO: average accuracy in cross-validation
         for (double sigmaSquared : sigmaSquaredValues) {
             double avgAccuracy = .0;
             for (int i = 0; i < 5; i++) {

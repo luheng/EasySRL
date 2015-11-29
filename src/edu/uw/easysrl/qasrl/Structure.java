@@ -76,13 +76,21 @@ public class Structure {
         }
     }
 
+    /**
+     * All scores are in log scale.
+     * p(y|x) = exp(w.f(x,y)) / sum_y' (exp(w.f(x,y')))
+     */
     public static class MultiClassStructure extends AbstractStructure {
         Clique goldClique;
         Clique[] allCliques;
         double[] cliqueScores;
         protected int goldCliqueId;
         // TODO: fixme
-        static final double backoff = 1e-8;
+        static double backoff = 1e-8;
+
+        public static final void setBackoff(double backoff) {
+            MultiClassStructure.backoff = backoff;
+        }
 
         public MultiClassStructure(int goldCliqueId, Clique goldClique, Clique[] allCliques) {
             this.goldClique = goldClique;
@@ -95,8 +103,8 @@ public class Structure {
         public void updateScores(double[] featureWeights) {
             logLikelihood = goldClique.getLogScore(featureWeights);
             for (int c = 0; c < cliqueScores.length; c++) {
-                //cliqueScores[c] = Math.log(allCliques[c].getScore(featureWeights) + backoff);
                 cliqueScores[c] = allCliques[c].getLogScore(featureWeights);
+                cliqueScores[c] = Math.log(Math.exp(cliqueScores[c]) + backoff);
             }
             logNorm = CompUtils.logSumExp(cliqueScores, cliqueScores.length);
         }
@@ -109,7 +117,7 @@ public class Structure {
         @Override
         public void countExpectedFeatures(double[] counts) {
             for (int c = 0; c < allCliques.length; c++) {
-                allCliques[c].countFeatures(counts, cliqueScores[c] - logNorm);
+                allCliques[c].countFeatures(counts, Math.exp(cliqueScores[c] - logNorm));
             }
         }
 
