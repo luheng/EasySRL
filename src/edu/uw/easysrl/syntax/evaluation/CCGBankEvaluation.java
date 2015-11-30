@@ -21,6 +21,7 @@ import edu.uw.easysrl.corpora.CCGBankDependencies.CCGBankDependency;
 import edu.uw.easysrl.corpora.CCGBankDependencies.DependencyParse;
 import edu.uw.easysrl.corpora.CCGBankDependencies.Partition;
 import edu.uw.easysrl.corpora.ParallelCorpusReader;
+import edu.uw.easysrl.dependencies.DependencyStructure;
 import edu.uw.easysrl.dependencies.DependencyStructure.ResolvedDependency;
 import edu.uw.easysrl.dependencies.DependencyStructure.UnlabelledDependency;
 import edu.uw.easysrl.dependencies.SRLFrame;
@@ -59,6 +60,56 @@ public class CCGBankEvaluation {
 			"((N/PP)\\(N/PP))/NP.1"
 
 	));
+
+	public static Results evaluate(List<CCGandSRLparse> parses, List<DependencyParse> goldParses) throws IOException {
+		final Results results = new Results();
+		final Multiset<String> precisionErrors = HashMultiset.create();
+		final Multiset<String> correct = HashMultiset.create();
+		final Map<String, Results> perRelationResults = new HashMap<>();
+		for (int i = 0; i < goldParses.size(); i++) {
+			DependencyParse gold = goldParses.get(i);
+			CCGandSRLparse parsed = parses.get(i);
+			System.err.println(gold.getWords());
+			Set<ResolvedDependency> evalDeps;
+			if (parsed != null) {
+				final Set<UnlabelledDependency> deps = new HashSet<>();
+				extractDependencies(parses.get(0).getCcgParse(), deps);
+				evalDeps = new HashSet<>();
+				for (final UnlabelledDependency dep : deps) {
+					for (final Integer argument : dep.getArguments()) {
+						if (!filter(gold.getWords().get(dep.getHead()).word, dep.getCategory(), dep.getArgNumber())) {
+							evalDeps.add(new ResolvedDependency(dep.getHead(), dep.getCategory(), dep.getArgNumber(),
+									argument, SRLFrame.NONE, null));
+						}
+					}
+				}
+			} else {
+				evalDeps = new HashSet<>();
+			}
+			results.add(evaluate(evalDeps, asResolvedDependencies(gold.getDependencies()), precisionErrors, correct,
+					perRelationResults));
+		}
+		int i = 0;
+		for (final Entry<String> entry : Multisets.copyHighestCountFirst(precisionErrors).entrySet()) {
+			if (correct.count(entry.getElement()) > 10) {
+				continue;
+			}
+			System.err.println(entry.getElement() + "\t" + entry.getCount() + "\t" + correct.count(entry.getElement()));
+			if (i++ == 20) {
+				break;
+			}
+		}
+		System.err.println();
+		for (final java.util.Map.Entry<String, Results> relation : perRelationResults.entrySet().stream()
+				.sorted((e1, e2) -> e2.getValue().getFrequency() - e1.getValue().getFrequency())
+				.collect(Collectors.toList())) {
+			if (relation.getValue().getFrequency() > 100) {
+				System.err.println(relation.getKey() + "\t" + Util.twoDP(100.0 * relation.getValue().getF1()));
+			}
+		}
+		System.out.println(results);
+		return results;
+	}
 
 	public static Results evaluate(final SRLParser parser, final boolean isDev) throws IOException {
 

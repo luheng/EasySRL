@@ -50,7 +50,7 @@ public class CCGDependencyPrediction {
             CCGBankDependencies.CCGBankDependency ccg = mappedDependency.ccgDependency;
             List<String> words = mappedDependency.sentence.getWords();
             System.out.println(StringUtils.join(words, " "));
-
+            // TODO: CCG dependency doesn't give me a preposition, but I can probably extract it somewhere
             Category category = ccg.getCategory();
             int argNum = ccg.getArgNumber();
             String ccgInfo = category + "\t" +

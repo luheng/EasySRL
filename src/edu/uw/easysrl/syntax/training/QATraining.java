@@ -4,6 +4,8 @@ import com.google.common.io.Files;
 import edu.uw.easysrl.corpora.qa.QACorpusReader;
 import edu.uw.easysrl.dependencies.QADependency;
 import edu.uw.easysrl.main.EasySRL;
+import edu.uw.easysrl.qasrl.PropBankAligner;
+import edu.uw.easysrl.syntax.evaluation.CCGBankEvaluation;
 import edu.uw.easysrl.syntax.evaluation.QAEvaluation;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
@@ -133,6 +135,9 @@ public class QATraining {
                 QACorpusReader.getReader(evaluationDomain).getDevCorpus(),
                 maxSentenceLength,
                 trainingParameters.getResultsFile());
+        if (evaluationDomain.contains("newswire")) {
+            // TODO: get aligned sentences
+        }
         System.out.println("Final result: F1=" + results.getF1());
     }
 
