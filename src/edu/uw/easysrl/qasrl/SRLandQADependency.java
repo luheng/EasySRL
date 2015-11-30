@@ -9,19 +9,18 @@ import edu.uw.easysrl.dependencies.SRLDependency;
  * Created by luheng on 11/22/15.
  * Mapped SRL and QA dependency
  */
-public class MappedDependency {
-    public final ParallelCorpusReader.Sentence pbSentence;
+public class SRLandQADependency {
+    public final ParallelCorpusReader.Sentence sentence;
     public final SRLDependency srlDependency;
     public final QADependency qaDependency;
     public final int numSRLtoQAMaps, numQAtoSRLMaps;
 
-    public MappedDependency(ParallelCorpusReader.Sentence pbSentence, SRLDependency srlDependency,
-                            QADependency qaDependency, int numSRLtoQAMaps, int numQAtoSRLMaps) {
-        this.pbSentence = pbSentence;
+    public SRLandQADependency(ParallelCorpusReader.Sentence sentence, SRLDependency srlDependency,
+                              QADependency qaDependency, int numSRLtoQAMaps, int numQAtoSRLMaps) {
+        this.sentence = sentence;
         this.srlDependency = srlDependency;
         this.qaDependency = qaDependency;
         this.numSRLtoQAMaps = numSRLtoQAMaps;
         this.numQAtoSRLMaps = numQAtoSRLMaps;
     }
-
 }

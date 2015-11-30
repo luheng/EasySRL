@@ -141,7 +141,7 @@ public class Structure {
         }
     }
 
-    public static LabelPredictionInstance newLabelPredictionInstance(MappedDependency dependency,
+    public static LabelPredictionInstance newLabelPredictionInstance(SRLandQADependency dependency,
                                                                      QASrlFeatureHelper featureHelper) {
         SRLDependency srlDep  = dependency.srlDependency;
         List<Integer> argumentIndices = new ArrayList<>(srlDep.getArgumentPositions());

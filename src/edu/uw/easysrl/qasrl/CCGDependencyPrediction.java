@@ -1,69 +1,20 @@
 package edu.uw.easysrl.qasrl;
 
-import edu.uw.easysrl.util.Util;
+import edu.uw.easysrl.corpora.CCGBankDependencies;
+import edu.uw.easysrl.dependencies.QADependency;
+import edu.uw.easysrl.dependencies.SRLDependency;
+import edu.uw.easysrl.syntax.grammar.Category;
 
-import java.io.File;
 import java.util.*;
-import java.util.stream.Collectors;
+
+import edu.stanford.nlp.util.StringUtils;
 
 /**
- * Created by luheng on 11/23/15.
+ * Created by luheng on 11/29/15.
  */
-public class SRLLabelPrediction {
-    private static final int minFeatureCount = 5;
-    private static final QASrlFeatureHelper featureHelper = new QASrlFeatureHelper();
-    private static final Random random = new Random(12345);
-    private static Map<Integer, List<SRLandQADependency>> allDependencies;
+public class CCGDependencyPrediction {
+    private static Random random = new Random(12345);
     private static List<Integer> sentenceIndices = null;
-
-    public static double[] train(List<SRLandQADependency> trainingDependencies,
-                                 double sigmaSquared,
-                                 Util.Logger trainingLogger) {
-        featureHelper.extractFrequentFeatures(trainingDependencies, minFeatureCount);
-        List<Structure.LabelPredictionInstance> trainingData = trainingDependencies.stream()
-                .map(dep -> Structure.newLabelPredictionInstance(dep, featureHelper))
-                .collect(Collectors.toList());
-        final int numFeatures = featureHelper.getNumFeatures();
-        /**
-         * Create loss function.
-         */
-
-        final OptimizationHelper.LossFunction lossFunction = OptimizationHelper.getLossFunction(trainingData,
-                sigmaSquared, trainingLogger);
-
-        final double[] weights = new double[numFeatures];
-        Random random = new Random(12345);
-        for (int i = 0; i < numFeatures; i++) {
-            weights[i] = random.nextDouble() / 100.0;
-        }
-        /**
-         * Train!
-         */
-        OptimizationHelper.TrainingAlgorithm algorithm = OptimizationHelper.makeLBFGS();
-        algorithm.train(lossFunction, weights);
-
-        return weights;
-    }
-
-    private static double evaluate(List<SRLandQADependency> testDependencies, double[] weights) {
-        double accuracy = .0;
-        for (SRLandQADependency dependency : testDependencies) {
-            Structure.LabelPredictionInstance testInstance = Structure.newLabelPredictionInstance(dependency,
-                    featureHelper);
-            testInstance.updateScores(weights);
-            int bestLabel = testInstance.getBest();
-            String goldSrlLabel = Structure.LabelPredictionInstance.classes[testInstance.goldCliqueId].toString();
-            String predSrlLabel = Structure.LabelPredictionInstance.classes[bestLabel].toString();
-            List<String> words = dependency.pbSentence.getWords();
-            //System.out.println(goldSrlLabel + "\t" + predSrlLabel + "\t" + dependency.qaDependency.toString(words));
-            if (testInstance.goldCliqueId == bestLabel) {
-                accuracy += 1.0;
-            }
-        }
-        accuracy /= testDependencies.size();
-        System.out.println("accuracy:\t" + accuracy);
-        return accuracy;
-    }
 
     private static void jackknife(Map<Integer, List<SRLandQADependency>> allDependencies,
                                   List<SRLandQADependency> trainingDependencies,
@@ -92,12 +43,40 @@ public class SRLLabelPrediction {
         System.out.println("training: " + trainingDependencies.size() + "\ttest: " + testDependencies.size());
     }
 
+    private static void tryStuff(List<SRLandQADependency> mappedDependencies) {
+        for (SRLandQADependency mappedDependency : mappedDependencies) {
+            QADependency qa = mappedDependency.qaDependency;
+            SRLDependency srl = mappedDependency.srlDependency;
+            Map<SRLDependency, CCGBankDependencies.CCGBankDependency> mappedSRLandCCGDeps =
+                    mappedDependency.pbSentence.getCorrespondingCCGBankDependencies();
+            List<String> words = mappedDependency.pbSentence.getWords();
+            System.out.println(StringUtils.join(words, " "));
+            mappedSRLandCCGDeps.forEach((mappedSRL, mappedCCG)-> {
+                if (mappedSRL.getPredicateIndex() == srl.getPredicateIndex() &&
+                        mappedSRL.getLabel().equals(srl.getLabel()) && mappedCCG != null) {
+                    Category category = mappedCCG.getCategory();
+                    int argNum = mappedCCG.getArgNumber();
+                    String ccgInfo = category + "\t" +
+                            String.format("%d/%d", argNum, category.getNumberOfArguments()) + "\t" +
+                            category.getArgument(argNum);
+                    System.out.println(qa.toString(words) + "\n" +
+                            srl.toString(words) + "\n" +
+                            mappedCCG.toString() + "\t" + ccgInfo + "\n");
+                }
+            });
+            System.out.println();
+        }
+    }
+
     public static void main(String[] args) {
         final double[] sigmaSquaredValues = {0.01, 0.1, 1, 10, 100};
         List<Double> results = new ArrayList<>();
         Map<Integer, List<SRLandQADependency>> allDependencies = PropBankAligner.getSrlAndQADependencies();
         List<SRLandQADependency> trainingDependencies = new ArrayList<>(),
                                testDependencies = new ArrayList<>();
+        jackknife(allDependencies, trainingDependencies, testDependencies, 0.2, 0);
+        tryStuff(trainingDependencies);
+        /*
         for (double sigmaSquared : sigmaSquaredValues) {
             double avgAccuracy = .0;
             for (int i = 0; i < 5; i++) {
@@ -113,5 +92,6 @@ public class SRLLabelPrediction {
         for (int i = 0; i < sigmaSquaredValues.length; i++) {
             System.out.println(sigmaSquaredValues[i] + "\t" + results.get(i));
         }
+        */
     }
 }
