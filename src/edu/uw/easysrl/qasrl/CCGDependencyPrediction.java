@@ -12,13 +12,14 @@ import edu.stanford.nlp.util.StringUtils;
 /**
  * Created by luheng on 11/29/15.
  */
+// TODO
 public class CCGDependencyPrediction {
     private static Random random = new Random(12345);
     private static List<Integer> sentenceIndices = null;
 
-    private static void jackknife(Map<Integer, List<SRLandQADependency>> allDependencies,
-                                  List<SRLandQADependency> trainingDependencies,
-                                  List<SRLandQADependency> testDependencies,
+    private static void jackknife(Map<Integer, List<CCGandQADependency>> allDependencies,
+                                  List<CCGandQADependency> trainingDependencies,
+                                  List<CCGandQADependency> testDependencies,
                                   double heldOutPortion,
                                   int heldOutFold) {
         if (sentenceIndices == null) {
@@ -33,7 +34,7 @@ public class CCGDependencyPrediction {
         trainingDependencies.clear();
         testDependencies.clear();
         for (int i = 0; i < numSentences; i++) {
-            List<SRLandQADependency> dependencies = allDependencies.get(sentenceIndices.get(i));
+            List<CCGandQADependency> dependencies = allDependencies.get(sentenceIndices.get(i));
             if (i < heldOutStartIdx || i >= heldOutEndIdx) {
                 trainingDependencies.addAll(dependencies);
             } else {
@@ -43,37 +44,28 @@ public class CCGDependencyPrediction {
         System.out.println("training: " + trainingDependencies.size() + "\ttest: " + testDependencies.size());
     }
 
-    private static void tryStuff(List<SRLandQADependency> mappedDependencies) {
-        for (SRLandQADependency mappedDependency : mappedDependencies) {
+    private static void tryStuff(List<CCGandQADependency> mappedDependencies) {
+        for (CCGandQADependency mappedDependency : mappedDependencies) {
             QADependency qa = mappedDependency.qaDependency;
-            SRLDependency srl = mappedDependency.srlDependency;
-            Map<SRLDependency, CCGBankDependencies.CCGBankDependency> mappedSRLandCCGDeps =
-                    mappedDependency.pbSentence.getCorrespondingCCGBankDependencies();
-            List<String> words = mappedDependency.pbSentence.getWords();
+            CCGBankDependencies.CCGBankDependency ccg = mappedDependency.ccgDependency;
+            List<String> words = mappedDependency.sentence.getWords();
             System.out.println(StringUtils.join(words, " "));
-            mappedSRLandCCGDeps.forEach((mappedSRL, mappedCCG)-> {
-                if (mappedSRL.getPredicateIndex() == srl.getPredicateIndex() &&
-                        mappedSRL.getLabel().equals(srl.getLabel()) && mappedCCG != null) {
-                    Category category = mappedCCG.getCategory();
-                    int argNum = mappedCCG.getArgNumber();
-                    String ccgInfo = category + "\t" +
-                            String.format("%d/%d", argNum, category.getNumberOfArguments()) + "\t" +
-                            category.getArgument(argNum);
-                    System.out.println(qa.toString(words) + "\n" +
-                            srl.toString(words) + "\n" +
-                            mappedCCG.toString() + "\t" + ccgInfo + "\n");
-                }
-            });
-            System.out.println();
+
+            Category category = ccg.getCategory();
+            int argNum = ccg.getArgNumber();
+            String ccgInfo = category + "\t" +
+                    String.format("%d/%d", argNum, category.getNumberOfArguments()) + "\t" +
+                    category.getArgument(argNum);
+            System.out.println(qa.toString(words) + "\n" + ccg.toString() + "\t" + ccgInfo + "\n");
         }
     }
 
     public static void main(String[] args) {
         final double[] sigmaSquaredValues = {0.01, 0.1, 1, 10, 100};
         List<Double> results = new ArrayList<>();
-        Map<Integer, List<SRLandQADependency>> allDependencies = PropBankAligner.getSrlAndQADependencies();
-        List<SRLandQADependency> trainingDependencies = new ArrayList<>(),
-                               testDependencies = new ArrayList<>();
+        Map<Integer, List<CCGandQADependency>> allDependencies = PropBankAligner.getCcgAndQADependencies();
+        List<CCGandQADependency> trainingDependencies = new ArrayList<>(),
+                                  testDependencies = new ArrayList<>();
         jackknife(allDependencies, trainingDependencies, testDependencies, 0.2, 0);
         tryStuff(trainingDependencies);
         /*

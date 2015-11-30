@@ -25,7 +25,7 @@ public class PropBankAligner {
     static List<QASentence> qaSentenceList = null;
     static List<ParallelCorpusReader.Sentence> pbSentenceList = null;
     static Map<Integer, List<SRLandQADependency>> srlAndQADependencies = null;
-    static Map<Integer, List<CCGanddQADependency>> ccgAndQADependencies = null;
+    static Map<Integer, List<CCGandQADependency>> ccgAndQADependencies = null;
 
     public static Map<Integer, List<SRLandQADependency>> getSrlAndQADependencies() {
         if (srlAndQADependencies == null) {
@@ -38,7 +38,7 @@ public class PropBankAligner {
         return srlAndQADependencies;
     }
 
-    public static Map<Integer, List<CCGanddQADependency>> getCcgAndQADependencies() {
+    public static Map<Integer, List<CCGandQADependency>> getCcgAndQADependencies() {
         if (ccgAndQADependencies == null) {
             try {
                 alignPropBankQADependencies();
@@ -73,6 +73,7 @@ public class PropBankAligner {
     private static void alignPropBankQADependencies() throws IOException {
         // Align sentences.
         srlAndQADependencies = new HashMap<>();
+        ccgAndQADependencies = new HashMap<>();
         pbSentenceList =  new ArrayList<>();
         qaSentenceList = new ArrayList<>();
         Iterator<QASentence> qaSentenceIterator = QACorpusReader.getReader("newswire").readTrainingCorpus();
@@ -162,7 +163,7 @@ public class PropBankAligner {
                             ccgAndQADependencies.put(sentIdx, new ArrayList<>());
                         }
                         ccgAndQADependencies.get(sentIdx).add(
-                                new CCGanddQADependency(pbSentence, ccgDependencies.get(ccgIdx),
+                                new CCGandQADependency(pbSentence, ccgDependencies.get(ccgIdx),
                                         qaDependencies.get(qaIdx), matched.size(), qa2ccg.get(qaIdx).size())
                         );
                     }

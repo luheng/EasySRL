@@ -151,7 +151,7 @@ public class Structure {
         for (int c = 0; c < LabelPredictionInstance.numClasses; c++) {
             SRLFrame.SRLLabel role = LabelPredictionInstance.classes[c];
             allCliques[c] = featureHelper.getClique(
-                    dependency.pbSentence,
+                    dependency.sentence,
                     new SRLDependency(srlDep.getPredicate(), srlDep.getPredicateIndex(),
                                       argumentIndices, role,
                                       srlDep.getPreposition()),
@@ -161,7 +161,7 @@ public class Structure {
             }
         }
 
-        Clique goldClique = featureHelper.getClique(dependency.pbSentence, srlDep, dependency.qaDependency);
+        Clique goldClique = featureHelper.getClique(dependency.sentence, srlDep, dependency.qaDependency);
         return new Structure.LabelPredictionInstance(goldCliqueId, goldClique, allCliques);
     }
 }

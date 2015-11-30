@@ -54,7 +54,7 @@ public class SRLLabelPrediction {
             int bestLabel = testInstance.getBest();
             String goldSrlLabel = Structure.LabelPredictionInstance.classes[testInstance.goldCliqueId].toString();
             String predSrlLabel = Structure.LabelPredictionInstance.classes[bestLabel].toString();
-            List<String> words = dependency.pbSentence.getWords();
+            List<String> words = dependency.sentence.getWords();
             //System.out.println(goldSrlLabel + "\t" + predSrlLabel + "\t" + dependency.qaDependency.toString(words));
             if (testInstance.goldCliqueId == bestLabel) {
                 accuracy += 1.0;
