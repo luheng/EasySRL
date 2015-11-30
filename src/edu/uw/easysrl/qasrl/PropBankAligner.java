@@ -25,7 +25,7 @@ public class PropBankAligner {
     static List<QASentence> qaSentenceList = null;
     static List<ParallelCorpusReader.Sentence> pbSentenceList = null;
     static Map<Integer, List<SRLandQADependency>> srlAndQADependencies = null;
-    static Map<Integer, List<CCGanddQADependency>> ccgAndQADependenceis = null;
+    static Map<Integer, List<CCGanddQADependency>> ccgAndQADependencies = null;
 
     public static Map<Integer, List<SRLandQADependency>> getSrlAndQADependencies() {
         if (srlAndQADependencies == null) {
@@ -38,15 +38,15 @@ public class PropBankAligner {
         return srlAndQADependencies;
     }
 
-    public static Map<Integer, List<CCGanddQADependency>> getCcgAndQADependenceis() {
-        if (ccgAndQADependenceis == null) {
+    public static Map<Integer, List<CCGanddQADependency>> getCcgAndQADependencies() {
+        if (ccgAndQADependencies == null) {
             try {
                 alignPropBankQADependencies();
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
-        return ccgAndQADependenceis;
+        return ccgAndQADependencies;
     }
 
     private static boolean match(SRLDependency srlDependency, QADependency qaDependency) {
@@ -158,10 +158,10 @@ public class PropBankAligner {
                 for (int ccgIdx : ccg2qa.keySet()) {
                     List<Integer> matched = ccg2qa.get(ccgIdx);
                     for (int qaIdx : matched) {
-                        if (!ccgAndQADependenceis.containsKey(sentIdx)) {
-                            ccgAndQADependenceis.put(sentIdx, new ArrayList<>());
+                        if (!ccgAndQADependencies.containsKey(sentIdx)) {
+                            ccgAndQADependencies.put(sentIdx, new ArrayList<>());
                         }
-                        ccgAndQADependenceis.get(sentIdx).add(
+                        ccgAndQADependencies.get(sentIdx).add(
                                 new CCGanddQADependency(pbSentence, ccgDependencies.get(ccgIdx),
                                         qaDependencies.get(qaIdx), matched.size(), qa2ccg.get(qaIdx).size())
                         );
