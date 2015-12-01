@@ -78,7 +78,6 @@ public class SSLTraining {
         }
         Map<Integer, Integer> sentMap = PropBankAligner.getPropBankToQASentenceMapping(allPropbankSentences,
                 qaTrainingSentences);
-        // TODO: shuffle the sentence ids, gather the first 500 or so sentences that did not appear in Q/A annotation.
         List<Integer> sentIds = new ArrayList<>();
         for (int pbIdx = 0; pbIdx < allPropbankSentences.size(); pbIdx ++) {
             sentIds.add(pbIdx);
@@ -112,7 +111,8 @@ public class SSLTraining {
 
         List<QASentence> qaTrainingSentences = new ArrayList<>();
         List<ParallelCorpusReader.Sentence> trainingSentences = new ArrayList<>(), evalSentences = new ArrayList<>();
-        for (int numPropBankTrainingSentences : new int[]{50, 100, 200, 500, 1000, 2000, 5000}) {
+        //for (int numPropBankTrainingSentences : new int[]{50, 100, 200, 500, 1000, 2000, 5000}) {
+        for (int numPropBankTrainingSentences : new int[]{300, 400, 1500, 7000, 10000, 15000, 20000}) {
             prepareCorpora(numPropBankTrainingSentences, qaTrainingSentences, trainingSentences, evalSentences);
 
             // Grid search of hyper-parameters.

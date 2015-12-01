@@ -23,4 +23,10 @@ public class CCGandQADependency {
         this.numSRLtoQAMaps = numSRLtoQAMaps;
         this.numQAtoSRLMaps = numQAtoSRLMaps;
     }
+
+    @Override
+    public String toString() {
+        // TODO
+        return "";
+    }
 }

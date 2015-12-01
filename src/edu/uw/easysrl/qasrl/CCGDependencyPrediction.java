@@ -2,7 +2,6 @@ package edu.uw.easysrl.qasrl;
 
 import edu.uw.easysrl.corpora.CCGBankDependencies;
 import edu.uw.easysrl.dependencies.QADependency;
-import edu.uw.easysrl.dependencies.SRLDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.*;

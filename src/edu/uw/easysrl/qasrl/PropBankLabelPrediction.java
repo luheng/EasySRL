@@ -9,14 +9,14 @@ import java.util.stream.Collectors;
 /**
  * Created by luheng on 11/23/15.
  */
-public class SRLLabelPrediction {
+public class PropBankLabelPrediction {
     private static final int minFeatureCount = 5;
     private static final QASrlFeatureHelper featureHelper = new QASrlFeatureHelper();
     private static final Random random = new Random(12345);
-    private static Map<Integer, List<SRLandQADependency>> allDependencies;
+    private static Map<Integer, List<PBandQADependency>> allDependencies;
     private static List<Integer> sentenceIndices = null;
 
-    public static double[] train(List<SRLandQADependency> trainingDependencies,
+    public static double[] train(List<PBandQADependency> trainingDependencies,
                                  double sigmaSquared,
                                  Util.Logger trainingLogger) {
         featureHelper.extractFrequentFeatures(trainingDependencies, minFeatureCount);
@@ -45,9 +45,15 @@ public class SRLLabelPrediction {
         return weights;
     }
 
-    private static double evaluate(List<SRLandQADependency> testDependencies, double[] weights) {
+    private static double evaluate(List<PBandQADependency> testDependencies, double[] weights) {
+        // TODO: confusion matrix
+        int numClasses = Structure.LabelPredictionInstance.numClasses;
+        double[][] confusion = new double[numClasses][numClasses];
+        for (int i = 0; i < numClasses; i++) {
+            Arrays.fill(confusion[i], 0.0);
+        }
         double accuracy = .0;
-        for (SRLandQADependency dependency : testDependencies) {
+        for (PBandQADependency dependency : testDependencies) {
             Structure.LabelPredictionInstance testInstance = Structure.newLabelPredictionInstance(dependency,
                     featureHelper);
             testInstance.updateScores(weights);
@@ -59,15 +65,31 @@ public class SRLLabelPrediction {
             if (testInstance.goldCliqueId == bestLabel) {
                 accuracy += 1.0;
             }
+            confusion[testInstance.goldCliqueId][bestLabel] += 1.0;
         }
         accuracy /= testDependencies.size();
         System.out.println("accuracy:\t" + accuracy);
+        // Row-normalize confusion matrix.
+        // Just print.
+        System.out.print("-");
+        for (int i = 0; i < numClasses; i++) {
+            System.out.print("\t" + Structure.LabelPredictionInstance.classes[i]);
+        }
+        System.out.println();
+        for (int i = 0; i < numClasses; i++) {
+            System.out.print(Structure.LabelPredictionInstance.classes[i]);
+            for (int j = 0; j < numClasses; j++) {
+                System.out.print("\t" + confusion[i][j]);
+            }
+            System.out.println();
+        }
+        System.out.println();
         return accuracy;
     }
 
-    private static void jackknife(Map<Integer, List<SRLandQADependency>> allDependencies,
-                                  List<SRLandQADependency> trainingDependencies,
-                                  List<SRLandQADependency> testDependencies,
+    private static void jackknife(Map<Integer, List<PBandQADependency>> allDependencies,
+                                  List<PBandQADependency> trainingDependencies,
+                                  List<PBandQADependency> testDependencies,
                                   double heldOutPortion,
                                   int heldOutFold) {
         if (sentenceIndices == null) {
@@ -82,7 +104,7 @@ public class SRLLabelPrediction {
         trainingDependencies.clear();
         testDependencies.clear();
         for (int i = 0; i < numSentences; i++) {
-            List<SRLandQADependency> dependencies = allDependencies.get(sentenceIndices.get(i));
+            List<PBandQADependency> dependencies = allDependencies.get(sentenceIndices.get(i));
             if (i < heldOutStartIdx || i >= heldOutEndIdx) {
                 trainingDependencies.addAll(dependencies);
             } else {
@@ -95,8 +117,8 @@ public class SRLLabelPrediction {
     public static void main(String[] args) {
         final double[] sigmaSquaredValues = {0.01, 0.1, 1, 10, 100};
         List<Double> results = new ArrayList<>();
-        Map<Integer, List<SRLandQADependency>> allDependencies = PropBankAligner.getSrlAndQADependencies();
-        List<SRLandQADependency> trainingDependencies = new ArrayList<>(),
+        Map<Integer, List<PBandQADependency>> allDependencies = PropBankAligner.getPbAndQADependencies();
+        List<PBandQADependency> trainingDependencies = new ArrayList<>(),
                                testDependencies = new ArrayList<>();
         for (double sigmaSquared : sigmaSquaredValues) {
             double avgAccuracy = .0;
