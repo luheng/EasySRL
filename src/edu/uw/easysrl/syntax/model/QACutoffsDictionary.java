@@ -2,6 +2,7 @@ package edu.uw.easysrl.syntax.model;
 
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Multiset;
+import edu.uw.easysrl.corpora.ParallelCorpusReader;
 import edu.uw.easysrl.corpora.qa.QACorpusReader;
 import edu.uw.easysrl.corpora.qa.QASentence;
 import edu.uw.easysrl.dependencies.DependencyStructure.ResolvedDependency;
@@ -28,19 +29,19 @@ public class QACutoffsDictionary extends CutoffsDictionary {
                                TrainingDataParameters dataParameters) {
         super(lexicalCategories, tagDict, maxDependencyLength);
         try {
-            makeAfterContruction(new CCGHelper(dataParameters, true /* backoff */));
+            makeAfterConstruction(new CCGHelper(dataParameters, true /* backoff */));
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
     @Override
-    protected void make() throws IOException {
+    protected void make(List<ParallelCorpusReader.Sentence> sentences) throws IOException {
         // do nothing
     }
 
     // Really hakcy ...
-    private void makeAfterContruction(CCGHelper ccgHelper) throws IOException {
+    private void makeAfterConstruction(CCGHelper ccgHelper) throws IOException {
         final Map<String, Multiset<SRLFrame.SRLLabel>> keyToRole = new HashMap<>();
         for (final SRLFrame.SRLLabel label : SRLFrame.getAllSrlLabels()) {
             srlToOffset.put(label, HashMultiset.create());

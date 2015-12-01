@@ -21,7 +21,6 @@ import edu.uw.easysrl.dependencies.SRLDependency;
  * Created by luheng on 11/19/15.
  */
 public class PropBankAligner {
-
     static List<QASentence> qaSentenceList = null;
     static List<ParallelCorpusReader.Sentence> pbSentenceList = null;
     static Map<Integer, List<SRLandQADependency>> srlAndQADependencies = null;
@@ -49,6 +48,31 @@ public class PropBankAligner {
         return ccgAndQADependencies;
     }
 
+    /**
+     * Given a list of PropBank sentences and a list of QA sentence, return a mapping from
+     * PropBank sentence index to QA sentence index, iff. the sentences align.
+     * @param pbSentences
+     * @param qaSentences
+     * @return
+     */
+    public static Map<Integer, Integer> getPropBankToQASentenceMapping(
+            List<ParallelCorpusReader.Sentence> pbSentenceList,
+            List<QASentence> qaSentenceList) {
+        HashMap<Integer, Integer> sentenceMap = new HashMap<>();
+        HashMap<String, Integer> sentenceStringMap = new HashMap<>();
+        for (int qaIdx = 0; qaIdx < qaSentenceList.size(); qaIdx++) {
+            String sentStr = StringUtils.join(qaSentenceList.get(qaIdx).getWords(), "");
+            sentenceStringMap.put(sentStr, qaIdx);
+        }
+        for (int pbIdx = 0; pbIdx < pbSentenceList.size(); pbIdx++) {
+            String sentStr = StringUtils.join(pbSentenceList.get(pbIdx).getWords(), "");
+            if (sentenceStringMap.containsKey(sentStr)) {
+                sentenceMap.put(pbIdx, sentenceStringMap.get(sentStr));
+            }
+        }
+        return sentenceMap;
+    }
+
     private static boolean match(SRLDependency srlDependency, QADependency qaDependency) {
         boolean predicateMatch = srlDependency.getPredicateIndex() == qaDependency.getPredicateIndex();
         boolean argumentMatch = srlDependency.getArgumentPositions().stream()
@@ -69,7 +93,7 @@ public class PropBankAligner {
         return match || reversedMatch;
     }
 
-    // FIXME: QA-newswire and PropBank are tokenized differently: A - B vs A-B
+    // QA-newswire and PropBank are tokenized differently: A - B vs A-B
     private static void alignPropBankQADependencies() throws IOException {
         // Align sentences.
         srlAndQADependencies = new HashMap<>();

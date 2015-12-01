@@ -49,7 +49,6 @@ class TrainingDataLoader {
 		try {
 			unaryRules = AbstractParser.loadUnaryRules(new File(this.dataParameters.getExistingModel(), "unaryRules"));
 			DependencyStructure.parseMarkedUpFile(new File(dataParameters.getExistingModel(), "markedup"));
-
 			// Build set of possible parses
 			this.parser = new CKY(
 					dataParameters.getExistingModel(),

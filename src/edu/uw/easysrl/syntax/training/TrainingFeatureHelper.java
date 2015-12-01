@@ -34,6 +34,72 @@ public class TrainingFeatureHelper {
         this.dataParameters = dataParameters;
     }
 
+    public Map<FeatureKey, Integer> makeKeyToIndexMap(
+            final int minimumFeatureFrequency,
+            final Set<FeatureKey> boundedFeatures,
+            List<ParallelCorpusReader.Sentence> trainingSentences) throws IOException {
+        final Multiset<FeatureKey> keyCount = HashMultiset.create();
+        final Multiset<FeatureKey> bilexicalKeyCount = HashMultiset.create();
+        final Multiset<FeatureKey> binaryFeatureCount = HashMultiset.create();
+        final Map<FeatureKey, Integer> result = new HashMap<>();
+
+        for (final ParallelCorpusReader.Sentence sentence : trainingSentences) {
+            final List<DependencyStructure.ResolvedDependency> goldDeps = getGoldDeps(sentence);
+            final List<Category> cats = sentence.getLexicalCategories();
+            for (int i = 0; i < cats.size(); i++) {
+                final Feature.FeatureKey key = trainingParameters.getFeatureSet().lexicalCategoryFeatures.getFeatureKey(
+                        sentence.getInputWords(), i, cats.get(i));
+                if (key != null) {
+                    keyCount.add(key);
+                }
+            }
+            for (final DependencyStructure.ResolvedDependency dep : goldDeps) {
+                final SRLFrame.SRLLabel role = dep.getSemanticRole();
+                for (final ArgumentSlotFeature feature : trainingParameters.getFeatureSet().argumentSlotFeatures) {
+                    final Feature.FeatureKey key = feature.getFeatureKey(sentence.getInputWords(), dep.getPredicateIndex(),
+                            role, dep.getCategory(), dep.getArgNumber(), dep.getPreposition());
+                    keyCount.add(key);
+                }
+                if (dep.getPreposition() != Preposition.NONE) {
+                    for (final PrepositionFeature feature : trainingParameters.getFeatureSet().prepositionFeatures) {
+                        final Feature.FeatureKey key = feature.getFeatureKey(sentence.getInputWords(), dep.getPredicateIndex(),
+                                dep.getCategory(), dep.getPreposition(), dep.getArgNumber());
+                        keyCount.add(key);
+                    }
+                }
+                if (dep.getSemanticRole() != SRLFrame.NONE) {
+                    for (final BilexicalFeature feature : trainingParameters.getFeatureSet().dependencyFeatures) {
+                        final Feature.FeatureKey key = feature.getFeatureKey(sentence.getInputWords(), dep.getSemanticRole(),
+                                dep.getPredicateIndex(), dep.getArgumentIndex());
+                        bilexicalKeyCount.add(key);
+                    }
+                }
+
+            }
+            getFromDerivation(sentence.getCcgbankParse(), binaryFeatureCount, sentence.getInputWords(), 0,
+                    sentence.getInputWords().size());
+            for (final Feature.RootCategoryFeature rootFeature : trainingParameters.getFeatureSet().rootFeatures) {
+                final Feature.FeatureKey key = rootFeature.getFeatureKey(sentence.getCcgbankParse().getCategory(),
+                        sentence.getInputWords());
+                boundedFeatures.add(key);
+                keyCount.add(key);
+            }
+        }
+        result.put(trainingParameters.getFeatureSet().lexicalCategoryFeatures.getDefault(), result.size());
+        addFrequentFeatures(minimumFeatureFrequency, keyCount, result, boundedFeatures, false);
+        addFrequentFeatures(minimumFeatureFrequency, bilexicalKeyCount, result, boundedFeatures, false);
+        for (final Feature.BinaryFeature feature : trainingParameters.getFeatureSet().binaryFeatures) {
+            boundedFeatures.add(feature.getDefault());
+        }
+        for (final Feature feature : trainingParameters.getFeatureSet().getAllFeatures()) {
+            if (!result.containsKey(feature.getDefault())) {
+                result.put(feature.getDefault(), result.size());
+            }
+        }
+        System.out.println("Total features: " + result.size());
+        return result;
+    }
+
     /**
      * Creates a map from (sufficiently frequent) features to integers
      */
