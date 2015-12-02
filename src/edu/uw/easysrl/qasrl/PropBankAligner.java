@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.rmi.NotBoundException;
 
 import java.util.*;
+import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
 import edu.stanford.nlp.util.StringUtils;
@@ -261,7 +262,7 @@ public class PropBankAligner {
         Arrays.fill(offsets, 0);
         for (int firstHyphenIdx = 1; firstHyphenIdx < qaSentLength - 1; firstHyphenIdx++) {
             int lastHyphenIdx = firstHyphenIdx;
-            for  ( ;lastHyphenIdx < qaSentLength - 1; lastHyphenIdx += 2) {
+            for  ( ; lastHyphenIdx < qaSentLength - 1; lastHyphenIdx += 2) {
                 if (!qaWords.get(lastHyphenIdx).equals("-")) {
                     break;
                 }
@@ -286,14 +287,24 @@ public class PropBankAligner {
                         StringUtils.join(qaWords));
             }
         }
-        Collection<QADependency> realignedDeps = new HashSet<>();
-        qaSentence.getDependencies().stream().map(dep -> {
-            int newPredicateIndex = dep.getPredicateIndex() - offsets[dep.getPredicateIndex()];
+        /*
+        List<QADependency> realignedDependencies = new ArrayList<>();
+        for (QADependency dep : qaSentence.getDependencies()) {
+            int newPredicateIndex = dep.getPredicateIndex() + offsets[dep.getPredicateIndex()];
             List<Integer> newAnswerIndices = dep.getAnswerPositions().stream()
-                    .map(idx -> idx - offsets[idx]).distinct().sorted().collect(Collectors.toList());
-            return new QADependency(dep.getPredicate(), newPredicateIndex, dep.getQuestion(), newAnswerIndices);
-        });
-        return realignedDeps;
+                    .map(idx -> (idx + offsets[idx])).distinct().sorted()
+                    .collect(Collectors.toList());
+            realignedDependencies.add(new QADependency(pbWords.get(newPredicateIndex), newPredicateIndex,
+                    dep.getQuestion(), newAnswerIndices));
+        }*/
+        return qaSentence.getDependencies().stream().map(
+                dep -> new QADependency(dep.getPredicate(),
+                        dep.getPredicateIndex() + offsets[dep.getPredicateIndex()], // new predicate index
+                            dep.getQuestion(),
+                            dep.getAnswerPositions().stream() // new argument indices
+                                    .map(idx -> idx + offsets[idx]).distinct().sorted()
+                                    .collect(Collectors.toList())))
+                .collect(Collectors.toList());
     }
 
     // TODO: learn a distribution of questions given gold parse/dependencies
