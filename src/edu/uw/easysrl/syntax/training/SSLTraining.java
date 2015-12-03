@@ -112,7 +112,8 @@ public class SSLTraining {
         List<QASentence> qaTrainingSentences = new ArrayList<>();
         List<ParallelCorpusReader.Sentence> trainingSentences = new ArrayList<>(), evalSentences = new ArrayList<>();
         //for (int numPropBankTrainingSentences : new int[]{50, 100, 200, 500, 1000, 2000, 5000}) {
-        for (int numPropBankTrainingSentences : new int[]{300, 400, 1500, 7000, 10000, 15000, 20000}) {
+        //for (int numPropBankTrainingSentences : new int[]{300, 400, 1500, 7000, 10000, 15000, 20000}) {
+        for (int numPropBankTrainingSentences : new int[]{700, 3000, 4000, 6000, 20000}) {
             prepareCorpora(numPropBankTrainingSentences, qaTrainingSentences, trainingSentences, evalSentences);
 
             // Grid search of hyper-parameters.

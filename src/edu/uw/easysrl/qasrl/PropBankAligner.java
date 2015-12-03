@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.rmi.NotBoundException;
 
 import java.util.*;
-import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
 import edu.stanford.nlp.util.StringUtils;
@@ -322,14 +321,14 @@ public class PropBankAligner {
                 CCGBankDependencies.CCGBankDependency ccg = dep.ccgDependency;
                 String ccgInfo = (ccg == null ? "" : ccg.getCategory() + ", " + ccg.getArgNumber());
                 QADependency qa = dep.qaDependency;
-                if (ccg != null && qa != null) {
+                if (ccg == null || qa == null) {
                     continue;
                 }
                 System.out.println(
                         (ccg == null ? "null" : ccgInfo + " | " + ccg) + "\t|\t" +
                         (qa == null ? "null" : qa.toString(words)) + "\t" +
-                        dep.numSRLtoQAMaps + "\t" + dep.numQAtoSRLMaps);
-                if (dep.numQAtoSRLMaps == 1 && dep.numSRLtoQAMaps == 1) {
+                        dep.numCCGtoQAMaps + "\t" + dep.numQAtoCCGMaps);
+                if (dep.numQAtoCCGMaps == 1 && dep.numCCGtoQAMaps == 1) {
                     numUniquelyAlignedDependencies ++;
                 }
                 if (ccg != null && qa != null) {

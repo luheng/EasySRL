@@ -11,7 +11,7 @@ public class CCGandQADependency {
     public final ParallelCorpusReader.Sentence sentence;
     public final CCGBankDependencies.CCGBankDependency ccgDependency;
     public final QADependency qaDependency;
-    public final int numSRLtoQAMaps, numQAtoSRLMaps;
+    public final int numCCGtoQAMaps, numQAtoCCGMaps;
 
     public CCGandQADependency(ParallelCorpusReader.Sentence sentence,
                               CCGBankDependencies.CCGBankDependency ccgDependency,
@@ -19,8 +19,8 @@ public class CCGandQADependency {
         this.sentence = sentence;
         this.ccgDependency = ccgDependency;
         this.qaDependency = qaDependency;
-        this.numSRLtoQAMaps = numSRLtoQAMaps;
-        this.numQAtoSRLMaps = numQAtoSRLMaps;
+        this.numCCGtoQAMaps = numSRLtoQAMaps;
+        this.numQAtoCCGMaps = numQAtoSRLMaps;
     }
 
     @Override
