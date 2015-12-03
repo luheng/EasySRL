@@ -10,14 +10,14 @@ import edu.uw.easysrl.dependencies.SRLDependency;
  */
 public class PBandQADependency {
     public final ParallelCorpusReader.Sentence sentence;
-    public final SRLDependency srlDependency;
+    public final SRLDependency pbDependency;
     public final QADependency qaDependency;
     public final int numSRLtoQAMaps, numQAtoSRLMaps;
 
-    public PBandQADependency(ParallelCorpusReader.Sentence sentence, SRLDependency srlDependency,
+    public PBandQADependency(ParallelCorpusReader.Sentence sentence, SRLDependency pbDependency,
                              QADependency qaDependency, int numSRLtoQAMaps, int numQAtoSRLMaps) {
         this.sentence = sentence;
-        this.srlDependency = srlDependency;
+        this.pbDependency = pbDependency;
         this.qaDependency = qaDependency;
         this.numSRLtoQAMaps = numSRLtoQAMaps;
         this.numQAtoSRLMaps = numQAtoSRLMaps;

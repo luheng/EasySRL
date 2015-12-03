@@ -300,10 +300,10 @@ public class PropBankAligner {
         return qaSentence.getDependencies().stream().map(
                 dep -> new QADependency(dep.getPredicate(),
                         dep.getPredicateIndex() + offsets[dep.getPredicateIndex()], // new predicate index
-                            dep.getQuestion(),
-                            dep.getAnswerPositions().stream() // new argument indices
-                                    .map(idx -> idx + offsets[idx]).distinct().sorted()
-                                    .collect(Collectors.toList())))
+                        dep.getQuestion(),
+                        dep.getAnswerPositions().stream() // new argument indices
+                                .map(idx -> idx + offsets[idx]).distinct().sorted()
+                                .collect(Collectors.toList())))
                 .collect(Collectors.toList());
     }
 
@@ -320,9 +320,13 @@ public class PropBankAligner {
             System.out.println("\n" + StringUtils.join(words, " "));
             for (CCGandQADependency dep : ccgAndQADependencies.get(sentIdx)) {
                 CCGBankDependencies.CCGBankDependency ccg = dep.ccgDependency;
+                String ccgInfo = (ccg == null ? "" : ccg.getCategory() + ", " + ccg.getArgNumber());
                 QADependency qa = dep.qaDependency;
+                if (ccg != null && qa != null) {
+                    continue;
+                }
                 System.out.println(
-                        (ccg == null ? "null" : ccg) + "\t|\t" +
+                        (ccg == null ? "null" : ccgInfo + " | " + ccg) + "\t|\t" +
                         (qa == null ? "null" : qa.toString(words)) + "\t" +
                         dep.numSRLtoQAMaps + "\t" + dep.numQAtoSRLMaps);
                 if (dep.numQAtoSRLMaps == 1 && dep.numSRLtoQAMaps == 1) {

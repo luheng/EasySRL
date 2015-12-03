@@ -3,7 +3,6 @@ package edu.uw.easysrl.qasrl;
 import edu.uw.easysrl.corpora.CCGBankDependencies;
 import edu.uw.easysrl.corpora.ParallelCorpusReader;
 import edu.uw.easysrl.dependencies.QADependency;
-import edu.uw.easysrl.dependencies.SRLDependency;
 
 /**
  * Created by luheng on 11/30/15.

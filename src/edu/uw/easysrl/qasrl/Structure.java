@@ -143,7 +143,7 @@ public class Structure {
 
     public static LabelPredictionInstance newLabelPredictionInstance(PBandQADependency dependency,
                                                                      QASrlFeatureHelper featureHelper) {
-        SRLDependency srlDep  = dependency.srlDependency;
+        SRLDependency srlDep  = dependency.pbDependency;
         List<Integer> argumentIndices = new ArrayList<>(srlDep.getArgumentPositions());
         Collections.sort(argumentIndices);
         Clique[] allCliques = new Clique[LabelPredictionInstance.numClasses];

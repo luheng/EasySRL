@@ -104,7 +104,9 @@ public class PropBankLabelPrediction {
         trainingDependencies.clear();
         testDependencies.clear();
         for (int i = 0; i < numSentences; i++) {
-            List<PBandQADependency> dependencies = allDependencies.get(sentenceIndices.get(i));
+            List<PBandQADependency> dependencies = allDependencies.get(sentenceIndices.get(i)).stream()
+                    .filter(dep -> dep.pbDependency != null && dep.qaDependency != null)
+                    .collect(Collectors.toList());
             if (i < heldOutStartIdx || i >= heldOutEndIdx) {
                 trainingDependencies.addAll(dependencies);
             } else {
@@ -119,7 +121,7 @@ public class PropBankLabelPrediction {
         List<Double> results = new ArrayList<>();
         Map<Integer, List<PBandQADependency>> allDependencies = PropBankAligner.getPbAndQADependencies();
         List<PBandQADependency> trainingDependencies = new ArrayList<>(),
-                               testDependencies = new ArrayList<>();
+                                testDependencies = new ArrayList<>();
         for (double sigmaSquared : sigmaSquaredValues) {
             double avgAccuracy = .0;
             for (int i = 0; i < 5; i++) {
