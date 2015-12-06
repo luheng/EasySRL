@@ -24,20 +24,6 @@ import edu.uw.easysrl.syntax.grammar.Category;
  */
 // TODO: get dev ....
 public class PropBankAligner {
-
-    // i.e. AlignedCorpus<SRLDependency, QADependency>
-    static class AlignedCorpus<T1, T2> {
-        public Map<Integer, List<AlignedDependency<T1, T2>>> training = null;
-        public Map<Integer, List<AlignedDependency<T1, T2>>> dev = null;
-        public Map<Integer, List<AlignedDependency<T1, T2>>> test = null;
-
-        public AlignedCorpus() {
-            training = new HashMap<>();
-            dev = new HashMap<>();
-            test = new HashMap<>();
-        }
-    }
-
     static AlignedCorpus<SRLDependency, QADependency> pbAndQADependencies = null;
     static AlignedCorpus<CCGBankDependency, QADependency> ccgAndQADependencies = null;
 
