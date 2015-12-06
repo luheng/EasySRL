@@ -76,9 +76,10 @@ public class QASrlFeatureHelper {
     }
 
 
-    public void extractFrequentFeatures(List<PBandQADependency> data, final int minimumFeatureFrequency) {
+    public void extractFrequentFeatures(List<AlignedDependency<SRLDependency, QADependency>> data,
+                                        final int minimumFeatureFrequency) {
         featureDictionary = new CountDictionary();
-        data.forEach(dep -> extractFeatures(dep.sentence, dep.pbDependency, dep.qaDependency));
+        data.forEach(dep -> extractFeatures(dep.sentence, dep.dependency1, dep.dependency2));
         featureDictionary.freeze();
         featureDictionary = new CountDictionary(featureDictionary, minimumFeatureFrequency, false /* can grow */);
         System.out.println("Total features: " + featureDictionary.size());

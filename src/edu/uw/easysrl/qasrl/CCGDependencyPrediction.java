@@ -1,6 +1,6 @@
 package edu.uw.easysrl.qasrl;
 
-import edu.uw.easysrl.corpora.CCGBankDependencies;
+import edu.uw.easysrl.corpora.CCGBankDependencies.CCGBankDependency;
 import edu.uw.easysrl.dependencies.QADependency;
 import edu.uw.easysrl.syntax.grammar.Category;
 
@@ -16,9 +16,9 @@ public class CCGDependencyPrediction {
     private static Random random = new Random(12345);
     private static List<Integer> sentenceIndices = null;
 
-    private static void jackknife(Map<Integer, List<CCGandQADependency>> allDependencies,
-                                  List<CCGandQADependency> trainingDependencies,
-                                  List<CCGandQADependency> testDependencies,
+    private static void jackknife(Map<Integer, List<AlignedDependency<CCGBankDependency, QADependency>>> allDependencies,
+                                  List<AlignedDependency<CCGBankDependency, QADependency>> trainingDependencies,
+                                  List<AlignedDependency<CCGBankDependency, QADependency>> testDependencies,
                                   double heldOutPortion,
                                   int heldOutFold) {
         if (sentenceIndices == null) {
@@ -33,7 +33,8 @@ public class CCGDependencyPrediction {
         trainingDependencies.clear();
         testDependencies.clear();
         for (int i = 0; i < numSentences; i++) {
-            List<CCGandQADependency> dependencies = allDependencies.get(sentenceIndices.get(i));
+            List<AlignedDependency<CCGBankDependency, QADependency>> dependencies =
+                    allDependencies.get(sentenceIndices.get(i));
             if (i < heldOutStartIdx || i >= heldOutEndIdx) {
                 trainingDependencies.addAll(dependencies);
             } else {
@@ -43,10 +44,10 @@ public class CCGDependencyPrediction {
         System.out.println("training: " + trainingDependencies.size() + "\ttest: " + testDependencies.size());
     }
 
-    private static void tryStuff(List<CCGandQADependency> mappedDependencies) {
-        for (CCGandQADependency mappedDependency : mappedDependencies) {
-            QADependency qa = mappedDependency.qaDependency;
-            CCGBankDependencies.CCGBankDependency ccg = mappedDependency.ccgDependency;
+    private static void tryStuff(List<AlignedDependency<CCGBankDependency, QADependency>> mappedDependencies) {
+        for (AlignedDependency<CCGBankDependency, QADependency> mappedDependency : mappedDependencies) {
+            CCGBankDependency ccg = mappedDependency.dependency1;
+            QADependency qa = mappedDependency.dependency2;
             List<String> words = mappedDependency.sentence.getWords();
             System.out.println(StringUtils.join(words, " "));
             // TODO: CCG dependency doesn't give me a preposition, but I can probably extract it somewhere
@@ -62,9 +63,10 @@ public class CCGDependencyPrediction {
     public static void main(String[] args) {
         final double[] sigmaSquaredValues = {0.01, 0.1, 1, 10, 100};
         List<Double> results = new ArrayList<>();
-        Map<Integer, List<CCGandQADependency>> allDependencies = PropBankAligner.getCcgAndQADependencies();
-        List<CCGandQADependency> trainingDependencies = new ArrayList<>(),
-                                  testDependencies = new ArrayList<>();
+        Map<Integer, List<AlignedDependency<CCGBankDependency, QADependency>>> allDependencies =
+                PropBankAligner.getCcgAndQADependencies();
+        List<AlignedDependency<CCGBankDependency, QADependency>> trainingDependencies = new ArrayList<>(),
+                                                                 testDependencies = new ArrayList<>();
         jackknife(allDependencies, trainingDependencies, testDependencies, 0.2, 0);
         tryStuff(trainingDependencies);
         /*

@@ -1,6 +1,6 @@
 package edu.uw.easysrl.qasrl;
-
-import edu.uw.easysrl.corpora.CCGBankDependencies;
+;
+import edu.uw.easysrl.corpora.CCGBankDependencies.CCGBankDependency;
 import edu.uw.easysrl.dependencies.QADependency;
 import edu.uw.easysrl.util.CountDictionary;
 
@@ -24,13 +24,13 @@ public class QuestionGenerationDataHandler {
     // Data format example:
     // line #1: <s> Pat <v> built </v> a <a> robot </a> </s> what was built ?
     // line #2: (S[dcl]\NP)/NP 2
-    private static void outputEncoderDecoderTrainingData(File outputFile, List<CCGandQADependency> dependencies)
+    private static void outputEncoderDecoderTrainingData(File outputFile, List<AlignedDependency> dependencies)
             throws IOException {
         BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile));
         int lineCounter = 0;
-        for (CCGandQADependency dependency : dependencies) {
-            CCGBankDependencies.CCGBankDependency ccg = dependency.ccgDependency;
-            QADependency qa = dependency.qaDependency;
+        for (AlignedDependency dependency : dependencies) {
+            CCGBankDependency ccg = (CCGBankDependency) dependency.dependency1;
+            QADependency qa = (QADependency) dependency.dependency2;
             if (ccg == null || qa == null) {
                 continue;
             }
@@ -57,22 +57,23 @@ public class QuestionGenerationDataHandler {
         System.out.println(String.format("Writing %d lines to %s.", lineCounter, outputFile.toString()));
     }
 
-    private static void analyzeData(Map<Integer, List<CCGandQADependency>> data) {
+    // TODO: compute coverage and purity
+    private static void analyzeData(Map<Integer, List<AlignedDependency>> data) {
         CountDictionary ccgLabels = new CountDictionary(),
                 mappedCcgLabels = new CountDictionary(),
                 uniquelyMappedCcgLabels = new CountDictionary();
         for (int sentIdx : data.keySet()) {
-            for (CCGandQADependency dep : data.get(sentIdx)) {
-                CCGBankDependencies.CCGBankDependency ccgDep = dep.ccgDependency;
+            for (AlignedDependency dep : data.get(sentIdx)) {
+                CCGBankDependency ccgDep = (CCGBankDependency) dep.dependency1;
                 if (ccgDep == null) {
                     continue;
                 }
                 String ccgInfo = String.format("%s_%d", ccgDep.getCategory(), ccgDep.getArgNumber());
                 ccgLabels.addString(ccgInfo);
-                if (dep.qaDependency != null) {
+                if (dep.dependency2 != null) {
                     mappedCcgLabels.addString(ccgInfo);
                 }
-                if (dep.numCCGtoQAMaps == 1 && dep.numQAtoCCGMaps == 1) {
+                if (dep.numD1toD2 == 1 && dep.numD2toD1 == 1) {
                     uniquelyMappedCcgLabels.addString(ccgInfo);
                 }
             }
@@ -87,12 +88,13 @@ public class QuestionGenerationDataHandler {
     }
 
     public static void main(String[] args) {
-        Map<Integer, List<CCGandQADependency>> training = PropBankAligner.getCcgAndQADependencies();
+        Map<Integer, List<AlignedDependency<CCGBankDependency, QADependency>>> training =
+                PropBankAligner.getCcgAndQADependencies();
         System.out.println(training.size());
-        Map<Integer, List<CCGandQADependency>> dev = PropBankAligner.getCcgAndQADependenciesDev();
+        Map<Integer, List<AlignedDependency<CCGBankDependency, QADependency>>> dev =
+                PropBankAligner.getCcgAndQADependenciesDev();
         System.out.println(dev.size());
-        List<CCGandQADependency> trainingList = new ArrayList<>(),
-                                 devList = new ArrayList<>();
+        List<AlignedDependency> trainingList = new ArrayList<>(), devList = new ArrayList<>();
         for (int sentIdx : training.keySet()) {
             trainingList.addAll(training.get(sentIdx));
         }

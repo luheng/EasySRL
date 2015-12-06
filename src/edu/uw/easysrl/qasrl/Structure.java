@@ -1,5 +1,6 @@
 package edu.uw.easysrl.qasrl;
 
+import edu.uw.easysrl.dependencies.QADependency;
 import edu.uw.easysrl.dependencies.SRLDependency;
 import edu.uw.easysrl.dependencies.SRLFrame;
 import edu.uw.easysrl.util.CompUtils;
@@ -141,9 +142,9 @@ public class Structure {
         }
     }
 
-    public static LabelPredictionInstance newLabelPredictionInstance(PBandQADependency dependency,
-                                                                     QASrlFeatureHelper featureHelper) {
-        SRLDependency srlDep  = dependency.pbDependency;
+    public static LabelPredictionInstance newLabelPredictionInstance(
+            AlignedDependency<SRLDependency, QADependency> dependency, QASrlFeatureHelper featureHelper) {
+        SRLDependency srlDep  = dependency.dependency1;
         List<Integer> argumentIndices = new ArrayList<>(srlDep.getArgumentPositions());
         Collections.sort(argumentIndices);
         Clique[] allCliques = new Clique[LabelPredictionInstance.numClasses];
@@ -155,13 +156,12 @@ public class Structure {
                     new SRLDependency(srlDep.getPredicate(), srlDep.getPredicateIndex(),
                                       argumentIndices, role,
                                       srlDep.getPreposition()),
-                    dependency.qaDependency);
+                    dependency.dependency2);
             if (role == srlDep.getLabel()) {
                 goldCliqueId = c;
             }
         }
-
-        Clique goldClique = featureHelper.getClique(dependency.sentence, srlDep, dependency.qaDependency);
+        Clique goldClique = featureHelper.getClique(dependency.sentence, srlDep, dependency.dependency2);
         return new Structure.LabelPredictionInstance(goldCliqueId, goldClique, allCliques);
     }
 }
