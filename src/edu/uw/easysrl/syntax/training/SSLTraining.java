@@ -150,7 +150,7 @@ public class SSLTraining {
                                             alignedPBSentences = new ArrayList<>();
         //for (int numPropBankTrainingSentences : new int[]{50, 100, 200, 500, 1000, 2000, 5000}) {
         //for (int numPropBankTrainingSentences : new int[]{300, 400, 1500, 7000, 10000, 15000, 20000}) {
-        for (int numPropBankTrainingSentences : new int[]{50, }) {
+        for (int numPropBankTrainingSentences : new int[]{750, 1000, 1500, 2000, 3000, 4000, 5000, 7000}) {
             prepareCorpora(numPropBankTrainingSentences, trainingSentences, evalSentences, alignedPBSentences,
                            qaTrainingSentences, alignedQASentences);
             // Grid search of hyper-parameters.
