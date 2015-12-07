@@ -5,6 +5,7 @@ import edu.uw.easysrl.corpora.CCGBankDependencies.CCGBankDependency;
 import edu.uw.easysrl.corpora.ParallelCorpusReader;
 import edu.uw.easysrl.corpora.qa.QACorpusReader;
 import edu.uw.easysrl.corpora.qa.QASentence;
+import edu.uw.easysrl.dependencies.SRLFrame.SRLLabel;
 
 import java.io.IOException;
 import java.rmi.NotBoundException;
@@ -13,9 +14,12 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import edu.stanford.nlp.util.StringUtils;
+import edu.uw.easysrl.dependencies.DependencyStructure.ResolvedDependency;
 import edu.uw.easysrl.dependencies.QADependency;
 import edu.uw.easysrl.dependencies.SRLDependency;
+import edu.uw.easysrl.dependencies.SRLFrame;
 import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.syntax.parser.SRLParser;
 
 /**
  * Align PropBank data with newswire QA-SRL data.
@@ -27,7 +31,21 @@ public class PropBankAligner {
     static AlignedCorpus<SRLDependency, QADependency> pbAndQADependencies = null;
     static AlignedCorpus<CCGBankDependency, QADependency> ccgAndQADependencies = null;
 
-    public static Map<Integer, List<AlignedDependency<SRLDependency, QADependency>>> getPbAndQADependencies() {
+    public static AlignedCorpus<SRLDependency, QADependency> getPbAndQADependencies() {
+        if (pbAndQADependencies == null) {
+            alignDependencies();
+        }
+        return pbAndQADependencies;
+    }
+
+    public static AlignedCorpus<CCGBankDependency, QADependency> getCcgAndQADependencies() {
+        if (ccgAndQADependencies == null) {
+            alignDependencies();
+        }
+        return ccgAndQADependencies;
+    }
+
+    public static Map<Integer, List<AlignedDependency<SRLDependency, QADependency>>> getPbAndQADependenciesTrain() {
         if (pbAndQADependencies == null) {
             alignDependencies();
         }
@@ -41,7 +59,7 @@ public class PropBankAligner {
         return pbAndQADependencies.dev;
     }
 
-    public static Map<Integer, List<AlignedDependency<CCGBankDependency, QADependency>>> getCcgAndQADependencies() {
+    public static Map<Integer, List<AlignedDependency<CCGBankDependency, QADependency>>> getCcgAndQADependenciesTrain() {
         if (ccgAndQADependencies == null) {
             alignDependencies();
         }
@@ -74,29 +92,60 @@ public class PropBankAligner {
             String sentStr = StringUtils.join(pbSentenceList.get(pbIdx).getWords(), "");
             if (sentenceStringMap.containsKey(sentStr)) {
                 sentenceMap.put(pbIdx, sentenceStringMap.get(sentStr));
+                // TODO: debug why this happens ... are there duplicate sentences in PropBank ???
+                sentenceStringMap.remove(sentStr);
             }
         }
         return sentenceMap;
     }
 
-    private static boolean match(SRLDependency srlDependency, QADependency qaDependency) {
-        boolean predicateMatch = srlDependency.getPredicateIndex() == qaDependency.getPredicateIndex();
-        boolean argumentMatch = srlDependency.getArgumentPositions().stream()
-                .filter(idx -> qaDependency.getAnswerPositions().contains(idx))
-                .count() > 0;
-        return predicateMatch && argumentMatch;
-    }
-
-    private static boolean match(CCGBankDependency ccgDependency, QADependency qaDependency) {
-        // Undirected match.
-        // TODO: figure out when do we need a reversedMatch.
-        int ccgPredicate = ccgDependency.getSentencePositionOfPredicate();
-        int ccgArgument = ccgDependency.getSentencePositionOfArgument();
-        int qaPredicate = qaDependency.getPredicateIndex();
-        Collection<Integer> qaArguments = qaDependency.getAnswerPositions();
-        boolean match = (qaPredicate == ccgPredicate && qaArguments.contains(ccgArgument));
-        boolean reversedMatch = (qaArguments.contains(ccgPredicate) && qaPredicate == ccgArgument);
-        return match || reversedMatch;
+    public static List<AlignedDependency<ResolvedDependency, QADependency>> alignDependencies(
+                ParallelCorpusReader.Sentence pbSentence, // TODO: change to pb words ...
+                List<String> qaWords, SRLParser.CCGandSRLparse parse, Collection<QADependency> qaDeps) {
+        List<ResolvedDependency> srlDependencies = parse.getDependencyParse().stream()
+                .filter(dep -> {
+                    SRLLabel role = dep.getSemanticRole();
+                    return role != SRLFrame.NONE && role != SRLFrame.UNLABELLED_ARGUMENT;
+                }).collect(Collectors.toList());
+        List<String> pbWords = pbSentence.getWords();
+        List<QADependency> qaDependencies = new ArrayList(fixQASentenceAlignment(pbWords, qaWords, qaDeps));
+        List<AlignedDependency<ResolvedDependency, QADependency>> matchedDependencies = new ArrayList<>();
+        int numSrlDependencies = srlDependencies.size(),
+            numQaDependencies = qaDependencies.size();
+        List<List<Integer>> srl2qa = new ArrayList<>(), qa2srl = new ArrayList<>();
+        for (int pbIdx = 0; pbIdx < numSrlDependencies; pbIdx++) {
+            srl2qa.add(new ArrayList<>());
+        }
+        for (int qaIdx = 0; qaIdx < numQaDependencies; qaIdx++) {
+            qa2srl.add(new ArrayList<>());
+            QADependency qaDependency = qaDependencies.get(qaIdx);
+            for (int pbIdx = 0; pbIdx < numSrlDependencies; pbIdx++) {
+                ResolvedDependency pbDependency = srlDependencies.get(pbIdx);
+                if (match(pbDependency, qaDependency)) {
+                    qa2srl.get(qaIdx).add(pbIdx);
+                    srl2qa.get(pbIdx).add(qaIdx);
+                }
+            }
+        }
+        for (int srlIdx = 0; srlIdx < numSrlDependencies; srlIdx++) {
+            ResolvedDependency srlDependency = srlDependencies.get(srlIdx);
+            List<Integer> matchedIds = srl2qa.get(srlIdx);
+            if (matchedIds.size() == 0) {
+                matchedDependencies.add(new AlignedDependency(pbSentence, srlDependency, null /* QA */, 0, 0));
+            } else {
+                for (int qaIdx : matchedIds) {
+                    matchedDependencies.add(new AlignedDependency(pbSentence, srlDependency, qaDependencies.get(qaIdx),
+                            matchedIds.size(), qa2srl.get(qaIdx).size()));
+                }
+            }
+        }
+        for (int qaIdx = 0; qaIdx < numQaDependencies; qaIdx++) {
+            QADependency qaDependency = qaDependencies.get(qaIdx);
+            if (qa2srl.get(qaIdx).size() == 0) {
+                matchedDependencies.add(new AlignedDependency(pbSentence, null /* PB */, qaDependency, 0, 0));
+            }
+        }
+        return matchedDependencies;
     }
 
     private static void alignDependencies(List<ParallelCorpusReader.Sentence> pbSentenceList,
@@ -136,7 +185,8 @@ public class PropBankAligner {
                             .filter(ccg -> ccg.getCategory().isFunctionInto(Category.valueOf("S|NP")) ||
                                     ccg.getCategory().isFunctionInto(Category.valueOf("S|S")))
                             .collect(Collectors.toList());
-            List<QADependency> qaDependencies = new ArrayList<>(fixQASentenceAlignment(pbSentence, qaSentence));
+            List<QADependency> qaDependencies = new ArrayList<>(fixQASentenceAlignment(pbSentence.getWords(),
+                    qaSentence.getWords(), qaSentence.getDependencies()));
             int numPbDependencies = pbDependencies.size(),
                     numCcgDependencies = ccgDependencies.size(),
                     numQaDependencies = qaDependencies.size();
@@ -285,20 +335,20 @@ public class PropBankAligner {
     /**
      * Change the A - B style tokenization into A-B, A - B - C to A-B-C, so on and so forth ..
      */
-    private static Collection<QADependency> fixQASentenceAlignment(ParallelCorpusReader.Sentence pbSentence,
-                                                                   QASentence qaSentence) {
-        if (pbSentence.getLength() == qaSentence.getSentenceLength()) {
-            return qaSentence.getDependencies();
+    private static Collection<QADependency> fixQASentenceAlignment(List<String> pbSentenceTokens,
+                                                                   List<String> qaSentenceTokens,
+                                                                   Collection<QADependency> qaDependencies) {
+        int qaSentLength = qaSentenceTokens.size();
+        if (pbSentenceTokens.size() == qaSentLength) {
+            return qaDependencies;
         }
-        List<String> pbWords = pbSentence.getWords(),
-                     qaWords = qaSentence.getWords();
-        int qaSentLength = qaWords.size();
+
         int[] offsets = new int[qaSentLength];
         Arrays.fill(offsets, 0);
         for (int firstHyphenIdx = 1; firstHyphenIdx < qaSentLength - 1; firstHyphenIdx++) {
             int lastHyphenIdx = firstHyphenIdx;
             for  ( ; lastHyphenIdx < qaSentLength - 1; lastHyphenIdx += 2) {
-                if (!qaWords.get(lastHyphenIdx).equals("-")) {
+                if (!qaSentenceTokens.get(lastHyphenIdx).equals("-")) {
                     break;
                 }
             }
@@ -307,9 +357,9 @@ public class PropBankAligner {
             }
             String mw = "";
             for (int i = firstHyphenIdx - 1; i < lastHyphenIdx; i++) {
-                mw += qaWords.get(i);
+                mw += qaSentenceTokens.get(i);
             }
-            if (pbWords.contains(mw)) {
+            if (pbSentenceTokens.contains(mw)) {
                 for (int i = firstHyphenIdx; i < lastHyphenIdx; i++) {
                     offsets[i] -= (i + 1 - firstHyphenIdx);
                 }
@@ -318,11 +368,11 @@ public class PropBankAligner {
                 }
                 firstHyphenIdx = lastHyphenIdx - 1;
             } else {
-                System.err.println("Unable to fix alignment:\n" + mw + "\n" + StringUtils.join(pbWords) + "\n" +
-                        StringUtils.join(qaWords));
+                System.err.println("Unable to fix alignment:\n" + mw + "\n" + StringUtils.join(pbSentenceTokens) +
+                        "\n" + StringUtils.join(qaSentenceTokens));
             }
         }
-        return qaSentence.getDependencies().stream().map(
+        return qaDependencies.stream().map(
                 dep -> new QADependency(dep.getPredicate(),
                         dep.getPredicateIndex() + offsets[dep.getPredicateIndex()], // new predicate index
                         dep.getQuestion(),
@@ -332,41 +382,42 @@ public class PropBankAligner {
                 .collect(Collectors.toList());
     }
 
+    private static boolean match(ResolvedDependency dependency, QADependency qaDependency) {
+        int predicate = dependency.getPredicateIndex(),
+            argument = dependency.getArgumentIndex(),
+            qaPredicate = qaDependency.getPredicateIndex();
+        Collection<Integer> qaArguments = qaDependency.getAnswerPositions();
+        boolean match = (predicate == qaPredicate) && qaArguments.contains(argument);
+        boolean reversedMatch = (argument == qaPredicate) && qaArguments.contains(predicate);
+        return match || reversedMatch;
+    }
+
+    private static boolean match(SRLDependency srlDependency, QADependency qaDependency) {
+        boolean predicateMatch = srlDependency.getPredicateIndex() == qaDependency.getPredicateIndex();
+        boolean argumentMatch = srlDependency.getArgumentPositions().stream()
+                .filter(idx -> qaDependency.getAnswerPositions().contains(idx))
+                .count() > 0;
+        return predicateMatch && argumentMatch;
+    }
+
+    private static boolean match(CCGBankDependency ccgDependency, QADependency qaDependency) {
+        // Undirected match.
+        // TODO: figure out when do we need a reversedMatch.
+        int ccgPredicate = ccgDependency.getSentencePositionOfPredicate();
+        int ccgArgument = ccgDependency.getSentencePositionOfArgument();
+        int qaPredicate = qaDependency.getPredicateIndex();
+        Collection<Integer> qaArguments = qaDependency.getAnswerPositions();
+        boolean match = (qaPredicate == ccgPredicate && qaArguments.contains(ccgArgument));
+        boolean reversedMatch = (qaArguments.contains(ccgPredicate) && qaPredicate == ccgArgument);
+        return match || reversedMatch;
+    }
+
     // TODO: learn a distribution of questions given gold parse/dependencies
     // TODO: learn a distribution or Propbank tags given question and predicate
     public static void main(String[] args)  throws IOException, InterruptedException, NotBoundException {
-        PropBankAligner.getPbAndQADependencies();
-        int numAlignedDependencies = 0, numUniquelyAlignedDependencies = 0;
-        // Print aligned dependencies
-        for (int sentIdx : ccgAndQADependencies.training.keySet()) {
-            boolean firstDep = true;
-
-            for (AlignedDependency<CCGBankDependency, QADependency> dep : ccgAndQADependencies.training.get(sentIdx)) {
-                ParallelCorpusReader.Sentence pbSentence = dep.sentence;
-                List<String> words = pbSentence.getWords();
-                if (firstDep) {
-                    System.out.println("\n" + StringUtils.join(words, " "));
-                    firstDep = false;
-                }
-                CCGBankDependency ccg = dep.dependency1;
-                String ccgInfo = (ccg == null ? "" : ccg.getCategory() + ", " + ccg.getArgNumber());
-                QADependency qa = dep.dependency2;
-                if (ccg == null || qa == null) {
-                    continue;
-                }
-                System.out.println(
-                        (ccg == null ? "null" : ccgInfo + " | " + ccg) + "\t|\t" +
-                        (qa == null ? "null" : qa.toString(words)) + "\t" +
-                        dep.numD1toD2 + "\t" + dep.numD2toD1);
-                if (dep.numD1toD2 == 1 && dep.numD2toD1 == 1) {
-                    numUniquelyAlignedDependencies ++;
-                }
-                if (ccg != null && qa != null) {
-                    numAlignedDependencies ++;
-                }
-            }
-        }
-        System.out.println("Number of aligned dependencies:\t" + numAlignedDependencies);
-        System.out.println("Number of uniquely aligned dependencies:\t" + numUniquelyAlignedDependencies);
+        AlignedCorpus<SRLDependency, QADependency> pbQA = PropBankAligner.getPbAndQADependencies();
+        AlignedCorpus<CCGBankDependency, QADependency> ccgQA = PropBankAligner.getCcgAndQADependencies();
+        pbQA.printAnalysis();
+        ccgQA.printAnalysis();
     }
 }

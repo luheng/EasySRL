@@ -58,23 +58,40 @@ public class QuestionGenerationDataHandler {
     }
 
     // TODO: compute coverage and purity
-    private static void analyzeData(Map<Integer, List<AlignedDependency>> data) {
+    private static void analyzeData(Map<Integer, List<AlignedDependency<CCGBankDependency, QADependency>>> data) {
         CountDictionary ccgLabels = new CountDictionary(),
-                mappedCcgLabels = new CountDictionary(),
-                uniquelyMappedCcgLabels = new CountDictionary();
+                        mappedCcgLabels = new CountDictionary(),
+                        uniquelyMappedCcgLabels = new CountDictionary();
+        int numCCGDeps = 0;
+        int numQADeps = 0;
+        int numMappings = 0;
+        int numUniqueCCGMappings = 0;
+        int numUniqueQAMappings = 0;
+
         for (int sentIdx : data.keySet()) {
-            for (AlignedDependency dep : data.get(sentIdx)) {
-                CCGBankDependency ccgDep = (CCGBankDependency) dep.dependency1;
-                if (ccgDep == null) {
-                    continue;
+            for (AlignedDependency<CCGBankDependency, QADependency> dep : data.get(sentIdx)) {
+                CCGBankDependency ccgDep = dep.dependency1;
+                QADependency qaDep = dep.dependency2;
+                if (qaDep != null) {
+                    numQADeps ++;
                 }
-                String ccgInfo = String.format("%s_%d", ccgDep.getCategory(), ccgDep.getArgNumber());
-                ccgLabels.addString(ccgInfo);
-                if (dep.dependency2 != null) {
-                    mappedCcgLabels.addString(ccgInfo);
-                }
-                if (dep.numD1toD2 == 1 && dep.numD2toD1 == 1) {
-                    uniquelyMappedCcgLabels.addString(ccgInfo);
+                if (ccgDep != null) {
+                    numCCGDeps ++;
+                    String ccgInfo = String.format("%s_%d", ccgDep.getCategory(), ccgDep.getArgNumber());
+                    ccgLabels.addString(ccgInfo);
+                    if (qaDep != null) {
+                        mappedCcgLabels.addString(ccgInfo);
+                        numMappings ++;
+                    }
+                    if (dep.d1ToHowManyD2 == 1 && dep.d2ToHowManyD1 == 1) {
+                        uniquelyMappedCcgLabels.addString(ccgInfo);
+                    }
+                    if (dep.d1ToHowManyD2 == 1) {
+                        numUniqueCCGMappings ++;
+                    }
+                    if (dep.d2ToHowManyD1 == 1) {
+                        numUniqueQAMappings ++;
+                    }
                 }
             }
         }
@@ -85,11 +102,16 @@ public class QuestionGenerationDataHandler {
             System.out.println(ccgLabel + "\t" + ccgLabels.getCount(ccgLabel) + "\t" +
                     mappedCcgLabels.getCount(ccgLabel) + '\t' + uniquelyMappedCcgLabels.getCount(ccgLabel));
         }
+        // Print stats
+        System.out.println(String.format("CCG coverage:\t%.3f%%", 100.0 * numMappings / numCCGDeps));
+        System.out.println(String.format("QA coverage:\t%.3f%%", 100.0 * numMappings / numQADeps));
+        System.out.println(String.format("CCG purity:\t%.3f%%", 100.0 * numUniqueCCGMappings / numMappings));
+        System.out.println(String.format("QA purity:\t%.3f%%", 100.0 * numUniqueQAMappings / numMappings));
     }
 
     public static void main(String[] args) {
         Map<Integer, List<AlignedDependency<CCGBankDependency, QADependency>>> training =
-                PropBankAligner.getCcgAndQADependencies();
+                PropBankAligner.getCcgAndQADependenciesTrain();
         System.out.println(training.size());
         Map<Integer, List<AlignedDependency<CCGBankDependency, QADependency>>> dev =
                 PropBankAligner.getCcgAndQADependenciesDev();
@@ -101,6 +123,7 @@ public class QuestionGenerationDataHandler {
         for (int sentIdx : dev.keySet()) {
             devList.addAll(dev.get(sentIdx));
         }
+
         File outputFile1 = new File("ccg_qg.training.txt"),
              outputFile2 = new File("ccg_qg.dev.txt");
         try {
@@ -109,6 +132,9 @@ public class QuestionGenerationDataHandler {
         } catch (IOException e) {
             e.printStackTrace();
         }
+
+        analyzeData(training);
+        analyzeData(dev);
     }
 
 }

@@ -64,7 +64,7 @@ public class CCGDependencyPrediction {
         final double[] sigmaSquaredValues = {0.01, 0.1, 1, 10, 100};
         List<Double> results = new ArrayList<>();
         Map<Integer, List<AlignedDependency<CCGBankDependency, QADependency>>> allDependencies =
-                PropBankAligner.getCcgAndQADependencies();
+                PropBankAligner.getCcgAndQADependenciesTrain();
         List<AlignedDependency<CCGBankDependency, QADependency>> trainingDependencies = new ArrayList<>(),
                                                                  testDependencies = new ArrayList<>();
         jackknife(allDependencies, trainingDependencies, testDependencies, 0.2, 0);

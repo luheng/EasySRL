@@ -124,7 +124,7 @@ public class PropBankLabelPrediction {
         final double[] sigmaSquaredValues = {0.01, 0.1, 1, 10, 100};
         List<Double> results = new ArrayList<>();
         Map<Integer, List<AlignedDependency<SRLDependency, QADependency>>> allDependencies =
-                PropBankAligner.getPbAndQADependencies();
+                PropBankAligner.getPbAndQADependenciesTrain();
         List<AlignedDependency<SRLDependency, QADependency>> trainingDependencies = new ArrayList<>(),
                                                              testDependencies = new ArrayList<>();
         for (double sigmaSquared : sigmaSquaredValues) {

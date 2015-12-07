@@ -18,10 +18,10 @@ import edu.uw.easysrl.syntax.tagger.TagDict;
 import edu.uw.easysrl.syntax.tagger.TaggerEmbeddings;
 import edu.uw.easysrl.util.TrainingUtils;
 import edu.uw.easysrl.util.Util;
-import lbfgsb.DifferentiableFunction;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.Reader;
 import java.nio.file.StandardCopyOption;
 import java.rmi.NotBoundException;
 import java.rmi.registry.LocateRegistry;
@@ -51,48 +51,84 @@ public class SSLTraining {
     private final CutoffsDictionary cutoffsDictionary;
     private final Util.Logger trainingLogger;
 
-    private final List<ParallelCorpusReader.Sentence> trainingSentences, evalSentence;
-    private final List<QASentence> qaTrainingSentences;
+    private final List<ParallelCorpusReader.Sentence> trainingSentences, evalSentences, alignedPBSentences;
+    private final List<QASentence> qaTrainingSentences, alignedQASentences;
 
-    // FIXME
-    //private static final int numPropBankTrainingSentences = 500;
     private static final Random random = new Random(12345);
 
-    private static void prepareCorpora(int numPropBankTrainingSentences, List<QASentence> qaTrainingSentences,
+    private SSLTraining(
+            final TrainingDataParameters dataParameters,
+            final TrainingParameters parameters,
+            final List<ParallelCorpusReader.Sentence> trainingSentences,
+            final List<ParallelCorpusReader.Sentence> evalSentences,
+            final List<ParallelCorpusReader.Sentence> alignedPBSentences,
+            final List<QASentence> qaTraining,
+            final List<QASentence> alignedQASentences) throws IOException {
+        super();
+        this.dataParameters = dataParameters;
+        this.trainingParameters = parameters;
+        this.trainingLogger = new Util.Logger(trainingParameters.getLogFile());
+        this.trainingSentences = trainingSentences;
+        this.evalSentences = evalSentences;
+        this.alignedPBSentences = alignedPBSentences;
+        this.qaTrainingSentences = qaTraining;
+        this.alignedQASentences = alignedQASentences;
+        final List<Category> lexicalCategoriesList = TaggerEmbeddings.loadCategories(new File(dataParameters
+                .getExistingModel(), "categories"));
+        this.cutoffsDictionary = new CutoffsDictionary(
+                lexicalCategoriesList,
+                TagDict.readDict(dataParameters.getExistingModel(), new HashSet<>(lexicalCategoriesList)),
+                trainingParameters.getMaxDependencyLength(),
+                trainingSentences);
+    }
+
+    private static void prepareCorpora(int numPropBankTrainingSentences,
                                        List<ParallelCorpusReader.Sentence> trainingSentences,
-                                       List<ParallelCorpusReader.Sentence> evalSentences) throws IOException {
-        // Split training, qa training and eval
-        // Read qa sentences
-        List<ParallelCorpusReader.Sentence> allPropbankSentences = new ArrayList<>();
+                                       List<ParallelCorpusReader.Sentence> evalSentences,
+                                       List<ParallelCorpusReader.Sentence> alignedPBSentences,
+                                       List<QASentence> qaTrainingSentences,
+                                       List<QASentence> alignedQASentences) throws IOException {
+        List<ParallelCorpusReader.Sentence> trainingPool = new ArrayList<>();
         Iterator<QASentence> qaIter = QACorpusReader.getReader("newswire").readTrainingCorpus();
         while (qaIter.hasNext()) {
             qaTrainingSentences.add(qaIter.next());
         }
+        qaIter = QACorpusReader.getReader("newswire").readEvaluationCorpus();
+        List<QASentence> qaEvalSentences = new ArrayList<>();
+        while (qaIter.hasNext()) {
+            qaEvalSentences.add(qaIter.next());
+        }
         Iterator<ParallelCorpusReader.Sentence> pbIter = ParallelCorpusReader.READER.readCorpus(false /* not dev */);
         while (pbIter.hasNext()) {
-            allPropbankSentences.add(pbIter.next());
+            trainingPool.add(pbIter.next());
         }
         Iterator<ParallelCorpusReader.Sentence> pbIter2 = ParallelCorpusReader.READER.readCorpus(true /* dev */);
         while (pbIter2.hasNext()) {
             evalSentences.add(pbIter2.next());
         }
-        Map<Integer, Integer> sentMap = PropBankAligner.getPropBankToQASentenceMapping(allPropbankSentences,
+        Map<Integer, Integer> sentMap = PropBankAligner.getPropBankToQASentenceMapping(trainingPool,
                 qaTrainingSentences);
+        Map<Integer, Integer> evalSentMap = PropBankAligner.getPropBankToQASentenceMapping(trainingPool,
+                qaEvalSentences);
+        System.out.println("mapped sentences:\t" + sentMap.size() + "\t" + evalSentMap.size());
         List<Integer> sentIds = new ArrayList<>();
-        for (int pbIdx = 0; pbIdx < allPropbankSentences.size(); pbIdx ++) {
-            sentIds.add(pbIdx);
+        for (int pbIdx = 0; pbIdx < trainingPool.size(); pbIdx ++) {
+            if (!sentMap.containsKey(pbIdx) && !evalSentMap.containsKey(pbIdx)) {
+                sentIds.add(pbIdx);
+            }
         }
         Collections.shuffle(sentIds, random);
         for (int pbIdx : sentIds) {
-            if (sentMap.containsKey(pbIdx)) {
-                // Skipping sentences that are annotated with Q/A pairs.
-                continue;
-            }
-            trainingSentences.add(allPropbankSentences.get(pbIdx));
+            trainingSentences.add(trainingPool.get(pbIdx));
             if (trainingSentences.size() >= numPropBankTrainingSentences) {
                 break;
             }
         }
+        for (int pbIdx : evalSentMap.keySet()) {
+            alignedPBSentences.add(trainingPool.get(pbIdx));
+            alignedQASentences.add(qaEvalSentences.get(evalSentMap.get(pbIdx)));
+        }
+        System.out.println(String.format("Aligned %d sentences in dev set.", alignedPBSentences.size()));
         System.out.println(String.format("%d training, %d qa and %d evaluation sentences.", trainingSentences.size(),
                 qaTrainingSentences.size(), evalSentences.size()));
     }
@@ -109,13 +145,14 @@ public class SSLTraining {
         // Dummy clustering (i.e. words)
         clusterings.add(null);
 
-        List<QASentence> qaTrainingSentences = new ArrayList<>();
-        List<ParallelCorpusReader.Sentence> trainingSentences = new ArrayList<>(), evalSentences = new ArrayList<>();
+        List<QASentence> qaTrainingSentences = new ArrayList<>(), alignedQASentences = new ArrayList<>();
+        List<ParallelCorpusReader.Sentence> trainingSentences = new ArrayList<>(), evalSentences = new ArrayList<>(),
+                                            alignedPBSentences = new ArrayList<>();
         //for (int numPropBankTrainingSentences : new int[]{50, 100, 200, 500, 1000, 2000, 5000}) {
         //for (int numPropBankTrainingSentences : new int[]{300, 400, 1500, 7000, 10000, 15000, 20000}) {
-        for (int numPropBankTrainingSentences : new int[]{700, 3000, 4000, 6000, 20000}) {
-            prepareCorpora(numPropBankTrainingSentences, qaTrainingSentences, trainingSentences, evalSentences);
-
+        for (int numPropBankTrainingSentences : new int[]{50, }) {
+            prepareCorpora(numPropBankTrainingSentences, trainingSentences, evalSentences, alignedPBSentences,
+                           qaTrainingSentences, alignedQASentences);
             // Grid search of hyper-parameters.
             for (final int minFeatureCount : TrainingUtils.parseIntegers(trainingSettings, "minimum_feature_frequency")) {
                 for (final int maxChart : TrainingUtils.parseIntegers(trainingSettings, "max_chart_size")) {
@@ -157,7 +194,8 @@ public class SSLTraining {
                                     // TODO: split training, eval and qa training
                                     final SSLTraining training = new SSLTraining(
                                             dataParameters, standard,
-                                            trainingSentences, qaTrainingSentences, evalSentences);
+                                            trainingSentences, evalSentences, alignedPBSentences, qaTrainingSentences,
+                                            alignedQASentences);
                                     training.trainLocal();
                                     for (final double beam : TrainingUtils.parseDoubles(trainingSettings, "beta_for_decoding")) {
                                         System.out.println(com.google.common.base.Objects.toStringHelper("Settings").add("DecodingBeam", beam)
@@ -181,34 +219,27 @@ public class SSLTraining {
         }
     }
 
-    private List<Optimization.TrainingExample> makeTrainingData(final boolean small) throws IOException {
-        return new TrainingDataLoader(cutoffsDictionary, dataParameters, true /* backoff? */)
-                .makeTrainingData(trainingSentences.iterator(), true /* single thread */);
-    }
-
     private double[] trainLocal() throws IOException {
         TrainingFeatureHelper featureHelper = new TrainingFeatureHelper(trainingParameters, dataParameters);
         final Set<Feature.FeatureKey> boundedFeatures = new HashSet<>();
         // TODO: only pass a small number of sentences.
         // TODO: fix cutoff dictionary.
         final Map<Feature.FeatureKey, Integer> featureToIndex = featureHelper.makeKeyToIndexMap(
-                trainingParameters.getMinimumFeatureFrequency(),
-                boundedFeatures,
-                trainingSentences);
-        final List<Optimization.TrainingExample> data = makeTrainingData(false);
+                trainingParameters.getMinimumFeatureFrequency(), boundedFeatures, trainingSentences);
+        final List<Optimization.TrainingExample> data =
+                new TrainingDataLoader(cutoffsDictionary, dataParameters, true /* backoff? */)
+                        .makeTrainingData(trainingSentences.iterator(), true /* single thread */);
         final Optimization.LossFunction lossFunction = Optimization.getLossFunction(data, featureToIndex,
                 trainingParameters, trainingLogger);
-        final double[] weights = train(lossFunction, featureToIndex, boundedFeatures);
-        return weights;
-    }
 
-    private double[] train(final DifferentiableFunction lossFunction,
-                           final Map<Feature.FeatureKey, Integer> featureToIndex,
-                           final Set<Feature.FeatureKey> boundedFeatures) throws IOException {
-        trainingParameters.getModelFolder().mkdirs();
         final double[] weights = new double[featureToIndex.size()];
-        // Do training
-        train(lossFunction, Optimization.makeLBFGS(featureToIndex, boundedFeatures), weights);
+
+
+        trainingParameters.getModelFolder().mkdirs();
+        trainingLogger.log("Starting Training");
+        Optimization.makeLBFGS(featureToIndex, boundedFeatures).train(lossFunction, weights);
+        trainingLogger.log("Training Completed");
+
         // Save model
         Util.serialize(weights, trainingParameters.getWeightsFile());
         Util.serialize(trainingParameters.getFeatureSet(), trainingParameters.getFeaturesFile());
@@ -221,36 +252,8 @@ public class SSLTraining {
         Files.copy(new File(dataParameters.getExistingModel(), "unaryRules"), new File(modelFolder, "unaryRules"));
         Files.copy(new File(dataParameters.getExistingModel(), "markedup"), new File(modelFolder, "markedup"));
         Files.copy(new File(dataParameters.getExistingModel(), "seenRules"), new File(modelFolder, "seenRules"));
+
         return weights;
-    }
-
-    private void train(final DifferentiableFunction lossFunction, final Optimization.TrainingAlgorithm algorithm,
-                       final double[] weights) throws IOException {
-        trainingLogger.log("Starting Training");
-        algorithm.train(lossFunction, weights);
-        trainingLogger.log("Training Completed");
-    }
-
-    private SSLTraining(
-            final TrainingDataParameters dataParameters,
-            final TrainingParameters parameters,
-            final List<ParallelCorpusReader.Sentence> training,
-            final List<QASentence> qaTraining,
-            final List<ParallelCorpusReader.Sentence> eval) throws IOException {
-        super();
-        this.dataParameters = dataParameters;
-        this.trainingParameters = parameters;
-        this.trainingLogger = new Util.Logger(trainingParameters.getLogFile());
-        this.trainingSentences = training;
-        this.qaTrainingSentences = qaTraining;
-        this.evalSentence = eval;
-        final List<Category> lexicalCategoriesList = TaggerEmbeddings.loadCategories(new File(dataParameters
-                .getExistingModel(), "categories"));
-        this.cutoffsDictionary = new CutoffsDictionary(
-                lexicalCategoriesList,
-                TagDict.readDict(dataParameters.getExistingModel(), new HashSet<>(lexicalCategoriesList)),
-                trainingParameters.getMaxDependencyLength(),
-                training);
     }
 
     private void evaluate(final double testingSupertaggerBeam, final Optional<Double> supertaggerWeight)
@@ -266,9 +269,12 @@ public class SSLTraining {
                     dataParameters.getExistingModel().getAbsolutePath(),
                     0.0001, EasySRL.ParsingAlgorithm.ASTAR, 100000, false, Optional.empty(), 1),
                 Util.deserialize(new File(dataParameters.getExistingModel(), "labelClassifier")), posTagger));
-        Collection<SRLParse> goldParses = evalSentence.stream()
+        Collection<SRLParse> goldParses = evalSentences.stream()
                 .map(sentence -> sentence.getSrlParse()).collect(Collectors.toSet());
         final Results results = SRLEvaluation.evaluate(backoffParser, goldParses, maxSentenceLength);
         System.out.println("Final result: F1=" + results.getF1());
+        final Results results2 = SRLEvaluation.evaluate(backoffParser, alignedPBSentences, alignedQASentences, maxSentenceLength);
+        System.out.println("Final result: F1=" + results2.getF1() + " on aligned PB-QA sentences");
+
     }
 }
