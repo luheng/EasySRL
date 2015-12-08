@@ -177,15 +177,12 @@ public class SSLTraining {
         List<ParallelCorpusReader.Sentence> trainingPool = new ArrayList<>(), evalSentences = new ArrayList<>(),
                                             alignedPBSentences = new ArrayList<>();
         List<Integer> trainingSentenceIds = new ArrayList<>();
-
+        prepareCorpora(trainingPool, evalSentences, alignedPBSentences, qaTrainingSentences, alignedQASentences,
+                trainingSentenceIds);
         ResultsTable allResults = new ResultsTable();
-        //for (int numPropBankTrainingSentences : new int[]{50, 100, 150, 200, 300, 500, 750, 1000, 1500, 2000}) {
-        for (int numPropBankTrainingSentences : new int[]{1500, 2000, 3000, 4000, 5000, 7500, 10000, 15000, 20000}) {
+        for (int numPropBankTrainingSentences : new int[]{50, 100, 150, 200, 300, 500, 750, 1000, 1500, 2000}) {
+        //for (int numPropBankTrainingSentences : new int[]{3000, 4000, 5000, 7500, 10000, 15000, 20000}) {
             for (int r = 0; r < numRandomSampleRuns; r++) {
-                // TODO: move it back..
-                prepareCorpora(trainingPool, evalSentences, alignedPBSentences, qaTrainingSentences, alignedQASentences,
-                        trainingSentenceIds);
-
                 ////////////////// BROILERPLATE ///////////////////////
                 final List<Clustering> clusterings = new ArrayList<>();
                 clusterings.add(null);
