@@ -9,10 +9,6 @@ import java.util.List;
 
 import com.google.common.collect.ImmutableSet;
 
-import edu.uw.easysrl.syntax.model.feature.Feature.BinaryFeature;
-import edu.uw.easysrl.syntax.model.feature.Feature.RootCategoryFeature;
-import edu.uw.easysrl.syntax.model.feature.Feature.UnaryRuleFeature;
-
 public class FeatureSet implements Serializable {
 
 	/**

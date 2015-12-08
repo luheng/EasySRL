@@ -14,6 +14,7 @@ import edu.uw.easysrl.syntax.evaluation.SRLEvaluation;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.model.CutoffsDictionary;
 import edu.uw.easysrl.syntax.model.feature.*;
+import edu.uw.easysrl.syntax.parser.AbstractParser;
 import edu.uw.easysrl.syntax.parser.SRLParser;
 import edu.uw.easysrl.syntax.tagger.POSTagger;
 import edu.uw.easysrl.syntax.tagger.TagDict;
@@ -180,8 +181,8 @@ public class SSLTraining {
         prepareCorpora(trainingPool, evalSentences, alignedPBSentences, qaTrainingSentences, alignedQASentences,
                 trainingSentenceIds);
         ResultsTable allResults = new ResultsTable();
-        for (int numPropBankTrainingSentences : new int[]{50, 100, 150, 200, 300, 500, 750, 1000, 1500, 2000}) {
-        //for (int numPropBankTrainingSentences : new int[]{3000, 4000, 5000, 7500, 10000, 15000, 20000}) {
+        //for (int numPropBankTrainingSentences : new int[]{50, 100, 150, 200, 300, 500, 750, 1000, 1500, 2000}) {
+        for (int numPropBankTrainingSentences : new int[]{1500, 2000, 3000, 4000, 5000, 7500, 10000, 15000, 20000}) {
             for (int r = 0; r < numRandomSampleRuns; r++) {
                 ////////////////// BROILERPLATE ///////////////////////
                 final List<Clustering> clusterings = new ArrayList<>();
@@ -210,7 +211,7 @@ public class SSLTraining {
                         new DenseLexicalFeature(pipeline, 0.0),
                         BilexicalFeature.getBilexicalFeatures(clusterings, 3),
                         ArgumentSlotFeature.argumentSlotFeatures,
-                        Feature.unaryRules,
+                        UnaryRuleFeature.unaryRules,
                         PrepositionFeature.prepositionFeaures,
                         Collections.emptyList(),
                         Collections.emptyList());

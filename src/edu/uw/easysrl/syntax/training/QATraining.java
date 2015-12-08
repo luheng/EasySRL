@@ -185,7 +185,7 @@ public class QATraining {
                                         new DenseLexicalFeature(pipeline, 0.0),
                                         BilexicalFeature.getBilexicalFeatures(clusterings, 3),
                                         ArgumentSlotFeature.argumentSlotFeatures,
-                                        Feature.unaryRules,
+                                        UnaryRuleFeature.unaryRules,
                                         PrepositionFeature.prepositionFeaures,
                                         Collections.emptyList(), /* root features */
                                         Collections.emptyList()  /* binary features */);

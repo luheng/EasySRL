@@ -19,14 +19,8 @@ import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.Combinator.RuleType;
 import edu.uw.easysrl.syntax.grammar.Preposition;
 import edu.uw.easysrl.syntax.model.CutoffsDictionary;
-import edu.uw.easysrl.syntax.model.feature.ArgumentSlotFeature;
-import edu.uw.easysrl.syntax.model.feature.BilexicalFeature;
-import edu.uw.easysrl.syntax.model.feature.Feature.BinaryFeature;
+import edu.uw.easysrl.syntax.model.feature.*;
 import edu.uw.easysrl.syntax.model.feature.Feature.FeatureKey;
-import edu.uw.easysrl.syntax.model.feature.Feature.RootCategoryFeature;
-import edu.uw.easysrl.syntax.model.feature.Feature.UnaryRuleFeature;
-import edu.uw.easysrl.syntax.model.feature.FeatureSet;
-import edu.uw.easysrl.syntax.model.feature.PrepositionFeature;
 import edu.uw.easysrl.syntax.training.CompressedChart.Key;
 import edu.uw.easysrl.syntax.training.CompressedChart.Value;
 
