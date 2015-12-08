@@ -11,14 +11,17 @@ import java.util.Map;
  */
 public class ResultsTable {
     Map<String, List<Double>> results;
+    List<String> orderedKeyList;
 
     public ResultsTable() {
         results = new HashMap<>();
+        orderedKeyList = new ArrayList<>();
     }
 
     public void add(String key, double result) {
         if (!results.containsKey(key)) {
             results.put(key, new ArrayList<>());
+            orderedKeyList.add(key);
         }
         results.get(key).add(result);
     }
@@ -39,19 +42,20 @@ public class ResultsTable {
         if (otherResults != null) {
             if (!results.containsKey(key)) {
                 results.put(key, new ArrayList<>());
+                orderedKeyList.add(key);
             }
             results.get(key).addAll(otherResults);
         }
     }
 
     public void addAll(ResultsTable otherResults) {
-        for (String key : otherResults.results.keySet()) {
+        for (String key : otherResults.orderedKeyList) {
             addAll(key, otherResults.get(key));
         }
     }
 
     public void addAll(String keyPrefix, ResultsTable otherResults) {
-        for (String key : otherResults.results.keySet()) {
+        for (String key : otherResults.orderedKeyList) {
             addAll(keyPrefix + "\t" + key, otherResults.get(key));
         }
     }
@@ -60,9 +64,10 @@ public class ResultsTable {
         return results.get(key);
     }
 
+    // TODO: need testing
     public List<Double> get(String[] partialKeys) {
         List<Double> gathered = new ArrayList<>();
-        for (String key : results.keySet()) {
+        for (String key : orderedKeyList) {
             String keyStr = "\t" + key.trim() + "\t";
             boolean match = true;
             for (String pk : partialKeys) {
@@ -89,7 +94,7 @@ public class ResultsTable {
 
     public Map<String, Double> getAveraged() {
         Map<String, Double> avg = new HashMap<>();
-        for (String key : results.keySet()) {
+        for (String key : orderedKeyList) {
             avg.put(key, getAveraged(key));
         }
         return avg;
@@ -98,14 +103,14 @@ public class ResultsTable {
     public void printAggregated() {
         // TODO: sort by key string
         Map<String, Double> avg = getAveraged();
-        avg.keySet().forEach(key -> System.out.println(String.format("%s\t%.6f", key, avg.get(key))));
+        orderedKeyList.forEach(key -> System.out.println(String.format("%s\t%.6f", key, avg.get(key))));
     }
 
     @Override
     public String toString() {
         // TODO: sort by key string
         String str = "";
-        for (String key : results.keySet()) {
+        for (String key : orderedKeyList) {
             str += key;
             for (Double result : results.get(key)) {
                 str += "\t"+ result;
