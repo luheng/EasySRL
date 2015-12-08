@@ -47,7 +47,7 @@ public class SSLTraining {
             Category.valueOf("S[b]\\NP")
     );
 
-    private static final int numRandomSampleRuns = 3;
+    private static final int numRandomSampleRuns = 5;
     private static final Random random = new Random(123456);
 
     private final TrainingDataParameters dataParameters;
@@ -179,7 +179,8 @@ public class SSLTraining {
         List<Integer> trainingSentenceIds = new ArrayList<>();
 
         ResultsTable allResults = new ResultsTable();
-        for (int numPropBankTrainingSentences : new int[]{50, 100, 150, 200, 300, 500, 750, 1000, 1500, 2000}) {
+        //for (int numPropBankTrainingSentences : new int[]{50, 100, 150, 200, 300, 500, 750, 1000, 1500, 2000}) {
+        for (int numPropBankTrainingSentences : new int[]{1500, 2000, 3000, 4000, 5000, 7500, 10000, 15000, 20000}) {
             for (int r = 0; r < numRandomSampleRuns; r++) {
                 // TODO: move it back..
                 prepareCorpora(trainingPool, evalSentences, alignedPBSentences, qaTrainingSentences, alignedQASentences,
@@ -235,6 +236,8 @@ public class SSLTraining {
             System.out.println(allResults);
             allResults.printAggregated();
         }
+        System.out.println(allResults);
+        allResults.printAggregated();
     }
 
     private double[] trainLocal() throws IOException {
