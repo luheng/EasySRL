@@ -8,6 +8,7 @@ import edu.uw.easysrl.corpora.qa.QASentence;
 import edu.uw.easysrl.main.EasySRL;
 import edu.uw.easysrl.qasrl.PropBankAligner;
 import edu.uw.easysrl.syntax.evaluation.Results;
+import edu.uw.easysrl.syntax.evaluation.ResultsTable;
 import edu.uw.easysrl.syntax.evaluation.SRLEvaluation;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.model.CutoffsDictionary;
@@ -21,7 +22,6 @@ import edu.uw.easysrl.util.Util;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.Reader;
 import java.nio.file.StandardCopyOption;
 import java.rmi.NotBoundException;
 import java.rmi.registry.LocateRegistry;
@@ -45,6 +45,8 @@ public class SSLTraining {
             Category.valueOf("S[qem]"),
             Category.valueOf("S[b]\\NP")
     );
+
+    private static final int numRandomSampleRuns = 10;
 
     private final TrainingDataParameters dataParameters;
     private final TrainingParameters trainingParameters;
@@ -82,27 +84,26 @@ public class SSLTraining {
                 trainingSentences);
     }
 
-    private static void prepareCorpora(int numPropBankTrainingSentences,
-                                       List<ParallelCorpusReader.Sentence> trainingSentences,
+    private static void prepareCorpora(List<ParallelCorpusReader.Sentence> trainingPool,
                                        List<ParallelCorpusReader.Sentence> evalSentences,
                                        List<ParallelCorpusReader.Sentence> alignedPBSentences,
                                        List<QASentence> qaTrainingSentences,
-                                       List<QASentence> alignedQASentences) throws IOException {
-        List<ParallelCorpusReader.Sentence> trainingPool = new ArrayList<>();
-        Iterator<QASentence> qaIter = QACorpusReader.getReader("newswire").readTrainingCorpus();
-        while (qaIter.hasNext()) {
-            qaTrainingSentences.add(qaIter.next());
-        }
-        qaIter = QACorpusReader.getReader("newswire").readEvaluationCorpus();
+                                       List<QASentence> alignedQASentences,
+                                       List<Integer> trainingSentenceIds) throws IOException {
         List<QASentence> qaEvalSentences = new ArrayList<>();
-        while (qaIter.hasNext()) {
-            qaEvalSentences.add(qaIter.next());
+        Iterator<QASentence> qaIter1 = QACorpusReader.getReader("newswire").readTrainingCorpus(),
+                             qaIter2 = QACorpusReader.getReader("newswire").readEvaluationCorpus();
+        Iterator<ParallelCorpusReader.Sentence> pbIter1 = ParallelCorpusReader.READER.readCorpus(false /* not dev */),
+                                                pbIter2 = ParallelCorpusReader.READER.readCorpus(true  /* dev */);
+        while (qaIter1.hasNext()) {
+            qaTrainingSentences.add(qaIter1.next());
         }
-        Iterator<ParallelCorpusReader.Sentence> pbIter = ParallelCorpusReader.READER.readCorpus(false /* not dev */);
-        while (pbIter.hasNext()) {
-            trainingPool.add(pbIter.next());
+        while (qaIter2.hasNext()) {
+            qaEvalSentences.add(qaIter2.next());
         }
-        Iterator<ParallelCorpusReader.Sentence> pbIter2 = ParallelCorpusReader.READER.readCorpus(true /* dev */);
+        while (pbIter1.hasNext()) {
+            trainingPool.add(pbIter1.next());
+        }
         while (pbIter2.hasNext()) {
             evalSentences.add(pbIter2.next());
         }
@@ -111,17 +112,9 @@ public class SSLTraining {
         Map<Integer, Integer> evalSentMap = PropBankAligner.getPropBankToQASentenceMapping(trainingPool,
                 qaEvalSentences);
         System.out.println("mapped sentences:\t" + sentMap.size() + "\t" + evalSentMap.size());
-        List<Integer> sentIds = new ArrayList<>();
         for (int pbIdx = 0; pbIdx < trainingPool.size(); pbIdx ++) {
             if (!sentMap.containsKey(pbIdx) && !evalSentMap.containsKey(pbIdx)) {
-                sentIds.add(pbIdx);
-            }
-        }
-        Collections.shuffle(sentIds, random);
-        for (int pbIdx : sentIds) {
-            trainingSentences.add(trainingPool.get(pbIdx));
-            if (trainingSentences.size() >= numPropBankTrainingSentences) {
-                break;
+                trainingSentenceIds.add(pbIdx);
             }
         }
         for (int pbIdx : evalSentMap.keySet()) {
@@ -129,8 +122,21 @@ public class SSLTraining {
             alignedQASentences.add(qaEvalSentences.get(evalSentMap.get(pbIdx)));
         }
         System.out.println(String.format("Aligned %d sentences in dev set.", alignedPBSentences.size()));
-        System.out.println(String.format("%d training, %d qa and %d evaluation sentences.", trainingSentences.size(),
-                qaTrainingSentences.size(), evalSentences.size()));
+    }
+
+    private static List<ParallelCorpusReader.Sentence> subsample(final int numPropBankTrainingSentences,
+                                                                 final List<ParallelCorpusReader.Sentence> trainingPool,
+                                                                 final List<Integer> trainingSentenceIds) {
+        List<ParallelCorpusReader.Sentence> trainingSentences = new ArrayList<>();
+        trainingSentences.clear();
+        Collections.shuffle(trainingSentenceIds, random);
+        for (int pbIdx : trainingSentenceIds) {
+            trainingSentences.add(trainingPool.get(pbIdx));
+            if (trainingSentences.size() >= numPropBankTrainingSentences) {
+                break;
+            }
+        }
+        return trainingSentences;
     }
 
     public static void main(final String[] args) throws IOException, InterruptedException, NotBoundException {
@@ -145,77 +151,70 @@ public class SSLTraining {
         // Dummy clustering (i.e. words)
         clusterings.add(null);
 
+        // Initialize hyperparameters
+        final int minFeatureCount = TrainingUtils.parseIntegers(trainingSettings, "minimum_feature_frequency").get(0);
+        final int maxChart = TrainingUtils.parseIntegers(trainingSettings, "max_chart_size").get(0);
+        final double sigmaSquared = TrainingUtils.parseDoubles(trainingSettings, "sigma_squared").get(0);
+        final double goldBeam = TrainingUtils.parseDoubles(trainingSettings, "beta_for_positive_charts").get(0);
+        final double costFunctionWeight = TrainingUtils.parseDoubles(trainingSettings, "cost_function_weight").get(0);
+        final double beta = TrainingUtils.parseDoubles(trainingSettings, "beta_for_training_charts").get(0);
+        final double beam = TrainingUtils.parseDoubles(trainingSettings, "beta_for_decoding").get(0);
+        final Double supertaggerWeight = 0.9;
+        System.out.println(com.google.common.base.Objects.toStringHelper("Settings").add("DecodingBeam", beam)
+                .add("MinFeatureCount", minFeatureCount).add("maxChart", maxChart)
+                .add("sigmaSquared", sigmaSquared)
+                .add("cost_function_weight", costFunctionWeight)
+                .add("beta_for_positive_charts", goldBeam)
+                .add("beta_for_training_charts", beta).toString());
+
+        // Broilerplate code
+        String absolutePath = Util.getHomeFolder().getAbsolutePath();
+        final File modelFolder = new File(trainingSettings.getProperty("output_folder").replaceAll("~", absolutePath));
+        modelFolder.mkdirs();
+        Files.copy(propertiesFile, new File(modelFolder, "training.properties"));
+        final File baseModel = new File(trainingSettings.getProperty("supertagging_model_folder").replaceAll("~", absolutePath));
+        if (!baseModel.exists()) {
+            throw new IllegalArgumentException("Supertagging model not found: " + baseModel.getAbsolutePath());
+        }
+        final File pipeline = new File(modelFolder, "pipeline");
+        pipeline.mkdir();
+        for (final File f : baseModel.listFiles()) {
+            java.nio.file.Files.copy(f.toPath(), new File(pipeline, f.getName()).toPath(), StandardCopyOption.REPLACE_EXISTING);
+        }
+        final TrainingDataParameters dataParameters = new TrainingDataParameters(beta, 70, ROOT_CATEGORIES, baseModel,
+                maxChart, goldBeam);
+        final FeatureSet allFeatures = new FeatureSet(new DenseLexicalFeature(pipeline),
+                BilexicalFeature.getBilexicalFeatures(clusterings, 3),
+                ArgumentSlotFeature.argumentSlotFeatures, Feature.unaryRules, PrepositionFeature.prepositionFeaures,
+                Collections.emptyList(), Collections.emptyList());
+        final TrainingParameters standard = new TrainingParameters(50, allFeatures, sigmaSquared, minFeatureCount,
+                modelFolder, costFunctionWeight);
+
+        // Initialize corpora
         List<QASentence> qaTrainingSentences = new ArrayList<>(), alignedQASentences = new ArrayList<>();
-        List<ParallelCorpusReader.Sentence> trainingSentences = new ArrayList<>(), evalSentences = new ArrayList<>(),
+        List<ParallelCorpusReader.Sentence> trainingPool = new ArrayList<>(), evalSentences = new ArrayList<>(),
                                             alignedPBSentences = new ArrayList<>();
-        //for (int numPropBankTrainingSentences : new int[]{50, 100, 200, 500, 1000, 2000, 5000}) {
-        //for (int numPropBankTrainingSentences : new int[]{300, 400, 1500, 7000, 10000, 15000, 20000}) {
-        for (int numPropBankTrainingSentences : new int[]{750, 1000, 1500, 2000, 3000, 4000, 5000, 7000}) {
-            prepareCorpora(numPropBankTrainingSentences, trainingSentences, evalSentences, alignedPBSentences,
-                           qaTrainingSentences, alignedQASentences);
-            // Grid search of hyper-parameters.
-            for (final int minFeatureCount : TrainingUtils.parseIntegers(trainingSettings, "minimum_feature_frequency")) {
-                for (final int maxChart : TrainingUtils.parseIntegers(trainingSettings, "max_chart_size")) {
-                    for (final double sigmaSquared : TrainingUtils.parseDoubles(trainingSettings, "sigma_squared")) {
-                        for (final double goldBeam : TrainingUtils.parseDoubles(trainingSettings, "beta_for_positive_charts")) {
-                            for (final double costFunctionWeight : TrainingUtils.parseDoubles(trainingSettings, "cost_function_weight")) {
-                                for (final double beta : TrainingUtils.parseDoubles(trainingSettings, "beta_for_training_charts")) {
-                                    // Setting an output folder, whatever.
-                                    final File modelFolder = new File(trainingSettings.getProperty("output_folder")
-                                            .replaceAll("~", Util.getHomeFolder().getAbsolutePath()));
-                                    modelFolder.mkdirs();
-                                    Files.copy(propertiesFile, new File(modelFolder, "training.properties"));
-                                    // Pre-trained EasyCCG model.
-                                    final File baseModel = new File(trainingSettings.getProperty(
-                                            "supertagging_model_folder").replaceAll("~",
-                                            Util.getHomeFolder().getAbsolutePath()));
-                                    if (!baseModel.exists()) {
-                                        throw new IllegalArgumentException("Supertagging model not found: "
-                                                + baseModel.getAbsolutePath());
-                                    }
-                                    // What for?
-                                    final File pipeline = new File(modelFolder, "pipeline");
-                                    pipeline.mkdir();
-                                    for (final File f : baseModel.listFiles()) {
-                                        java.nio.file.Files.copy(f.toPath(), new File(pipeline, f.getName()).toPath(),
-                                                StandardCopyOption.REPLACE_EXISTING);
-                                    }
-                                    final TrainingDataParameters dataParameters = new TrainingDataParameters(beta, 70,
-                                            ROOT_CATEGORIES, baseModel, maxChart, goldBeam);
-                                    // Features to use
-                                    final FeatureSet allFeatures = new FeatureSet(new DenseLexicalFeature(pipeline),
-                                            BilexicalFeature.getBilexicalFeatures(clusterings, 3),
-                                            ArgumentSlotFeature.argumentSlotFeatures, Feature.unaryRules,
-                                            PrepositionFeature.prepositionFeaures, Collections.emptyList(),
-                                            Collections.emptyList());
-                                    final TrainingParameters standard = new TrainingParameters(50, allFeatures,
-                                            sigmaSquared, minFeatureCount, modelFolder, costFunctionWeight);
-                                    // Initialize training.
-                                    // TODO: split training, eval and qa training
-                                    final SSLTraining training = new SSLTraining(
-                                            dataParameters, standard,
-                                            trainingSentences, evalSentences, alignedPBSentences, qaTrainingSentences,
-                                            alignedQASentences);
-                                    training.trainLocal();
-                                    for (final double beam : TrainingUtils.parseDoubles(trainingSettings, "beta_for_decoding")) {
-                                        System.out.println(com.google.common.base.Objects.toStringHelper("Settings").add("DecodingBeam", beam)
-                                                .add("MinFeatureCount", minFeatureCount).add("maxChart", maxChart)
-                                                .add("sigmaSquared", sigmaSquared)
-                                                .add("cost_function_weight", costFunctionWeight)
-                                                .add("beta_for_positive_charts", goldBeam)
-                                                .add("beta_for_training_charts", beta).toString());
-                                        //for (final Double supertaggerWeight :Arrays.asList(null, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)) {
-                                        Double supertaggerWeight = 0.9;
-                                        training.evaluate(beam, Optional.of(supertaggerWeight));
-                                        //supertaggerWeight == null ? Optional.empty() :
-                                        //}
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+        List<Integer> trainingSentenceIds = new ArrayList<>();
+        prepareCorpora(trainingPool, evalSentences, alignedPBSentences, qaTrainingSentences, alignedQASentences,
+                trainingSentenceIds);
+
+        ResultsTable allResults = new ResultsTable();
+        for (int numPropBankTrainingSentences : new int[]{50, 100, 150}) {
+            for (int r = 0; r < numRandomSampleRuns; r++) {
+                List<ParallelCorpusReader.Sentence> trainingSentences = subsample(numPropBankTrainingSentences,
+                        trainingPool, trainingSentenceIds);
+                System.out.println(String.format("%d training, %d qa and (%d, %d) evaluation sentences.",
+                        trainingSentences.size(), qaTrainingSentences.size(), evalSentences.size(),
+                        alignedPBSentences));
+                final SSLTraining training = new SSLTraining(dataParameters, standard, trainingSentences, evalSentences,
+                        alignedPBSentences, qaTrainingSentences, alignedQASentences);
+                training.trainLocal();
+                String resultKey = String.format("numTrainSents=%d", numPropBankTrainingSentences);
+                allResults.addAll(resultKey, training.evaluate(beam, Optional.of(supertaggerWeight)));
             }
+            // Print aggregated results every time :)
+            System.out.println(allResults);
+            allResults.printAggregated();
         }
     }
 
@@ -234,13 +233,13 @@ public class SSLTraining {
 
         final double[] weights = new double[featureToIndex.size()];
 
-
         trainingParameters.getModelFolder().mkdirs();
         trainingLogger.log("Starting Training");
         Optimization.makeLBFGS(featureToIndex, boundedFeatures).train(lossFunction, weights);
         trainingLogger.log("Training Completed");
 
         // Save model
+        /*
         Util.serialize(weights, trainingParameters.getWeightsFile());
         Util.serialize(trainingParameters.getFeatureSet(), trainingParameters.getFeaturesFile());
         Util.serialize(featureToIndex, trainingParameters.getFeatureToIndexFile());
@@ -252,12 +251,13 @@ public class SSLTraining {
         Files.copy(new File(dataParameters.getExistingModel(), "unaryRules"), new File(modelFolder, "unaryRules"));
         Files.copy(new File(dataParameters.getExistingModel(), "markedup"), new File(modelFolder, "markedup"));
         Files.copy(new File(dataParameters.getExistingModel(), "seenRules"), new File(modelFolder, "seenRules"));
-
+        */
         return weights;
     }
 
-    private void evaluate(final double testingSupertaggerBeam, final Optional<Double> supertaggerWeight)
+    private ResultsTable evaluate(final double testingSupertaggerBeam, final Optional<Double> supertaggerWeight)
             throws IOException {
+        ResultsTable resultsTable = new ResultsTable();
         final int maxSentenceLength = 70;
         final POSTagger posTagger = POSTagger
                 .getStanfordTagger(new File(dataParameters.getExistingModel(), "posTagger"));
@@ -271,10 +271,13 @@ public class SSLTraining {
                 Util.deserialize(new File(dataParameters.getExistingModel(), "labelClassifier")), posTagger));
         Collection<SRLParse> goldParses = evalSentences.stream()
                 .map(sentence -> sentence.getSrlParse()).collect(Collectors.toSet());
-        final Results results = SRLEvaluation.evaluate(backoffParser, goldParses, maxSentenceLength);
-        System.out.println("Final result: F1=" + results.getF1());
-        final Results results2 = SRLEvaluation.evaluate(backoffParser, alignedPBSentences, alignedQASentences, maxSentenceLength);
-        System.out.println("Final result: F1=" + results2.getF1() + " on aligned PB-QA sentences");
-
+        final Results pbDevResults = SRLEvaluation.evaluate(backoffParser, goldParses, maxSentenceLength);
+        final ResultsTable alignedDev = SRLEvaluation.evaluate(backoffParser, alignedPBSentences, alignedQASentences,
+                maxSentenceLength);
+        resultsTable.add("pbDev", pbDevResults);
+        resultsTable.addAll("alignedDev", alignedDev);
+        System.out.println("Final result: F1=" + pbDevResults.getF1());
+        System.out.println("Final result: F1=" + alignedDev.get("F1") + " on aligned PB-QA sentences");
+        return resultsTable;
     }
 }

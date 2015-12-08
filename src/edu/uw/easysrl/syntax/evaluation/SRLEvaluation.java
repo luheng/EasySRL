@@ -93,15 +93,13 @@ public class SRLEvaluation {
 		if (!oneThread) {
 			Util.runJobsInParallel(jobs, Runtime.getRuntime().availableProcessors());
 		}
-		/*
-			for (final List<String> cov : failedToParse) {
+		/* for (final List<String> cov : failedToParse) {
 				System.err.print("FAILED TO PARSE: ");
 				for (final String word : cov) {
 					System.err.print(word + " ");
 				}
 				System.err.println();
-			}
-		*/
+			} */
 		System.out.println(results);
 		System.out.println("Coverage: " + Util.twoDP(100.0 * parsed.get() / shouldParse.get()));
 		System.out.println("Time: " + stopwatch.elapsed(TimeUnit.SECONDS));
@@ -115,11 +113,12 @@ public class SRLEvaluation {
 	 * @return
 	 * @throws FileNotFoundException
 	 */
-	public static Results evaluate(final SRLParser parser,
-								   final List<ParallelCorpusReader.Sentence> pbSentenceList,
-								   final List<QASentence> qaSentenceList,
-								   final int maxSentenceLength) throws FileNotFoundException {
+	public static ResultsTable evaluate(final SRLParser parser,
+                                        final List<ParallelCorpusReader.Sentence> pbSentenceList,
+								        final List<QASentence> qaSentenceList,
+								        final int maxSentenceLength) throws FileNotFoundException {
 		final List<String> autoOutput = new ArrayList<>();
+        final ResultsTable resultsTable = new ResultsTable();
 		final Results results = new Results();
 		final Collection<List<String>> failedToParse = new ArrayList<>();
 		final AtomicInteger shouldParse = new AtomicInteger();
@@ -154,19 +153,20 @@ public class SRLEvaluation {
 		System.out.println(results);
 		System.out.println("Coverage: " + Util.twoDP(100.0 * parsed.get() / shouldParse.get()));
 		System.out.println("Time: " + stopwatch.elapsed(TimeUnit.SECONDS));
-		System.out.println("[coverage analysis]");
-		printAnalysis(alignedDependencies);
-		return results;
+
+        resultsTable.add(results);
+        resultsTable.addAll(computeCoveragePurity(alignedDependencies));
+		return resultsTable;
 	}
 
 	// TODO: put this somewhere else ..
-	private static void printAnalysis(Map<Integer, List<AlignedDependency<ResolvedDependency, QADependency>>> data) {
+	private static ResultsTable computeCoveragePurity(Map<Integer,
+                                                      List<AlignedDependency<ResolvedDependency, QADependency>>> data) {
 		int numD1 = 0;
 		int numD2 = 0;
 		int numMappings = 0;
 		int numUniquelyMappedD1 = 0;
 		int numUniquelyMappedD2 = 0;
-
 		for (int sentIdx : data.keySet()) {
 			for (AlignedDependency dep : data.get(sentIdx)) {
 				if (dep.dependency2 != null) {
@@ -186,10 +186,13 @@ public class SRLEvaluation {
 				}
 			}
 		}
-		System.out.println(String.format("D1 coverage:\t%.3f%%", 100.0 * numMappings / numD1));
-		System.out.println(String.format("D2 coverage:\t%.3f%%", 100.0 * numMappings / numD2));
-		System.out.println(String.format("D1 purity:\t%.3f%%", 100.0 * numUniquelyMappedD1 / numMappings));
-		System.out.println(String.format("D2 purity:\t%.3f%%", 100.0 * numUniquelyMappedD2 / numMappings));
+        ResultsTable resultsTable = new ResultsTable();
+        resultsTable.add("D1_coverage", numMappings / numD1);
+        resultsTable.add("D2_coverage", numMappings / numD2);
+        resultsTable.add("D1_purity", numUniquelyMappedD1 / numMappings);
+        resultsTable.add("D2_purity", numUniquelyMappedD2 / numMappings);
+        System.out.println("[coverage analysis]:\n" + resultsTable);
+        return resultsTable;
 	}
 
 	private static Results evaluate(final SRLParse gold, final CCGandSRLparse parse) {
