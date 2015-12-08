@@ -1,5 +1,6 @@
 package edu.uw.easysrl.syntax.training;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.io.Files;
 import edu.uw.easysrl.corpora.ParallelCorpusReader;
 import edu.uw.easysrl.corpora.SRLParse;
@@ -47,6 +48,7 @@ public class SSLTraining {
     );
 
     private static final int numRandomSampleRuns = 10;
+    private static final Random random = new Random(123456);
 
     private final TrainingDataParameters dataParameters;
     private final TrainingParameters trainingParameters;
@@ -55,8 +57,6 @@ public class SSLTraining {
 
     private final List<ParallelCorpusReader.Sentence> trainingSentences, evalSentences, alignedPBSentences;
     private final List<QASentence> qaTrainingSentences, alignedQASentences;
-
-    private static final Random random = new Random(12345);
 
     private SSLTraining(
             final TrainingDataParameters dataParameters,
@@ -70,11 +70,12 @@ public class SSLTraining {
         this.dataParameters = dataParameters;
         this.trainingParameters = parameters;
         this.trainingLogger = new Util.Logger(trainingParameters.getLogFile());
-        this.trainingSentences = trainingSentences;
-        this.evalSentences = evalSentences;
-        this.alignedPBSentences = alignedPBSentences;
-        this.qaTrainingSentences = qaTraining;
-        this.alignedQASentences = alignedQASentences;
+        // TODO: change this back later.
+        this.trainingSentences = ImmutableList.copyOf(trainingSentences);
+        this.evalSentences = ImmutableList.copyOf(evalSentences);
+        this.alignedPBSentences = ImmutableList.copyOf(alignedPBSentences);
+        this.qaTrainingSentences = ImmutableList.copyOf(qaTraining);
+        this.alignedQASentences = ImmutableList.copyOf(alignedQASentences);
         final List<Category> lexicalCategoriesList = TaggerEmbeddings.loadCategories(new File(dataParameters
                 .getExistingModel(), "categories"));
         this.cutoffsDictionary = new CutoffsDictionary(
@@ -90,6 +91,12 @@ public class SSLTraining {
                                        List<QASentence> qaTrainingSentences,
                                        List<QASentence> alignedQASentences,
                                        List<Integer> trainingSentenceIds) throws IOException {
+        trainingPool.clear();
+        evalSentences.clear();
+        alignedPBSentences.clear();
+        qaTrainingSentences.clear();
+        alignedQASentences.clear();
+        trainingSentenceIds.clear();
         List<QASentence> qaEvalSentences = new ArrayList<>();
         Iterator<QASentence> qaIter1 = QACorpusReader.getReader("newswire").readTrainingCorpus(),
                              qaIter2 = QACorpusReader.getReader("newswire").readEvaluationCorpus();
@@ -128,7 +135,6 @@ public class SSLTraining {
                                                                  final List<ParallelCorpusReader.Sentence> trainingPool,
                                                                  final List<Integer> trainingSentenceIds) {
         List<ParallelCorpusReader.Sentence> trainingSentences = new ArrayList<>();
-        trainingSentences.clear();
         Collections.shuffle(trainingSentenceIds, random);
         for (int pbIdx : trainingSentenceIds) {
             trainingSentences.add(trainingPool.get(pbIdx));
@@ -147,9 +153,6 @@ public class SSLTraining {
         final File propertiesFile = new File(args[0]);
         final Properties trainingSettings = Util.loadProperties(propertiesFile);
         LocateRegistry.createRegistry(1099);
-        final List<Clustering> clusterings = new ArrayList<>();
-        // Dummy clustering (i.e. words)
-        clusterings.add(null);
 
         // Initialize hyperparameters
         final int minFeatureCount = TrainingUtils.parseIntegers(trainingSettings, "minimum_feature_frequency").get(0);
@@ -160,47 +163,62 @@ public class SSLTraining {
         final double beta = TrainingUtils.parseDoubles(trainingSettings, "beta_for_training_charts").get(0);
         final double beam = TrainingUtils.parseDoubles(trainingSettings, "beta_for_decoding").get(0);
         final Double supertaggerWeight = 0.9;
-        System.out.println(com.google.common.base.Objects.toStringHelper("Settings").add("DecodingBeam", beam)
-                .add("MinFeatureCount", minFeatureCount).add("maxChart", maxChart)
+        System.out.println(com.google.common.base.Objects.toStringHelper("Settings")
+                .add("DecodingBeam", beam)
+                .add("MinFeatureCount", minFeatureCount)
+                .add("maxChart", maxChart)
                 .add("sigmaSquared", sigmaSquared)
                 .add("cost_function_weight", costFunctionWeight)
                 .add("beta_for_positive_charts", goldBeam)
                 .add("beta_for_training_charts", beta).toString());
-
-        // Broilerplate code
-        String absolutePath = Util.getHomeFolder().getAbsolutePath();
-        final File modelFolder = new File(trainingSettings.getProperty("output_folder").replaceAll("~", absolutePath));
-        modelFolder.mkdirs();
-        Files.copy(propertiesFile, new File(modelFolder, "training.properties"));
-        final File baseModel = new File(trainingSettings.getProperty("supertagging_model_folder").replaceAll("~", absolutePath));
-        if (!baseModel.exists()) {
-            throw new IllegalArgumentException("Supertagging model not found: " + baseModel.getAbsolutePath());
-        }
-        final File pipeline = new File(modelFolder, "pipeline");
-        pipeline.mkdir();
-        for (final File f : baseModel.listFiles()) {
-            java.nio.file.Files.copy(f.toPath(), new File(pipeline, f.getName()).toPath(), StandardCopyOption.REPLACE_EXISTING);
-        }
-        final TrainingDataParameters dataParameters = new TrainingDataParameters(beta, 70, ROOT_CATEGORIES, baseModel,
-                maxChart, goldBeam);
-        final FeatureSet allFeatures = new FeatureSet(new DenseLexicalFeature(pipeline),
-                BilexicalFeature.getBilexicalFeatures(clusterings, 3),
-                ArgumentSlotFeature.argumentSlotFeatures, Feature.unaryRules, PrepositionFeature.prepositionFeaures,
-                Collections.emptyList(), Collections.emptyList());
-        final TrainingParameters standard = new TrainingParameters(50, allFeatures, sigmaSquared, minFeatureCount,
-                modelFolder, costFunctionWeight);
 
         // Initialize corpora
         List<QASentence> qaTrainingSentences = new ArrayList<>(), alignedQASentences = new ArrayList<>();
         List<ParallelCorpusReader.Sentence> trainingPool = new ArrayList<>(), evalSentences = new ArrayList<>(),
                                             alignedPBSentences = new ArrayList<>();
         List<Integer> trainingSentenceIds = new ArrayList<>();
-        prepareCorpora(trainingPool, evalSentences, alignedPBSentences, qaTrainingSentences, alignedQASentences,
-                trainingSentenceIds);
 
         ResultsTable allResults = new ResultsTable();
-        for (int numPropBankTrainingSentences : new int[]{50, 100, 150}) {
+        for (int numPropBankTrainingSentences : new int[]{50, 100, 200, 300, 500}) {
             for (int r = 0; r < numRandomSampleRuns; r++) {
+                // TODO: move it back..
+                prepareCorpora(trainingPool, evalSentences, alignedPBSentences, qaTrainingSentences, alignedQASentences,
+                        trainingSentenceIds);
+
+                ////////////////// BROILERPLATE ///////////////////////
+                final List<Clustering> clusterings = new ArrayList<>();
+                clusterings.add(null);
+
+                String absolutePath = Util.getHomeFolder().getAbsolutePath();
+                String tempFolder = trainingSettings.getProperty("output_folder") +
+                        String.format("ntr%d_r%d/", numPropBankTrainingSentences, r);
+                final File modelFolder = new File(tempFolder.replaceAll("~", absolutePath));
+                modelFolder.mkdirs();
+                Files.copy(propertiesFile, new File(modelFolder, "training.properties"));
+                final File baseModel = new File(trainingSettings.getProperty("supertagging_model_folder")
+                        .replaceAll("~", absolutePath));
+                if (!baseModel.exists()) {
+                    throw new IllegalArgumentException("Supertagging model not found: " + baseModel.getAbsolutePath());
+                }
+                final File pipeline = new File(modelFolder, "pipeline");
+                pipeline.mkdir();
+                for (final File f : baseModel.listFiles()) {
+                    java.nio.file.Files.copy(f.toPath(), new File(pipeline, f.getName()).toPath(), StandardCopyOption.REPLACE_EXISTING);
+                }
+                final TrainingDataParameters dataParameters = new TrainingDataParameters(beta, 70, ROOT_CATEGORIES,
+                        baseModel, maxChart, goldBeam);
+                final FeatureSet allFeatures = new FeatureSet(
+                        new DenseLexicalFeature(pipeline),
+                        BilexicalFeature.getBilexicalFeatures(clusterings, 3),
+                        ArgumentSlotFeature.argumentSlotFeatures,
+                        Feature.unaryRules,
+                        PrepositionFeature.prepositionFeaures,
+                        Collections.emptyList(),
+                        Collections.emptyList());
+                final TrainingParameters standard = new TrainingParameters(50, allFeatures, sigmaSquared,
+                        minFeatureCount, modelFolder, costFunctionWeight);
+                /////////////// END OF BROILERPLATE ////////////////
+
                 List<ParallelCorpusReader.Sentence> trainingSentences = subsample(numPropBankTrainingSentences,
                         trainingPool, trainingSentenceIds);
                 System.out.println(String.format("%d training, %d qa and (%d, %d) evaluation sentences.",
@@ -220,16 +238,14 @@ public class SSLTraining {
 
     private double[] trainLocal() throws IOException {
         TrainingFeatureHelper featureHelper = new TrainingFeatureHelper(trainingParameters, dataParameters);
-        final Set<Feature.FeatureKey> boundedFeatures = new HashSet<>();
-        // TODO: only pass a small number of sentences.
-        // TODO: fix cutoff dictionary.
-        final Map<Feature.FeatureKey, Integer> featureToIndex = featureHelper.makeKeyToIndexMap(
+        Set<Feature.FeatureKey> boundedFeatures = new HashSet<>();
+        Map<Feature.FeatureKey, Integer> featureToIndex = featureHelper.makeKeyToIndexMap(
                 trainingParameters.getMinimumFeatureFrequency(), boundedFeatures, trainingSentences);
-        final List<Optimization.TrainingExample> data =
+        List<Optimization.TrainingExample> data =
                 new TrainingDataLoader(cutoffsDictionary, dataParameters, true /* backoff? */)
                         .makeTrainingData(trainingSentences.iterator(), true /* single thread */);
-        final Optimization.LossFunction lossFunction = Optimization.getLossFunction(data, featureToIndex,
-                trainingParameters, trainingLogger);
+        Optimization.LossFunction lossFunction = Optimization.getLossFunction(data, featureToIndex, trainingParameters,
+                trainingLogger);
 
         final double[] weights = new double[featureToIndex.size()];
 
@@ -238,8 +254,7 @@ public class SSLTraining {
         Optimization.makeLBFGS(featureToIndex, boundedFeatures).train(lossFunction, weights);
         trainingLogger.log("Training Completed");
 
-        // Save model
-        /*
+        // Save model. Have to do this because the evaluation method reads from it :(
         Util.serialize(weights, trainingParameters.getWeightsFile());
         Util.serialize(trainingParameters.getFeatureSet(), trainingParameters.getFeaturesFile());
         Util.serialize(featureToIndex, trainingParameters.getFeatureToIndexFile());
@@ -251,7 +266,7 @@ public class SSLTraining {
         Files.copy(new File(dataParameters.getExistingModel(), "unaryRules"), new File(modelFolder, "unaryRules"));
         Files.copy(new File(dataParameters.getExistingModel(), "markedup"), new File(modelFolder, "markedup"));
         Files.copy(new File(dataParameters.getExistingModel(), "seenRules"), new File(modelFolder, "seenRules"));
-        */
+
         return weights;
     }
 
@@ -277,7 +292,7 @@ public class SSLTraining {
         resultsTable.add("pbDev", pbDevResults);
         resultsTable.addAll("alignedDev", alignedDev);
         System.out.println("Final result: F1=" + pbDevResults.getF1());
-        System.out.println("Final result: F1=" + alignedDev.get("F1") + " on aligned PB-QA sentences");
+        System.out.println("Final result: F1=" + alignedDev.get("F1").get(0) + " on aligned PB-QA sentences");
         return resultsTable;
     }
 }

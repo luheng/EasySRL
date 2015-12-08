@@ -60,10 +60,6 @@ public class ResultsTable {
         return results.get(key);
     }
 
-    public double getAverage(String key) {
-        return results.containsKey(key) ? 0 : results.get(key).stream().mapToDouble(r->r).average().getAsDouble();
-    }
-
     public List<Double> get(String[] partialKeys) {
         List<Double> gathered = new ArrayList<>();
         for (String key : results.keySet()) {
@@ -82,6 +78,10 @@ public class ResultsTable {
         return gathered;
     }
 
+    public double getAveraged(String key) {
+        return results.containsKey(key) ? results.get(key).stream().mapToDouble(r->r).average().getAsDouble() : 0;
+    }
+
     public double getAveraged(String[] partialKeys) {
         List<Double> res = get(partialKeys);
         return res == null ? 0 : res.stream().mapToDouble(r->r).average().getAsDouble();
@@ -90,18 +90,20 @@ public class ResultsTable {
     public Map<String, Double> getAveraged() {
         Map<String, Double> avg = new HashMap<>();
         for (String key : results.keySet()) {
-            avg.put(key, getAverage(key));
+            avg.put(key, getAveraged(key));
         }
         return avg;
     }
 
     public void printAggregated() {
+        // TODO: sort by key string
         Map<String, Double> avg = getAveraged();
         avg.keySet().forEach(key -> System.out.println(String.format("%s\t%.6f", key, avg.get(key))));
     }
 
     @Override
     public String toString() {
+        // TODO: sort by key string
         String str = "";
         for (String key : results.keySet()) {
             str += key;

@@ -371,8 +371,8 @@ public class PropBankAligner {
                 }
                 firstHyphenIdx = lastHyphenIdx - 1;
             } else {
-                System.err.println("Unable to fix alignment:\n" + mw + "\n" + StringUtils.join(pbSentenceTokens) +
-                        "\n" + StringUtils.join(qaSentenceTokens));
+                // System.err.println("Unable to fix alignment:\n" + mw + "\n" + StringUtils.join(pbSentenceTokens) +
+                //        "\n" + StringUtils.join(qaSentenceTokens));
             }
         }
         return qaDependencies.stream().map(

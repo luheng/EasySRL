@@ -154,14 +154,15 @@ public class SRLEvaluation {
 		System.out.println("Coverage: " + Util.twoDP(100.0 * parsed.get() / shouldParse.get()));
 		System.out.println("Time: " + stopwatch.elapsed(TimeUnit.SECONDS));
 
+        System.out.println(alignedDependencies.size());
         resultsTable.add(results);
         resultsTable.addAll(computeCoveragePurity(alignedDependencies));
 		return resultsTable;
 	}
 
 	// TODO: put this somewhere else ..
-	private static ResultsTable computeCoveragePurity(Map<Integer,
-                                                      List<AlignedDependency<ResolvedDependency, QADependency>>> data) {
+	private static ResultsTable computeCoveragePurity(
+            Map<Integer, List<AlignedDependency<ResolvedDependency, QADependency>>> data) {
 		int numD1 = 0;
 		int numD2 = 0;
 		int numMappings = 0;
@@ -187,10 +188,10 @@ public class SRLEvaluation {
 			}
 		}
         ResultsTable resultsTable = new ResultsTable();
-        resultsTable.add("D1_coverage", numMappings / numD1);
-        resultsTable.add("D2_coverage", numMappings / numD2);
-        resultsTable.add("D1_purity", numUniquelyMappedD1 / numMappings);
-        resultsTable.add("D2_purity", numUniquelyMappedD2 / numMappings);
+        resultsTable.add("D1_coverage", 1.0 * numMappings / numD1);
+        resultsTable.add("D2_coverage", 1.0 * numMappings / numD2);
+        resultsTable.add("D1_purity", 1.0 * numUniquelyMappedD1 / numMappings);
+        resultsTable.add("D2_purity", 1.0 * numUniquelyMappedD2 / numMappings);
         System.out.println("[coverage analysis]:\n" + resultsTable);
         return resultsTable;
 	}

@@ -162,7 +162,6 @@ class FeatureForest {
 	}
 
 	static abstract class ConjunctiveNode {
-
 		private final DisjunctiveNode parent;
 
 		public List<DisjunctiveNode> getChildren() {
@@ -203,11 +202,9 @@ class FeatureForest {
 
 		abstract double getLogScore(List<InputWord> words, FeatureSet featureSet,
 				Map<FeatureKey, Integer> featureToIndexMap, double[] featureWeights);
-
 	}
 
 	private static abstract class CachedConjunctiveNode extends ConjunctiveNode {
-
 		private CachedConjunctiveNode(final DisjunctiveNode parent, final List<DisjunctiveNode> children) {
 			super(parent, children);
 		}
@@ -289,7 +286,6 @@ class FeatureForest {
 		@Override
 		void updateExpectations(final List<InputWord> words, final double nodeScore, final double[] result,
 				final FeatureSet featureSet, final Map<FeatureKey, Integer> featureToIndexMap) {
-
 			final int featureIndex = featureToIndexMap.get(featureSet.lexicalCategoryFeatures.getDefault());
 			result[featureIndex] += nodeScore * getPretrainedValue(words, featureSet);
 		}
@@ -356,6 +352,10 @@ class FeatureForest {
 			for (final UnaryRuleFeature feature : featureSet.unaryRuleFeatures) {
 				final int index = feature.getFeatureIndex(getUnaryRuleID(), words, child.startIndex,
 						child.lastIndex + 1, featureToIndexMap);
+				if (index >= featureToIndexMap.size()) {
+					System.err.println("UnaryRuleFeature Error: index out of bound.");
+					continue;
+				}
 				result.add(index);
 			}
 			return result;
@@ -364,7 +364,6 @@ class FeatureForest {
 		@Override
 		public int getEndIndex() {
 			return child.lastIndex + 1;
-
 		}
 
 		@Override
@@ -403,30 +402,35 @@ class FeatureForest {
 		@Override
 		Collection<Integer> getFeatureIndices(final List<InputWord> words, final FeatureSet featureSet,
 				final Map<FeatureKey, Integer> featureToIndexMap) {
-
 			final List<Integer> result = new ArrayList<>(featureSet.binaryFeatures.size());
 			for (final BinaryFeature feature : featureSet.binaryFeatures) {
 				final int index = feature.getFeatureIndex(parent.category, parent.ruleClass, left.category,
 						left.ruleClass.getNormalFormClassForRule(), left.lastIndex - left.startIndex + 1,
-						right.category, right.ruleClass.getNormalFormClassForRule(), right.lastIndex - right.startIndex
-								+ 1, words, featureToIndexMap);
+						right.category, right.ruleClass.getNormalFormClassForRule(),
+						right.lastIndex - right.startIndex + 1, words, featureToIndexMap);
+				if (index >= featureToIndexMap.size()) {
+					System.err.println("BinaryFeature Error: index out of bound.");
+					continue;
+				}
 				result.add(index);
 			}
 
 			if (parent.lastIndex - parent.startIndex == words.size() - 1) {
 				for (final RootCategoryFeature feature : featureSet.rootFeatures) {
 					final int index = feature.getFeatureIndex(words, parent.category, featureToIndexMap);
+					if (index >= featureToIndexMap.size()) {
+						System.err.println("RootCategoryFeature Error: index out of bound.");
+						continue;
+					}
 					result.add(index);
 				}
 			}
-
 			return result;
 		}
 
 		@Override
 		public int getEndIndex() {
 			return right.lastIndex + 1;
-
 		}
 
 		@Override
@@ -479,6 +483,10 @@ class FeatureForest {
 				for (final BilexicalFeature feature : featureSet.dependencyFeatures) {
 					final int index = feature.getFeatureIndex(words, dependency.getSemanticRole(),
 							dependency.getPredicateIndex(), dependency.getArgumentIndex(), featureToIndexMap);
+					if (index >= featureToIndexMap.size()) {
+						System.err.println("Bilexical Feature Error: index out of bound.");
+						continue;
+					}
 					result.add(index);
 				}
 			}
@@ -486,6 +494,10 @@ class FeatureForest {
 				final int index = feature.getFeatureIndex(words, dependency.getPredicateIndex(),
 						dependency.getSemanticRole(), dependency.getCategory(), dependency.getArgNumber(),
 						dependency.getPreposition(), featureToIndexMap);
+				if (index >= featureToIndexMap.size()) {
+					System.err.println("ArgumentSlotFeature Error: index out of bound.");
+					continue;
+				}
 				result.add(index);
 			}
 			if (dependency.getPreposition() != Preposition.NONE) {
@@ -493,6 +505,10 @@ class FeatureForest {
 					final int index = feature.getFeatureIndex(words, dependency.getPredicateIndex(),
 							dependency.getCategory(), dependency.getPreposition(), dependency.getArgNumber(),
 							featureToIndexMap);
+					if (index >= featureToIndexMap.size()) {
+						System.err.println("PrepositionFeature Error: index out of bound.");
+						continue;
+					}
 					result.add(index);
 				}
 			}
@@ -521,7 +537,6 @@ class FeatureForest {
 	}
 
 	static class DisjunctiveNode {
-
 		private final List<ConjunctiveNode> children = new ArrayList<>();
 		private final List<ConjunctiveNode> parents = new ArrayList<>();
 
@@ -540,7 +555,6 @@ class FeatureForest {
 		public Collection<ConjunctiveNode> getParents() {
 			return parents;
 		}
-
 	}
 
 	public Collection<DisjunctiveNode> getRoots() {

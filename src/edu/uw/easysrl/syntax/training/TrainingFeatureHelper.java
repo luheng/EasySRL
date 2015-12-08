@@ -3,6 +3,7 @@ package edu.uw.easysrl.syntax.training;
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Multiset;
 import edu.uw.easysrl.corpora.CCGBankDependencies;
+import edu.uw.easysrl.corpora.CCGBankDependencies.CCGBankDependency;
 import edu.uw.easysrl.corpora.ParallelCorpusReader;
 import edu.uw.easysrl.corpora.qa.QASentence;
 import edu.uw.easysrl.dependencies.*;
@@ -19,15 +20,14 @@ import edu.uw.easysrl.util.Util;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
 /**
  * Created by luheng on 10/28/15.
  */
 public class TrainingFeatureHelper {
-    private TrainingParameters trainingParameters;
-    private TrainingDataParameters dataParameters;
+    private final TrainingParameters trainingParameters;
+    private final TrainingDataParameters dataParameters;
 
     public TrainingFeatureHelper(TrainingParameters trainingParameters, TrainingDataParameters dataParameters) {
         this.trainingParameters = trainingParameters;
@@ -42,12 +42,12 @@ public class TrainingFeatureHelper {
         final Multiset<FeatureKey> bilexicalKeyCount = HashMultiset.create();
         final Multiset<FeatureKey> binaryFeatureCount = HashMultiset.create();
         final Map<FeatureKey, Integer> result = new HashMap<>();
-
+        final FeatureSet featureSet = trainingParameters.getFeatureSet();
         for (final ParallelCorpusReader.Sentence sentence : trainingSentences) {
             final List<DependencyStructure.ResolvedDependency> goldDeps = getGoldDeps(sentence);
             final List<Category> cats = sentence.getLexicalCategories();
             for (int i = 0; i < cats.size(); i++) {
-                final Feature.FeatureKey key = trainingParameters.getFeatureSet().lexicalCategoryFeatures.getFeatureKey(
+                final Feature.FeatureKey key = featureSet.lexicalCategoryFeatures.getFeatureKey(
                         sentence.getInputWords(), i, cats.get(i));
                 if (key != null) {
                     keyCount.add(key);
@@ -55,46 +55,46 @@ public class TrainingFeatureHelper {
             }
             for (final DependencyStructure.ResolvedDependency dep : goldDeps) {
                 final SRLFrame.SRLLabel role = dep.getSemanticRole();
-                for (final ArgumentSlotFeature feature : trainingParameters.getFeatureSet().argumentSlotFeatures) {
-                    final Feature.FeatureKey key = feature.getFeatureKey(sentence.getInputWords(), dep.getPredicateIndex(),
-                            role, dep.getCategory(), dep.getArgNumber(), dep.getPreposition());
+                for (final ArgumentSlotFeature feature : featureSet.argumentSlotFeatures) {
+                    final Feature.FeatureKey key = feature.getFeatureKey(sentence.getInputWords(),
+                            dep.getPredicateIndex(), role, dep.getCategory(), dep.getArgNumber(), dep.getPreposition());
                     keyCount.add(key);
                 }
                 if (dep.getPreposition() != Preposition.NONE) {
-                    for (final PrepositionFeature feature : trainingParameters.getFeatureSet().prepositionFeatures) {
-                        final Feature.FeatureKey key = feature.getFeatureKey(sentence.getInputWords(), dep.getPredicateIndex(),
-                                dep.getCategory(), dep.getPreposition(), dep.getArgNumber());
+                    for (final PrepositionFeature feature : featureSet.prepositionFeatures) {
+                        final Feature.FeatureKey key = feature.getFeatureKey(sentence.getInputWords(),
+                                dep.getPredicateIndex(), dep.getCategory(), dep.getPreposition(), dep.getArgNumber());
                         keyCount.add(key);
                     }
                 }
                 if (dep.getSemanticRole() != SRLFrame.NONE) {
-                    for (final BilexicalFeature feature : trainingParameters.getFeatureSet().dependencyFeatures) {
-                        final Feature.FeatureKey key = feature.getFeatureKey(sentence.getInputWords(), dep.getSemanticRole(),
-                                dep.getPredicateIndex(), dep.getArgumentIndex());
+                    for (final BilexicalFeature feature : featureSet.dependencyFeatures) {
+                        final Feature.FeatureKey key = feature.getFeatureKey(sentence.getInputWords(),
+                                dep.getSemanticRole(), dep.getPredicateIndex(), dep.getArgumentIndex());
                         bilexicalKeyCount.add(key);
                     }
                 }
-
             }
             getFromDerivation(sentence.getCcgbankParse(), binaryFeatureCount, sentence.getInputWords(), 0,
                     sentence.getInputWords().size());
-            for (final Feature.RootCategoryFeature rootFeature : trainingParameters.getFeatureSet().rootFeatures) {
+            for (final Feature.RootCategoryFeature rootFeature : featureSet.rootFeatures) {
                 final Feature.FeatureKey key = rootFeature.getFeatureKey(sentence.getCcgbankParse().getCategory(),
                         sentence.getInputWords());
                 boundedFeatures.add(key);
                 keyCount.add(key);
             }
         }
-        result.put(trainingParameters.getFeatureSet().lexicalCategoryFeatures.getDefault(), result.size());
+        result.put(featureSet.lexicalCategoryFeatures.getDefault(), result.size());
         addFrequentFeatures(minimumFeatureFrequency, keyCount, result, boundedFeatures, false);
         addFrequentFeatures(minimumFeatureFrequency, bilexicalKeyCount, result, boundedFeatures, false);
-        for (final Feature.BinaryFeature feature : trainingParameters.getFeatureSet().binaryFeatures) {
+        for (final Feature.BinaryFeature feature : featureSet.binaryFeatures) {
             boundedFeatures.add(feature.getDefault());
         }
-        for (final Feature feature : trainingParameters.getFeatureSet().getAllFeatures()) {
+        for (final Feature feature : featureSet.getAllFeatures()) {
             if (!result.containsKey(feature.getDefault())) {
                 result.put(feature.getDefault(), result.size());
             }
+            feature.resetDefaultIndex();
         }
         System.out.println("Total features: " + result.size());
         return result;
@@ -303,12 +303,11 @@ public class TrainingFeatureHelper {
      * Used for identifying features that occur in positive examples.
      * Compares labels gold-standard CCGbank dependencies with SRL labels.
      */
-    static List<DependencyStructure.ResolvedDependency> getGoldDeps(final ParallelCorpusReader.Sentence sentence) {
-        final List<Category> goldCategories = sentence.getLexicalCategories();
-        final List<DependencyStructure.ResolvedDependency> goldDeps = new ArrayList<>();
-        final Set<CCGBankDependencies.CCGBankDependency> unlabelledDeps =
-                new HashSet<>(sentence.getCCGBankDependencyParse().getDependencies());
-        for (final Map.Entry<SRLDependency, CCGBankDependencies.CCGBankDependency> dep :
+    private List<DependencyStructure.ResolvedDependency> getGoldDeps(final ParallelCorpusReader.Sentence sentence) {
+        List<Category> goldCategories = sentence.getLexicalCategories();
+        List<DependencyStructure.ResolvedDependency> goldDeps = new ArrayList<>();
+        Set<CCGBankDependency> unlabelledDeps = new HashSet<>(sentence.getCCGBankDependencyParse().getDependencies());
+        for (final Map.Entry<SRLDependency, CCGBankDependency> dep :
                 sentence.getCorrespondingCCGBankDependencies().entrySet()) {
             final CCGBankDependencies.CCGBankDependency ccgbankDep = dep.getValue();
             if (ccgbankDep == null) {
@@ -325,7 +324,6 @@ public class TrainingFeatureHelper {
                     .fromString(dep.getKey().getPreposition())));
             unlabelledDeps.remove(ccgbankDep);
         }
-
         for (final CCGBankDependencies.CCGBankDependency dep : unlabelledDeps) {
             final Category goldCategory = goldCategories.get(dep.getSentencePositionOfPredicate());
             if (dep.getArgNumber() > goldCategory.getNumberOfArguments()) {
@@ -340,7 +338,7 @@ public class TrainingFeatureHelper {
         return goldDeps;
     }
 
-    static List<DependencyStructure.ResolvedDependency> getGoldDeps(
+    private List<DependencyStructure.ResolvedDependency> getGoldDeps(
             final QASentence sentence,
             final CompressedChart smallChart,
             final List<Set<Category>> allCategories) {

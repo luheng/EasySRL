@@ -132,9 +132,7 @@ public class QuestionGenerationDataHandler {
         } catch (IOException e) {
             e.printStackTrace();
         }
-
         analyzeData(training);
         analyzeData(dev);
     }
-
 }
