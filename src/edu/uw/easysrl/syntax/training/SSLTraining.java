@@ -205,7 +205,7 @@ public class SSLTraining {
                         trainingPool, trainingSentenceIds);
                 System.out.println(String.format("%d training, %d qa and (%d, %d) evaluation sentences.",
                         trainingSentences.size(), qaTrainingSentences.size(), evalSentences.size(),
-                        alignedPBSentences));
+                        alignedPBSentences.size()));
                 final SSLTraining training = new SSLTraining(dataParameters, standard, trainingSentences, evalSentences,
                         alignedPBSentences, qaTrainingSentences, alignedQASentences);
                 training.trainLocal();
