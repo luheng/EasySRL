@@ -18,9 +18,8 @@ public class PennTreebank {
 			throws IOException {
 		final Table<String, Integer, TreebankParse> result = HashBasedTable
 				.create();
-		for (final File file : Util.findAllFiles(folder, ".*.mrg")) {
-			final String name = file.getName().substring(0,
-					file.getName().length() - 4);
+		for (final File file : Util.findAllFiles(folder, ".*.MRG")) {
+			final String name = file.getName().substring(0, file.getName().length() - 4).toLowerCase();
 			// System.out.println(name);
 			final Iterator<String> lines = Util.readFileLineByLine(file);
 			int sentenceNumber = 0;

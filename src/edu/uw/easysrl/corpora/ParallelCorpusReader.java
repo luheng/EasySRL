@@ -27,25 +27,17 @@ import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeLeaf;
 import edu.uw.easysrl.util.Util;
 
+
 public class ParallelCorpusReader {
 	private final static boolean USING_NOMBANK = false;
-
-	private final static Properties PROPERTIES = Util.loadProperties(new File(
-			"corpora.properties"));
-	public static final File PROPBANK = new File(
-			PROPERTIES.getProperty("propbank"));
-	private static final File NOMBANK = new File(
-			PROPERTIES.getProperty("nombank"));
+	private final static Properties PROPERTIES = Util.loadProperties(new File("corpora.properties"));
+	public static final File PROPBANK = new File(PROPERTIES.getProperty("propbank"));
+	private static final File NOMBANK = new File(PROPERTIES.getProperty("nombank"));
 	private static final File WSJ = new File(PROPERTIES.getProperty("ptb"));
-	public static final File CCGREBANK = new File(
-			PROPERTIES.getProperty("ccgbank"));
-
+	public static final File CCGREBANK = new File(PROPERTIES.getProperty("ccgbank"));
 	public static final File BROWN = new File(PROPERTIES.getProperty("brown"));
 
 	public static class Sentence implements Serializable {
-		/**
-		 *
-		 */
 		private static final long serialVersionUID = 1L;
 		private final SyntacticDependencyParse syntacticDependencyParse;
 
@@ -79,8 +71,7 @@ public class ParallelCorpusReader {
 		private final DependencyParse ccgbankDependencyParse;
 
 		public boolean isConsistent() {
-			return ccgbankParse.getLeaves().size() == srlParse
-					.getSentenceLength();
+			return ccgbankParse.getLeaves().size() == srlParse.getSentenceLength();
 		}
 
 		public SyntacticDependencyParse getSyntacticDependencyParse() {
@@ -92,7 +83,6 @@ public class ParallelCorpusReader {
 			for (final SyntaxTreeNodeLeaf leaf : ccgbankParse.getLeaves()) {
 				result.add(leaf.getWord());
 			}
-
 			return result;
 		}
 
@@ -101,7 +91,6 @@ public class ParallelCorpusReader {
 			for (final SyntaxTreeNodeLeaf leaf : ccgbankParse.getLeaves()) {
 				result.add(leaf.getCategory());
 			}
-
 			return result;
 		}
 
@@ -111,11 +100,9 @@ public class ParallelCorpusReader {
 			if (inputWords == null) {
 				inputWords = new ArrayList<>(ccgbankParse.getLeaves().size());
 				for (final SyntaxTreeNodeLeaf leaf : ccgbankParse.getLeaves()) {
-					inputWords.add(new InputWord(leaf.getWord(), leaf.getPos(),
-							leaf.getNER()));
+					inputWords.add(new InputWord(leaf.getWord(), leaf.getPos(), leaf.getNER()));
 				}
 			}
-
 			return inputWords;
 		}
 
@@ -127,11 +114,9 @@ public class ParallelCorpusReader {
 			final Map<SRLDependency, CCGBankDependency> result = new HashMap<>();
 			for (final SRLDependency dep : srlParse.getDependencies()) {
 				final CCGBankDependency correspondingDep = ParallelCorpusReader
-						.getCorrespondingCCGBankDependency(dep,
-								ccgbankDependencyParse);
+						.getCorrespondingCCGBankDependency(dep, ccgbankDependencyParse);
 				result.put(dep, correspondingDep);
 			}
-
 			return result;
 		}
 
@@ -145,11 +130,10 @@ public class ParallelCorpusReader {
 	private final File treebank;
 	private final File nombank;
 
-	public final static ParallelCorpusReader READER = new ParallelCorpusReader(
-			CCGREBANK, PROPBANK, WSJ, USING_NOMBANK ? NOMBANK : null);
+	public final static ParallelCorpusReader READER = new ParallelCorpusReader(CCGREBANK, PROPBANK, WSJ,
+			USING_NOMBANK ? NOMBANK : null);
 
-	private ParallelCorpusReader(final File ccgbank, final File propbank,
-			final File treebank, final File nombank) {
+	private ParallelCorpusReader(final File ccgbank, final File propbank, final File treebank, final File nombank) {
 		super();
 		this.ccgbank = ccgbank;
 		this.propbank = propbank;
@@ -159,27 +143,21 @@ public class ParallelCorpusReader {
 
 	public static Collection<SRLParse> getPropBank00() throws IOException {
 		return getPropbankSection("00");
-
 	}
 
 	private static Collection<SRLParse> getPropbankSection(final String section)
 			throws IOException {
 		final Table<String, Integer, TreebankParse> PTB = new PennTreebank()
 				.readCorpus(WSJ);
-		final Table<String, Integer, SRLParse> srlParses = SRLParse
-				.parseCorpus(
+		final Table<String, Integer, SRLParse> srlParses = SRLParse.parseCorpus(
 						PTB,
 						Util.readFileLineByLine(new File(PROPBANK, "prop.txt")),
 						USING_NOMBANK ? Util.readFileLineByLine(NOMBANK) : null);
 
-		final Table<String, Integer, SRLParse> goldParses = TreeBasedTable
-				.create();
+		final Table<String, Integer, SRLParse> goldParses = TreeBasedTable.create();
 		for (final Cell<String, Integer, TreebankParse> cell : PTB.cellSet()) {
-
-			// Propbank files skip sentences with no SRL deps. Add a default
-			// empty parse for all sentences.
-			goldParses.put(cell.getRowKey(), cell.getColumnKey(), new SRLParse(
-					cell.getValue().getWords()));
+			// Propbank files skip sentences with no SRL deps. Add a default empty parse for all sentences.
+			goldParses.put(cell.getRowKey(), cell.getColumnKey(), new SRLParse(cell.getValue().getWords()));
 		}
 		goldParses.putAll(srlParses);
 
@@ -202,8 +180,8 @@ public class ParallelCorpusReader {
 	private Table<String, Integer, SyntacticDependencyParse> CoNLL;
 	private Table<String, Integer, SRLParse> srlParses;
 
-	public Iterator<Sentence> readCorpus(final boolean isDev)
-			throws IOException {
+	public Iterator<Sentence> readCorpus(final boolean isDev) throws IOException {
+		System.err.println("I am reading the Propbank.");
 		synchronized (this) {
 			if (PTB == null) {
 				PTB = new PennTreebank().readCorpus(treebank);
@@ -212,17 +190,12 @@ public class ParallelCorpusReader {
 				CoNLL = new DependencyTreebank().readCorpus(treebank);
 			}
 			if (srlParses == null) {
-				srlParses = SRLParse
-						.parseCorpus(
+				srlParses = SRLParse.parseCorpus(
 								PTB,
-								Util.readFileLineByLine(new File(propbank,
-										"prop.txt")),
-								nombank != null ? Util
-												.readFileLineByLine(nombank) : null);
+								Util.readFileLineByLine(new File(propbank,  "prop.txt")),
+								nombank != null ? Util.readFileLineByLine(nombank) : null);
 			}
-
 		}
-
 		List<SyntaxTreeNode> parses;
 		List<DependencyParse> depParses;
 		if (isDev) {
@@ -231,12 +204,10 @@ public class ParallelCorpusReader {
 					parsesDev = CCGBankParseReader.loadCorpus(ccgbank, true);
 				}
 				if (depParsesDev == null) {
-					depParsesDev = CCGBankDependencies.loadCorpus(ccgbank,
-							Partition.DEV);
+					depParsesDev = CCGBankDependencies.loadCorpus(ccgbank, Partition.DEV);
 				}
 				parses = parsesDev;
 				depParses = depParsesDev;
-
 			}
 		} else {
 			synchronized (ccgbank) {
@@ -244,8 +215,7 @@ public class ParallelCorpusReader {
 					parsesTrain = CCGBankParseReader.loadCorpus(ccgbank, false);
 				}
 				if (depParsesTrain == null) {
-					depParsesTrain = CCGBankDependencies.loadCorpus(ccgbank,
-							Partition.TRAIN);
+					depParsesTrain = CCGBankDependencies.loadCorpus(ccgbank, Partition.TRAIN);
 				}
 				parses = parsesTrain;
 				depParses = depParsesTrain;
@@ -271,16 +241,13 @@ public class ParallelCorpusReader {
 				final SyntacticDependencyParse conll = CoNLL.get(
 						depParse.getFile(), depParse.getSentenceNumber());
 				i++;
-
 				if (srl == null) {
 					final List<String> words = getWords(parse);
 					srl = new SRLParse(words);
 				}
-
 				if (depParse.getSentenceLength() != srl.getSentenceLength()) {
 					return next();
 				}
-
 				return new Sentence(parse, depParse, conll, srl, PTB.get(
 						depParse.getFile(), depParse.getSentenceNumber()));
 			}
@@ -300,22 +267,17 @@ public class ParallelCorpusReader {
 			final DependencyParse ccgbankDependencies) {
 		for (final int argIndex : srlDependency.getArgumentPositions()) {
 			final CCGBankDependency dep = ccgbankDependencies.getDependency(
-					srlDependency.isCoreArgument() ? srlDependency
-							.getPredicateIndex() : argIndex,
-							srlDependency.isCoreArgument() ? argIndex : srlDependency
-									.getPredicateIndex());
+					srlDependency.isCoreArgument() ? srlDependency.getPredicateIndex() : argIndex,
+					srlDependency.isCoreArgument() ? argIndex : srlDependency.getPredicateIndex());
 			if (dep != null) {
 				return dep;
 			}
-
 		}
-
 		return null;
 	}
 
 	public static Collection<SRLParse> getPropBank23() throws IOException {
 		return getPropbankSection("23");
-
 	}
 
 }

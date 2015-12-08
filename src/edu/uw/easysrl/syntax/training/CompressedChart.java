@@ -34,8 +34,7 @@ import edu.uw.easysrl.syntax.training.CKY.EquivalenceClassValue;
  * we don't use that for features. TODO merge this with FeatureForest
  *
  */
-class CompressedChart {
-
+public class CompressedChart {
 	private final List<InputWord> words;
 	private final Collection<Key> roots;
 
@@ -48,7 +47,6 @@ class CompressedChart {
 	static class Key {
 		final Category category;
 		final RuleType ruleClass;
-
 		final int startIndex;
 		final int lastIndex;
 		final Set<Value> values;
@@ -61,7 +59,6 @@ class CompressedChart {
 			this.ruleClass = ruleClass;
 			this.startIndex = startIndex;
 			this.lastIndex = lastIndex;
-
 		}
 
 		private Integer hashCode = null;
@@ -80,13 +77,10 @@ class CompressedChart {
 
 		@Override
 		public boolean equals(final Object obj) {
-
 			final Key other = (Key) obj;
-
 			return this == other
 					|| (values.equals(other.values) && category == other.category && ruleClass.equals(other.ruleClass)
 							&& startIndex == other.startIndex && lastIndex == other.lastIndex);
-
 		}
 
 		public Collection<Value> getChildren() {
@@ -95,13 +89,11 @@ class CompressedChart {
 
 		public int getLastIndex() {
 			return lastIndex;
-
 		}
 
 		public int getStartIndex() {
 			return startIndex;
 		}
-
 	}
 
 	static abstract class Value {
@@ -113,7 +105,6 @@ class CompressedChart {
 
 		@Override
 		public final int hashCode() {
-
 			if (hashCode == null) {
 				hashCode = hashCode2();
 			}
@@ -149,7 +140,6 @@ class CompressedChart {
 		public int getRuleID() {
 			throw new UnsupportedOperationException();
 		}
-
 	}
 
 	static class CategoryValue extends Value {
@@ -196,7 +186,6 @@ class CompressedChart {
 		public List<Key> getChildren() {
 			return Collections.emptyList();
 		}
-
 	}
 
 	static class TreeValueBinary extends TreeValue {
@@ -226,17 +215,12 @@ class CompressedChart {
 
 		@Override
 		public boolean equals(final Object obj) {
-
 			if (!(obj instanceof TreeValueBinary)) {
 				return false;
 			}
-
 			final TreeValueBinary other = (TreeValueBinary) obj;
-
 			return left.equals(other.left) && right.equals(other.right) && super.equals(other);
-
 		}
-
 	}
 
 	static class TreeValueUnary extends TreeValue {
@@ -278,7 +262,6 @@ class CompressedChart {
 			final TreeValueUnary other = (TreeValueUnary) obj;
 			return ruleID == other.ruleID && child.equals(other.child) && super.equals(other);
 		}
-
 	}
 
 	static abstract class TreeValue extends Value {
@@ -311,9 +294,7 @@ class CompressedChart {
 			if (!(obj instanceof TreeValue)) {
 				return false;
 			}
-
 			final TreeValue other = (TreeValue) obj;
-
 			return deps.equals(other.deps);
 		}
 
@@ -336,33 +317,25 @@ class CompressedChart {
 		if (visited.contains(key)) {
 			return;
 		}
-
 		visited.add(key);
-
 		for (final Value value : key.getChildren()) {
 			for (final ResolvedDependency dep : value.getDependencies()) {
 				result.add(dep);
 			}
-
 			for (final Key child : value.getChildren()) {
 				getAllDependencies(child, result, visited);
 			}
 		}
-
 	}
 
-	private static Key make(final ChartCell[][] chart, final int spanStart, final int spanLength,
+  private static Key make(final ChartCell[][] chart, final int spanStart, final int spanLength,
 			final EquivalenceClassKey key, final Map<Object, Key> cache, final Map<Object, Value> valueCache,
 			final CutoffsDictionary cutoffs, final Multimap<Category, UnaryRule> unaryRules) {
-
 		final ChartCell cell = chart[spanStart][spanLength - 1];
-
 		Key result = cache.get(key);
 		if (result == null) {
-
 			final Collection<EquivalenceClassValue> entries = cell.getEntries(key);
 			final Set<Value> values = new HashSet<>(entries.size());
-
 			for (final EquivalenceClassValue value : entries) {
 				final Set<ResolvedDependency> deps = new HashSet<>(value.getResolvedDependencies().size());
 				for (final UnlabelledDependency dependency : value.getResolvedDependencies()) {
@@ -376,7 +349,6 @@ class CompressedChart {
 							.getArgNumber(), dependency.getArguments().get(0), SRLFrame.UNLABELLED_ARGUMENT, dependency
 							.getPreposition()));
 				}
-
 				int start = spanStart;
 				final List<EquivalenceClassKey> uncompressedChildren = value.getChildren();
 				final List<Key> children = new ArrayList<>(uncompressedChildren.size());
@@ -384,15 +356,12 @@ class CompressedChart {
 					children.add(make(chart, start, child.length(), child, cache, valueCache, cutoffs, unaryRules));
 					start += child.length();
 				}
-
 				Value newVal;
 				if (children.isEmpty()) {
 					newVal = new CategoryValue(key.getCategory(), spanStart);
-
 				} else if (children.size() == 1) {
 					Preconditions.checkState(uncompressedChildren.size() == 1);
 					final Category from = uncompressedChildren.get(0).getCategory();
-
 					final Category to = key.getCategory();
 					Integer ruleID = null;
 					for (final UnaryRule unary : unaryRules.get(from)) {
@@ -400,28 +369,21 @@ class CompressedChart {
 							ruleID = unary.getID();
 						}
 					}
-
 					newVal = new TreeValueUnary(children.get(0), ruleID, deps);
-
 				} else {
 					newVal = new TreeValueBinary(children.get(0), children.get(1), deps);
 				}
-
 				final Value existing = valueCache.get(newVal);
 				if (existing != null) {
 					newVal = existing;
 				} else {
 					valueCache.put(newVal, newVal);
 				}
-
 				values.add(newVal);
-
 			}
-
 			result = new Key(key.getCategory(), spanStart, spanStart + spanLength - 1, key.getRuleType(), values);
 			cache.put(key, result);
 		}
-
 		return result;
 	}
 
@@ -432,20 +394,15 @@ class CompressedChart {
 		final Collection<Key> roots = new HashSet<>();
 		final Map<Object, Value> valueCache = new HashMap<>();
 		final Map<Object, Key> keyCache = new IdentityHashMap<>();
-
 		for (final EquivalenceClassKey entry : cell.getKeys()) {
-
 			if (rootCategories.contains(entry.getCategory())) {
 				roots.add(make(chart, 0, chart.length, entry, keyCache, valueCache, cutoffs, unaryRules));
 			}
 		}
-
 		if (roots.size() == 0) {
 			return null;
 		}
-
 		return new CompressedChart(words, ImmutableSet.copyOf(roots));
-
 	}
 
 	public Collection<Key> getRoots() {
@@ -461,9 +418,7 @@ class CompressedChart {
 		final Map<Key, Integer> cache = new HashMap<>();
 		for (final Key root : roots) {
 			result += getNumberOfPossibleParses(root, cache);
-
 		}
-
 		return result;
 	}
 
@@ -476,10 +431,8 @@ class CompressedChart {
 				for (final Key child : value.getChildren()) {
 					resultForValue = resultForValue * getNumberOfPossibleParses(child, cache);
 				}
-
 				result += resultForValue;
 			}
-
 			cache.put(key, result);
 		}
 		return result;

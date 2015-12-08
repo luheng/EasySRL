@@ -36,7 +36,6 @@ public class SeenRules {
 			final Sentence sentence = sentences.next();
 			getRulesFromParse(sentence.getCcgbankParse(), result);
 		}
-
 		for (final String rule : Multisets.copyHighestCountFirst(result).elementSet()) {
 			System.out.println(rule);
 		}
@@ -45,9 +44,7 @@ public class SeenRules {
 	private static void getRulesFromParse(final SyntaxTreeNode parse, final Multiset<String> result) {
 		if (parse.getChildren().size() == 2) {
 			result.add(parse.getChild(0).getCategory().toString() + " " + parse.getChild(1).getCategory().toString());
-
 		}
-
 		for (final SyntaxTreeNode child : parse.getChildren()) {
 			getRulesFromParse(child, result);
 		}
@@ -63,7 +60,6 @@ public class SeenRules {
 			result = result.dropPPandPRfeatures();
 			simplify.put(input, result);
 		}
-
 		return result;
 	}
 
@@ -105,25 +101,20 @@ public class SeenRules {
 					maxID = addToTable(tab, maxID, left, right);
 				}
 			}
-
 			final Set<Category> punctatation = new HashSet<>();
 			for (final Category category : lexicalCategories) {
 				if (category.isPunctuation()) {
 					punctatation.add(category);
 				}
 			}
-
 			for (final Category category : lexicalCategories) {
-
 				// Let punctuation combine with anything.
 				for (final Category punct : punctatation) {
 					maxID = addToTable(tab, maxID, punct, category);
 					maxID = addToTable(tab, maxID, category, punct);
 				}
-
 				// Add in default application seen rules. Useful for new
 				// categories created by rebanking.
-
 				if (category.isFunctor()) {
 					if (category.getSlash() == Slash.FWD) {
 						maxID = addToTable(tab, maxID, category, category.getRight());
@@ -131,9 +122,7 @@ public class SeenRules {
 						maxID = addToTable(tab, maxID, category.getRight(), category);
 					}
 				}
-
 			}
-
 			seen = new boolean[maxID + 1][maxID + 1];
 			for (final Cell<Category, Category, Boolean> entry : tab.cellSet()) {
 				seen[entry.getRowKey().getID()][entry.getColumnKey().getID()] = true;

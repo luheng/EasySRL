@@ -31,9 +31,7 @@ import edu.uw.easysrl.syntax.training.CompressedChart.Key;
 import edu.uw.easysrl.syntax.training.CompressedChart.Value;
 
 class FeatureForest {
-
 	private final Collection<ConjunctiveNode> conjunctiveNodes = new ArrayList<>();
-
 	private final Collection<DisjunctiveNode> roots;
 	private final CutoffsDictionary cutoffsDictionary;
 	private final List<InputWord> words;
@@ -41,7 +39,6 @@ class FeatureForest {
 	FeatureForest(final List<InputWord> words, final CompressedChart allParses,
 			final CutoffsDictionary cutoffsDictionary) {
 		final Collection<DisjunctiveNode> result = new ArrayList<>();
-
 		this.words = words;
 		this.cutoffsDictionary = cutoffsDictionary;
 		final Map<Key, DisjunctiveNode> cache1 = new HashMap<>();
@@ -50,7 +47,6 @@ class FeatureForest {
 		for (final Key key : allParses.getRoots()) {
 			result.add(parseDisjunctive(key, cache1, dependencyNodeCache, conjuctiveNodeCache));
 		}
-
 		this.roots = result;
 	}
 
@@ -117,31 +113,24 @@ class FeatureForest {
 				// Unlabelled arguments are those which are under-specified from
 				// the training charts
 				dep.getSemanticRole() == SRLFrame.UNLABELLED_ARGUMENT) {
-
 			// Underspecified labels.
 			for (final SRLLabel label : cutoffsDictionary.getRoles(words.get(dep.getHead()).word, dep.getCategory(),
 					dep.getPreposition(), dep.getArgNumber())) {
 				if (cutoffsDictionary.isFrequent(dep.getCategory(), dep.getArgNumber(), label)) {
 					final ResolvedDependency labelledDep = dep.overwriteLabel(label);
-
 					possibleLabels.add(new ConjunctiveDependencyNode(labelledDep, parent, cutoffsDictionary.isFrequent(
 							label, dep.getOffset())));
 				}
-
 			}
 		} else {
 			// Gold labels.
-
 			if (!cutoffsDictionary.getRoles(words.get(dep.getHead()).word, dep.getCategory(), dep.getPreposition(),
 					dep.getArgNumber()).contains(dep.getSemanticRole())) {
 				throw new RuntimeException("Role " + dep.getSemanticRole() + " should have been pruned:"
 						+ words.get(dep.getHead()).word + " " + dep.getCategory() + " " + dep.getPreposition() + " "
 						+ dep.getArgNumber());
 			}
-
-			Preconditions.checkState(cutoffsDictionary.isFrequent(dep.getCategory(), dep.getArgNumber(),
-					dep.getSemanticRole()));
-
+			Preconditions.checkState(cutoffsDictionary.isFrequent(dep.getCategory(), dep.getArgNumber(), dep.getSemanticRole()));
 			possibleLabels.add(new ConjunctiveDependencyNode(dep, parent, cutoffsDictionary.isFrequent(
 					dep.getSemanticRole(), dep.getOffset())));
 		}
@@ -172,7 +161,6 @@ class FeatureForest {
 	}
 
 	static abstract class ConjunctiveNode {
-
 		private final DisjunctiveNode parent;
 
 		public List<DisjunctiveNode> getChildren() {
@@ -213,11 +201,9 @@ class FeatureForest {
 
 		abstract double getLogScore(List<InputWord> words, FeatureSet featureSet,
 				Map<FeatureKey, Integer> featureToIndexMap, double[] featureWeights);
-
 	}
 
 	private static abstract class CachedConjunctiveNode extends ConjunctiveNode {
-
 		private CachedConjunctiveNode(final DisjunctiveNode parent, final List<DisjunctiveNode> children) {
 			super(parent, children);
 		}
@@ -239,7 +225,6 @@ class FeatureForest {
 			for (final int featureIndex : getFeatureIndicesCached(words, featureSet, featureToIndexMap)) {
 				result += featureWeights[featureIndex];
 			}
-
 			return result;
 		}
 
@@ -288,26 +273,20 @@ class FeatureForest {
 
 		private double getPretrainedValue(final List<InputWord> words, final FeatureSet featureSet) {
 			if (cachedValue == null) {
-
 				List<Map<Category, Double>> tags = cache.get(words);
 				if (tags == null) {
 					tags = featureSet.lexicalCategoryFeatures.getCategoryScores(words, 1.0);
-					cache.put(words, tags);
 				}
-
 				cachedValue = tags.get(index).get(category);
 			}
-
 			return cachedValue;
 		}
 
 		@Override
 		void updateExpectations(final List<InputWord> words, final double nodeScore, final double[] result,
 				final FeatureSet featureSet, final Map<FeatureKey, Integer> featureToIndexMap) {
-
 			final int featureIndex = featureToIndexMap.get(featureSet.lexicalCategoryFeatures.getDefault());
 			result[featureIndex] += nodeScore * getPretrainedValue(words, featureSet);
-
 		}
 
 		@Override
@@ -316,7 +295,6 @@ class FeatureForest {
 			double result = 0.0;
 			final int featureIndex = featureToIndexMap.get(featureSet.lexicalCategoryFeatures.getDefault());
 			result += getPretrainedValue(words, featureSet) * featureWeights[featureIndex];
-
 			return result;
 		}
 
@@ -349,7 +327,6 @@ class FeatureForest {
 		@Override
 		public Category getCategory() {
 			return category;
-
 		}
 
 		@Override
@@ -365,7 +342,6 @@ class FeatureForest {
 		@Override
 		public int getIndex() {
 			throw new UnsupportedOperationException();
-
 		}
 
 		@Override
@@ -375,6 +351,10 @@ class FeatureForest {
 			for (final UnaryRuleFeature feature : featureSet.unaryRuleFeatures) {
 				final int index = feature.getFeatureIndex(getUnaryRuleID(), words, child.startIndex,
 						child.lastIndex + 1, featureToIndexMap);
+				if (index >= featureToIndexMap.size()) {
+					System.err.println("UnaryRuleFeature Error: index out of bound.");
+					continue;
+				}
 				result.add(index);
 			}
 			return result;
@@ -383,7 +363,6 @@ class FeatureForest {
 		@Override
 		public int getEndIndex() {
 			return child.lastIndex + 1;
-
 		}
 
 		@Override
@@ -393,7 +372,6 @@ class FeatureForest {
 	}
 
 	private static class ConjunctiveBinaryNode extends CachedConjunctiveNode {
-
 		private final DisjunctiveTreeNode left;
 		private final DisjunctiveTreeNode right;
 		private final DisjunctiveTreeNode parent;
@@ -403,7 +381,6 @@ class FeatureForest {
 			this.left = (DisjunctiveTreeNode) children.get(0); // TODO
 			this.right = (DisjunctiveTreeNode) children.get(1); // TODO
 			this.parent = parent;
-
 		}
 
 		@Override
@@ -424,37 +401,41 @@ class FeatureForest {
 		@Override
 		Collection<Integer> getFeatureIndices(final List<InputWord> words, final FeatureSet featureSet,
 				final Map<FeatureKey, Integer> featureToIndexMap) {
-
 			final List<Integer> result = new ArrayList<>(featureSet.binaryFeatures.size());
 			for (final BinaryFeature feature : featureSet.binaryFeatures) {
 				final int index = feature.getFeatureIndex(parent.category, parent.ruleClass, left.category,
 						left.ruleClass.getNormalFormClassForRule(), left.lastIndex - left.startIndex + 1,
-						right.category, right.ruleClass.getNormalFormClassForRule(), right.lastIndex - right.startIndex
-								+ 1, words, featureToIndexMap);
+						right.category, right.ruleClass.getNormalFormClassForRule(),
+						right.lastIndex - right.startIndex + 1, words, featureToIndexMap);
+				if (index >= featureToIndexMap.size()) {
+					System.err.println("BinaryFeature Error: index out of bound.");
+					continue;
+				}
 				result.add(index);
 			}
 
 			if (parent.lastIndex - parent.startIndex == words.size() - 1) {
 				for (final RootCategoryFeature feature : featureSet.rootFeatures) {
 					final int index = feature.getFeatureIndex(words, parent.category, featureToIndexMap);
+					if (index >= featureToIndexMap.size()) {
+						System.err.println("RootCategoryFeature Error: index out of bound.");
+						continue;
+					}
 					result.add(index);
 				}
 			}
-
 			return result;
 		}
 
 		@Override
 		public int getEndIndex() {
 			return right.lastIndex + 1;
-
 		}
 
 		@Override
 		public int getStartIndex() {
 			return left.startIndex;
 		}
-
 	}
 
 	private static class ConjunctiveDependencyNode extends CachedConjunctiveNode {
@@ -504,23 +485,28 @@ class FeatureForest {
 					result.add(index);
 				}
 			}
-
 			for (final ArgumentSlotFeature feature : featureSet.argumentSlotFeatures) {
 				final int index = feature.getFeatureIndex(words, dependency.getHead(),
 						dependency.getSemanticRole(), dependency.getCategory(), dependency.getArgNumber(),
 						dependency.getPreposition(), featureToIndexMap);
+				if (index >= featureToIndexMap.size()) {
+					System.err.println("ArgumentSlotFeature Error: index out of bound.");
+					continue;
+				}
 				result.add(index);
 			}
-
 			if (dependency.getPreposition() != Preposition.NONE) {
 				for (final PrepositionFeature feature : featureSet.prepositionFeatures) {
 					final int index = feature.getFeatureIndex(words, dependency.getHead(),
 							dependency.getCategory(), dependency.getPreposition(), dependency.getArgNumber(),
 							featureToIndexMap);
+					if (index >= featureToIndexMap.size()) {
+						System.err.println("PrepositionFeature Error: index out of bound.");
+						continue;
+					}
 					result.add(index);
 				}
 			}
-
 			return result;
 		}
 	}
@@ -546,7 +532,6 @@ class FeatureForest {
 	}
 
 	static class DisjunctiveNode {
-
 		private final List<ConjunctiveNode> children = new ArrayList<>();
 		private final List<ConjunctiveNode> parents = new ArrayList<>();
 
@@ -565,7 +550,6 @@ class FeatureForest {
 		public Collection<ConjunctiveNode> getParents() {
 			return parents;
 		}
-
 	}
 
 	public Collection<DisjunctiveNode> getRoots() {

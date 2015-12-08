@@ -14,8 +14,7 @@ public class SRLFrame implements Serializable {
 	private static final long serialVersionUID = 1L;
 
 	public final static SRLLabel NONE = SRLLabel.make("NONE", false);
-	public final static SRLLabel UNLABELLED_ARGUMENT = SRLLabel.make(
-			"UNLABELLED", false);
+	public final static SRLLabel UNLABELLED_ARGUMENT = SRLLabel.make("UNLABELLED", false);
 
 	public final static SRLLabel ARG0 = SRLLabel.make("ARG0", true);
 	public final static SRLLabel ARG1 = SRLLabel.make("ARG1", true);
@@ -37,21 +36,21 @@ public class SRLFrame implements Serializable {
 	public final static SRLLabel DIS = SRLLabel.make("DIS", false);
 	public final static SRLLabel ADV = SRLLabel.make("ADV", false);
 	public final static SRLLabel MOD = SRLLabel.make("MOD", false);
+
+	// Speical hard coded symbols..
 	public final static SRLLabel NEG = SRLLabel.make("NEG", false);
 
 	public static class SRLLabel implements Serializable {
-
 		// Not using an enum because hash codes don't persist on serialization.
-
 		private static final long serialVersionUID = 1L;
-		private final String name;
-		private final boolean isCoreArgument;
-		private final static Map<String, SRLLabel> cache = Collections
-				.synchronizedMap(new HashMap<String, SRLLabel>());
-		private final int id;
-		private final static AtomicInteger numRoles = new AtomicInteger();
+		private final static Map<String, SRLLabel> cache = Collections.synchronizedMap(new HashMap<>());
 
-		private SRLLabel(final String name, final boolean isCoreArgument) {
+		protected final String name;
+		protected final boolean isCoreArgument;
+		protected final int id;
+		protected final static AtomicInteger numRoles = new AtomicInteger();
+
+		protected SRLLabel(final String name, final boolean isCoreArgument) {
 			super();
 			this.name = name;
 			this.isCoreArgument = isCoreArgument;
@@ -98,7 +97,6 @@ public class SRLFrame implements Serializable {
 				result = new SRLLabel(name, isCoreArgument);
 				cache.put(name, result);
 			}
-
 			return result;
 		}
 
@@ -120,11 +118,9 @@ public class SRLFrame implements Serializable {
 		public String toString() {
 			return name;
 		}
-
 	}
 
 	public static Collection<SRLLabel> getAllSrlLabels() {
 		return SRLLabel.getAllLabels();
 	}
-
 }

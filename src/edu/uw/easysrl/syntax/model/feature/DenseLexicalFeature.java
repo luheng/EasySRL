@@ -12,20 +12,12 @@ import edu.uw.easysrl.syntax.model.feature.Feature.LexicalCategoryFeature;
 import edu.uw.easysrl.syntax.tagger.Tagger;
 
 public class DenseLexicalFeature extends LexicalCategoryFeature {
-
 	private final transient Tagger tagger;
-
-	/**
-	 *
-	 */
 	private static final long serialVersionUID = 5203606720996573193L;
-
 	private final int id = -1;
 
 	public DenseLexicalFeature(final File modelFolder, final double supertaggerBeam) throws IOException {
-
 		this.tagger = Tagger.make(modelFolder, supertaggerBeam, 50, null);
-
 	}
 
 	/**
@@ -57,6 +49,9 @@ public class DenseLexicalFeature extends LexicalCategoryFeature {
 	public FeatureKey getDefault() {
 		return defaultKey;
 	}
+
+	@Override
+	public void resetDefaultIndex() { /* do nothing */ }
 
 	public List<Map<Category, Double>> getCategoryScores(final List<InputWord> words, final double supertaggerWeight) {
 		return tagger.getCategoryScores(words, supertaggerWeight);

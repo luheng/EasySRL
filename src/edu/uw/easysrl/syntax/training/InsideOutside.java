@@ -123,26 +123,21 @@ class InsideOutside {
 	private final double logInsideScoreConjunctive(final ConjunctiveNode conjunctiveNode) {
 		Double result = insideScoreConjunctiveCache.get(conjunctiveNode);
 		if (result == null) {
-
 			final Collection<DisjunctiveNode> children = conjunctiveNode.getChildren();
 			final double logScoreOfFeaturesAtNode = conjunctiveNode.getLogScore(words, featureSet, featureToIndexMap,
 					featureWeights);
-
 			result = logScoreOfFeaturesAtNode;
 			for (final DisjunctiveNode daughter : children) {
 				result = result + logInsideScoreDisjunctive(daughter);
 			}
-
 			insideScoreConjunctiveCache.put(conjunctiveNode, result);
 		}
-
 		return result;
 	}
 
 	private final double logOutsideScoreDisjunctive(final DisjunctiveNode disjunctiveNode) {
 		Double result = outsideScoreDisjunctiveCache.get(disjunctiveNode);
 		if (result == null) {
-
 			if (disjunctiveNode.getParents().size() == 0) {
 				result = 0.0;
 			} else {
@@ -159,15 +154,12 @@ class InsideOutside {
 						}
 						resultForParent = resultForParent + logInsideScoreDisjunctive(sister);
 					}
-
 					result = logSum(result, resultForParent);
 				}
 
 			}
-
 			outsideScoreDisjunctiveCache.put(disjunctiveNode, result);
 		}
-
 		return result;
 	}
 
@@ -179,7 +171,6 @@ class InsideOutside {
 		double result = Double.NEGATIVE_INFINITY;
 		final Map<DisjunctiveNode, Double> disjunctiveCache = new HashMap<>();
 		final Map<ConjunctiveNode, Double> conjunctiveCache = new HashMap<>();
-
 		for (final DisjunctiveNode d : parses.getRoots()) {
 			result = Math.max(result, logViterbiInsideScoreDisjunctive(d, disjunctiveCache, conjunctiveCache));
 		}
@@ -189,14 +180,10 @@ class InsideOutside {
 	public Scored<Collection<ConjunctiveNode>> getViterbiParse() {
 		final Map<DisjunctiveNode, Scored<Collection<ConjunctiveNode>>> disjunctiveCache = new HashMap<>();
 		final Map<ConjunctiveNode, Scored<Collection<ConjunctiveNode>>> conjunctiveCache = new HashMap<>();
-
 		Scored<Collection<ConjunctiveNode>> result = new Scored<>(Collections.emptyList(), Double.NEGATIVE_INFINITY);
-
 		for (final DisjunctiveNode d : parses.getRoots()) {
-
 			final Scored<Collection<ConjunctiveNode>> child = getViterbiParseDisjuctive(d, disjunctiveCache,
 					conjunctiveCache);
-
 			if (child.getScore() > result.getScore()) {
 				result = child;
 			}

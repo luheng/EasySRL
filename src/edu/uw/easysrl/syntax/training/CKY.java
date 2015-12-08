@@ -36,7 +36,6 @@ class CKY {
 	private final Multimap<Category, UnaryRule> unaryRules;
 	private final SeenRules seenRules;
 	private final int maxLength;
-
 	private final int maxChartSize;
 
 	CKY(final File modelFolder, final int maxSentenceLength, final int maxChartSize) throws IOException {
@@ -48,39 +47,35 @@ class CKY {
 
 	}
 
-	ChartCell[][] parse(final List<String> words, final List<Collection<Category>> input) {
-
+	ChartCell[][] parse(final List<String> words, final List<Collection<Category>> input, boolean verbatim) {
 		final int numWords = input.size();
 		if (input.size() > maxLength) {
 			return null;
 		}
-
 		final ChartCell[][] chart = new ChartCell[numWords][numWords];
-
 		// Add lexical categories
 		for (int i = 0; i < numWords; i++) {
 			chart[i][0] = makeChartCell(words, input.get(i), i);
 		}
-
 		int size = 0;
 		for (int spanLength = 2; spanLength <= numWords; spanLength++) {
 			for (int startOfSpan = 0; startOfSpan <= numWords - spanLength; startOfSpan++) {
 				final ChartCell newCell = makeChartCell(chart, startOfSpan, spanLength);
-
 				chart[startOfSpan][spanLength - 1] = newCell;
 				size += newCell.entries.values().size();
-
 				if (size > maxChartSize) {
-
 					return null;
 				}
 			}
 		}
-
 		// System.out.println("Chart size=" + size);
 		return chart;
-
 	}
+
+	ChartCell[][] parse(final List<String> words, final List<Collection<Category>> input) {
+		return parse(words, input, false /* verbatim */);
+	}
+
 
 	private ChartCell makeChartCell(final ChartCell[][] chart, final int startOfSpan, final int spanLength) {
 
@@ -106,30 +101,24 @@ class CKY {
 				if (!seenRules.isSeen(l.getCategory(), r.getCategory())) {
 					continue;
 				}
-
 				for (final RuleProduction rule : Combinator.getRules(l.getCategory(), r.getCategory(),
 						Combinator.STANDARD_COMBINATORS)) {
-
 					final RuleType leftRuleClass = l.getRuleType();
 					final RuleType ruleType = rule.getRuleType();
 					final RuleType rightRuleClass = r.getRuleType();
-
 					if (!NormalForm.isOk(leftRuleClass.getNormalFormClassForRule(),
 							rightRuleClass.getNormalFormClassForRule(), ruleType, l.getCategory(), r.getCategory(),
 							rule.getCategory(), startOfSpan == 0)) {
 						continue;
 					}
-
 					final List<UnlabelledDependency> resolvedDependencies = new ArrayList<>();
 					final DependencyStructure result = rule.getCombinator().apply(l.dependencyStructure,
 							r.dependencyStructure, resolvedDependencies);
-
 					addEntry(entries, EquivalenceClassValue.make(resolvedDependencies, l, r), rule.getCategory(),
 							ruleType, l.length + r.length, sentenceLength, result);
 				}
 			}
 		}
-
 	}
 
 	private void addEntry(final Multimap<EquivalenceClassKey, EquivalenceClassValue> nodes,
@@ -146,7 +135,6 @@ class CKY {
 				final List<UnlabelledDependency> resolvedDependencies = new ArrayList<>();
 				final DependencyStructure newDeps = unary.getDependencyStructureTransformation().apply(
 						key.dependencyStructure, resolvedDependencies);
-
 				addEntry(nodes, EquivalenceClassValue.make(resolvedDependencies, key), unary.getCategory(), unary
 						.getCategory().isForwardTypeRaised() ? RuleType.FORWARD_TYPERAISE : (unary.getCategory()
 						.isBackwardTypeRaised() ? RuleType.BACKWARD_TYPE_RAISE : RuleType.TYPE_CHANGE), length,

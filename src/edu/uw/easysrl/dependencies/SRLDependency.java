@@ -11,7 +11,6 @@ import com.google.common.collect.ImmutableSortedSet;
 import edu.uw.easysrl.dependencies.SRLFrame.SRLLabel;
 
 public class SRLDependency implements Serializable {
-
 	/**
 	 *
 	 */
@@ -30,12 +29,10 @@ public class SRLDependency implements Serializable {
 				: argumentIndices.get(argumentIndices.size() - 1);
 
 		final List<Integer> firstConstituent = new ArrayList<>();
-		for (int i = firstArgumentPosition; i <= lastArgumentPosition
-				&& argumentIndices.contains(i); i++) {
+		for (int i = firstArgumentPosition; i <= lastArgumentPosition && argumentIndices.contains(i); i++) {
 			firstConstituent.add(i);
 		}
 		this.firstConstituent = ImmutableSortedSet.copyOf(firstConstituent);
-
 		this.preposition = preposition;
 		this.label = label;
 	}

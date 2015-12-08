@@ -69,7 +69,6 @@ import edu.uw.easysrl.syntax.tagger.TaggerEmbeddings;
 import edu.uw.easysrl.syntax.training.Optimization.LossFunction;
 import edu.uw.easysrl.syntax.training.Optimization.TrainingAlgorithm;
 import edu.uw.easysrl.syntax.training.Optimization.TrainingExample;
-import edu.uw.easysrl.syntax.training.TrainingDataLoader.TrainingDataParameters;
 import edu.uw.easysrl.util.Util;
 import edu.uw.easysrl.util.Util.Logger;
 
@@ -98,11 +97,11 @@ public class Training {
 
 		// Dummy clustering (i.e. words)
 		clusterings.add(null);
-
+    /*
 		for (final String file : trainingSettings.getProperty("clusterings").split(",")) {
 			clusterings.add(new Clustering(new File(file), false));
 		}
-
+    */
 		final boolean local = args.length == 1;
 
 		for (final int minFeatureCount : parseIntegers(trainingSettings, "minimum_feature_frequency")) {
@@ -131,7 +130,6 @@ public class Training {
 								final File pipeline = new File(modelFolder, "pipeline");
 								pipeline.mkdir();
 								for (final File f : baseModel.listFiles()) {
-
 									java.nio.file.Files.copy(f.toPath(), new File(pipeline, f.getName()).toPath(),
 											StandardCopyOption.REPLACE_EXISTING);
 								}
@@ -145,7 +143,7 @@ public class Training {
 										PrepositionFeature.prepositionFeaures, Collections.emptyList(),
 										Collections.emptyList());
 
-								final TrainingParameters standard = new Training.TrainingParameters(50, allFeatures,
+								final TrainingParameters standard = new TrainingParameters(50, allFeatures,
 										sigmaSquared, minFeatureCount, modelFolder, costFunctionWeight);
 
 								final Training training = new Training(dataParameters, standard);
@@ -199,7 +197,7 @@ public class Training {
 
 	private double[] trainLocal() throws IOException {
 		final Set<FeatureKey> boundedFeatures = new HashSet<>();
-		final Map<FeatureKey, Integer> featureToIndex = makeKeyToIndexMap(trainingParameters.minimumFeatureFrequency,
+		final Map<FeatureKey, Integer> featureToIndex = makeKeyToIndexMap(trainingParameters.getMinimumFeatureFrequency(),
 				boundedFeatures);
 
 		final List<TrainingExample> data = makeTrainingData(false);
@@ -214,7 +212,7 @@ public class Training {
 
 	private double[] trainDistributed() throws IOException, NotBoundException {
 		final Set<FeatureKey> boundedFeatures = new HashSet<>();
-		final Map<FeatureKey, Integer> featureToIndex = makeKeyToIndexMap(trainingParameters.minimumFeatureFrequency,
+		final Map<FeatureKey, Integer> featureToIndex = makeKeyToIndexMap(trainingParameters.getMinimumFeatureFrequency(),
 				boundedFeatures);
 
 		final Collection<RemoteTrainer> workers = getTrainers(featureToIndex);
@@ -311,19 +309,14 @@ public class Training {
 		while (sentenceIt.hasNext()) {
 			final Sentence sentence = sentenceIt.next();
 			final List<ResolvedDependency> goldDeps = getGoldDeps(sentence);
-
 			final List<Category> cats = sentence.getLexicalCategories();
-
 			for (int i = 0; i < cats.size(); i++) {
-
 				final FeatureKey key = trainingParameters.getFeatureSet().lexicalCategoryFeatures.getFeatureKey(
 						sentence.getInputWords(), i, cats.get(i));
 				if (key != null) {
 					keyCount.add(key);
 				}
-
 			}
-
 			for (final ResolvedDependency dep : goldDeps) {
 				final SRLLabel role = dep.getSemanticRole();
 				// if (cutoffsDictionary.isFrequentWithAnySRLLabel(
@@ -335,7 +328,6 @@ public class Training {
 							role, dep.getCategory(), dep.getArgNumber(), dep.getPreposition());
 					keyCount.add(key);
 				}
-
 				if (dep.getPreposition() != Preposition.NONE) {
 					for (final PrepositionFeature feature : trainingParameters.getFeatureSet().prepositionFeatures) {
 						final FeatureKey key = feature.getFeatureKey(sentence.getInputWords(), dep.getHead(),
@@ -344,7 +336,6 @@ public class Training {
 					}
 				}
 				// }
-
 				if (dep.getSemanticRole() != SRLFrame.NONE) {
 					for (final BilexicalFeature feature : trainingParameters.getFeatureSet().dependencyFeatures) {
 						final FeatureKey key = feature.getFeatureKey(sentence.getInputWords(), dep.getSemanticRole(),
@@ -354,17 +345,14 @@ public class Training {
 				}
 
 			}
-
 			getFromDerivation(sentence.getCcgbankParse(), binaryFeatureCount, boundedFeatures,
 					sentence.getInputWords(), 0, sentence.getInputWords().size());
-
 			for (final RootCategoryFeature rootFeature : trainingParameters.getFeatureSet().rootFeatures) {
 				final FeatureKey key = rootFeature.getFeatureKey(sentence.getCcgbankParse().getCategory(),
 						sentence.getInputWords());
 				boundedFeatures.add(key);
 				keyCount.add(key);
 			}
-
 		}
 
 		result.put(trainingParameters.getFeatureSet().lexicalCategoryFeatures.getDefault(), result.size());
@@ -398,7 +386,7 @@ public class Training {
 			for (final RuleProduction rule : Combinator.getRules(left.getCategory(), right.getCategory(),
 					Combinator.STANDARD_COMBINATORS)) {
 				if (rule.getCategory().equals(node.getCategory())) {
-					for (final BinaryFeature feature : trainingParameters.featureSet.binaryFeatures) {
+					for (final BinaryFeature feature : trainingParameters.getFeatureSet().binaryFeatures) {
 						final FeatureKey featureKey = feature.getFeatureKey(node.getCategory(), node.getRuleType(),
 								left.getCategory(), left.getRuleType().getNormalFormClassForRule(), 0,
 								right.getCategory(), right.getRuleType().getNormalFormClassForRule(), 0, null);
@@ -410,7 +398,7 @@ public class Training {
 
 		if (node.getChildren().size() == 1) {
 			for (final UnaryRule rule : dataParameters.getUnaryRules().values()) {
-				for (final UnaryRuleFeature feature : trainingParameters.featureSet.unaryRuleFeatures) {
+				for (final UnaryRuleFeature feature : trainingParameters.getFeatureSet().unaryRuleFeatures) {
 					final FeatureKey key = feature.getFeatureKey(rule.getID(), words, startIndex, endIndex);
 					binaryFeatureCount.add(key);
 				}
@@ -514,10 +502,10 @@ public class Training {
 	}
 
 	private final TrainingDataParameters dataParameters;
-	private final Training.TrainingParameters trainingParameters;
+	private final TrainingParameters trainingParameters;
 	private final CutoffsDictionary cutoffsDictionary;
 
-	private Training(final TrainingDataParameters dataParameters, final Training.TrainingParameters parameters)
+	private Training(final TrainingDataParameters dataParameters, final TrainingParameters parameters)
 			throws IOException {
 		super();
 		this.dataParameters = dataParameters;
@@ -528,7 +516,7 @@ public class Training {
 				.getExistingModel(), "categories"));
 		this.cutoffsDictionary = new CutoffsDictionary(lexicalCategoriesList, TagDict.readDict(
 				dataParameters.getExistingModel(), new HashSet<>(lexicalCategoriesList)),
-				trainingParameters.maxDependencyLength);
+				trainingParameters.getMaxDependencyLength());
 
 	}
 
@@ -546,97 +534,8 @@ public class Training {
 				.getExistingModel().getAbsolutePath(), 0.0001, ParsingAlgorithm.ASTAR, 100000, false, Optional.empty(),
 				1), Util.deserialize(new File(dataParameters.getExistingModel(), "labelClassifier")), posTagger));
 
-		final Results results = SRLEvaluation
-				.evaluate(backoff, ParallelCorpusReader.getPropBank00(), maxSentenceLength);
+		final Results results = SRLEvaluation.evaluate(backoff, ParallelCorpusReader.getPropBank00(), maxSentenceLength);
 
 		System.out.println("Final result: F1=" + results.getF1());
-
 	}
-
-	static class TrainingParameters implements Serializable {
-		private final int minimumFeatureFrequency;
-		/**
-		 *
-		 */
-		private static final long serialVersionUID = 6752386432642051238L;
-		private final FeatureSet featureSet;
-		private final double sigmaSquared;
-		private final int maxDependencyLength;
-		private final File modelFolder;
-		private final double costFunctionWeight;
-
-		private TrainingParameters(final int maxDependencyLength, final FeatureSet featureSet,
-				final double sigmaSquared, final int minimumFeatureFrequency, final File modelFolder,
-				final double costFunctionWeight) {
-			super();
-			this.featureSet = featureSet;
-			this.sigmaSquared = sigmaSquared;
-			this.maxDependencyLength = maxDependencyLength;
-			this.minimumFeatureFrequency = minimumFeatureFrequency;
-			this.modelFolder = modelFolder;
-			this.costFunctionWeight = costFunctionWeight;
-		}
-
-		private Object readResolve() {
-			// Hack to deal with transient DenseLexicalFeature
-			try {
-				return new TrainingParameters(maxDependencyLength, featureSet.setSupertaggingFeature(new File(
-						modelFolder, "pipeline"), 0.0), sigmaSquared, minimumFeatureFrequency, modelFolder,
-						costFunctionWeight);
-			} catch (final IOException e) {
-				throw new RuntimeException(e);
-			}
-		}
-
-		public DenseLexicalFeature getLexicalCategoryFeatures() {
-			return featureSet.lexicalCategoryFeatures;
-		}
-
-		private File getLogFile() {
-			return new File(getModelFolder(), "log");
-		}
-
-		private File getModelFolder() {
-			return modelFolder;
-		}
-
-		private File getFeaturesFile() {
-			return new File(getModelFolder(), "features");
-		}
-
-		private File getWeightsFile() {
-			return new File(getModelFolder(), "weights");
-		}
-
-		File getFeatureToIndexFile() {
-			return new File(getModelFolder(), "featureToIndex");
-		}
-
-		public int getMaxDependencyLength() {
-			return maxDependencyLength;
-		}
-
-		public FeatureSet getFeatureSet() {
-			return featureSet;
-		}
-
-		public Collection<ArgumentSlotFeature> getArgumentslotfeatures() {
-			return featureSet.argumentSlotFeatures;
-		}
-
-		public Collection<BilexicalFeature> getDependencyFeatures() {
-			return featureSet.dependencyFeatures;
-
-		}
-
-		public double getSigmaSquared() {
-			return sigmaSquared;
-		}
-
-		public double getCostFunctionWeight() {
-			return costFunctionWeight;
-		}
-
-	}
-
 }

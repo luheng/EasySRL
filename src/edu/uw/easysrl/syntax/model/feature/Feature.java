@@ -13,6 +13,7 @@ import edu.uw.easysrl.main.InputReader.InputWord;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.Combinator.RuleClass;
 import edu.uw.easysrl.syntax.grammar.Combinator.RuleType;
+import edu.uw.easysrl.syntax.parser.AbstractParser;
 
 public abstract class Feature implements Serializable {
 	/**
@@ -27,10 +28,9 @@ public abstract class Feature implements Serializable {
 
 	public abstract FeatureKey getDefault();
 
+	public abstract void resetDefaultIndex();
+
 	public static class FeatureKey implements Serializable {
-		/**
-		 *
-		 */
 		private static final long serialVersionUID = 1L;
 		private final int[] values;
 		private final int hashCode;
@@ -38,7 +38,6 @@ public abstract class Feature implements Serializable {
 		FeatureKey(final int... values) {
 			this.values = values;
 			this.hashCode = Arrays.hashCode(values);
-
 		}
 
 		@Override
@@ -83,7 +82,6 @@ public abstract class Feature implements Serializable {
 	}
 
 	static FeatureKey hash(final int... objects) {
-
 		return new FeatureKey(objects);
 	}
 
@@ -97,9 +95,6 @@ public abstract class Feature implements Serializable {
 			this.defaultKey = new FeatureKey(super.id);
 		}
 
-		/**
-		 *
-		 */
 		private static final long serialVersionUID = 1L;
 
 		public double getFeatureScore(final int ruleID, final List<InputWord> sentence, final int spanStart,
@@ -110,7 +105,6 @@ public abstract class Feature implements Serializable {
 				if (defaultScore == Double.MIN_VALUE) {
 					defaultScore = featureToScore.get(defaultKey);
 				}
-
 				return defaultScore;
 			}
 			return result;
@@ -121,6 +115,9 @@ public abstract class Feature implements Serializable {
 			return defaultKey;
 		}
 
+		@Override
+		public void resetDefaultIndex() { defaultIndex = 0; }
+
 		public int getFeatureIndex(final int ruleID, final List<InputWord> words, final int startIndex,
 				final int spanEnd, final Map<FeatureKey, Integer> featureToIndexMap) {
 			final Integer result = featureToIndexMap.get(getFeatureKey(ruleID, words, startIndex, spanEnd));
@@ -128,21 +125,16 @@ public abstract class Feature implements Serializable {
 				if (defaultIndex == 0) {
 					defaultIndex = featureToIndexMap.get(defaultKey);
 				}
-
 				return defaultIndex;
-
 			}
-
 			return result;
 		}
 
 		public abstract FeatureKey getFeatureKey(final int ruleID, final List<InputWord> sentence, final int spanStart,
 				final int spanEnd);
-
 	}
 
 	private final static UnaryRuleFeature unaryRuleIDFeature = new UnaryRuleFeature() {
-
 		private static final long serialVersionUID = 1L;
 
 		@Override
@@ -154,7 +146,6 @@ public abstract class Feature implements Serializable {
 
 	@SuppressWarnings("unused")
 	private final static UnaryRuleFeature unaryRuleIDandLengthFeature = new UnaryRuleFeature() {
-
 		private static final long serialVersionUID = 1L;
 
 		@Override
@@ -166,7 +157,6 @@ public abstract class Feature implements Serializable {
 
 	@SuppressWarnings("unused")
 	private final static UnaryRuleFeature unaryRuleIDandPreviousWordFeature = new UnaryRuleFeature() {
-
 		private static final long serialVersionUID = 1L;
 
 		@Override
@@ -175,6 +165,7 @@ public abstract class Feature implements Serializable {
 			return hash(super.id, ruleID, (spanStart == 0 ? "" : sentence.get(spanStart - 1).word).hashCode());
 		}
 	};
+
 	public final static Collection<UnaryRuleFeature> unaryRules = Arrays.asList(unaryRuleIDFeature);
 
 	public static abstract class RootCategoryFeature extends Feature {
@@ -196,7 +187,6 @@ public abstract class Feature implements Serializable {
 				if (defaultIndex == 0) {
 					defaultIndex = featureToIndex.get(defaultKey);
 				}
-
 				return defaultIndex;
 			}
 			return result;
@@ -210,7 +200,6 @@ public abstract class Feature implements Serializable {
 				if (defaultScore == Double.MIN_VALUE) {
 					defaultScore = featureToScore.get(defaultKey);
 				}
-
 				return defaultScore;
 			}
 			return result;
@@ -220,6 +209,9 @@ public abstract class Feature implements Serializable {
 		public FeatureKey getDefault() {
 			return defaultKey;
 		}
+
+		@Override
+		public void resetDefaultIndex() { defaultIndex = 0; }
 
 		public abstract FeatureKey getFeatureKey(Category category, List<InputWord> sentence);
 
@@ -233,7 +225,6 @@ public abstract class Feature implements Serializable {
 		};
 
 		public static RootCategoryFeature categoryAndFirstWord = new RootCategoryFeature() {
-
 			private static final long serialVersionUID = 1L;
 
 			@Override
@@ -243,7 +234,6 @@ public abstract class Feature implements Serializable {
 		};
 
 		public static RootCategoryFeature categoryAndLastWord = new RootCategoryFeature() {
-
 			private static final long serialVersionUID = 1L;
 
 			@Override
@@ -253,7 +243,6 @@ public abstract class Feature implements Serializable {
 		};
 
 		public static RootCategoryFeature categoryAndLength = new RootCategoryFeature() {
-
 			private static final long serialVersionUID = 1L;
 
 			@Override
@@ -268,7 +257,6 @@ public abstract class Feature implements Serializable {
 	}
 
 	public static abstract class BinaryFeature extends Feature {
-
 		private static final long serialVersionUID = 1L;
 		private final FeatureKey defaultKey;
 		private int defaultIndex = 0;
@@ -284,10 +272,12 @@ public abstract class Feature implements Serializable {
 			return defaultKey;
 		}
 
+		@Override
+		public void resetDefaultIndex() { defaultIndex = 0; }
+
 		public int getFeatureIndex(final Category category, final RuleType ruleClass, final Category left,
 				final RuleClass leftRuleClass, final int leftLength, final Category right,
 				final RuleClass rightRuleClass,
-
 				final int rightLength, final List<InputWord> sentence, final Map<FeatureKey, Integer> featureToIndex) {
 			final FeatureKey featureKey = getFeatureKey(category, ruleClass, left, leftRuleClass, leftLength, right,
 					rightRuleClass, rightLength, sentence);
@@ -296,7 +286,6 @@ public abstract class Feature implements Serializable {
 				if (defaultIndex == 0) {
 					defaultIndex = featureToIndex.get(defaultKey);
 				}
-
 				return defaultIndex;
 			}
 			return result;
@@ -317,7 +306,6 @@ public abstract class Feature implements Serializable {
 				if (defaultScore == Double.MIN_VALUE) {
 					defaultScore = featureToScore.get(defaultKey);
 				}
-
 				return defaultScore;
 			}
 			return result;

@@ -28,7 +28,6 @@ import edu.uw.easysrl.syntax.training.CompressedChart.Value;
  *
  */
 public class GoldChartFinder {
-
 	private final CompressedChart completeChart;
 
 	public GoldChartFinder(final CompressedChart completeChart) {
@@ -39,7 +38,6 @@ public class GoldChartFinder {
 	private static class Scored<T> {
 		private final T object;
 		private final int matchedDependencies;
-
 		public Scored(final T object, final int matchedDependencies) {
 			this.object = object;
 			this.matchedDependencies = matchedDependencies;
@@ -48,9 +46,7 @@ public class GoldChartFinder {
 	}
 
 	CompressedChart goldChart(final Sentence sentence, final CutoffsDictionary cutoffs) {
-
 		final Set<SRLDependency> goldDeps = getTrainingDependencies(sentence);
-
 		return goldChart(goldDeps, cutoffs);
 	}
 
@@ -74,7 +70,6 @@ public class GoldChartFinder {
 						firstConstituent, srl.getLabel(), srl.getPreposition());
 
 				goldDeps.add(newDep);
-
 			}
 		}
 		return goldDeps;
@@ -82,17 +77,11 @@ public class GoldChartFinder {
 
 	private CompressedChart goldChart(final Set<SRLDependency> goldDeps, final CutoffsDictionary cutoffs) {
 		final Table<Key, Set<SRLDependency>, Scored<Key>> cache = HashBasedTable.create();
-
 		int bestScore = -1;
-
 		Collection<Key> bestKeys = null;
-
 		for (final Key root : completeChart.getRoots()) {
-			// Choose the value that maximizes the number of dependencies in
-			// GoldDeps
-
+			// Choose the value that maximizes the number of dependencies in GoldDeps
 			final Scored<Key> scoredKey = bestKey(root, goldDeps, cache, cutoffs);
-
 			if (scoredKey.matchedDependencies > bestScore) {
 				bestKeys = new HashSet<>();
 				bestKeys.add(scoredKey.object);
@@ -101,15 +90,12 @@ public class GoldChartFinder {
 				bestKeys.add(scoredKey.object);
 			}
 		}
-
 		if (bestScore > goldDeps.size()) {
 			throw new IllegalStateException();
 		}
-
 		if (bestScore == 0) {
 			return null;
 		}
-
 		return new CompressedChart(completeChart.getWords(), bestKeys);
 	}
 
@@ -238,14 +224,12 @@ public class GoldChartFinder {
 						&& cutoffs.getRoles(completeChart.getWords().get(dep.getHead()).word,
 								dep.getCategory(), dep.getPreposition(), dep.getArgNumber()).contains(srl.getLabel())
 								&& matches(predicateIndex, argumentIndex, srl, dep.getPreposition())) {
-
 					matchedDeps.add(srl);
 					newDeps.add(dep.overwriteLabel(srl.getLabel()));
 					isSRL = true;
 					break;
 				}
 			}
-
 			if (!isSRL) {
 				newDeps.add(dep.overwriteLabel(SRLFrame.NONE));
 			}

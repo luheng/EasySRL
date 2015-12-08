@@ -10,10 +10,8 @@ import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.syntax.parser.AbstractParser.UnaryRule;
 
 public abstract class Model {
-
 	public static abstract class ModelFactory {
 		public abstract Model make(List<InputWord> sentence);
-
 		public abstract Collection<Category> getLexicalCategories();
 	}
 
@@ -60,7 +58,6 @@ public abstract class Model {
 				outsideScoresUpperBound[i][j] = fromLeft[i] + fromRight[j];
 			}
 		}
-
 		return total;
 	}
 

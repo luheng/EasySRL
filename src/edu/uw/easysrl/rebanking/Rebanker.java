@@ -45,7 +45,6 @@ public abstract class Rebanker {
 	}
 
 	static class DummyRebanker extends Rebanker {
-
 		@Override
 		boolean dontUseAsTrainingExample(final Category c) {
 			return false;

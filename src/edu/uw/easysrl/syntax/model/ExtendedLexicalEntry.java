@@ -465,18 +465,14 @@ class ExtendedLexicalEntry {
 		@Override
 		double getLogScore(final List<InputWord> words, final int functorIndex, final FeatureSet featureSet,
 				final ObjectDoubleHashMap<FeatureKey> featureToScore, final FeatureCache featureCache) {
-
 			if (offset == 0) {
 				// null attachment
 				return 0;
 			}
-
 			final int argumentIndex = functorIndex + offset;
-
 			Preconditions.checkState(argumentIndex >= 0 && argumentIndex < words.size());
 			return featureCache.getScore(functorIndex, label, argumentIndex);
 		}
-
 	}
 
 	private static class ConjunctiveArgumentSlotNode extends ConjunctiveNode {
@@ -498,10 +494,8 @@ class ExtendedLexicalEntry {
 		@Override
 		double getLogScore(final List<InputWord> words, final int wordIndex, final FeatureSet featureSet,
 				final ObjectDoubleHashMap<FeatureKey> featureToScore, final FeatureCache featureCache) {
-
 			return featureCache.getScore(words, wordIndex, category, preposition, argumentNumber, label);
 		}
-
 		public SRLLabel getLabel() {
 			return label;
 		}
