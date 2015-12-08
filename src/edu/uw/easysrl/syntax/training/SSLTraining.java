@@ -47,7 +47,7 @@ public class SSLTraining {
             Category.valueOf("S[b]\\NP")
     );
 
-    private static final int numRandomSampleRuns = 10;
+    private static final int numRandomSampleRuns = 3;
     private static final Random random = new Random(123456);
 
     private final TrainingDataParameters dataParameters;
@@ -179,7 +179,7 @@ public class SSLTraining {
         List<Integer> trainingSentenceIds = new ArrayList<>();
 
         ResultsTable allResults = new ResultsTable();
-        for (int numPropBankTrainingSentences : new int[]{50, 100, 200, 300, 500}) {
+        for (int numPropBankTrainingSentences : new int[]{50, 100, 150, 200, 300, 500, 750, 1000, 1500, 2000}) {
             for (int r = 0; r < numRandomSampleRuns; r++) {
                 // TODO: move it back..
                 prepareCorpora(trainingPool, evalSentences, alignedPBSentences, qaTrainingSentences, alignedQASentences,
@@ -203,7 +203,8 @@ public class SSLTraining {
                 final File pipeline = new File(modelFolder, "pipeline");
                 pipeline.mkdir();
                 for (final File f : baseModel.listFiles()) {
-                    java.nio.file.Files.copy(f.toPath(), new File(pipeline, f.getName()).toPath(), StandardCopyOption.REPLACE_EXISTING);
+                    java.nio.file.Files.copy(f.toPath(), new File(pipeline, f.getName()).toPath(),
+                            StandardCopyOption.REPLACE_EXISTING);
                 }
                 final TrainingDataParameters dataParameters = new TrainingDataParameters(beta, 70, ROOT_CATEGORIES,
                         baseModel, maxChart, goldBeam);

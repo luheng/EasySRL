@@ -83,11 +83,19 @@ public class ResultsTable {
         return gathered;
     }
 
-    public double getAveraged(String key) {
+    public double getMean(String key) {
         return results.containsKey(key) ? results.get(key).stream().mapToDouble(r->r).average().getAsDouble() : 0;
     }
 
-    public double getAveraged(String[] partialKeys) {
+    public double getStandardDeviation(String key) {
+        if (!results.containsKey(key)) {
+            return 0;
+        }
+        double mean = getMean(key);
+        return Math.sqrt(results.get(key).stream().mapToDouble(r->(r-mean)*(r-mean)).average().getAsDouble());
+    }
+
+    public double getMean(String[] partialKeys) {
         List<Double> res = get(partialKeys);
         return res == null ? 0 : res.stream().mapToDouble(r->r).average().getAsDouble();
     }
@@ -95,15 +103,14 @@ public class ResultsTable {
     public Map<String, Double> getAveraged() {
         Map<String, Double> avg = new HashMap<>();
         for (String key : orderedKeyList) {
-            avg.put(key, getAveraged(key));
+            avg.put(key, getMean(key));
         }
         return avg;
     }
 
     public void printAggregated() {
-        // TODO: sort by key string
-        Map<String, Double> avg = getAveraged();
-        orderedKeyList.forEach(key -> System.out.println(String.format("%s\t%.6f", key, avg.get(key))));
+        orderedKeyList.forEach(key -> System.out.println(String.format("%s\t%.6f\t%.6f", key, getMean(key),
+                getStandardDeviation(key))));
     }
 
     @Override
