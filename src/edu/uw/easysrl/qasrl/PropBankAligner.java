@@ -14,7 +14,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import edu.stanford.nlp.util.StringUtils;
-import edu.uw.easysrl.dependencies.DependencyStructure.ResolvedDependency;
+import edu.uw.easysrl.dependencies
 import edu.uw.easysrl.dependencies.QADependency;
 import edu.uw.easysrl.dependencies.SRLDependency;
 import edu.uw.easysrl.dependencies.SRLFrame;
