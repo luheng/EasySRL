@@ -7,6 +7,7 @@ import edu.uw.easysrl.corpora.ParallelCorpusReader;
  */
 public class AlignedDependency<T1, T2> {
     // TODO: change this to more ``generic'' sentence types, i.e. List<String>
+    // FIXME: null T1 and T2 causes a lot of trouble, need to fix this.
     public final ParallelCorpusReader.Sentence sentence;
     public final T1 dependency1;
     public final T2 dependency2;

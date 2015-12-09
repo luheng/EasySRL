@@ -71,12 +71,11 @@ public class SSLTraining {
         this.dataParameters = dataParameters;
         this.trainingParameters = parameters;
         this.trainingLogger = new Util.Logger(trainingParameters.getLogFile());
-        // TODO: change this back later.
-        this.trainingSentences = ImmutableList.copyOf(trainingSentences);
-        this.evalSentences = ImmutableList.copyOf(evalSentences);
-        this.alignedPBSentences = ImmutableList.copyOf(alignedPBSentences);
-        this.qaTrainingSentences = ImmutableList.copyOf(qaTraining);
-        this.alignedQASentences = ImmutableList.copyOf(alignedQASentences);
+        this.trainingSentences = trainingSentences;
+        this.evalSentences = evalSentences;
+        this.alignedPBSentences = alignedPBSentences;
+        this.qaTrainingSentences = qaTraining;
+        this.alignedQASentences = alignedQASentences;
         final List<Category> lexicalCategoriesList = TaggerEmbeddings.loadCategories(new File(dataParameters
                 .getExistingModel(), "categories"));
         this.cutoffsDictionary = new CutoffsDictionary(
@@ -173,6 +172,40 @@ public class SSLTraining {
                 .add("beta_for_positive_charts", goldBeam)
                 .add("beta_for_training_charts", beta).toString());
 
+        ////////////////// BROILERPLATE ///////////////////////
+        final List<Clustering> clusterings = new ArrayList<>();
+        clusterings.add(null);
+
+        String absolutePath = Util.getHomeFolder().getAbsolutePath();
+        String tempFolder = trainingSettings.getProperty("output_folder");
+                // String.format("ntr%d_r%d/", numPropBankTrainingSentences, r);
+        final File modelFolder = new File(tempFolder.replaceAll("~", absolutePath));
+        modelFolder.mkdirs();
+        Files.copy(propertiesFile, new File(modelFolder, "training.properties"));
+        final File baseModel = new File(trainingSettings.getProperty("supertagging_model_folder")
+                .replaceAll("~", absolutePath));
+        if (!baseModel.exists()) {
+            throw new IllegalArgumentException("Supertagging model not found: " + baseModel.getAbsolutePath());
+        }
+        final File pipeline = new File(modelFolder, "pipeline");
+        pipeline.mkdir();
+        for (final File f : baseModel.listFiles()) {
+            java.nio.file.Files.copy(f.toPath(), new File(pipeline, f.getName()).toPath(),
+                    StandardCopyOption.REPLACE_EXISTING);
+        }
+        final TrainingDataParameters dataParameters = new TrainingDataParameters(beta, 70, ROOT_CATEGORIES,
+                baseModel, maxChart, goldBeam);
+        final FeatureSet allFeatures = new FeatureSet(
+                new DenseLexicalFeature(pipeline, 0.0),
+                BilexicalFeature.getBilexicalFeatures(clusterings, 3),
+                ArgumentSlotFeature.argumentSlotFeatures,
+                UnaryRuleFeature.unaryRules,
+                PrepositionFeature.prepositionFeaures,
+                Collections.emptyList(),
+                Collections.emptyList());
+        final TrainingParameters standard = new TrainingParameters(50, allFeatures, sigmaSquared,
+                minFeatureCount, modelFolder, costFunctionWeight);
+
         // Initialize corpora
         List<QASentence> qaTrainingSentences = new ArrayList<>(), alignedQASentences = new ArrayList<>();
         List<ParallelCorpusReader.Sentence> trainingPool = new ArrayList<>(), evalSentences = new ArrayList<>(),
@@ -184,41 +217,6 @@ public class SSLTraining {
         //for (int numPropBankTrainingSentences : new int[]{50, 100, 150, 200, 300, 500, 750, 1000, 1500, 2000}) {
         for (int numPropBankTrainingSentences : new int[]{1500, 2000, 3000, 4000, 5000, 7500, 10000, 15000, 20000}) {
             for (int r = 0; r < numRandomSampleRuns; r++) {
-                ////////////////// BROILERPLATE ///////////////////////
-                final List<Clustering> clusterings = new ArrayList<>();
-                clusterings.add(null);
-
-                String absolutePath = Util.getHomeFolder().getAbsolutePath();
-                String tempFolder = trainingSettings.getProperty("output_folder") +
-                        String.format("ntr%d_r%d/", numPropBankTrainingSentences, r);
-                final File modelFolder = new File(tempFolder.replaceAll("~", absolutePath));
-                modelFolder.mkdirs();
-                Files.copy(propertiesFile, new File(modelFolder, "training.properties"));
-                final File baseModel = new File(trainingSettings.getProperty("supertagging_model_folder")
-                        .replaceAll("~", absolutePath));
-                if (!baseModel.exists()) {
-                    throw new IllegalArgumentException("Supertagging model not found: " + baseModel.getAbsolutePath());
-                }
-                final File pipeline = new File(modelFolder, "pipeline");
-                pipeline.mkdir();
-                for (final File f : baseModel.listFiles()) {
-                    java.nio.file.Files.copy(f.toPath(), new File(pipeline, f.getName()).toPath(),
-                            StandardCopyOption.REPLACE_EXISTING);
-                }
-                final TrainingDataParameters dataParameters = new TrainingDataParameters(beta, 70, ROOT_CATEGORIES,
-                        baseModel, maxChart, goldBeam);
-                final FeatureSet allFeatures = new FeatureSet(
-                        new DenseLexicalFeature(pipeline, 0.0),
-                        BilexicalFeature.getBilexicalFeatures(clusterings, 3),
-                        ArgumentSlotFeature.argumentSlotFeatures,
-                        UnaryRuleFeature.unaryRules,
-                        PrepositionFeature.prepositionFeaures,
-                        Collections.emptyList(),
-                        Collections.emptyList());
-                final TrainingParameters standard = new TrainingParameters(50, allFeatures, sigmaSquared,
-                        minFeatureCount, modelFolder, costFunctionWeight);
-                /////////////// END OF BROILERPLATE ////////////////
-
                 List<ParallelCorpusReader.Sentence> trainingSentences = subsample(numPropBankTrainingSentences,
                         trainingPool, trainingSentenceIds);
                 System.out.println(String.format("%d training, %d qa and (%d, %d) evaluation sentences.",
