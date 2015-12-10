@@ -1,16 +1,13 @@
-package edu.uw.easysrl.qasrl;
+package edu.uw.easysrl.qasrl.qg;
 
-import com.sun.tools.javac.comp.Resolve;
 import edu.stanford.nlp.util.StringUtils;
-import edu.uw.easysrl.corpora.CCGBankDependencies;
 import edu.uw.easysrl.corpora.CCGBankDependencies.CCGBankDependency;
 import edu.uw.easysrl.corpora.ParallelCorpusReader.Sentence;
-import edu.uw.easysrl.corpora.qa.QASentence;
 import edu.uw.easysrl.dependencies.QADependency;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
+import edu.uw.easysrl.qasrl.AlignedDependency;
+import edu.uw.easysrl.qasrl.PropBankAligner;
 import edu.uw.easysrl.syntax.grammar.Category;
-import org.eclipse.jetty.util.StringUtil;
-
 
 import java.util.*;
 
@@ -94,7 +91,7 @@ public class QuestionGenerationSandbox {
                 System.out.println(q1);
                 System.out.println(goldQA == null ? "[no-qa]" : StringUtils.join(goldQA.getQuestion()) + "?");
             } else {
-                
+
             }
         }
         /*
