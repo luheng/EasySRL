@@ -7,6 +7,7 @@ import edu.uw.easysrl.dependencies.QADependency;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.AlignedDependency;
 import edu.uw.easysrl.qasrl.PropBankAligner;
+import edu.uw.easysrl.qasrl.VerbInflectionDictionary;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.*;
@@ -15,6 +16,10 @@ import java.util.*;
  * Created by luheng on 12/8/15.
  */
 public class QuestionGenerationSandbox {
+
+    private static final Category somethingVerbal = Category.valueOf("S|NP");
+    private static final Category somethingAdjunctive = Category.valueOf("S|S");
+    private static final Category simpleTransitiveVerb = Category.valueOf("(S[dcl]\\NP)/NP");
 
     public static void generateFromGoldCCG(
             Map<Integer, List<AlignedDependency<CCGBankDependency, QADependency>>> alignedDependencies) {
@@ -25,6 +30,7 @@ public class QuestionGenerationSandbox {
             }
             Sentence sentence = deps.get(0).sentence;
             List<String> words = sentence.getWords();
+            List<Category> categories = sentence.getLexicalCategories();
             Collection<CCGBankDependency> ccgDeps = sentence.getCCGBankDependencyParse().getDependencies();
             for (AlignedDependency<CCGBankDependency, QADependency> dep : deps) {
                 CCGBankDependency ccgDep = dep.dependency1;
@@ -32,10 +38,12 @@ public class QuestionGenerationSandbox {
                     continue;
                 }
                 Category category = ccgDep.getCategory();
-                if (category.isFunctionInto(Category.valueOf("(S\\NP)/NP"))) // we will deal with adjuncts later ...
-                    // || category.isFunctionInto(Category.valueOf("S|S"))) {
-                    generateQuestions(ccgDep, words, ccgDeps, dep.dependency2);
-            }
+                if (AuxiliaryVerbHelper.isCopula(words, ccgDep.getSentencePositionOfPredicate())) {
+                    continue;
+                }
+                if (category.isFunctionInto(somethingVerbal) || category.isFunctionInto(somethingAdjunctive)) {
+                    generateQuestions(ccgDep, words, categories, ccgDeps, dep.dependency2);
+                }
             /*
             for (CCGBankDependency dep : ccgDeps) {
                 if (dep.getSentencePositionOfArgument() == dep.getSentencePositionOfPredicate()) {
@@ -48,11 +56,13 @@ public class QuestionGenerationSandbox {
                 }
             }
             */
+            }
         }
     }
 
     private static void generateQuestions(CCGBankDependency targetDependency,
                                           List<String> words,
+                                          List<Category> categories,
                                           Collection<CCGBankDependency> dependencies,
                                           QADependency goldQA) {
         Map<Integer, CCGBankDependency> slotToDependency = new HashMap<>();
@@ -77,25 +87,49 @@ public class QuestionGenerationSandbox {
         assert slotToDependency.containsKey(targetSlotId);
         Collections.sort(wordIndices);
 
-        if (targetDependency.getCategory().isFunctionInto(Category.valueOf("(S[dcl]\\NP)/NP"))) {
+        if (targetDependency.getCategory().isFunctionInto(simpleTransitiveVerb)) {
+            System.out.println("\n" + StringUtils.join(words));
+            System.out.println(targetDependency.getCategory() + "\t" + targetDependency.getArgNumber());
+            // Pat* built a robot -> Who built a robot ?
             if (targetSlotId == 1) {
-                System.out.println("\n" + StringUtils.join(words));
-                System.out.println(targetDependency.getCategory() + "\t" + targetDependency.getArgNumber());
-
-                String q1 = "";
+                String q1;
                 if (slotToWord.containsKey(2)) {
-                    q1 = "Who/What " + words.get(predicateIndex) + " " + words.get(slotToWord.get(2)) + "?";
+                    q1 = "Who " + words.get(predicateIndex) + " " + words.get(slotToWord.get(2)) + "?";
                 } else {
-                    q1 = "Who/What " + words.get(predicateIndex) + " something?";
+                    q1 = "Who " + words.get(predicateIndex) + " something?";
+                }
+                System.out.println(q1);
+                System.out.println(goldQA == null ? "[no-qa]" : StringUtils.join(goldQA.getQuestion()) + "?");
+            }
+            // Pat built a robot* -> What did Pat build / What was built ?
+            else if (targetSlotId == 2) {
+                String q1;
+                List<Integer> auxChain = AuxiliaryVerbHelper.getAuxiliaryChain(words, categories, predicateIndex);
+                if (AuxiliaryVerbHelper.isPassive(words, categories, predicateIndex)) {
+                    q1 = "What";
+                    for (int aux : auxChain) {
+                        q1 += " " + words.get(aux);
+                    }
+                    q1 += " " + words.get(predicateIndex) + "?";
+                } else {
+                    q1 = "What";
+                    if (auxChain.size() == 0) {
+                        String[] split = AuxiliaryVerbHelper.splitVerb(words, categories, predicateIndex);
+                        q1 += " " + split[0] + " someone " + split[1] + "?";
+                    } else {
+                        for (int aux : auxChain) {
+                            q1 += " " + words.get(aux);
+                        }
+                        q1 += " someone " + words.get(predicateIndex) + "?";
+                    }
                 }
                 System.out.println(q1);
                 System.out.println(goldQA == null ? "[no-qa]" : StringUtils.join(goldQA.getQuestion()) + "?");
             } else {
-
+                System.err.println("How did this happen?");
             }
         }
-        /*
-                wordIndices.forEach(id -> {
+        /* wordIndices.forEach(id -> {
                     if (id == predicateIndex) {
                         System.out.print("[" + words.get(id) + "]\t");
                     } else if (id == targetDependency.getSentencePositionOfArgument()) {
@@ -113,6 +147,8 @@ public class QuestionGenerationSandbox {
     }
 
     public static void main(String[] args) {
+        // hacky: Initialize inflection dictionary ..
+        AuxiliaryVerbHelper.inflectionDictionary = VerbInflectionDictionary.buildFromPropBankTraining();
         Map<Integer, List<AlignedDependency<CCGBankDependency, QADependency>>>
             mappedDependencies = PropBankAligner.getCcgAndQADependenciesTrain();
         generateFromGoldCCG(mappedDependencies);

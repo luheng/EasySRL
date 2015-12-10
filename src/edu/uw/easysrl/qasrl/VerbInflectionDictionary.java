@@ -115,11 +115,17 @@ public class VerbInflectionDictionary {
 			}
 		}
 	}
-	
-	public static void main(String[] args) throws IOException {
+
+	public static VerbInflectionDictionary buildFromPropBankTraining() {
 		Properties PROPERTIES = Util.loadProperties(new File("corpora.properties"));
 		CountDictionary wordDict = new CountDictionary();
-		Iterator<ParallelCorpusReader.Sentence> sentenceIterator = ParallelCorpusReader.READER.readCorpus(false);
+		Iterator<ParallelCorpusReader.Sentence> sentenceIterator;
+		try {
+			sentenceIterator = ParallelCorpusReader.READER.readCorpus(false);
+		} catch (IOException e) {
+			e.printStackTrace();
+			return null;
+		}
 		while (sentenceIterator.hasNext()) {
 			ParallelCorpusReader.Sentence sentence = sentenceIterator.next();
 			sentence.getWords().forEach(word -> wordDict.addString(word));
@@ -131,5 +137,6 @@ public class VerbInflectionDictionary {
 			e.printStackTrace();
 		}
 		System.out.println("Loaded inflections:\t" + inflDict.inflections.size());
+		return inflDict;
 	}
 }
