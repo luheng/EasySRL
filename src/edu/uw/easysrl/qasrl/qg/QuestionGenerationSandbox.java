@@ -7,7 +7,6 @@ import edu.uw.easysrl.dependencies.QADependency;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.AlignedDependency;
 import edu.uw.easysrl.qasrl.PropBankAligner;
-import edu.uw.easysrl.qasrl.VerbInflectionDictionary;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.*;
@@ -38,7 +37,7 @@ public class QuestionGenerationSandbox {
                     continue;
                 }
                 Category category = ccgDep.getCategory();
-                if (AuxiliaryVerbHelper.isCopula(words, ccgDep.getSentencePositionOfPredicate())) {
+                if (VerbHelper.isCopula(words, ccgDep.getSentencePositionOfPredicate())) {
                     continue;
                 }
                 if (category.isFunctionInto(somethingVerbal) || category.isFunctionInto(somethingAdjunctive)) {
@@ -104,8 +103,8 @@ public class QuestionGenerationSandbox {
             // Pat built a robot* -> What did Pat build / What was built ?
             else if (targetSlotId == 2) {
                 String q1;
-                List<Integer> auxChain = AuxiliaryVerbHelper.getAuxiliaryChain(words, categories, predicateIndex);
-                if (AuxiliaryVerbHelper.isPassive(words, categories, predicateIndex)) {
+                List<Integer> auxChain = VerbHelper.getAuxiliaryChain(words, categories, predicateIndex);
+                if (VerbHelper.isPassive(words, categories, predicateIndex)) {
                     q1 = "What";
                     for (int aux : auxChain) {
                         q1 += " " + words.get(aux);
@@ -114,7 +113,7 @@ public class QuestionGenerationSandbox {
                 } else {
                     q1 = "What";
                     if (auxChain.size() == 0) {
-                        String[] split = AuxiliaryVerbHelper.splitVerb(words, categories, predicateIndex);
+                        String[] split = VerbHelper.splitVerb(words, categories, predicateIndex);
                         q1 += " " + split[0] + " someone " + split[1] + "?";
                     } else {
                         for (int aux : auxChain) {
@@ -148,7 +147,7 @@ public class QuestionGenerationSandbox {
 
     public static void main(String[] args) {
         // hacky: Initialize inflection dictionary ..
-        AuxiliaryVerbHelper.inflectionDictionary = VerbInflectionDictionary.buildFromPropBankTraining();
+        VerbHelper.inflectionDictionary = VerbInflectionDictionary.buildFromPropBankTraining();
         Map<Integer, List<AlignedDependency<CCGBankDependency, QADependency>>>
             mappedDependencies = PropBankAligner.getCcgAndQADependenciesTrain();
         generateFromGoldCCG(mappedDependencies);

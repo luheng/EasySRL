@@ -1,4 +1,4 @@
-package edu.uw.easysrl.qasrl;
+package edu.uw.easysrl.qasrl.qg;
 
 import edu.uw.easysrl.corpora.ParallelCorpusReader;
 import edu.uw.easysrl.util.CountDictionary;
