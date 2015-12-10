@@ -67,9 +67,89 @@ public class VerbHelper {
         Collections.addAll(enCopulaVerbSet, enCopulaVerbs);
     }
 
-    // TODO: change this to non-static later.
-    public static VerbInflectionDictionary inflectionDictionary = null;
+    private VerbInflectionDictionary inflectionDictionary = null;
 
+    public VerbHelper(VerbInflectionDictionary inflectionDictionary) {
+        this.inflectionDictionary = inflectionDictionary;
+    }
+
+    public List<Integer> getAuxiliaryChain(List<String> words, List<Category> categories, int index) {
+        List<Integer> auxliaryIndices = new ArrayList<>();
+        for (int i = index - 1; i >= 0; i--) {
+            boolean isAux = isAuxiliaryVerb(words, categories, i);
+            boolean isNeg = isNegationWord(words, categories, i);
+            boolean isAdv = isModifierWord(words, categories, i);
+            if (!isAux && !isNeg && !isAdv) {
+                break;
+            }
+            if (isAux || isNeg) {
+                auxliaryIndices.add(i);
+            }
+        }
+        if (auxliaryIndices.size() > 0) {
+            Collections.sort(auxliaryIndices);
+        }
+        return auxliaryIndices;
+    }
+
+    public boolean isVerb(List<String> words, List<Category> categories, int index) {
+        return index < words.size() && categories.get(index).isFunctionInto(Category.valueOf("(S\\NP)/NP"));
+    }
+
+    public boolean isAuxiliaryVerb(List<String> words, List<Category> categories, int index) {
+        return index < words.size() && enAuxiliaryVerbSet.contains(words.get(index).toLowerCase()) &&
+                categories.get(index).isFunctionInto(Category.valueOf("(S\\NP)|(S\\NP)"));
+    }
+
+    public boolean isNegationWord(List<String> words, List<Category> categories, int index) {
+        if(index < words.size()) {
+            String word = words.get(index);
+            return word.equalsIgnoreCase("n\'t") || word.equalsIgnoreCase("not");
+        }
+        return false;
+    }
+
+    public boolean isModifierWord(List<String> words, List<Category> categories, int index) {
+        return index < words.size() && categories.get(index).isFunctionInto(Category.ADVERB);
+    }
+
+    public boolean isPassive(List<String> words, List<Category> categories, int index) {
+        return categories.get(index).isFunctionInto(Category.valueOf("(S[pss]\\NP)/NP"));
+    }
+
+    public boolean isCopula(List<String> words, int index) {
+        return enCopulaVerbSet.contains(words.get(index).toLowerCase());
+    }
+
+    /**
+     * approved -> List { did, approve }
+     */
+    public String[] getAuxiliaryAndVerbStrings(List<String> words, List<Category> categories, int index) {
+        String verbStr = words.get(index).toLowerCase();
+        String[] infl = inflectionDictionary.getBestInflections(verbStr.toLowerCase());
+        // build
+        if (verbStr.equals(infl[0])) {
+            return new String[] {"would", infl[0]};
+        }
+        // builds
+        if (verbStr.equals(infl[1])) {
+            return new String[] {"does", infl[0]};
+        }
+        // building
+        if (verbStr.equals(infl[2])) {
+            return new String[] {"would", "be " + infl[2]};
+        }
+        // built
+        if (verbStr.equals(infl[3])) {
+            return new String[] {"did", infl[0]};
+        }
+        // built (pt)
+        return new String[] {"have", infl[4]};
+    }
+
+    /**
+     * Analysis code.
+     */
     private static void seh() {
         Iterator<ParallelCorpusReader.Sentence> sentenceIterator = null;
         try {
@@ -111,116 +191,6 @@ public class VerbHelper {
                 }
             }
         }
-    }
-
-    public static List<Integer> getAuxiliaryChain(List<String> words, List<Category> categories, int index) {
-        List<Integer> auxliaryIndices = new ArrayList<>();
-        for (int i = index - 1; i >= 0; i--) {
-            boolean isAux = isAuxiliaryVerb(words, categories, i);
-            boolean isNeg = isNegationWord(words, categories, i);
-            boolean isAdv = isModifierWord(words, categories, i);
-            if (!isAux && !isNeg && !isAdv) {
-                break;
-            }
-            if (isAux || isNeg) {
-                auxliaryIndices.add(i);
-            }
-        }
-        if (auxliaryIndices.size() > 0) {
-            Collections.sort(auxliaryIndices);
-        }
-        return auxliaryIndices;
-    }
-
-    /**
-     * Identify auxiliary verb groups by simple pattern matching.
-     */
-    public void postprocess(List<String> words, List<Category> categories, int[] verbHeads) {
-        Arrays.fill(verbHeads, -1);
-        ArrayList<Integer> auxVerbs = new ArrayList<>();
-
-        for (int i = 0; i < words.size(); i++) {
-            if (isAuxiliaryVerb(words, categories, i)) {
-                if (isAuxiliaryVerb(words, categories, i + 1) && isVerb(words, categories, i + 2)) {
-                    // e.g. has been doing
-                    //auxVerbs.add(new Span(i, i + 3));
-                    verbHeads[i] = verbHeads[i+1] = i + 2;
-                    i += 2;
-                } else if (isAuxiliaryVerb(words, categories, i + 1) && isVerb(words, categories, i + 3)) {
-                    // e.g. has n't been doing
-                    //auxVerbs.add(new Span(i, i + 4));
-                    verbHeads[i] = verbHeads[i+1] = verbHeads[i+2] = i + 3;
-                    i += 3;
-                } else if (isVerb(words, categories, i + 2)) {
-                    // e.g. is hurriedly doing
-                    //auxVerbs.add(new Span(i, i + 3));
-                    verbHeads[i] = verbHeads[i+1] = i + 2;
-                    i += 2;
-                } else if (isVerb(words, categories, i + 1)) {
-                    // change parent
-                    //auxVerbs.add(new Span(i, i + 2));
-                    verbHeads[i] = i + 1;
-                    i += 1;
-                }
-
-            }
-        }
-        //return auxVerbs;
-    }
-
-    public static boolean isVerb(List<String> words, List<Category> categories, int index) {
-        return index < words.size() && categories.get(index).isFunctionInto(Category.valueOf("(S\\NP)/NP"));
-    }
-
-    public static boolean isAuxiliaryVerb(List<String> words, List<Category> categories, int index) {
-        return index < words.size() && enAuxiliaryVerbSet.contains(words.get(index).toLowerCase()) &&
-                categories.get(index).isFunctionInto(Category.valueOf("(S\\NP)|(S\\NP)"));
-    }
-
-    public static boolean isNegationWord(List<String> words, List<Category> categories, int index) {
-        if(index < words.size()) {
-            String word = words.get(index);
-            return word.equalsIgnoreCase("n\'t") || word.equalsIgnoreCase("not");
-        }
-        return false;
-    }
-
-    public static boolean isModifierWord(List<String> words, List<Category> categories, int index) {
-        return index < words.size() && categories.get(index).isFunctionInto(Category.ADVERB);
-    }
-
-    public static boolean isPassive(List<String> words, List<Category> categories, int index) {
-        return categories.get(index).isFunctionInto(Category.valueOf("(S[pss]\\NP)/NP"));
-    }
-
-    public static boolean isCopula(List<String> words, int index) {
-        return enCopulaVerbSet.contains(words.get(index).toLowerCase());
-    }
-
-    /**
-     * approved -> List { did, approve }
-     */
-    public static String[] splitVerb(List<String> words, List<Category> categories, int index) {
-        String verbStr = words.get(index).toLowerCase();
-        String[] infl = inflectionDictionary.getBestInflections(verbStr.toLowerCase());
-        // build
-        if (verbStr.equals(infl[0])) {
-            return new String[] {"would", infl[0]};
-        }
-        // builds
-        if (verbStr.equals(infl[1])) {
-            return new String[] {"does", infl[0]};
-        }
-        // building
-        if (verbStr.equals(infl[2])) {
-            return new String[] {"would", "be " + infl[2]};
-        }
-        // built
-        if (verbStr.equals(infl[3])) {
-            return new String[] {"did", infl[0]};
-        }
-        // built (pt)
-        return new String[] {"have", infl[4]};
     }
 
     public static void main(String[] args) {

@@ -15,10 +15,16 @@ import java.util.*;
  * Created by luheng on 12/8/15.
  */
 public class QuestionGenerationSandbox {
+    /*
+        Everything is static here :)
+     */
 
     private static final Category somethingVerbal = Category.valueOf("S|NP");
     private static final Category somethingAdjunctive = Category.valueOf("S|S");
     private static final Category simpleTransitiveVerb = Category.valueOf("(S[dcl]\\NP)/NP");
+
+    private static VerbHelper verbHelper;
+    private static ArgumentHelper argumentHelper = new ArgumentHelper();
 
     public static void generateFromGoldCCG(
             Map<Integer, List<AlignedDependency<CCGBankDependency, QADependency>>> alignedDependencies) {
@@ -37,7 +43,7 @@ public class QuestionGenerationSandbox {
                     continue;
                 }
                 Category category = ccgDep.getCategory();
-                if (VerbHelper.isCopula(words, ccgDep.getSentencePositionOfPredicate())) {
+                if (verbHelper.isCopula(words, ccgDep.getSentencePositionOfPredicate())) {
                     continue;
                 }
                 if (category.isFunctionInto(somethingVerbal) || category.isFunctionInto(somethingAdjunctive)) {
@@ -85,58 +91,60 @@ public class QuestionGenerationSandbox {
         }
         assert slotToDependency.containsKey(targetSlotId);
         Collections.sort(wordIndices);
-
+        String q1 = "";
         if (targetDependency.getCategory().isFunctionInto(simpleTransitiveVerb)) {
             System.out.println("\n" + StringUtils.join(words));
             System.out.println(targetDependency.getCategory() + "\t" + targetDependency.getArgNumber());
-            // Pat* built a robot -> Who built a robot ?
+            /**
+             * {Pat} built a robot -> Who built a robot ?
+             */
             if (targetSlotId == 1) {
-                String q1;
-                if (slotToWord.containsKey(2)) {
-                    q1 = "Who " + words.get(predicateIndex) + " " + words.get(slotToWord.get(2)) + "?";
-                } else {
-                    q1 = "Who " + words.get(predicateIndex) + " something?";
-                }
-                System.out.println(q1);
-                System.out.println(goldQA == null ? "[no-qa]" : StringUtils.join(goldQA.getQuestion()) + "?");
+                int otherSlot = 2;
+                String ph = slotToWord.containsKey(otherSlot) ?
+                        argumentHelper.getPlaceHolderString(words, categories, predicateIndex,
+                                slotToWord.get(otherSlot), otherSlot) : "something";
+
+                q1 = "Who " + words.get(predicateIndex) + " " + ph + "?";
+
             }
-            // Pat built a robot* -> What did Pat build / What was built ?
+            /**
+             * {Pat} built a robot* -> What did Pat build / What was built ?
+             */
             else if (targetSlotId == 2) {
-                String q1;
-                List<Integer> auxChain = VerbHelper.getAuxiliaryChain(words, categories, predicateIndex);
-                if (VerbHelper.isPassive(words, categories, predicateIndex)) {
+                int otherSlot = 1;
+                List<Integer> auxChain = verbHelper.getAuxiliaryChain(words, categories, predicateIndex);
+                String ph = slotToWord.containsKey(otherSlot) ?
+                        argumentHelper.getPlaceHolderString(words, categories, predicateIndex,
+                                slotToWord.get(otherSlot), otherSlot) : "someone";
+                /**
+                 * What did Pat/someone build?
+                 */
+                if (verbHelper.isPassive(words, categories, predicateIndex)) {
                     q1 = "What";
                     for (int aux : auxChain) {
                         q1 += " " + words.get(aux);
                     }
                     q1 += " " + words.get(predicateIndex) + "?";
-                } else {
+                }
+                /**
+                 * What was built?
+                 */
+                else {
                     q1 = "What";
                     if (auxChain.size() == 0) {
-                        String[] split = VerbHelper.splitVerb(words, categories, predicateIndex);
-                        q1 += " " + split[0] + " someone " + split[1] + "?";
+                        String[] split = verbHelper.getAuxiliaryAndVerbStrings(words, categories, predicateIndex);
+                        q1 += " " + split[0] + " " + ph + " " + split[1] + "?";
                     } else {
                         for (int aux : auxChain) {
                             q1 += " " + words.get(aux);
                         }
-                        q1 += " someone " + words.get(predicateIndex) + "?";
+                        q1 += " " + ph + " " + words.get(predicateIndex) + "?";
                     }
                 }
-                System.out.println(q1);
-                System.out.println(goldQA == null ? "[no-qa]" : StringUtils.join(goldQA.getQuestion()) + "?");
-            } else {
-                System.err.println("How did this happen?");
             }
+            System.out.println(q1);
+            System.out.println(goldQA == null ? "[no-qa]" : StringUtils.join(goldQA.getQuestion()) + "?");
         }
-        /* wordIndices.forEach(id -> {
-                    if (id == predicateIndex) {
-                        System.out.print("[" + words.get(id) + "]\t");
-                    } else if (id == targetDependency.getSentencePositionOfArgument()) {
-                        System.out.print("*" + wordIdToSlot.get(id) + ":" + words.get(id) + "\t");
-                    } else {
-                        System.out.print(wordIdToSlot.get(id) + ":" + words.get(id) + "\t");
-                    }
-                });*/
     }
 
     // TODO: generate questions from predicted ...
@@ -147,7 +155,7 @@ public class QuestionGenerationSandbox {
 
     public static void main(String[] args) {
         // hacky: Initialize inflection dictionary ..
-        VerbHelper.inflectionDictionary = VerbInflectionDictionary.buildFromPropBankTraining();
+        verbHelper = new VerbHelper(VerbInflectionDictionary.buildFromPropBankTraining());
         Map<Integer, List<AlignedDependency<CCGBankDependency, QADependency>>>
             mappedDependencies = PropBankAligner.getCcgAndQADependenciesTrain();
         generateFromGoldCCG(mappedDependencies);
