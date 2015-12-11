@@ -127,6 +127,10 @@ public class VerbHelper {
     public String[] getAuxiliaryAndVerbStrings(List<String> words, List<Category> categories, int index) {
         String verbStr = words.get(index).toLowerCase();
         String[] infl = inflectionDictionary.getBestInflections(verbStr.toLowerCase());
+        if (infl == null) {
+            System.err.println("Can't find inflections for: " + words.get(index));
+            return new String[] {"", verbStr};
+        }
         // build
         if (verbStr.equals(infl[0])) {
             return new String[] {"would", infl[0]};
@@ -145,6 +149,12 @@ public class VerbHelper {
         }
         // built (pt)
         return new String[] {"have", infl[4]};
+    }
+
+    public boolean isUninflected(List<String> words, List<Category> categories, int index) {
+        String verbStr = words.get(index).toLowerCase();
+        String[] infl = inflectionDictionary.getBestInflections(verbStr.toLowerCase());
+        return infl != null && verbStr.equals(infl[0]);
     }
 
     /**

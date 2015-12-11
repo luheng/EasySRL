@@ -18,7 +18,11 @@ import java.util.*;
 public class QuestionGenerationSandbox {
     private static final Category somethingVerbal = Category.valueOf("S|NP");
     private static final Category somethingAdjunctive = Category.valueOf("S|S");
+    private static final Category intransitiveVerb = Category.valueOf("S\\NP");
+    // TODO: Changing this to (S\NP)/NP causes a np exception, why?
     private static final Category transitiveVerb = Category.valueOf("(S[dcl]\\NP)/NP");
+    // TODO: check this
+    private static final Category ditransitiveVerb = Category.valueOf("((S\\NP)/NP)/NP");
 
     private static VerbHelper verbHelper;
     private static ArgumentHelper argumentHelper = new ArgumentHelper();
@@ -126,28 +130,29 @@ public class QuestionGenerationSandbox {
         assert slotToDependency.containsKey(targetSlotId);
         Collections.sort(wordIndices);
         List<String> question = new ArrayList<>();
-
+        List<Integer> auxChain = verbHelper.getAuxiliaryChain(words, categories, predicateIndex);
         /**
          * Intransitive/Ergative verbs?
          */
-        if (predicateCategory.isFunctionInto(transitiveVerb) && predicateCategory.getNumberOfArguments() == 2) {
-            String ccgInfo = targetDependency.getCategory() + "_" + targetDependency.getArgNumber();
-            System.out.println("\n" + StringUtils.join(words));
-            wordIndices.forEach(id -> {
-                if (id == targetDependency.getSentencePositionOfArgument()) {
-                    System.out.print("{" + words.get(id) + "} ");
-                } else {
-                    System.out.print(words.get(id) + " ");
-                }
-            });
-            System.out.println("\n" + ccgInfo);
-            System.out.println(goldQA == null ? "[no-qa]" : StringUtils.join(goldQA.getQuestion()) + "?");
+        if (predicateCategory.isFunctionInto(intransitiveVerb) && predicateCategory.getNumberOfArguments() == 1) {
+            question.add("What");
+            if (auxChain.size() > 0) {
+                auxChain.forEach(aux -> question.add(words.get(aux)));
+            } else if (predicateCategory.isFunctionInto(Category.valueOf("S[adj]\\NP")) ||
+                       predicateCategory.isFunctionInto(Category.valueOf("S[pss]\\NP"))) {
+                question.add("might");
+                question.add("be");
+            } else if (verbHelper.isUninflected(words, categories, predicateIndex)) {
+                question.add("might");
+            }
+            question.add(words.get(predicateIndex));
+            return question;
         }
         /**
          * For simple transitive verbs, such as A built B
          */
         if (predicateCategory.isFunctionInto(transitiveVerb) && predicateCategory.getNumberOfArguments() == 2) {
-            List<Integer> auxChain = verbHelper.getAuxiliaryChain(words, categories, predicateIndex);
+
             /**
              * {Pat} built a robot -> Who built a robot ?
              */
@@ -197,6 +202,10 @@ public class QuestionGenerationSandbox {
             }
             return question;
         }
+        /**
+         * A gave B C
+         * A charged B C on D ...
+         */
         if (predicateCategory.isFunctionInto(transitiveVerb) && predicateCategory.getNumberOfArguments() >= 3) {
 
         }
@@ -216,3 +225,35 @@ public class QuestionGenerationSandbox {
         generateFromGoldCCG(mappedDependencies);
     }
 }
+
+
+// Backup space
+
+   /*
+            String ccgInfo = targetDependency.getCategory() + "_" + targetDependency.getArgNumber();
+            System.out.println("\n" + StringUtils.join(words));
+            wordIndices.forEach(id -> {
+                if (id == targetDependency.getSentencePositionOfArgument()) {
+                    System.out.print("{" + words.get(id) + "} ");
+                } else {
+                    System.out.print(words.get(id) + " ");
+                }
+            });
+            System.out.println("\n" + ccgInfo);
+            System.out.println(StringUtils.join(question) + "?");
+            System.out.println(goldQA == null ? "[no-qa]" : StringUtils.join(goldQA.getQuestion()) + "?");
+            */
+
+  /*
+            String ccgInfo = targetDependency.getCategory() + "_" + targetDependency.getArgNumber();
+            System.out.println("\n" + StringUtils.join(words));
+            wordIndices.forEach(id -> {
+                if (id == targetDependency.getSentencePositionOfArgument()) {
+                    System.out.print("{" + words.get(id) + "} ");
+                } else {
+                    System.out.print(words.get(id) + " ");
+                }
+            });
+            System.out.println("\n" + ccgInfo);
+            System.out.println(goldQA == null ? "[no-qa]" : StringUtils.join(goldQA.getQuestion()) + "?");
+            */
