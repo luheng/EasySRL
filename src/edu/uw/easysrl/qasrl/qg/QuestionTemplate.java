@@ -1,13 +1,10 @@
 package edu.uw.easysrl.qasrl.qg;
 
-import edu.uw.easysrl.corpora.CCGBankDependencies;
 import edu.uw.easysrl.corpora.CCGBankDependencies.CCGBankDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.qasrl.qg.QuestionSlot.*;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
+import java.util.*;
 
 /**
  * Created by luheng on 12/10/15.
@@ -20,6 +17,7 @@ public class QuestionTemplate {
 
     public QuestionSlot[] slots;
     public VerbSlot verbSlot;
+    public Map<Integer, Integer> argNumToSlotId;
 
     public QuestionTemplate(QuestionSlot[] slots, List<String> words, List<Category> categories,
                             Collection<CCGBankDependency> dependencies) {
@@ -27,25 +25,37 @@ public class QuestionTemplate {
         this.words = words;
         this.categories = categories;
         this.dependencies = dependencies;
-
+        this.argNumToSlotId = new HashMap<>();
         // do something ...
-        for (int i = 0; i < slots.length; i++) {
-            if (VerbSlot.class.isInstance(slots[i])) {
-                verbSlot = (VerbSlot) slots[i];
+        for (int slotId = 0; slotId < slots.length; slotId++) {
+            argNumToSlotId.put(slots[slotId].argumentNumber, slotId);
+            if (VerbSlot.class.isInstance(slots[slotId])) {
+                verbSlot = (VerbSlot) slots[slotId];
                 predicateCategory = verbSlot.category;
             }
         }
     }
 
+    public int getNumArguments() {
+        return slots.length - 1;
+    }
+
     // whMapper
-    public String getWhWord(int slotId) {
-        // very dumb way ...
-        return slotId == 0 ? "who" : "what";
+    // TODO: split "What is something given to", "What was someone expected to do"
+    public String getWhWord(int argNum) {
+        ArgumentSlot slot = (ArgumentSlot) slots[argNumToSlotId.get(argNum)];
+        if (slot.hasPreposition) {
+            return words.get(slot.indexInSentence - 1) + " what";
+        }
+        if (slot.category.isFunctionInto(Category.valueOf("S[to]\\NP"))) {
+            return "to do what";
+        }
+        return argNum == getNumArguments() ?  "what" : "who";
     }
 
     // phMapper
-    public String getPlaceHolderWord(int slotId) {
-        ArgumentSlot slot = (ArgumentSlot) slots[slotId];
+    public String getPlaceHolderWord(int argNum) {
+        ArgumentSlot slot = (ArgumentSlot) slots[argNumToSlotId.get(argNum)];
         if (UnrealizedArgumentSlot.class.isInstance(slot)) {
             return "something";
         }
@@ -53,12 +63,19 @@ public class QuestionTemplate {
         if (argumentIndex > 1 && categories.get(argumentIndex - 1).isFunctionInto(Category.valueOf("NP|N"))) {
             return words.get(argumentIndex - 1) + " " + words.get(argumentIndex);
         }
+        if (slot.hasPreposition) {
+            return words.get(slot.indexInSentence - 1) + " something";
+        }
+        if (slot.category.isFunctionInto(Category.valueOf("S[to]\\NP"))) {
+            return "to do something";
+        }
         if (words.get(argumentIndex).equalsIgnoreCase("what")) {
             return "something";
         }
         if (words.get(argumentIndex).equalsIgnoreCase("who")) {
             return "someone";
         }
+        return "something";
     }
 
     // i.e. {"", "built"}, or {"might", "build"}
@@ -79,14 +96,26 @@ public class QuestionTemplate {
         return result;
     }
 
-    // i.e. {"did", "build"}
-    public String[] getActiveSplitVerb(VerbHelper verbHelper) {
-
+    // i.e. "built" -> {"did", "build"}
+    public List<String> getActiveSplitVerb(VerbHelper verbHelper) {
+        // if the verb was passive to start with, or has auxiliaries by itself ..
+        List<String> result = new ArrayList<>();
+        List<Integer> auxiliaries = verbSlot.auxiliaries;
+        int verbIndex = verbSlot.indexInSentence;
+        if (auxiliaries.size() > 0) {
+            auxiliaries.forEach(aux -> result.add(words.get(aux)));
+            result.add(words.get(verbIndex));
+        } else {
+            String[] split = verbHelper.getAuxiliaryAndVerbStrings(words, null /* categories */,  verbIndex);
+            result.add(split[0]);
+            result.add(split[1]);
+        }
+        return result;
     }
 
     // i.e. {"was", "built"}, {"have been", "built"}
-    public String[] getPassiveVerb() {
-
+    public List<String> getPassiveVerb() {
+        return null;
     }
 
 }

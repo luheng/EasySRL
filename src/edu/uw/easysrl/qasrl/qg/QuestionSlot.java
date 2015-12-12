@@ -21,6 +21,8 @@ public abstract class QuestionSlot {
         this.category = category;
     }
 
+    public abstract String toString(List<String> sentenceWords);
+
     public static class VerbSlot extends QuestionSlot {
         public List<Integer> auxiliaries;
 
@@ -29,6 +31,7 @@ public abstract class QuestionSlot {
             this.auxiliaries = auxiliaries;
         }
 
+        @Override
         public String toString(List<String> sentenceWords) {
             List<String> res = new ArrayList<>();
             auxiliaries.forEach(aux -> res.add(sentenceWords.get(aux)));
@@ -47,6 +50,7 @@ public abstract class QuestionSlot {
             isVerb = argumentCategory.isFunctionInto(Category.valueOf("S\\NP"));
         }
 
+        @Override
         public String toString(List<String> sentenceWords) {
             return String.format("T%d:%s:%s", argumentNumber, category, sentenceWords.get(indexInSentence));
         }
@@ -58,7 +62,7 @@ public abstract class QuestionSlot {
         }
 
         @Override
-        public String toString() {
+        public String toString(List<String> sentenceWords) {
             return String.format("T%d:%s:__", argumentNumber, category);
         }
     }

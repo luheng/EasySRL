@@ -125,22 +125,24 @@ public class QuestionGenerationSandbox {
                         uncoveredDeps.addString(ccgDep.getCategory().toString());
                         continue;
                     }
-                    String[] question = generateQuestions(template, ccgDep, qaDep, words, categories, ccgDeps);
+                    List<String> question = generateQuestions(template, ccgDep, qaDep, words, categories, ccgDeps);
+                    if (question.size() == 0) {
+                        continue;
+                    }
                     numQuestionsGenerated ++;
                     coveredDeps.addString(ccgDep.getCategory().toString());
+                    /*
                     // output tempalte.
                     String ccgInfo = ccgDep.getCategory() + "_" + ccgDep.getArgNumber();
                     System.out.println("\n\n" + StringUtils.join(words));
                     System.out.println(ccgInfo);
-                    for (QuestionSlot slot : template) {
-                        System.out.print(slot + "\t");
+                    for (QuestionSlot slot : template.slots) {
+                        System.out.print(slot.toString(words) + "\t");
                     }
-                    /*
-                    String ccgInfo = ccgDep.getCategory() + "_" + ccgDep.getArgNumber();
-                    System.out.println("\n" + StringUtils.join(words));
-                    System.out.println(ccgInfo);
-                    System.out.println(StringUtils.join(question) + "?");
-                    System.out.println(goldQA == null ? "[no-qa]" : StringUtils.join(goldQA.getQuestion()) + "?");
+                    System.out.println();
+                    question.forEach(w -> System.out.print(w + " "));
+                    System.out.println("?");
+                    System.out.println(qaDep == null ? "[no-qa]" : StringUtils.join(qaDep.getQuestion()) + "?");
                     */
                 }
             }
@@ -151,33 +153,6 @@ public class QuestionGenerationSandbox {
                 numQuestionsGenerated,
                 100.0 * numQuestionsGenerated / numDependenciesProcessed, numDependenciesProcessed,
                 100.0 * numQuestionsGenerated / numAligned, numAligned));
-
-        /*
-        for (String depStr : uncoveredDeps.getStrings()) {
-            int freq = uncoveredDeps.getCount(depStr);
-            int qaFreq = alignedDeps.getCount(depStr);
-            if (freq < 10 || depStr.equals("<UNK>")) {
-                continue;
-            }
-            String filename = String.format("/Users/luheng/Workspace/EasySRL/examples_%03d_%03d_%s.txt", freq, qaFreq,
-                    depStr.replace("/", ":"));
-            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(filename), "utf-8"));
-            System.out.println(filename);
-
-            for (int sentIdx : alignedDependencies.keySet()) {
-                if (alignedDependencies.get(sentIdx) == null) {
-                    continue;
-                }
-                Sentence sentence = alignedDependencies.get(sentIdx).get(0).sentence;
-                for (AlignedDependency<CCGBankDependency, QADependency> dep : alignedDependencies.get(sentIdx)) {
-                    CCGBankDependency ccgDep = dep.dependency1;
-                    if (ccgDep != null && ccgDep.getCategory().toString().equals(depStr)) {
-                        printPredicateInfo(writer, sentence, ccgDep, dep.dependency2);
-                    }
-                }
-            }
-            writer.close();
-        }*/
         uncoveredDeps.prettyPrint();
     }
 
@@ -221,120 +196,56 @@ public class QuestionGenerationSandbox {
                                                   CCGBankDependency ccgDep, QADependency qaDep,
                                                   List<String> words, List<Category> categories,
                                                   Collection<CCGBankDependency> dependencies) {
+        // TODO: slot id doesn't mean argument id , sighs
         int targetArgNum = ccgDep.getArgNumber();
-        int targetSlotId = 0;
-        for (int i = 0; i < template.slots.length; i++) {
-            if (template.slots[i].argumentNumber == targetArgNum) {
-                targetSlotId = i;
-                break;
-            }
-        }
-
         List<String> question = new ArrayList<>();
         // Intransitive verb: T1 V
-        if (template.slots.length == 2) {
-            assert (targetSlotId == 1);
-            question.add(template.getWhWord(targetSlotId));
+        if (template.getNumArguments() == 1) {
+            assert (targetArgNum == 1);
+            question.add(template.getWhWord(targetArgNum));
             question.addAll(template.getActiveVerb(verbHelper));
             return question;
         }
         // Intransitive verb: T1 V T2
-        if (template.slots.length == 2) {
+        if (template.getNumArguments() == 2) {
             // {Pat} built a robot -> Who built a robot ?
-            if (targetSlotId == 1) {
-                question.add(template.getWhWord(targetSlotId));
+            if (targetArgNum == 1) {
+                question.add(template.getWhWord(targetArgNum  ));
                 question.addAll(template.getActiveVerb(verbHelper));
                 question.add(template.getPlaceHolderWord(2));
                 return question;
             }
             // {Pat} built a robot* -> What did Pat build / What was built ?
-            if (targetSlotId == 2) {
-                String[] auxAndVerb = template.getActiveSplitVerb(verbHelper);
-                question.add(template.getWhWord(targetSlotId));
-                int otherSlot = 1;
-                String phWord = slotToWordId.containsKey(otherSlot) ?
-                        argumentHelper.getPlaceHolderString(words, categories, predicateIndex,
-                                slotToWordId.get(otherSlot), otherSlot) : "someone";
-                question.add("What");
-                /**
-                 * What did Pat/someone build?
-                 */
-                if (verbHelper.isPassive(words, categories, predicateIndex)) {
-                    auxChain.forEach(aux -> question.add(words.get(aux)));
-                    question.add(words.get(predicateIndex));
+            if (targetArgNum == 2) {
+                List<String> auxAndVerb = template.getActiveSplitVerb(verbHelper);
+                question.add(template.getWhWord(targetArgNum));
+                for (int i = 0; i < auxAndVerb.size() - 1; i++) {
+                    question.add(auxAndVerb.get(i));
                 }
-                /**
-                 * What was built?
-                 */
-                else {
-                    if (auxChain.size() == 0) {
-                        question.add(auxAndVerb[0]);
-                        question.add(phWord);
-                        question.add(auxAndVerb[1]);
-                    } else {
-                        auxChain.forEach(aux -> question.add(words.get(aux)));
-                        question.add(phWord);
-                        question.add(words.get(predicateIndex));
-                    }
-                }
+                question.add(template.getPlaceHolderWord(1));
+                question.add(auxAndVerb.get(auxAndVerb.size() - 1));
             }
             return question;
         }
-        if (predicateCategory.isFunctionInto(sayVerb)) {
-            String[] auxAndVerb = verbHelper.getAuxiliaryAndVerbStrings(words, categories, predicateIndex);
-            /**
-             * {Pat} said the robot is awesome.
-             */
-            if (targetSlotId == 1) {
-                String phWord = "something";
-                question.add("Who");
-                auxChain.forEach(aux -> question.add(words.get(aux)));
-                question.add(words.get(predicateIndex));
-                question.add(phWord);
-            }
-            /**
-             * Pat said {the robot is awesome}.
-             */
-            else if (targetSlotId == 2) {
-                String phWord = "someone";
-                question.add("What");
-                if (verbHelper.isPassive(words, categories, predicateIndex)) {
-                    question.add("What");
-                    auxChain.forEach(aux -> question.add(words.get(aux)));
-                    question.add(words.get(predicateIndex));
-                } else {
-                    if (auxChain.size() == 0) {
-                        question.add(auxAndVerb[0]);
-                        question.add(phWord);
-                        question.add(auxAndVerb[1]);
-                    } else {
-                        auxChain.forEach(aux -> question.add(words.get(aux)));
-                        question.add(phWord);
-                        question.add(words.get(predicateIndex));
-                    }
-                }
-            }
-           outputInfo(ccgDep, qaDep, words, categories, dependencies, wordIdToSlot, slotToWordId, wordIndices, question);
-           return question;
-        }
+
         /**
          * Ditransitive verbs: ....
          * A gave B C
          * A charged B C on D ...
          */
         //if (predicateCategory.isFunctionInto(transitiveVerb) && predicateCategory.getNumberOfArguments() >= 3) {
-        if (predicateCategory.isFunctionInto(Category.valueOf("((S\\NP)\\(S\\NP))/S[dcl]"))) {
+        //if (predicateCategory.isFunctionInto(Category.valueOf("((S\\NP)\\(S\\NP))/S[dcl]"))) {
             // outputInfo(ccgDep, qaDep, words, categories, dependencies, wordIdToSlot, slotToWordId, wordIndices, question);
-        }
+        //}
         return question;
     }
 
     private static QuestionTemplate getTemplate(int predicateIndex, List<String> words, List<Category> categories,
-                                                Collection<CCGBankDependency> allDependencies) {
+                                                Collection<CCGBankDependency> dependencies) {
         Map<Integer, CCGBankDependency> slotToDependency = new HashMap<>();
         Category predicateCategory = categories.get(predicateIndex);
         int numArguments = predicateCategory.getNumberOfArguments();
-        for (CCGBankDependency dep : allDependencies) {
+        for (CCGBankDependency dep : dependencies) {
             int argNum = dep.getArgNumber();
             int predId = dep.getSentencePositionOfPredicate();
             int argId = dep.getSentencePositionOfArgument();
@@ -342,7 +253,6 @@ public class QuestionGenerationSandbox {
                 slotToDependency.put(argNum, dep);
             }
         }
-
         List<Integer> auxChain = verbHelper.getAuxiliaryChain(words, categories, predicateIndex);
         QuestionSlot verb = new VerbSlot(predicateIndex, auxChain, predicateCategory);
         QuestionSlot[] arguments = new QuestionSlot[numArguments + 1];
@@ -381,7 +291,7 @@ public class QuestionGenerationSandbox {
                 slots = new QuestionSlot[]{arguments[1], verb, arguments[3], arguments[2]};
             }
         }
-        return slots == null ? null : new QuestionTemplate(slots, words, allDependencies);
+        return slots == null ? null : new QuestionTemplate(slots, words, categories, dependencies);
     }
 
     public static void outputInfo(CCGBankDependency ccgDep,
