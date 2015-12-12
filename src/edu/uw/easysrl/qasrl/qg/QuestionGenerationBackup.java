@@ -17,9 +17,11 @@ import java.io.*;
 import java.util.*;
 
 /**
+ * Just for backup purpose.
+ * Everything is wrong and outdated here.
  * Created by luheng on 12/8/15.
  */
-public class QuestionGenerationSandbox {
+public class QuestionGenerationBackup {
     private static final Category somethingVerbal = Category.valueOf("S|NP");
     private static final Category somethingAdjunctive = Category.valueOf("S|S");
     private static final Category intransitiveVerb = Category.valueOf("S\\NP");
@@ -29,14 +31,12 @@ public class QuestionGenerationSandbox {
     private static final Category transitiveVerbPP = Category.valueOf("(S\\NP)/PP");
 
     // Verbs such as say, think, add ... is there a name for them?
-    // T1 said (that) T2
+    // A1 said (that) A2
     private static final Category sayVerb = Category.valueOf("(S[dcl]\\NP)/S");
-    // T1, T2 said, or T1, said T2
-    private static final Category sayVerb2 = Category.valueOf("(S[dcl]\\S[dcl])|NP");
+    // A1, A2 said
+    private static final Category sayVerb2 = Category.valueOf("(S[dcl]\\S[dcl])\\NP");
 
-    // T1 agreed to do T2
-    // Including: (S[dcl]\NP)/(S[to]\NP), (S[ng]\NP)/S[to]\NP), and (S[b]\NP)/(S[to]\NP)
-    private static final Category controlVerb = Category.valueOf("(S\\NP)/(S[to]\\NP)");
+    private static final Category controlVerb = Category.valueOf("(S[dcl]\\NP)/(S[to]\\NP)");
 
     private static final Category ditransitiveVerb = Category.valueOf("((S\\NP)/NP)/NP");
     private static final Category ditransitiveVerbPP = Category.valueOf("((S\\NP)/PP)/NP");
@@ -112,36 +112,35 @@ public class QuestionGenerationSandbox {
                 }
                 // Generate question for the target dependency.
                 if (category.isFunctionInto(prepositions) || category.isFunctionInto(auxiliaries) ||
-                    category.isFunctionInto(controlParticles) || category.isFunctionInto(pastParticiples) ||
+                        category.isFunctionInto(controlParticles) || category.isFunctionInto(pastParticiples) ||
                         otherFilteredCategorySet.contains(category.toString())) {
                     continue;
                 }
                 if (category.isFunctionInto(somethingVerbal) || category.isFunctionInto(somethingAdjunctive)) {
                     numDependenciesProcessed ++;
                     //List<String> question = generateQuestions(ccgDep, qaDep, words, categories, ccgDeps);
-                    QuestionTemplate template = getTemplate(ccgDep.getSentencePositionOfPredicate(), words, categories,
-                                                            ccgDeps);
-                    if (template == null) {
+                    QuestionSlot[] template = getTemplate(ccgDep.getSentencePositionOfPredicate(), words,
+                            categories, ccgDeps);
+                    if (template.length > 0) {
+                        numQuestionsGenerated ++;
+                        coveredDeps.addString(ccgDep.getCategory().toString());
+                        // output tempalte.
+                        String ccgInfo = ccgDep.getCategory() + "_" + ccgDep.getArgNumber();
+                        System.out.println("\n\n" + StringUtils.join(words));
+                        System.out.println(ccgInfo);
+                        for (QuestionSlot slot : template) {
+                            System.out.print(slot + "\t");
+                        }
+                        /*
+                        String ccgInfo = ccgDep.getCategory() + "_" + ccgDep.getArgNumber();
+                        System.out.println("\n" + StringUtils.join(words));
+                        System.out.println(ccgInfo);
+                        System.out.println(StringUtils.join(question) + "?");
+                        System.out.println(goldQA == null ? "[no-qa]" : StringUtils.join(goldQA.getQuestion()) + "?");
+                        */
+                    } else {
                         uncoveredDeps.addString(ccgDep.getCategory().toString());
-                        continue;
                     }
-                    String[] question = generateQuestions(template, ccgDep, qaDep, words, categories, ccgDeps);
-                    numQuestionsGenerated ++;
-                    coveredDeps.addString(ccgDep.getCategory().toString());
-                    // output tempalte.
-                    String ccgInfo = ccgDep.getCategory() + "_" + ccgDep.getArgNumber();
-                    System.out.println("\n\n" + StringUtils.join(words));
-                    System.out.println(ccgInfo);
-                    for (QuestionSlot slot : template) {
-                        System.out.print(slot + "\t");
-                    }
-                    /*
-                    String ccgInfo = ccgDep.getCategory() + "_" + ccgDep.getArgNumber();
-                    System.out.println("\n" + StringUtils.join(words));
-                    System.out.println(ccgInfo);
-                    System.out.println(StringUtils.join(question) + "?");
-                    System.out.println(goldQA == null ? "[no-qa]" : StringUtils.join(goldQA.getQuestion()) + "?");
-                    */
                 }
             }
         }
@@ -217,40 +216,77 @@ public class QuestionGenerationSandbox {
         writer.write("\n\n");
     }
 
-    private static List<String> generateQuestions(QuestionTemplate template,
-                                                  CCGBankDependency ccgDep, QADependency qaDep,
-                                                  List<String> words, List<Category> categories,
+    private static List<String> generateQuestions(CCGBankDependency ccgDep,
+                                                  QADependency qaDep,
+                                                  List<String> words,
+                                                  List<Category> categories,
                                                   Collection<CCGBankDependency> dependencies) {
-        int targetArgNum = ccgDep.getArgNumber();
-        int targetSlotId = 0;
-        for (int i = 0; i < template.slots.length; i++) {
-            if (template.slots[i].argumentNumber == targetArgNum) {
-                targetSlotId = i;
-                break;
+        Map<Integer, CCGBankDependency> slotToDependency = new HashMap<>();
+        List<Integer> wordIndices = new ArrayList<>();
+        Map<Integer, Integer> wordIdToSlot = new HashMap<>();
+        Map<Integer, Integer> slotToWordId = new HashMap<>();
+
+        Category predicateCategory = ccgDep.getCategory();
+        int predicateIndex = ccgDep.getSentencePositionOfPredicate();
+        int targetSlotId = ccgDep.getArgNumber();
+        int maxSlotId = 0;
+        wordIndices.add(predicateIndex);
+        for (CCGBankDependency dep : dependencies) {
+            int slotId = dep.getArgNumber();
+            int predId = dep.getSentencePositionOfPredicate();
+            int argId = dep.getSentencePositionOfArgument();
+            if (dep.getSentencePositionOfPredicate() == predicateIndex && predId != argId) {
+                slotToDependency.put(slotId, dep);
+                slotToWordId.put(slotId, argId);
+                wordIdToSlot.put(argId, slotId);
+                wordIndices.add(argId);
+                maxSlotId = Math.max(maxSlotId, slotId);
             }
         }
-
+        assert slotToDependency.containsKey(targetSlotId);
+        Collections.sort(wordIndices);
         List<String> question = new ArrayList<>();
-        // Intransitive verb: T1 V
-        if (template.slots.length == 2) {
-            assert (targetSlotId == 1);
-            question.add(template.getWhWord(targetSlotId));
-            question.addAll(template.getActiveVerb(verbHelper));
+        List<Integer> auxChain = verbHelper.getAuxiliaryChain(words, categories, predicateIndex);
+        /**
+         * Intransitive/Ergative verbs?
+         */
+        if (predicateCategory.isFunctionInto(intransitiveVerb) && predicateCategory.getNumberOfArguments() == 1) {
+            question.add("What");
+            if (auxChain.size() > 0) {
+                auxChain.forEach(aux -> question.add(words.get(aux)));
+            } else if (predicateCategory.isFunctionInto(Category.valueOf("S[adj]\\NP")) ||
+                    predicateCategory.isFunctionInto(Category.valueOf("S[pss]\\NP"))) {
+                question.add("might");
+                question.add("be");
+            } else if (verbHelper.isUninflected(words, categories, predicateIndex)) {
+                question.add("might");
+            }
+            question.add(words.get(predicateIndex));
             return question;
         }
-        // Intransitive verb: T1 V T2
-        if (template.slots.length == 2) {
-            // {Pat} built a robot -> Who built a robot ?
+        /**
+         * For simple transitive verbs, such as A built B
+         */
+        if (predicateCategory.isFunctionInto(transitiveVerb) && predicateCategory.getNumberOfArguments() == 2) {
+            String[] auxAndVerb = verbHelper.getAuxiliaryAndVerbStrings(words, categories, predicateIndex);
+            /**
+             * {Pat} built a robot -> Who built a robot ?
+             */
             if (targetSlotId == 1) {
-                question.add(template.getWhWord(targetSlotId));
-                question.addAll(template.getActiveVerb(verbHelper));
-                question.add(template.getPlaceHolderWord(2));
-                return question;
+                int otherSlot = 2;
+                String phWord = slotToWordId.containsKey(otherSlot) ?
+                        argumentHelper.getPlaceHolderString(words, categories, predicateIndex,
+                                slotToWordId.get(otherSlot), otherSlot) : "something";
+                question.add("Who");
+                auxChain.forEach(aux -> question.add(words.get(aux)));
+                // TODO: post-process verb as in verb-splitter
+                question.add(words.get(predicateIndex));
+                question.add(phWord);
             }
-            // {Pat} built a robot* -> What did Pat build / What was built ?
-            if (targetSlotId == 2) {
-                String[] auxAndVerb = template.getActiveSplitVerb(verbHelper);
-                question.add(template.getWhWord(targetSlotId));
+            /**
+             * {Pat} built a robot* -> What did Pat build / What was built ?
+             */
+            else if (targetSlotId == 2) {
                 int otherSlot = 1;
                 String phWord = slotToWordId.containsKey(otherSlot) ?
                         argumentHelper.getPlaceHolderString(words, categories, predicateIndex,
@@ -314,8 +350,8 @@ public class QuestionGenerationSandbox {
                     }
                 }
             }
-           outputInfo(ccgDep, qaDep, words, categories, dependencies, wordIdToSlot, slotToWordId, wordIndices, question);
-           return question;
+            outputInfo(ccgDep, qaDep, words, categories, dependencies, wordIdToSlot, slotToWordId, wordIndices, question);
+            return question;
         }
         /**
          * Ditransitive verbs: ....
@@ -329,8 +365,8 @@ public class QuestionGenerationSandbox {
         return question;
     }
 
-    private static QuestionTemplate getTemplate(int predicateIndex, List<String> words, List<Category> categories,
-                                                Collection<CCGBankDependency> allDependencies) {
+    private static QuestionSlot[] getTemplate(int predicateIndex, List<String> words, List<Category> categories,
+                                              Collection<CCGBankDependency> allDependencies) {
         Map<Integer, CCGBankDependency> slotToDependency = new HashMap<>();
         Category predicateCategory = categories.get(predicateIndex);
         int numArguments = predicateCategory.getNumberOfArguments();
@@ -346,42 +382,41 @@ public class QuestionGenerationSandbox {
         List<Integer> auxChain = verbHelper.getAuxiliaryChain(words, categories, predicateIndex);
         QuestionSlot verb = new VerbSlot(predicateIndex, auxChain, predicateCategory);
         QuestionSlot[] arguments = new QuestionSlot[numArguments + 1];
-        QuestionSlot[] slots = null;
         for (int argNum = 1; argNum <= numArguments; argNum++) {
             CCGBankDependency dep = slotToDependency.get(argNum);
-            Category argumentCategory = predicateCategory.getArgument(argNum);
-            arguments[argNum] = (dep == null ? new UnrealizedArgumentSlot(argNum, argumentCategory) :
-                    new ArgumentSlot(dep.getSentencePositionOfArgument(), argNum, argumentCategory));
+            arguments[argNum] = (dep == null ?
+                    new UnrealizedArgumentSlot(argNum, predicateCategory) :
+                    new ArgumentSlot(dep.getSentencePositionOfArgument(), argNum, predicateCategory));
         }
         // 1. Intransitive verbs. i.e. T1 ran.
         if (predicateCategory.isFunctionInto(intransitiveVerb) && numArguments == 1) {
-            slots = new QuestionSlot[]{arguments[1], verb};
+            return new QuestionSlot[] { arguments[1], verb };
         }
         // 2. Simple transitive verbs, i.e. T1 built T2,
         //    Transitive verb with PPs:     T1 focuses on T2, or
         //    Control verbs:                T1 promised to do T2
         //    "say, think":                 T1 said (that) T2
         //    Special case of "say":        T1, T2 said (said T2)
-        else if (numArguments == 2) {
+        if (numArguments == 2) {
             if (predicateCategory.isFunctionInto(transitiveVerb) ||
                     predicateCategory.isFunctionInto(transitiveVerbPP) ||
                     predicateCategory.isFunctionInto(controlVerb) ||
                     predicateCategory.isFunctionInto(sayVerb)) {
-                slots = new QuestionSlot[]{arguments[1], verb, arguments[2]};
+                return new QuestionSlot[]{arguments[1], verb, arguments[2]};
             }
             if (predicateCategory.isFunctionInto(sayVerb2)) {
-                slots = new QuestionSlot[]{arguments[2], verb, arguments[1]};
+                return new QuestionSlot[]{arguments[2], verb, arguments[1]};
             }
         }
         // 3. Ditransitive verbs with 3 arguments ..., i.e. T1 gave T3 T2
         //    or with pp:                                   T1 gave T3 to T2
-        else if (numArguments == 3) {
+        if (numArguments == 3) {
             if (predicateCategory.isFunctionInto(ditransitiveVerb) ||
                     predicateCategory.isFunctionInto(ditransitiveVerbPP)) {
-                slots = new QuestionSlot[]{arguments[1], verb, arguments[3], arguments[2]};
+                return new QuestionSlot[]{arguments[1], verb, arguments[3], arguments[2]};
             }
         }
-        return slots == null ? null : new QuestionTemplate(slots, words, allDependencies);
+        return new QuestionSlot[] {};
     }
 
     public static void outputInfo(CCGBankDependency ccgDep,
@@ -416,17 +451,36 @@ public class QuestionGenerationSandbox {
     private static void generateQuestions(ResolvedDependency targetDependency, List<String> words,
                                           Collection<ResolvedDependency> dependencies) {
     }
-
-    public static void main(String[] args) {
-        // hacky: Initialize inflection dictionary ..
-        verbHelper = new VerbHelper(VerbInflectionDictionary.buildFromPropBankTraining());
-        Map<Integer, List<AlignedDependency<CCGBankDependency, QADependency>>>
-            mappedDependencies = PropBankAligner.getCcgAndQADependenciesTrain();
-        try {
-            generateFromGoldCCG(mappedDependencies);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
 }
 
+
+// Backup space
+
+   /*
+            String ccgInfo = targetDependency.getCategory() + "_" + targetDependency.getArgNumber();
+            System.out.println("\n" + StringUtils.join(words));
+            wordIndices.forEach(id -> {
+                if (id == targetDependency.getSentencePositionOfArgument()) {
+                    System.out.print("{" + words.get(id) + "} ");
+                } else {
+                    System.out.print(words.get(id) + " ");
+                }
+            });
+            System.out.println("\n" + ccgInfo);
+            System.out.println(StringUtils.join(question) + "?");
+            System.out.println(goldQA == null ? "[no-qa]" : StringUtils.join(goldQA.getQuestion()) + "?");
+            */
+
+  /*
+            String ccgInfo = targetDependency.getCategory() + "_" + targetDependency.getArgNumber();
+            System.out.println("\n" + StringUtils.join(words));
+            wordIndices.forEach(id -> {
+                if (id == targetDependency.getSentencePositionOfArgument()) {
+                    System.out.print("{" + words.get(id) + "} ");
+                } else {
+                    System.out.print(words.get(id) + " ");
+                }
+            });
+            System.out.println("\n" + ccgInfo);
+            System.out.println(goldQA == null ? "[no-qa]" : StringUtils.join(goldQA.getQuestion()) + "?");
+            */
