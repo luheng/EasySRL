@@ -134,17 +134,20 @@ public class QuestionGenerationSandbox {
                     coveredDeps.addString(ccgDep.getCategory().toString());
 
                     // output tempalte.
-                    String ccgInfo = ccgDep.getCategory() + "_" + ccgDep.getArgNumber();
-                    System.out.println("\n\n" + StringUtils.join(words));
-                    System.out.println(ccgInfo);
-                    for (QuestionSlot slot : template.slots) {
-                        System.out.print(slot.toString(words) + "\t");
+                    if (template.getNumArguments() == 3) {
+                        String ccgInfo = ccgDep.getCategory() + "_" + ccgDep.getArgNumber();
+                        System.out.println(ccgDep.getChild().toString());
+                        ccgDep.getParent().getChildren().forEach(c -> System.out.println("\t" + c.toString()));
+                        System.out.println("\n\n" + StringUtils.join(words));
+                        System.out.println(ccgInfo);
+                        for (QuestionSlot slot : template.slots) {
+                            System.out.print(slot.toString(words) + "\t");
+                        }
+                        System.out.println();
+                        question.forEach(w -> System.out.print(w + " "));
+                        System.out.println("?");
+                        System.out.println(qaDep == null ? "[no-qa]" : StringUtils.join(qaDep.getQuestion()) + "?");
                     }
-                    System.out.println();
-                    question.forEach(w -> System.out.print(w + " "));
-                    System.out.println("?");
-                    System.out.println(qaDep == null ? "[no-qa]" : StringUtils.join(qaDep.getQuestion()) + "?");
-
                 }
             }
         }

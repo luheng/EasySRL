@@ -50,7 +50,8 @@ public class QuestionTemplate {
         ArgumentSlot slot = (ArgumentSlot) slots[argNumToSlotId.get(argNum)];
         if (slot.hasPreposition) {
             // FIXME: this is a hack. How can we get PPs?
-            return new String[] { "what", words.get(verbSlot.indexInSentence + 1),  };
+            String pp = PrepositionHelper.getPreposition(words, categories, slot.indexInSentence);
+            return new String[] { "what", pp };
         }
         if (slot.category.isFunctionInto(Category.valueOf("S[to]\\NP"))) {
             return new String[] { "what", "to do" };
@@ -66,23 +67,26 @@ public class QuestionTemplate {
     // { "", "something" }, {"for", "something" }
     public String[] getPlaceHolderWord(int argNum) {
         ArgumentSlot slot = (ArgumentSlot) slots[argNumToSlotId.get(argNum)];
+        int argumentIndex = slot.indexInSentence;
         if (UnrealizedArgumentSlot.class.isInstance(slot)) {
-            return new String[] {"", "something"};
+            return new String[] { "", "something" };
         }
         if (slot.category.isFunctionInto(Category.valueOf("S[to]\\NP"))) {
-            return new String[] {"to do", "something"};
+            return new String[] { "to do", "something" };
         }
-        int argumentIndex = slot.indexInSentence;
-        String phStr = "";
-        if (argumentIndex > 1 && categories.get(argumentIndex - 1).isFunctionInto(Category.valueOf("NP|N"))) {
+        String phStr;
+        if (categories.get(argumentIndex).equals(Category.NP)) {
+            phStr =  words.get(argumentIndex);
+        } else if (argumentIndex > 1 && categories.get(argumentIndex - 1).isFunctionInto(Category.valueOf("NP|N"))) {
             phStr =  words.get(argumentIndex - 1) + " " + words.get(argumentIndex);
         } else {
             phStr = words.get(argumentIndex).equalsIgnoreCase("who") ? "someone" : "something";
         }
         if (slot.hasPreposition) {
-            return new String[] {words.get(verbSlot.indexInSentence + 1), phStr};
+            String pp = PrepositionHelper.getPreposition(words, categories, argumentIndex);
+            return new String[] { pp, phStr };
         }
-        return new String[] {"", phStr};
+        return new String[] { "", phStr };
     }
 
     // i.e. {"", "built"}, or {"might", "build"}
