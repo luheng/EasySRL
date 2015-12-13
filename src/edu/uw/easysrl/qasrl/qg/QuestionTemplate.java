@@ -92,12 +92,12 @@ public class QuestionTemplate {
         String verbStr = words.get(verbSlot.indexInSentence);
         // i.e. to allow
         if (predicateCategory.isFunctionInto(Category.valueOf("S[b]\\NP"))) {
-            if (words.get(auxiliaries.get(0)).equalsIgnoreCase("to")) {
+            if (auxiliaries.size() > 0 && words.get(auxiliaries.get(0)).equalsIgnoreCase("to")) {
                 return new String[]{"would", verbStr};
             }
         }
         if (predicateCategory.isFunctionInto(Category.valueOf("S[adj]\\NP")) ||
-                   predicateCategory.isFunctionInto(Category.valueOf("S[pss]\\NP"))) {
+            predicateCategory.isFunctionInto(Category.valueOf("S[pss]\\NP"))) {
             return new String[] {"might be", verbStr};
         }
         if (auxiliaries.size() > 0) {
@@ -113,25 +113,13 @@ public class QuestionTemplate {
         return new String[] {"", verbStr};
     }
 
-    // i.e. "built" -> {"did", "build"}
+    // If the verb is a single inflected one, we need to change it: "built" -> {"did", "build"}
     public String[] getActiveSplitVerb(VerbHelper verbHelper) {
-        // if the verb was passive to start with, or has auxiliaries by itself ..
-        List<Integer> auxiliaries = verbSlot.auxiliaries;
-        int verbIndex = verbSlot.indexInSentence;
-        String verbStr = words.get(verbIndex);
-        if (predicateCategory.isFunctionInto(Category.valueOf("S[b]\\NP"))) {
-            if (words.get(auxiliaries.get(0)).equalsIgnoreCase("to")) {
-                return new String[]{"would", verbStr};
-            }
+        if (verbSlot.auxiliaries.size() == 0) {
+            return verbHelper.getAuxiliaryAndVerbStrings(words, null /* categories */,  verbSlot.indexInSentence);
         }
-        if (auxiliaries.size() > 0) {
-            String aux = "";
-            for (int id : auxiliaries) {
-                aux += words.get(id) + " ";
-            }
-            return new String[] {aux.trim(), verbStr};
-        }
-        return verbHelper.getAuxiliaryAndVerbStrings(words, null /* categories */,  verbIndex);
+        return getActiveVerb(verbHelper);
+
     }
 
     // i.e. {"was", "built"}, {"have been", "built"}

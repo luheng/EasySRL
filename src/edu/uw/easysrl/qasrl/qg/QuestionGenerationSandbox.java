@@ -204,51 +204,85 @@ public class QuestionGenerationSandbox {
         // Intransitive verb: T1 V
         if (template.getNumArguments() == 1) {
             assert (targetArgNum == 1);
-            String[] verb = template.getActiveVerb(verbHelper);
-            question.add(whWords[0]);
-            question.add(verb[0]);
-            question.add(verb[1]);
-            question.add(whWords[1]);
+            add(question, whWords[0]);
+            addAll(question, template.getActiveVerb(verbHelper));
+            add(question, whWords[1]);
             return question;
         }
         // Intransitive verb: T1 V T2
         if (template.getNumArguments() == 2) {
             // {Pat} built a robot -> Who built a robot ?
             if (targetArgNum == 1) {
-                String[] verb = template.getActiveVerb(verbHelper);
-                String[] ph = template.getPlaceHolderWord(2);
-                question.add(whWords[0]);
-                question.add(verb[0]);
-                question.add(verb[1]);
-                question.add(ph[0]);
-                question.add(ph[1]);
-                question.add(whWords[1]);
+                add(question, whWords[0]);
+                addAll(question, template.getActiveVerb(verbHelper));
+                addAll(question, template.getPlaceHolderWord(2));
+                add(question, whWords[1]);
                 return question;
             }
             // {Pat} built a robot* -> What did Pat build / What was built ?
             if (targetArgNum == 2) {
                 String[] verb = template.getActiveSplitVerb(verbHelper);
-                String[] ph = template.getPlaceHolderWord(1);
-                question.add(whWords[0]);
-                question.add(verb[0]);
-                question.add(ph[0]);
-                question.add(ph[1]);
-                question.add(verb[1]);
-                question.add(whWords[1]);
+                add(question, whWords[0]);
+                add(question, verb[0]);
+                addAll(question, template.getPlaceHolderWord(1));
+                add(question, verb[1]);
+                add(question, whWords[1]);
+                return question;
             }
-            return question;
         }
-
         /**
          * Ditransitive verbs: ....
-         * A gave B C
-         * A charged B C on D ...
+         * T1:Pat gave T3:John T2:a robot.
+         * T1:Pat gave T3:a robot T2:to John.
          */
-        //if (predicateCategory.isFunctionInto(transitiveVerb) && predicateCategory.getNumberOfArguments() >= 3) {
-        //if (predicateCategory.isFunctionInto(Category.valueOf("((S\\NP)\\(S\\NP))/S[dcl]"))) {
-            // outputInfo(ccgDep, qaDep, words, categories, dependencies, wordIdToSlot, slotToWordId, wordIndices, question);
-        //}
+        if (template.getNumArguments() >= 3) {
+            // Who gave T3 T2?
+            if (targetArgNum == 1) {
+                add(question, whWords[0]);
+                addAll(question, template.getActiveVerb(verbHelper));
+                addAll(question, template.getPlaceHolderWord(3));
+                addAll(question, template.getPlaceHolderWord(2));
+                add(question, whWords[1]);
+                return question;
+            }
+            // What did T1 give T3?, i.e. What did John give Pat?
+            // (to) Who did T1 give T3?, Who did John give a robot to?
+            if (targetArgNum == 2) {
+                String[] verb = template.getActiveSplitVerb(verbHelper);
+                add(question, whWords[0]);
+                add(question, verb[0]);
+                addAll(question, template.getPlaceHolderWord(1));
+                add(question, verb[1]);
+                addAll(question, template.getPlaceHolderWord(3));
+                add(question, whWords[1]);
+                return question;
+            }
+            // Who did T1:Pat give T2:a robot?
+            // What did T1:Pat give T2:to John
+            if (targetArgNum == 3) {
+                String[] verb = template.getActiveSplitVerb(verbHelper);
+                add(question, whWords[0]);
+                add(question, verb[0]);
+                addAll(question, template.getPlaceHolderWord(1));
+                add(question, verb[1]);
+                addAll(question, template.getPlaceHolderWord(2));
+                add(question, whWords[1]);
+                return question;
+            }
+        }
         return question;
+    }
+
+    private static void add(List<String> question, String word) {
+        if (!word.isEmpty()) {
+            question.add(word);
+        }
+    }
+
+    private static void addAll(List<String> question, String[] words) {
+        for (String w : words) {
+            add(question, w);
+        }
     }
 
     private static QuestionTemplate getTemplate(int predicateIndex, List<String> words, List<Category> categories,
