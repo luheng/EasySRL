@@ -86,6 +86,7 @@ public class QuestionGenerationSandbox {
         /**
          * Go over the sentences..
          */
+        // TODO: shuffle sentence ids :)
         for (int sentIdx : alignedDependencies.keySet()) {
             List<AlignedDependency<CCGBankDependency, QADependency>> deps = alignedDependencies.get(sentIdx);
             if (deps == null) {
@@ -153,7 +154,7 @@ public class QuestionGenerationSandbox {
                 numQuestionsGenerated,
                 100.0 * numQuestionsGenerated / numDependenciesProcessed, numDependenciesProcessed,
                 100.0 * numQuestionsGenerated / numAligned, numAligned));
-        uncoveredDeps.prettyPrint();
+        // uncoveredDeps.prettyPrint();
     }
 
     private static void printPredicateInfo(BufferedWriter writer, Sentence sentence, CCGBankDependency ccgDep,
@@ -198,32 +199,42 @@ public class QuestionGenerationSandbox {
                                                   Collection<CCGBankDependency> dependencies) {
         // TODO: slot id doesn't mean argument id , sighs
         int targetArgNum = ccgDep.getArgNumber();
+        String[] whWords = template.getWhWord(targetArgNum);
         List<String> question = new ArrayList<>();
         // Intransitive verb: T1 V
         if (template.getNumArguments() == 1) {
             assert (targetArgNum == 1);
-            question.add(template.getWhWord(targetArgNum));
-            question.addAll(template.getActiveVerb(verbHelper));
+            String[] verb = template.getActiveVerb(verbHelper);
+            question.add(whWords[0]);
+            question.add(verb[0]);
+            question.add(verb[1]);
+            question.add(whWords[1]);
             return question;
         }
         // Intransitive verb: T1 V T2
         if (template.getNumArguments() == 2) {
             // {Pat} built a robot -> Who built a robot ?
             if (targetArgNum == 1) {
-                question.add(template.getWhWord(targetArgNum  ));
-                question.addAll(template.getActiveVerb(verbHelper));
-                question.add(template.getPlaceHolderWord(2));
+                String[] verb = template.getActiveVerb(verbHelper);
+                String[] ph = template.getPlaceHolderWord(2);
+                question.add(whWords[0]);
+                question.add(verb[0]);
+                question.add(verb[1]);
+                question.add(ph[0]);
+                question.add(ph[1]);
+                question.add(whWords[1]);
                 return question;
             }
             // {Pat} built a robot* -> What did Pat build / What was built ?
             if (targetArgNum == 2) {
-                List<String> auxAndVerb = template.getActiveSplitVerb(verbHelper);
-                question.add(template.getWhWord(targetArgNum));
-                for (int i = 0; i < auxAndVerb.size() - 1; i++) {
-                    question.add(auxAndVerb.get(i));
-                }
-                question.add(template.getPlaceHolderWord(1));
-                question.add(auxAndVerb.get(auxAndVerb.size() - 1));
+                String[] verb = template.getActiveSplitVerb(verbHelper);
+                String[] ph = template.getPlaceHolderWord(1);
+                question.add(whWords[0]);
+                question.add(verb[0]);
+                question.add(ph[0]);
+                question.add(ph[1]);
+                question.add(verb[1]);
+                question.add(whWords[1]);
             }
             return question;
         }
