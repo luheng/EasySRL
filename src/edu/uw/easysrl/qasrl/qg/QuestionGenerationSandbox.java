@@ -131,7 +131,7 @@ public class QuestionGenerationSandbox {
                     }
                     numQuestionsGenerated ++;
                     coveredDeps.addString(ccgDep.getCategory().toString());
-                    /*
+
                     // output tempalte.
                     String ccgInfo = ccgDep.getCategory() + "_" + ccgDep.getArgNumber();
                     System.out.println("\n\n" + StringUtils.join(words));
@@ -143,7 +143,7 @@ public class QuestionGenerationSandbox {
                     question.forEach(w -> System.out.print(w + " "));
                     System.out.println("?");
                     System.out.println(qaDep == null ? "[no-qa]" : StringUtils.join(qaDep.getQuestion()) + "?");
-                    */
+
                 }
             }
         }

@@ -45,7 +45,8 @@ public class QuestionTemplate {
     public String getWhWord(int argNum) {
         ArgumentSlot slot = (ArgumentSlot) slots[argNumToSlotId.get(argNum)];
         if (slot.hasPreposition) {
-            return words.get(slot.indexInSentence - 1) + " what";
+            // FIXME: this is a hack. How can we get PPs?
+            return words.get(verbSlot.indexInSentence + 1) + " what";
         }
         if (slot.category.isFunctionInto(Category.valueOf("S[to]\\NP"))) {
             return "to do what";
@@ -63,8 +64,9 @@ public class QuestionTemplate {
         if (argumentIndex > 1 && categories.get(argumentIndex - 1).isFunctionInto(Category.valueOf("NP|N"))) {
             return words.get(argumentIndex - 1) + " " + words.get(argumentIndex);
         }
+        // FIXME: this is a hack.
         if (slot.hasPreposition) {
-            return words.get(slot.indexInSentence - 1) + " something";
+            return words.get(verbSlot.indexInSentence + 1) + " something";
         }
         if (slot.category.isFunctionInto(Category.valueOf("S[to]\\NP"))) {
             return "to do something";
