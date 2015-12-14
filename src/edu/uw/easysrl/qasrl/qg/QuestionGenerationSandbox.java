@@ -50,7 +50,8 @@ public class QuestionGenerationSandbox {
     // Categories to skip ..
     private static final Category prepositions = Category.valueOf("((S\\NP)\\(S\\NP))/NP");
     private static final Category auxiliaries = Category.valueOf("(S[dcl]\\NP)/(S[b]\\NP)");
-    private static final Category controlParticles = Category.valueOf("(S[to]\\NP)/(S[b]\\NP)");
+    //private static final Category controlParticles = Category.valueOf("(S[to]\\NP)/(S[b]\\NP)");
+    private static final Category controlParticles = Category.valueOf("(S\\NP)/(S[b]\\NP)");
     private static final Category pastParticiples = Category.valueOf("(S[dcl]\\NP)/(S[pt]\\NP)");
 
     private static final String[] otherFilteredCategories = new String[] {
@@ -58,7 +59,9 @@ public class QuestionGenerationSandbox {
             "S[em]/S[dcl]", "(S/S)/(S/S)",
             "(S[b]\\NP)/(S[pt]\\NP)", "S[qem]/S[dcl]",
             "(S\\S)/S[dcl]", "(S[adj]\\NP)/(S[to]\\NP)",
-            "S/S",
+            "S/S",  "((S\\NP)\\(S\\NP))\\((S\\NP)\\(S\\NP))",
+            "((S\\NP)\\(S\\NP))/(S[b]\\NP)",
+            "(((S\\NP)\\(S\\NP))\\((S\\NP)\\(S\\NP)))/(((S\\NP)\\(S\\NP))\\((S\\NP)\\(S\\NP)))",
     };
 
     private static final Set<String> otherFilteredCategorySet;
@@ -68,7 +71,6 @@ public class QuestionGenerationSandbox {
     }
 
     private static VerbHelper verbHelper;
-    private static ArgumentHelper argumentHelper = new ArgumentHelper();
 
     /**
      * Go over all the sentences with aligned ccg-qa dependencies and generate questions. (we can as well generate
@@ -85,8 +87,11 @@ public class QuestionGenerationSandbox {
         CountDictionary coveredDeps = new CountDictionary();
         CountDictionary uncoveredDeps = new CountDictionary();
         CountDictionary alignedDeps = new CountDictionary();
+        // TODO: compute these numbers.
         int numDependenciesProcessed = 0;
         int numQuestionsGenerated = 0;
+        int numGeneratedAligned = 0;
+        int numQuestionExactMatch = 0;
         int numAligned = 0;
 
         // TODO: shuffle sentence ids :)
@@ -137,29 +142,44 @@ public class QuestionGenerationSandbox {
                         continue;
                     }
                     numQuestionsGenerated ++;
+                    if (qaDep != null) {
+                        numGeneratedAligned ++;
+                    }
                     coveredDeps.addString(ccgDep.getCategory().toString());
 
-                    // output tempalte.
-                    //if (template.getNumArguments() == 3) {
-                        String ccgInfo = ccgDep.getCategory() + "_" + ccgDep.getArgNumber();
-                        System.out.println("\n\n" + StringUtils.join(words));
-                        System.out.println(ccgInfo);
-                        for (QuestionSlot slot : template.slots) {
-                            System.out.print(slot.toString(words) + "\t");
+                    // Output template.
+                    String questionString = "";
+                    for (String w : question) {
+                        questionString += w + " ";
+                    }
+                    questionString += "?";
+                    String ccgInfo = ccgDep.getCategory() + "_" + ccgDep.getArgNumber();
+                    System.out.println("\n\n" + StringUtils.join(words));
+                    System.out.println(ccgInfo);
+                    for (QuestionSlot slot : template.slots) {
+                        System.out.print((slot.argumentNumber == ccgDep.getArgNumber() ?
+                                String.format("{%s}", slot.toString(words)) : slot.toString(words)) + "\t");
+                    }
+                    System.out.println("\n" + questionString + "\t" + words.get(ccgDep.getSentencePositionOfArgument()));
+                    if (qaDep == null) {
+                        System.out.println("[no-qa]");
+                    } else {
+                        System.out.println(qaDep.getQuestionString() + "\t" + qaDep.getAnswerString(words));
+                        if (qaDep.getQuestionString().equalsIgnoreCase(questionString)) {
+                            numQuestionExactMatch++;
                         }
-                        System.out.println();
-                        question.forEach(w -> System.out.print(w + " "));
-                        System.out.println("?");
-                        System.out.println(qaDep == null ? "[no-qa]" : StringUtils.join(qaDep.getQuestion()) + "?");
+                    }
                 }
             }
         }
         System.out.println("\n++++++++++++++++++++++++++++++++++++++++++");
         System.out.println(String.format("Now able to generate %d " +
-                        "(%.2f%% of %d dependencies, %.2f%% of %d aligned dependencies) questions.",
+                        "(%.2f%% of %d dependencies, %.2f%% of %d aligned dependencies) questions. " +
+                        "%d (%.2f%%) exact matches among all generated.",
                 numQuestionsGenerated,
                 100.0 * numQuestionsGenerated / numDependenciesProcessed, numDependenciesProcessed,
-                100.0 * numQuestionsGenerated / numAligned, numAligned));
+                100.0 * numGeneratedAligned / numAligned, numAligned,
+                numQuestionExactMatch, 100.0 * numQuestionExactMatch / numQuestionsGenerated));
         // uncoveredDeps.prettyPrint();
     }
 
@@ -175,7 +195,7 @@ public class QuestionGenerationSandbox {
             return question;
         }
 
-        String[] wh = template.getWhWord(targetArgNum);
+        String[] wh = template.getWhWordByArgNum(targetArgNum);
         // {Pat} built a robot -> Who built a robot ?
         // Who gave T3 T2?
         if (targetArgNum == 1) {
@@ -186,7 +206,7 @@ public class QuestionGenerationSandbox {
                 if (totalArgs >= 3 && argSlot.hasPreposition) {
                     continue;
                 }
-                addAll(question, template.getPlaceHolderWord(argSlot.argumentNumber));
+                addAll(question, template.getPlaceHolderWordByArgnum(argSlot.argumentNumber));
             }
             add(question, wh[1]);
             return question;
@@ -198,14 +218,14 @@ public class QuestionGenerationSandbox {
         String[] verb = template.getActiveSplitVerb(verbHelper);
         add(question, wh[0]);
         add(question, verb[0]);
-        addAll(question, template.getPlaceHolderWord(1));
+        addAll(question, template.getPlaceHolderWordByArgnum(1));
         add(question, verb[1]);
         for (int slotId = 2; slotId < template.slots.length; slotId++) {
             ArgumentSlot argSlot = (ArgumentSlot) template.slots[slotId];
             if (argSlot.argumentNumber == targetArgNum || (totalArgs >= 3 && argSlot.hasPreposition)) {
                 continue;
             }
-            addAll(question, template.getPlaceHolderWord(argSlot.argumentNumber));
+            addAll(question, template.getPlaceHolderWordByArgnum(argSlot.argumentNumber));
         }
         add(question, wh[1]);
         return question;

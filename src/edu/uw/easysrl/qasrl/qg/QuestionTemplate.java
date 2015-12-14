@@ -44,7 +44,7 @@ public class QuestionTemplate {
     // whMapper
     // Examples:
     // { "what", "for" }, {"what", "to do" }
-    public String[] getWhWord(int argNum) {
+    public String[] getWhWordByArgNum(int argNum) {
         ArgumentSlot slot = (ArgumentSlot) slots[argNumToSlotId.get(argNum)];
         if (slot.hasPreposition) {
             // FIXME: this is a hack. How can we get PPs?
@@ -66,7 +66,7 @@ public class QuestionTemplate {
     // phMapper
     // Examples:
     // { "", "something" }, {"for", "something" }
-    public String[] getPlaceHolderWord(int argNum) {
+    public String[] getPlaceHolderWordByArgnum(int argNum) {
         ArgumentSlot slot = (ArgumentSlot) slots[argNumToSlotId.get(argNum)];
         int argumentIndex = slot.indexInSentence;
         if (UnrealizedArgumentSlot.class.isInstance(slot)) {
@@ -80,11 +80,12 @@ public class QuestionTemplate {
         }
         String phStr;
         if (categories.get(argumentIndex).equals(Category.NP)) {
+            //phStr = words.get(argumentIndex).equalsIgnoreCase("who") ? "someone" : "something";
             phStr =  words.get(argumentIndex);
         } else if (argumentIndex > 1 && categories.get(argumentIndex - 1).isFunctionInto(Category.valueOf("NP|N"))) {
             phStr =  words.get(argumentIndex - 1) + " " + words.get(argumentIndex);
         } else {
-            phStr = words.get(argumentIndex).equalsIgnoreCase("who") ? "someone" : "something";
+            phStr = (argNum == 1 && getNumArguments() > 1 ? "someone" : "something");
         }
         if (slot.hasPreposition) {
             String pp = PrepositionHelper.getPreposition(words, categories, argumentIndex);

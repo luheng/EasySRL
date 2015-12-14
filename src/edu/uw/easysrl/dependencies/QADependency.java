@@ -1,5 +1,6 @@
 package edu.uw.easysrl.dependencies;
 
+import edu.uw.easysrl.corpora.ParallelCorpusReader;
 import edu.uw.easysrl.corpora.qa.QASlots;
 import edu.uw.easysrl.corpora.qa.QuestionEncoder;
 import edu.uw.easysrl.dependencies.SRLFrame.SRLLabel;
@@ -93,6 +94,25 @@ public class QADependency implements Serializable {
     public String[] getQuestion() {
         return question;
     }
+
+    public String getQuestionString() {
+        String result = "";
+        for (String w : question) {
+            if (!w.equals("_")) {
+                result += w + " ";
+            }
+        }
+        return result + "?";
+    }
+
+    public String getAnswerString(List<String> words) {
+        String result = "";
+        for (final int i : answerIndices) {
+            result += words.get(i) + " ";
+        }
+        return result.trim();
+    }
+
 
     public SRLLabel getLabel() {
         return label;
