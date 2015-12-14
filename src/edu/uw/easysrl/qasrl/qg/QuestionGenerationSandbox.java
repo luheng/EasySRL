@@ -43,8 +43,9 @@ public class QuestionGenerationSandbox {
     };
 
     private static final Category[] adjuncts = {
-            Category.valueOf("(S\\NP)/(S\\NP)"),
-            Category.valueOf("((S\\NP)\\(S\\NP))/S")
+            Category.valueOf("(S\\NP)|(S\\NP)"),
+            Category.valueOf("((S\\NP)\\(S\\NP))/S"),
+            Category.valueOf("((S\\NP)\\(S\\NP))/(S[ng]\\NP)"), // ``by'' as in ``by doing something''.
     };
 
     // Categories to skip ..
@@ -59,7 +60,9 @@ public class QuestionGenerationSandbox {
             "S[em]/S[dcl]", "(S/S)/(S/S)",
             "(S[b]\\NP)/(S[pt]\\NP)", "S[qem]/S[dcl]",
             "(S\\S)/S[dcl]", "(S[adj]\\NP)/(S[to]\\NP)",
-            "S/S",  "((S\\NP)\\(S\\NP))\\((S\\NP)\\(S\\NP))",
+            "S/S",
+            "((S\\NP)\\(S\\NP))/((S\\NP)\\(S\\NP))",
+            "((S\\NP)\\(S\\NP))\\((S\\NP)\\(S\\NP))",
             "((S\\NP)\\(S\\NP))/(S[b]\\NP)",
             "(((S\\NP)\\(S\\NP))\\((S\\NP)\\(S\\NP)))/(((S\\NP)\\(S\\NP))\\((S\\NP)\\(S\\NP)))",
     };
@@ -206,7 +209,7 @@ public class QuestionGenerationSandbox {
                 if (totalArgs >= 3 && argSlot.hasPreposition) {
                     continue;
                 }
-                addAll(question, template.getPlaceHolderWordByArgnum(argSlot.argumentNumber));
+                addAll(question, template.getPlaceHolderWordByArgNum(argSlot.argumentNumber));
             }
             add(question, wh[1]);
             return question;
@@ -218,14 +221,14 @@ public class QuestionGenerationSandbox {
         String[] verb = template.getActiveSplitVerb(verbHelper);
         add(question, wh[0]);
         add(question, verb[0]);
-        addAll(question, template.getPlaceHolderWordByArgnum(1));
+        addAll(question, template.getPlaceHolderWordByArgNum(1));
         add(question, verb[1]);
         for (int slotId = 2; slotId < template.slots.length; slotId++) {
             ArgumentSlot argSlot = (ArgumentSlot) template.slots[slotId];
             if (argSlot.argumentNumber == targetArgNum || (totalArgs >= 3 && argSlot.hasPreposition)) {
                 continue;
             }
-            addAll(question, template.getPlaceHolderWordByArgnum(argSlot.argumentNumber));
+            addAll(question, template.getPlaceHolderWordByArgNum(argSlot.argumentNumber));
         }
         add(question, wh[1]);
         return question;

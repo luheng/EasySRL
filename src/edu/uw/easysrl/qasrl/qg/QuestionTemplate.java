@@ -66,11 +66,11 @@ public class QuestionTemplate {
     // phMapper
     // Examples:
     // { "", "something" }, {"for", "something" }
-    public String[] getPlaceHolderWordByArgnum(int argNum) {
+    public String[] getPlaceHolderWordByArgNum(int argNum) {
         ArgumentSlot slot = (ArgumentSlot) slots[argNumToSlotId.get(argNum)];
         int argumentIndex = slot.indexInSentence;
         if (UnrealizedArgumentSlot.class.isInstance(slot)) {
-            return new String[] { "", "something" };
+            return new String [] { "", argNum == 1 && getNumArguments() > 1 ? "someone" : "something" };
         }
         if (slot.category.isFunctionInto(Category.valueOf("S[to]\\NP"))) {
             return new String[] { "to do", "something" };
@@ -130,7 +130,12 @@ public class QuestionTemplate {
     // If the verb is a single inflected one, we need to change it: "built" -> {"did", "build"}
     public String[] getActiveSplitVerb(VerbHelper verbHelper) {
         String[] result;
-        if (verbSlot.auxiliaries.size() == 0) {
+        if (verbSlot.auxiliaries.size() == 0 ) {
+            if (predicateCategory.isFunctionInto(Category.valueOf("S[adj]\\NP")) ||
+                    predicateCategory.isFunctionInto(Category.valueOf("S[pss]\\NP")) ||
+                    predicateCategory.isFunctionInto(Category.valueOf("S[ng]\\NP"))) {
+                return new String[] {"was", words.get(verbSlot.indexInSentence)};
+            }
             result = verbHelper.getAuxiliaryAndVerbStrings(words, null /* categories */,  verbSlot.indexInSentence);
             if (verbSlot.hasParticle) {
                 result[1] += " " + words.get(verbSlot.particleIndex);
