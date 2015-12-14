@@ -1,5 +1,6 @@
 package edu.uw.easysrl.qasrl.qg;
 
+import com.sun.org.apache.xpath.internal.Arg;
 import edu.stanford.nlp.util.StringUtils;
 import edu.uw.easysrl.corpora.CCGBankDependencies.CCGBankDependency;
 import edu.uw.easysrl.corpora.ParallelCorpusReader.Sentence;
@@ -10,6 +11,7 @@ import edu.uw.easysrl.qasrl.PropBankAligner;
 import edu.uw.easysrl.qasrl.qg.QuestionSlot.*;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.CountDictionary;
+import sun.misc.REException;
 
 import java.io.*;
 import java.util.*;
@@ -20,7 +22,6 @@ import java.util.*;
 public class QuestionGenerationSandbox {
     private static final Category somethingVerbal = Category.valueOf("S|NP");
     private static final Category somethingAdjunctive = Category.valueOf("S|S");
-
 
     private static final Category intransitiveVerb = Category.valueOf("S\\NP");
 
@@ -80,13 +81,8 @@ public class QuestionGenerationSandbox {
      * for unaligned dependencies, but we want to do evaluation with the annotated QAs.
      * @param alignedDependencies gold ccg dependencies
      */
-    public static void generateFromGoldCCG(
-            Map<Integer, List<AlignedDependency<CCGBankDependency, QADependency>>> alignedDependencies)
-            throws IOException {
-
-        /**
-         * Initialize stats.
-         */
+    public static void generateFromGoldCCG(Map<Integer, List<AlignedDependency<CCGBankDependency,
+                                           QADependency>>> alignedDependencies) throws IOException {
         CountDictionary coveredDeps = new CountDictionary();
         CountDictionary uncoveredDeps = new CountDictionary();
         CountDictionary alignedDeps = new CountDictionary();
@@ -98,6 +94,12 @@ public class QuestionGenerationSandbox {
         int numAligned = 0;
 
         // TODO: shuffle sentence ids :)
+        File outputFile = new File("qg.out.txt");
+        if (!outputFile.exists()) {
+            outputFile.createNewFile();
+        }
+        BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile));
+
         for (int sentIdx : alignedDependencies.keySet()) {
             List<AlignedDependency<CCGBankDependency, QADependency>> deps = alignedDependencies.get(sentIdx);
             if (deps == null) {
@@ -130,9 +132,8 @@ public class QuestionGenerationSandbox {
                 }
                 if (category.isFunctionInto(somethingVerbal) || category.isFunctionInto(somethingAdjunctive)) {
                     numDependenciesProcessed ++;
-                    //List<String> question = generateQuestions(ccgDep, qaDep, words, categories, ccgDeps);
-                    QuestionTemplate template = getTemplate(ccgDep.getSentencePositionOfPredicate(), words, categories,
-                                                            ccgDeps);
+                    int predicateIndex = ccgDep.getSentencePositionOfPredicate();
+                    QuestionTemplate template = getTemplateFromCCGBank(predicateIndex, words, categories, ccgDeps);
                     if (template == null) {
                         uncoveredDeps.addString(ccgDep.getCategory().toString());
                         if (category.getNumberOfArguments() > 3) {
@@ -140,7 +141,7 @@ public class QuestionGenerationSandbox {
                         }
                         continue;
                     }
-                    List<String> question = generateQuestions(template, ccgDep, qaDep, words, categories, ccgDeps);
+                    List<String> question = generateQuestions(template, ccgDep.getArgNumber());
                     if (question.size() == 0) {
                         continue;
                     }
@@ -157,17 +158,24 @@ public class QuestionGenerationSandbox {
                     }
                     questionString += "?";
                     String ccgInfo = ccgDep.getCategory() + "_" + ccgDep.getArgNumber();
-                    System.out.println("\n\n" + StringUtils.join(words));
-                    System.out.println(ccgInfo);
+
+                    System.out.println("\n" + StringUtils.join(words) + "\n" + ccgInfo);
+                    writer.write("\n" + StringUtils.join(words) + "\n" + ccgInfo + "\n");
+
                     for (QuestionSlot slot : template.slots) {
-                        System.out.print((slot.argumentNumber == ccgDep.getArgNumber() ?
-                                String.format("{%s}", slot.toString(words)) : slot.toString(words)) + "\t");
+                        String slotStr = (slot.argumentNumber == ccgDep.getArgNumber() ?
+                                String.format("{%s}", slot.toString(words)) : slot.toString(words));
+                        System.out.print(slotStr + "\t");
+                        writer.write(slotStr + "\t");
                     }
                     System.out.println("\n" + questionString + "\t" + words.get(ccgDep.getSentencePositionOfArgument()));
+                    writer.write("\n" + questionString + "\t" + words.get(ccgDep.getSentencePositionOfArgument()) + "\n");
                     if (qaDep == null) {
                         System.out.println("[no-qa]");
+                        writer.write("[no-qa]\n");
                     } else {
                         System.out.println(qaDep.getQuestionString() + "\t" + qaDep.getAnswerString(words));
+                        writer.write(qaDep.getQuestionString() + "\t" + qaDep.getAnswerString(words) + "\n");
                         if (qaDep.getQuestionString().equalsIgnoreCase(questionString)) {
                             numQuestionExactMatch++;
                         }
@@ -184,13 +192,76 @@ public class QuestionGenerationSandbox {
                 100.0 * numGeneratedAligned / numAligned, numAligned,
                 numQuestionExactMatch, 100.0 * numQuestionExactMatch / numQuestionsGenerated));
         // uncoveredDeps.prettyPrint();
+
+        writer.close();
     }
 
-    private static List<String> generateQuestions(QuestionTemplate template,
-                                                  CCGBankDependency ccgDep, QADependency qaDep,
-                                                  List<String> words, List<Category> categories,
-                                                  Collection<CCGBankDependency> dependencies) {
-        int targetArgNum = ccgDep.getArgNumber();
+    private static QuestionTemplate getTemplateFromCCGBank(int predicateIndex,
+                                                            List<String> words,
+                                                            List<Category> categories,
+                                                            Collection<CCGBankDependency> dependencies) {
+        Map<Integer, CCGBankDependency> slotToDependency = new HashMap<>();
+        Category predicateCategory = categories.get(predicateIndex);
+        int numArguments = predicateCategory.getNumberOfArguments();
+        if (numArguments == 0 || belongsTo(predicateCategory, adjuncts)) {
+            return null;
+        }
+        for (CCGBankDependency dep : dependencies) {
+            int argNum = dep.getArgNumber();
+            int predId = dep.getSentencePositionOfPredicate();
+            int argId = dep.getSentencePositionOfArgument();
+            if (dep.getSentencePositionOfPredicate() == predicateIndex && predId != argId) {
+                slotToDependency.put(argNum, dep);
+            }
+        }
+        List<Integer> auxChain = verbHelper.getAuxiliaryChain(words, categories, predicateIndex);
+        QuestionSlot verb;
+        boolean hasParticle = predicateCategory.getArgument(numArguments).isFunctionInto(Category.PR);
+        if (hasParticle) {
+            int particleIndex = slotToDependency.get(numArguments).getSentencePositionOfArgument();
+            verb = new VerbSlot(predicateIndex, particleIndex, auxChain, predicateCategory);
+        } else {
+            verb = new VerbSlot(predicateIndex, auxChain, predicateCategory);
+        }
+        // Generate slots.
+        QuestionSlot[] arguments = new QuestionSlot[numArguments + 1];
+        for (int argNum = 1; argNum <= numArguments; argNum++) {
+            CCGBankDependency dep = slotToDependency.get(argNum);
+            Category argumentCategory = predicateCategory.getArgument(argNum);
+            QuestionSlot slot;
+            if (dep == null) {
+                slot = new UnrealizedArgumentSlot(argNum, argumentCategory);
+            } else if (argumentCategory.equals(Category.PR)) {
+                slot = null;
+            } else {
+                slot = new ArgumentSlot(dep.getSentencePositionOfArgument(), argNum, argumentCategory);
+            }
+            arguments[argNum] = slot;
+        }
+        if (numArguments == 2 && predicateCategory.getArgument(1).equals(Category.Sdcl)) {
+            // T1, T2 said, or T2, said T1
+            QuestionSlot[] slots = new QuestionSlot[] { arguments[2], verb, arguments[1] };
+            return new QuestionTemplate(slots, words, categories);
+        }
+        if (predicateCategory.isFunctionInto(intransitiveVerb) ||
+                belongsTo(predicateCategory, transitiveVerbs) ||
+                belongsTo(predicateCategory, ditransitiveVerbs)) {
+            List<QuestionSlot> slots = new ArrayList<>();
+            slots.add(arguments[1]);
+            slots.add(verb);
+            // Skip PR slots.
+            for (int i = numArguments; i > 1; i--) {
+                if (arguments[i] != null) {
+                    slots.add(arguments[i]);
+                }
+            }
+            QuestionSlot[] slotList = slots.toArray(new QuestionSlot[slots.size()]);
+            return new QuestionTemplate(slotList, words, categories);
+        }
+        return null;
+    }
+
+    private static List<String> generateQuestions(QuestionTemplate template, int targetArgNum) {
         int totalArgs = template.getNumArguments();
         List<String> question = new ArrayList<>();
         // If target is not part of the template, return.
@@ -254,66 +325,6 @@ public class QuestionGenerationSandbox {
         }
         return false;
     }
-
-    private static QuestionTemplate getTemplate(int predicateIndex, List<String> words, List<Category> categories,
-                                                Collection<CCGBankDependency> dependencies) {
-        Map<Integer, CCGBankDependency> slotToDependency = new HashMap<>();
-        Category predicateCategory = categories.get(predicateIndex);
-        int numArguments = predicateCategory.getNumberOfArguments();
-        if (numArguments == 0 || belongsTo(predicateCategory, adjuncts)) {
-            return null;
-        }
-        for (CCGBankDependency dep : dependencies) {
-            int argNum = dep.getArgNumber();
-            int predId = dep.getSentencePositionOfPredicate();
-            int argId = dep.getSentencePositionOfArgument();
-            if (dep.getSentencePositionOfPredicate() == predicateIndex && predId != argId) {
-                slotToDependency.put(argNum, dep);
-            }
-        }
-        List<Integer> auxChain = verbHelper.getAuxiliaryChain(words, categories, predicateIndex);
-        QuestionSlot verb;
-        boolean hasParticle = predicateCategory.getArgument(numArguments).isFunctionInto(Category.PR);
-        if (hasParticle) {
-            int particleIndex = slotToDependency.get(numArguments).getSentencePositionOfArgument();
-            verb = new VerbSlot(predicateIndex, particleIndex, auxChain, predicateCategory);
-        } else {
-            verb = new VerbSlot(predicateIndex, auxChain, predicateCategory);
-        }
-        QuestionSlot[] arguments = new QuestionSlot[numArguments + 1];
-        for (int argNum = 1; argNum <= numArguments; argNum++) {
-            CCGBankDependency dep = slotToDependency.get(argNum);
-            Category argumentCategory = predicateCategory.getArgument(argNum);
-            arguments[argNum] = (dep == null ? new UnrealizedArgumentSlot(argNum, argumentCategory) :
-                        new ArgumentSlot(dep.getSentencePositionOfArgument(), argNum, argumentCategory));
-        }
-        if (numArguments == 2 && predicateCategory.getArgument(1).equals(Category.Sdcl)) {
-            // T1, T2 said, or T2, said T1
-            QuestionSlot[] slots = new QuestionSlot[] { arguments[2], verb, arguments[1] };
-            return new QuestionTemplate(slots, words, categories, dependencies);
-        }
-        if (predicateCategory.isFunctionInto(intransitiveVerb) ||
-                belongsTo(predicateCategory, transitiveVerbs) ||
-                belongsTo(predicateCategory, ditransitiveVerbs)) {
-            List<QuestionSlot> slots = new ArrayList<>();
-            slots.add(arguments[1]);
-            slots.add(verb);
-            for (int i = numArguments; i > 1; i--) {
-                if (!arguments[i].category.equals(Category.PR)) {
-                    slots.add(arguments[i]);
-                }
-            }
-            QuestionSlot[] slotList = slots.toArray(new QuestionSlot[slots.size()]);
-            return new QuestionTemplate(slotList, words, categories, dependencies);
-        }
-        return null;
-    }
-
-    // TODO: generate questions from predicted ...
-    private static void generateQuestions(ResolvedDependency targetDependency, List<String> words,
-                                          Collection<ResolvedDependency> dependencies) {
-    }
-
 
     private static void printPredicateInfo(BufferedWriter writer, Sentence sentence, CCGBankDependency ccgDep,
                                            QADependency qaDep)

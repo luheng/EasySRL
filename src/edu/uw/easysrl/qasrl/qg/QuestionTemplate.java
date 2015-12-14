@@ -1,31 +1,30 @@
 package edu.uw.easysrl.qasrl.qg;
 
-import edu.stanford.nlp.util.StringUtils;
-import edu.uw.easysrl.corpora.CCGBankDependencies.CCGBankDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.qasrl.qg.QuestionSlot.*;
 
 import java.util.*;
 
 /**
+ * Philosophical arguments:
+ *      A question template should be defined by and only by a given subset of ccg dependencies, which are the ones
+ *      fanned out from the predicate to the set of arguments (slots).
+ *      We might need SyntaxTreeNode dependencies to resolve constituents in the future.
  * Created by luheng on 12/10/15.
  */
 public class QuestionTemplate {
     public Category predicateCategory;
     public List<String> words;
     public List<Category> categories;
-    public Collection<CCGBankDependency> dependencies;
 
     public QuestionSlot[] slots;
     public VerbSlot verbSlot;
     public Map<Integer, Integer> argNumToSlotId;
 
-    public QuestionTemplate(QuestionSlot[] slots, List<String> words, List<Category> categories,
-                            Collection<CCGBankDependency> dependencies) {
+    public QuestionTemplate(QuestionSlot[] slots, List<String> words, List<Category> categories) {
         this.slots = slots;
         this.words = words;
         this.categories = categories;
-        this.dependencies = dependencies;
         this.argNumToSlotId = new HashMap<>();
         // do something ...
         for (int slotId = 0; slotId < slots.length; slotId++) {
