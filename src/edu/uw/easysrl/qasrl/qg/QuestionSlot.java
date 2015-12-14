@@ -47,6 +47,9 @@ public abstract class QuestionSlot {
             List<String> res = new ArrayList<>();
             auxiliaries.forEach(aux -> res.add(sentenceWords.get(aux)));
             res.add(sentenceWords.get(indexInSentence));
+            if (hasParticle) {
+                res.add(sentenceWords.get(particleIndex));
+            }
             return String.format("%s:%s", category, StringUtils.join(res));
         }
     }

@@ -101,12 +101,13 @@ public class QuestionTemplate {
         if (verbSlot.hasParticle) {
             verbStr += " " + words.get(verbSlot.particleIndex);
         }
-        // i.e. to allow
-        if (predicateCategory.isFunctionInto(Category.valueOf("S[b]\\NP"))) {
-            if (auxiliaries.size() > 0 && words.get(auxiliaries.get(0)).equalsIgnoreCase("to")) {
-                return new String[]{"would", verbStr};
-            }
+        // If we have the infinitive such as "to allow", change it to would allow.
+        //if (predicateCategory.isFunctionInto(Category.valueOf("S[b]\\NP"))) {
+        if (auxiliaries.size() > 0 && words.get(auxiliaries.get(0)).equalsIgnoreCase("to")) {
+            return new String[]{"would", verbStr};
         }
+
+        // If the verb has its own set of auxiliaries, return those as is.
         if (auxiliaries.size() > 0) {
             String aux = "";
             for (int id : auxiliaries) {
@@ -115,7 +116,8 @@ public class QuestionTemplate {
             return new String[] {aux.trim(), verbStr};
         }
         if (predicateCategory.isFunctionInto(Category.valueOf("S[adj]\\NP")) ||
-            predicateCategory.isFunctionInto(Category.valueOf("S[pss]\\NP"))) {
+            predicateCategory.isFunctionInto(Category.valueOf("S[pss]\\NP")) ||
+            predicateCategory.isFunctionInto(Category.valueOf("S[ng]\\NP"))) {
             return new String[] {"might be", verbStr};
         }
         if (verbHelper.isUninflected(words, categories, verbSlot.indexInSentence)) {
@@ -129,11 +131,11 @@ public class QuestionTemplate {
         String[] result;
         if (verbSlot.auxiliaries.size() == 0) {
             result = verbHelper.getAuxiliaryAndVerbStrings(words, null /* categories */,  verbSlot.indexInSentence);
+            if (verbSlot.hasParticle) {
+                result[1] += " " + words.get(verbSlot.particleIndex);
+            }
         } else {
             result = getActiveVerb(verbHelper);
-        }
-        if (verbSlot.hasParticle) {
-            result[1] += " " + words.get(verbSlot.particleIndex);
         }
         return result;
     }

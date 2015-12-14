@@ -42,6 +42,11 @@ public class QuestionGenerationSandbox {
             Category.valueOf("((S\\NP)/PP)/NP")
     };
 
+    private static final Category[] adjuncts = {
+            Category.valueOf("(S\\NP)/(S\\NP)"),
+            Category.valueOf("((S\\NP)\\(S\\NP))/S")
+    };
+
     // Categories to skip ..
     private static final Category prepositions = Category.valueOf("((S\\NP)\\(S\\NP))/NP");
     private static final Category auxiliaries = Category.valueOf("(S[dcl]\\NP)/(S[b]\\NP)");
@@ -84,9 +89,6 @@ public class QuestionGenerationSandbox {
         int numQuestionsGenerated = 0;
         int numAligned = 0;
 
-        /**
-         * Go over the sentences..
-         */
         // TODO: shuffle sentence ids :)
         for (int sentIdx : alignedDependencies.keySet()) {
             List<AlignedDependency<CCGBankDependency, QADependency>> deps = alignedDependencies.get(sentIdx);
@@ -165,79 +167,47 @@ public class QuestionGenerationSandbox {
                                                   CCGBankDependency ccgDep, QADependency qaDep,
                                                   List<String> words, List<Category> categories,
                                                   Collection<CCGBankDependency> dependencies) {
-        // TODO: slot id doesn't mean argument id , sighs
         int targetArgNum = ccgDep.getArgNumber();
-        String[] whWords = template.getWhWord(targetArgNum);
+        int totalArgs = template.getNumArguments();
         List<String> question = new ArrayList<>();
-        // Intransitive verb: T1 V
-        if (template.getNumArguments() == 1) {
-            assert (targetArgNum == 1);
-            add(question, whWords[0]);
-            addAll(question, template.getActiveVerb(verbHelper));
-            add(question, whWords[1]);
+        // If target is not part of the template, return.
+        if (!template.argNumToSlotId.containsKey(targetArgNum)) {
             return question;
         }
-        // Intransitive verb: T1 V T2
-        if (template.getNumArguments() == 2) {
-            // {Pat} built a robot -> Who built a robot ?
-            if (targetArgNum == 1) {
-                add(question, whWords[0]);
-                addAll(question, template.getActiveVerb(verbHelper));
-                addAll(question, template.getPlaceHolderWord(2));
-                add(question, whWords[1]);
-                return question;
+
+        String[] wh = template.getWhWord(targetArgNum);
+        // {Pat} built a robot -> Who built a robot ?
+        // Who gave T3 T2?
+        if (targetArgNum == 1) {
+            add(question, wh[0]);
+            addAll(question, template.getActiveVerb(verbHelper));
+            for (int slotId = 2; slotId < template.slots.length; slotId++) {
+                ArgumentSlot argSlot = (ArgumentSlot) template.slots[slotId];
+                if (totalArgs >= 3 && argSlot.hasPreposition) {
+                    continue;
+                }
+                addAll(question, template.getPlaceHolderWord(argSlot.argumentNumber));
             }
-            // {Pat} built a robot* -> What did Pat build / What was built ?
-            if (targetArgNum == 2) {
-                String[] verb = template.getActiveSplitVerb(verbHelper);
-                add(question, whWords[0]);
-                add(question, verb[0]);
-                addAll(question, template.getPlaceHolderWord(1));
-                add(question, verb[1]);
-                add(question, whWords[1]);
-                return question;
-            }
+            add(question, wh[1]);
+            return question;
         }
-        /**
-         * Ditransitive verbs: ....
-         * T1:Pat gave T3:John T2:a robot.
-         * T1:Pat gave T3:a robot T2:to John.
-         */
-        if (template.getNumArguments() >= 3) {
-            // Who gave T3 T2?
-            if (targetArgNum == 1) {
-                add(question, whWords[0]);
-                addAll(question, template.getActiveVerb(verbHelper));
-                addAll(question, template.getPlaceHolderWord(3));
-                addAll(question, template.getPlaceHolderWord(2));
-                add(question, whWords[1]);
-                return question;
+
+        // {Pat} built a robot* -> What did Pat build / What was built ?
+        // What did T1 give T3?, i.e. What did John give Pat?
+        // (to) Who did T1 give T3?, Who did John give a robot to?
+        String[] verb = template.getActiveSplitVerb(verbHelper);
+        add(question, wh[0]);
+        add(question, verb[0]);
+        addAll(question, template.getPlaceHolderWord(1));
+        add(question, verb[1]);
+        for (int slotId = 2; slotId < template.slots.length; slotId++) {
+            ArgumentSlot argSlot = (ArgumentSlot) template.slots[slotId];
+            if (argSlot.argumentNumber == targetArgNum || (totalArgs >= 3 && argSlot.hasPreposition)) {
+                continue;
             }
-            // What did T1 give T3?, i.e. What did John give Pat?
-            // (to) Who did T1 give T3?, Who did John give a robot to?
-            if (targetArgNum == 2) {
-                String[] verb = template.getActiveSplitVerb(verbHelper);
-                add(question, whWords[0]);
-                add(question, verb[0]);
-                addAll(question, template.getPlaceHolderWord(1));
-                add(question, verb[1]);
-                addAll(question, template.getPlaceHolderWord(3));
-                add(question, whWords[1]);
-                return question;
-            }
-            // Who did T1:Pat give T2:a robot?
-            // What did T1:Pat give T2:to John
-            if (targetArgNum == 3) {
-                String[] verb = template.getActiveSplitVerb(verbHelper);
-                add(question, whWords[0]);
-                add(question, verb[0]);
-                addAll(question, template.getPlaceHolderWord(1));
-                add(question, verb[1]);
-                addAll(question, template.getPlaceHolderWord(2));
-                add(question, whWords[1]);
-                return question;
-            }
+            addAll(question, template.getPlaceHolderWord(argSlot.argumentNumber));
         }
+        add(question, wh[1]);
         return question;
     }
 
@@ -267,10 +237,7 @@ public class QuestionGenerationSandbox {
         Map<Integer, CCGBankDependency> slotToDependency = new HashMap<>();
         Category predicateCategory = categories.get(predicateIndex);
         int numArguments = predicateCategory.getNumberOfArguments();
-        if (numArguments == 0) {
-            return null;
-        }
-        if (predicateCategory.isFunctionInto(somethingAdjunctive)) {
+        if (numArguments == 0 || belongsTo(predicateCategory, adjuncts)) {
             return null;
         }
         for (CCGBankDependency dep : dependencies) {
@@ -295,9 +262,9 @@ public class QuestionGenerationSandbox {
             CCGBankDependency dep = slotToDependency.get(argNum);
             Category argumentCategory = predicateCategory.getArgument(argNum);
             arguments[argNum] = (dep == null ? new UnrealizedArgumentSlot(argNum, argumentCategory) :
-                    new ArgumentSlot(dep.getSentencePositionOfArgument(), argNum, argumentCategory));
+                        new ArgumentSlot(dep.getSentencePositionOfArgument(), argNum, argumentCategory));
         }
-        if (predicateCategory.getArgument(1).isFunctionInto(Category.Sdcl)) {
+        if (numArguments == 2 && predicateCategory.getArgument(1).equals(Category.Sdcl)) {
             // T1, T2 said, or T2, said T1
             QuestionSlot[] slots = new QuestionSlot[] { arguments[2], verb, arguments[1] };
             return new QuestionTemplate(slots, words, categories, dependencies);
@@ -309,7 +276,9 @@ public class QuestionGenerationSandbox {
             slots.add(arguments[1]);
             slots.add(verb);
             for (int i = numArguments; i > 1; i--) {
-                slots.add(arguments[i]);
+                if (!arguments[i].category.equals(Category.PR)) {
+                    slots.add(arguments[i]);
+                }
             }
             QuestionSlot[] slotList = slots.toArray(new QuestionSlot[slots.size()]);
             return new QuestionTemplate(slotList, words, categories, dependencies);
