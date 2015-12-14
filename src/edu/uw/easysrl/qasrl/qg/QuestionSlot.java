@@ -25,10 +25,21 @@ public abstract class QuestionSlot {
 
     public static class VerbSlot extends QuestionSlot {
         public List<Integer> auxiliaries;
+        public boolean hasParticle;
+        public int particleIndex;
 
         public VerbSlot(int indexInSentence, List<Integer> auxiliaries, Category category) {
             super(indexInSentence, -1, category);
             this.auxiliaries = auxiliaries;
+            hasParticle = false;
+            particleIndex = -1;
+        }
+
+        public VerbSlot(int verbIndex, int particleIndex, List<Integer> auxiliaries, Category category) {
+            super(verbIndex, -1, category);
+            this.auxiliaries = auxiliaries;
+            this.hasParticle = true;
+            this.particleIndex = particleIndex;
         }
 
         @Override

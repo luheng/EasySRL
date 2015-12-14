@@ -42,8 +42,6 @@ public class QuestionTemplate {
     }
 
     // whMapper
-    // TODO: split "What is something given to", "What was someone expected to do"
-    // TODO: make these tuples ..
     // Examples:
     // { "what", "for" }, {"what", "to do" }
     public String[] getWhWord(int argNum) {
@@ -55,6 +53,9 @@ public class QuestionTemplate {
         }
         if (slot.category.isFunctionInto(Category.valueOf("S[to]\\NP"))) {
             return new String[] { "what", "to do" };
+        }
+        if (slot.category.isFunctionInto(Category.valueOf("S[ng]\\NP"))) {
+            return new String[] { "what", "doing" };
         }
         if (argNum == getNumArguments()) {
             return new String[] { "what", ""};
@@ -73,6 +74,9 @@ public class QuestionTemplate {
         }
         if (slot.category.isFunctionInto(Category.valueOf("S[to]\\NP"))) {
             return new String[] { "to do", "something" };
+        }
+        if (slot.category.isFunctionInto(Category.valueOf("S[ng]\\NP"))) {
+            return new String[] { "doing", "something" };
         }
         String phStr;
         if (categories.get(argumentIndex).equals(Category.NP)) {
@@ -94,15 +98,14 @@ public class QuestionTemplate {
     public String[] getActiveVerb(VerbHelper verbHelper) {
         List<Integer> auxiliaries = verbSlot.auxiliaries;
         String verbStr = words.get(verbSlot.indexInSentence);
+        if (verbSlot.hasParticle) {
+            verbStr += " " + words.get(verbSlot.particleIndex);
+        }
         // i.e. to allow
         if (predicateCategory.isFunctionInto(Category.valueOf("S[b]\\NP"))) {
             if (auxiliaries.size() > 0 && words.get(auxiliaries.get(0)).equalsIgnoreCase("to")) {
                 return new String[]{"would", verbStr};
             }
-        }
-        if (predicateCategory.isFunctionInto(Category.valueOf("S[adj]\\NP")) ||
-            predicateCategory.isFunctionInto(Category.valueOf("S[pss]\\NP"))) {
-            return new String[] {"might be", verbStr};
         }
         if (auxiliaries.size() > 0) {
             String aux = "";
@@ -110,6 +113,10 @@ public class QuestionTemplate {
                 aux += words.get(id) + " ";
             }
             return new String[] {aux.trim(), verbStr};
+        }
+        if (predicateCategory.isFunctionInto(Category.valueOf("S[adj]\\NP")) ||
+            predicateCategory.isFunctionInto(Category.valueOf("S[pss]\\NP"))) {
+            return new String[] {"might be", verbStr};
         }
         if (verbHelper.isUninflected(words, categories, verbSlot.indexInSentence)) {
             return new String[] {"might", verbStr};
@@ -119,11 +126,16 @@ public class QuestionTemplate {
 
     // If the verb is a single inflected one, we need to change it: "built" -> {"did", "build"}
     public String[] getActiveSplitVerb(VerbHelper verbHelper) {
+        String[] result;
         if (verbSlot.auxiliaries.size() == 0) {
-            return verbHelper.getAuxiliaryAndVerbStrings(words, null /* categories */,  verbSlot.indexInSentence);
+            result = verbHelper.getAuxiliaryAndVerbStrings(words, null /* categories */,  verbSlot.indexInSentence);
+        } else {
+            result = getActiveVerb(verbHelper);
         }
-        return getActiveVerb(verbHelper);
-
+        if (verbSlot.hasParticle) {
+            result[1] += " " + words.get(verbSlot.particleIndex);
+        }
+        return result;
     }
 
     // i.e. {"was", "built"}, {"have been", "built"}

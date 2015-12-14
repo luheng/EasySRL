@@ -9,7 +9,7 @@ import java.util.List;
  */
 public class PrepositionHelper {
     public static String getPreposition(List<String> words, List<Category> categories, int index) {
-        for (int i = index - 1; i >= 0; i--) {
+        for (int i = index; i >= 0; i--) {
             if (categories.get(i).isFunctionInto(Category.PP)) {
                 return words.get(i);
             }
