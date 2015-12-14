@@ -3,6 +3,7 @@ package edu.uw.easysrl.qasrl.qg;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 import edu.stanford.nlp.util.StringUtils;
+import edu.uw.easysrl.syntax.grammar.Preposition;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -56,11 +57,13 @@ public abstract class QuestionSlot {
 
     public static class ArgumentSlot extends QuestionSlot {
         public boolean hasPreposition;
+        public Preposition resolvedPreposition;
         public boolean isVerb;
 
         public ArgumentSlot(int indexInSentence, int argumentNumber, Category argumentCategory) {
             super(indexInSentence, argumentNumber, argumentCategory);
             hasPreposition = argumentCategory.isFunctionInto(Category.PP);
+            resolvedPreposition = null;
             isVerb = argumentCategory.isFunctionInto(Category.valueOf("S\\NP"));
         }
 

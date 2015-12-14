@@ -7,6 +7,7 @@ import edu.uw.easysrl.dependencies.QADependency;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.qg.QuestionSlot.*;
 import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.syntax.grammar.Preposition;
 
 import java.io.*;
 import java.util.*;
@@ -71,7 +72,6 @@ public class QuestionGeneration {
 
     private static VerbHelper verbHelper;
 
-
     private static List<String> generateQuestionFromTemplate(ResolvedDependency targetDependency,
                                                              List<String> words,
                                                              List<Category> categories,
@@ -119,7 +119,7 @@ public class QuestionGeneration {
         QuestionSlot verb;
         boolean hasParticle = predicateCategory.getArgument(numArguments).isFunctionInto(Category.PR);
         if (hasParticle) {
-            // TODO: pay attention to PR
+            // TODO: pay attention to PR.
             int particleIndex = slotToDependency.get(numArguments).getArgument();
             verb = new VerbSlot(predicateIndex, particleIndex, auxChain, predicateCategory);
         } else {
@@ -129,9 +129,19 @@ public class QuestionGeneration {
         for (int argNum = 1; argNum <= numArguments; argNum++) {
             ResolvedDependency dep = slotToDependency.get(argNum);
             Category argumentCategory = predicateCategory.getArgument(argNum);
-            arguments[argNum] = (dep == null ?
-                    new UnrealizedArgumentSlot(argNum, argumentCategory) :
-                    new ArgumentSlot(dep.getArgumentIndex(), argNum, argumentCategory));
+            ArgumentSlot slot;
+            if (argumentCategory.equals(Category.PR)) {
+                slot = null;
+            } else if (dep == null) {
+                slot = new UnrealizedArgumentSlot(argNum, argumentCategory);
+            } else {
+                slot = new ArgumentSlot(dep.getArgumentIndex(), argNum, argumentCategory);
+                if (slot.hasPreposition && !dep.getPreposition().equals(Preposition.NONE)) {
+                    // TODO: pay attention to resolved PP.
+                    slot.resolvedPreposition = dep.getPreposition();
+                }
+            }
+            arguments[argNum] = slot;
         }
         if (numArguments == 2 && predicateCategory.getArgument(1).equals(Category.Sdcl)) {
             // T1, T2 said, or T2, said T1
@@ -145,7 +155,7 @@ public class QuestionGeneration {
             slots.add(arguments[1]);
             slots.add(verb);
             for (int i = numArguments; i > 1; i--) {
-                if (!arguments[i].category.equals(Category.PR)) {
+                if (arguments[i] != null) {
                     slots.add(arguments[i]);
                 }
             }
@@ -218,53 +228,6 @@ public class QuestionGeneration {
             }
         }
         return false;
-    }
-
-    private static void printPredicateInfo(BufferedWriter writer, Sentence sentence, CCGBankDependency ccgDep,
-                                           QADependency qaDep)
-            throws IOException {
-        List<String> words = sentence.getWords();
-        int predicateIndex = ccgDep.getSentencePositionOfPredicate();
-        List<Integer> wordIndices = new ArrayList<>();
-        Map<Integer, Integer> wordIdToSlot = new HashMap<>();
-        wordIndices.add(predicateIndex);
-        for (CCGBankDependency d : sentence.getCCGBankDependencyParse().getDependencies()) {
-            int predId = d.getSentencePositionOfPredicate();
-            int argId = d.getSentencePositionOfArgument();
-            if (predId == predicateIndex && predId != argId) {
-                wordIdToSlot.put(argId, d.getArgNumber());
-                wordIndices.add(argId);
-            }
-        }
-        Collections.sort(wordIndices);
-        if (writer != null) {
-            writer.write(StringUtils.join(words) + "\n");
-        } else {
-            System.out.print(StringUtils.join(words) + "\n");
-        }
-        List<String> lineBuf = new ArrayList<>();
-        wordIndices.forEach(id -> {
-            if (id == predicateIndex) {
-                lineBuf.add(String.format("%s ", words.get(id)));
-            } else if (id == ccgDep.getSentencePositionOfArgument()) {
-                lineBuf.add(String.format("{%d:%s} ", wordIdToSlot.get(id), words.get(id)));
-            } else {
-                lineBuf.add(String.format("%d:%s ", wordIdToSlot.get(id), words.get(id)));
-            }
-        });
-        if (writer != null) {
-            writer.write(StringUtils.join(lineBuf) + "\n");
-            writer.write(words.get(predicateIndex) + "\t" + ccgDep.getCategory() + "\t" +
-                    ccgDep.getArgNumber() + "\n");
-            writer.write(qaDep == null ? "*N/A*" : StringUtils.join(qaDep.getQuestion()) + "?");
-            writer.write("\n\n");
-        } else {
-            System.out.print(StringUtils.join(lineBuf) + "\n");
-            System.out.print(words.get(predicateIndex) + "\t" + ccgDep.getCategory() + "\t" +
-                    ccgDep.getArgNumber() + "\n");
-            System.out.print(qaDep == null ? "*N/A*" : StringUtils.join(qaDep.getQuestion()) + "?");
-            System.out.print("\n\n");
-        }
     }
 }
 

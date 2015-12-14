@@ -46,9 +46,12 @@ public class QuestionTemplate {
     public String[] getWhWordByArgNum(int argNum) {
         ArgumentSlot slot = (ArgumentSlot) slots[argNumToSlotId.get(argNum)];
         if (slot.hasPreposition) {
-            // FIXME: this is a hack. How can we get PPs?
-            String pp = PrepositionHelper.getPreposition(words, categories, slot.indexInSentence);
-            return new String[] { "what", pp };
+            if (slot.resolvedPreposition == null) {
+                // FIXME: this is a hack. How can we get PPs?
+                String pp = PrepositionHelper.getPreposition(words, categories, slot.indexInSentence);
+                return new String[]{ "what", pp };
+            }
+            return new String[] { "what", slot.resolvedPreposition.toString() };
         }
         if (slot.category.isFunctionInto(Category.valueOf("S[to]\\NP"))) {
             return new String[] { "what", "to do" };
