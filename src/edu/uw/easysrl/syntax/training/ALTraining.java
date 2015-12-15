@@ -61,8 +61,8 @@ public class ALTraining {
     private final List<QASentence> qaTrainingSentences, alignedQASentences;
 
     private final QuestionGenerator questionGenerator;
-    private static final int nBest = 100;
-    private static final int numPropBankTrainingSentences = 500;
+    private static final int nBest = 20;
+    private static final int numPropBankTrainingSentences = 100;
 
     private ALTraining(
             final TrainingDataParameters dataParameters,
@@ -304,7 +304,6 @@ public class ALTraining {
             nbestOracle.add(ActiveLearningEvaluation.evaluate(goldParse.getDependencies(), allNBestDependencies));
             nbestQGOracle.add(ActiveLearningEvaluation.evaluate(goldParse.getDependencies(), allQGDependencies));
 
-            /*
             for (String questionStr : questionToDeps.keySet()) {
                 RerankingInfo rrDep = questionToDeps.get(questionStr);
                 ResolvedDependency targetDependency = rrDep.targetDependency;
@@ -332,7 +331,6 @@ public class ALTraining {
                 System.out.println(matchedQA == null ? "[no-qa]" : matchedQA.toString(qaSentence.getWords()));
                 System.out.println();
             }
-            */
         }
 
         System.out.println("Final result: F1=" + alignedDev.get("F1").get(0) + " on aligned PB-QA sentences");

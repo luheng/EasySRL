@@ -1,22 +1,22 @@
 package edu.uw.easysrl.qasrl.qg;
 
-import com.sun.org.apache.xpath.internal.Arg;
 import edu.stanford.nlp.util.StringUtils;
 import edu.uw.easysrl.corpora.CCGBankDependencies.CCGBankDependency;
 import edu.uw.easysrl.corpora.ParallelCorpusReader.Sentence;
 import edu.uw.easysrl.dependencies.QADependency;
-import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.AlignedDependency;
 import edu.uw.easysrl.qasrl.PropBankAligner;
 import edu.uw.easysrl.qasrl.qg.QuestionSlot.*;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.CountDictionary;
-import sun.misc.REException;
 
 import java.io.*;
 import java.util.*;
 
 /**
+ * Now able to generate 3378 (72.69% of 4647 dependencies, 73.66% of 3979 aligned dependencies) questions.
+ * 574 (16.99%) exact matches among all generated.
+ *
  * Created by luheng on 12/8/15.
  */
 public class QuestionGenerationSandbox {
@@ -278,9 +278,11 @@ public class QuestionGenerationSandbox {
         }
 
         String[] wh = template.getWhWordByArgNum(targetArgNum);
+
         // {Pat} built a robot -> Who built a robot ?
         // Who gave T3 T2?
-        if (targetArgNum == 1) {
+        // T2 said T1
+        if (targetArgNum == template.slots[0].argumentNumber) {
             add(question, wh[0]);
             addAll(question, template.getActiveVerb(verbHelper));
             for (int slotId = 2; slotId < template.slots.length; slotId++) {
@@ -300,7 +302,7 @@ public class QuestionGenerationSandbox {
         String[] verb = template.getActiveSplitVerb(verbHelper);
         add(question, wh[0]);
         add(question, verb[0]);
-        addAll(question, template.getPlaceHolderWordByArgNum(1));
+        addAll(question, template.getPlaceHolderWordByArgNum(template.slots[0].argumentNumber));
         add(question, verb[1]);
         for (int slotId = 2; slotId < template.slots.length; slotId++) {
             ArgumentSlot argSlot = (ArgumentSlot) template.slots[slotId];

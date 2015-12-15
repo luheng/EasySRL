@@ -105,6 +105,10 @@ public class VerbHelper {
         return false;
     }
 
+    public static boolean isNegationWord(String word) {
+        return word.equalsIgnoreCase("n\'t") || word.equalsIgnoreCase("not");
+    }
+
     public boolean isModifierWord(List<String> words, List<Category> categories, int index) {
         return index < words.size() && categories.get(index).isFunctionInto(Category.ADVERB);
     }

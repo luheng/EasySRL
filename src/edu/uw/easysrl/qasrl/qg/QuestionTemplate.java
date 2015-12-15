@@ -44,7 +44,8 @@ public class QuestionTemplate {
     // Examples:
     // { "what", "for" }, {"what", "to do" }
     public String[] getWhWordByArgNum(int argNum) {
-        ArgumentSlot slot = (ArgumentSlot) slots[argNumToSlotId.get(argNum)];
+        int slotId = argNumToSlotId.get(argNum);
+        ArgumentSlot slot = (ArgumentSlot) slots[slotId];
         if (slot.hasPreposition) {
             if (slot.resolvedPreposition == null) {
                 // FIXME: this is a hack. How can we get PPs?
@@ -59,17 +60,18 @@ public class QuestionTemplate {
         if (slot.category.isFunctionInto(Category.valueOf("S[ng]\\NP"))) {
             return new String[] { "what", "doing" };
         }
-        if (argNum == getNumArguments()) {
-            return new String[] { "what", ""};
+        if (slotId == 0 && getNumArguments() > 1) {
+            return new String[] { "who", ""};
         }
-        return new String[] { "who", ""};
+        return new String[] { "what", ""};
     }
 
     // phMapper
     // Examples:
     // { "", "something" }, {"for", "something" }
     public String[] getPlaceHolderWordByArgNum(int argNum) {
-        ArgumentSlot slot = (ArgumentSlot) slots[argNumToSlotId.get(argNum)];
+        int slotId = argNumToSlotId.get(argNum);
+        ArgumentSlot slot = (ArgumentSlot) slots[slotId];
         int argumentIndex = slot.indexInSentence;
         if (UnrealizedArgumentSlot.class.isInstance(slot)) {
             return new String [] { "", argNum == 1 && getNumArguments() > 1 ? "someone" : "something" };
@@ -91,7 +93,7 @@ public class QuestionTemplate {
         } else if (argumentIndex > 1 && categories.get(argumentIndex - 1).isFunctionInto(Category.valueOf("NP|N"))) {
             phStr =  words.get(argumentIndex - 1) + " " + words.get(argumentIndex);
         } else {
-            phStr = (argNum == 1 && getNumArguments() > 1 ? "someone" : "something");
+            phStr = (slotId == 0 && getNumArguments() > 1 ? "someone" : "something");
         }
         if (slot.hasPreposition) {
             String pp = PrepositionHelper.getPreposition(words, categories, argumentIndex);
@@ -147,7 +149,23 @@ public class QuestionTemplate {
                 result[1] += " " + words.get(verbSlot.particleIndex);
             }
         } else {
-            result = getActiveVerb(verbHelper);
+            String[] r = getActiveVerb(verbHelper);
+            String[] rw = (r[0] + " " + r[1]).split("\\s+");
+            result = new String[] { rw[0], "" };
+            // i.e. What {does n't} someone say ?
+            //      What {is n't} someone going to say ?
+            if (rw.length > 1 && VerbHelper.isNegationWord(rw[1])) {
+                result[0] += " " + rw[1];
+                for (int i = 2; i < rw.length; i++) {
+                    result[1] += (i >= 2 ? " " : "") + rw[i];
+                }
+            }
+            // i.e. What {is} someone going to say?
+            else {
+                for (int i = 1; i < rw.length; i++) {
+                    result[1] += (i >= 1 ? " " : "") + rw[i];
+                }
+            }
         }
         return result;
     }
