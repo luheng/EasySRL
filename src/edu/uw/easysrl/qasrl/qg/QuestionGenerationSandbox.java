@@ -15,7 +15,7 @@ import java.util.*;
 
 /**
  * Now able to generate 3378 (72.69% of 4647 dependencies, 73.66% of 3979 aligned dependencies) questions.
- * 574 (16.99%) exact matches among all generated.
+ * 612 (18.12%) exact matches among all generated.
  *
  * Created by luheng on 12/8/15.
  */
@@ -24,7 +24,6 @@ public class QuestionGenerationSandbox {
     private static final Category somethingAdjunctive = Category.valueOf("S|S");
 
     private static final Category intransitiveVerb = Category.valueOf("S\\NP");
-
     private static final Category[] transitiveVerbs = {
             Category.valueOf("(S\\NP)/NP"),
             Category.valueOf("(S\\NP)/PP"),
@@ -154,7 +153,9 @@ public class QuestionGenerationSandbox {
                     // Output template.
                     String questionString = "";
                     for (String w : question) {
-                        questionString += w + " ";
+                        if (!w.trim().isEmpty()) {
+                            questionString += w.trim() + " ";
+                        }
                     }
                     questionString += "?";
                     String ccgInfo = ccgDep.getCategory() + "_" + ccgDep.getArgNumber();

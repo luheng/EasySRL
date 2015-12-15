@@ -113,7 +113,7 @@ public class QuestionTemplate {
         // If we have the infinitive such as "to allow", change it to would allow.
         //if (predicateCategory.isFunctionInto(Category.valueOf("S[b]\\NP"))) {
         if (auxiliaries.size() > 0 && words.get(auxiliaries.get(0)).equalsIgnoreCase("to")) {
-            return new String[]{"would", verbStr};
+            return new String[]{ "would", verbStr };
         }
 
         // If the verb has its own set of auxiliaries, return those as is.
@@ -122,17 +122,17 @@ public class QuestionTemplate {
             for (int id : auxiliaries) {
                 aux += words.get(id) + " ";
             }
-            return new String[] {aux.trim(), verbStr};
+            return new String[] { aux.trim(), verbStr };
         }
         if (predicateCategory.isFunctionInto(Category.valueOf("S[adj]\\NP")) ||
             predicateCategory.isFunctionInto(Category.valueOf("S[pss]\\NP")) ||
             predicateCategory.isFunctionInto(Category.valueOf("S[ng]\\NP"))) {
-            return new String[] {"might be", verbStr};
+            return new String[] { "might be", verbStr };
         }
         if (verbHelper.isUninflected(words, categories, verbSlot.indexInSentence)) {
-            return new String[] {"might", verbStr};
+            return new String[] { "might", verbStr };
         }
-        return new String[] {"", verbStr};
+        return new String[] { "", verbStr };
     }
 
     // If the verb is a single inflected one, we need to change it: "built" -> {"did", "build"}
@@ -142,7 +142,7 @@ public class QuestionTemplate {
             if (predicateCategory.isFunctionInto(Category.valueOf("S[adj]\\NP")) ||
                     predicateCategory.isFunctionInto(Category.valueOf("S[pss]\\NP")) ||
                     predicateCategory.isFunctionInto(Category.valueOf("S[ng]\\NP"))) {
-                return new String[] {"was", words.get(verbSlot.indexInSentence)};
+                return new String[] { "was", words.get(verbSlot.indexInSentence) };
             }
             result = verbHelper.getAuxiliaryAndVerbStrings(words, null /* categories */,  verbSlot.indexInSentence);
             if (verbSlot.hasParticle) {
@@ -157,13 +157,13 @@ public class QuestionTemplate {
             if (rw.length > 1 && VerbHelper.isNegationWord(rw[1])) {
                 result[0] += " " + rw[1];
                 for (int i = 2; i < rw.length; i++) {
-                    result[1] += (i >= 2 ? " " : "") + rw[i];
+                    result[1] += (i > 2 ? " " : "") + rw[i];
                 }
             }
             // i.e. What {is} someone going to say?
             else {
                 for (int i = 1; i < rw.length; i++) {
-                    result[1] += (i >= 1 ? " " : "") + rw[i];
+                    result[1] += (i > 1 ? " " : "") + rw[i];
                 }
             }
         }
