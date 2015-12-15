@@ -15,7 +15,7 @@ import java.util.*;
 /**
  * Created by luheng on 12/8/15.
  */
-public class QuestionGeneration {
+public class QuestionGenerator {
     private static final Category somethingVerbal = Category.valueOf("S|NP");
     private static final Category somethingAdjunctive = Category.valueOf("S|S");
 
@@ -70,12 +70,17 @@ public class QuestionGeneration {
         Collections.addAll(otherFilteredCategorySet, otherFilteredCategories);
     }
 
-    private static VerbHelper verbHelper;
+    private VerbHelper verbHelper;
 
-    private static List<String> generateQuestionFromTemplate(ResolvedDependency targetDependency,
-                                                             List<String> words,
-                                                             List<Category> categories,
-                                                             Collection<ResolvedDependency> ccgDeps) {
+    public QuestionGenerator() {
+        // FIXME: build from unlabeled corpora.
+        verbHelper = new VerbHelper(VerbInflectionDictionary.buildFromPropBankTraining());
+    }
+
+    public List<String> generateQuestion(ResolvedDependency targetDependency,
+                                         List<String> words,
+                                         List<Category> categories,
+                                         Collection<ResolvedDependency> ccgDeps) {
         Category category = targetDependency.getCategory();
         int predicateIdx = targetDependency.getHead();
         int argumentIdx = targetDependency.getArgument();
@@ -97,10 +102,10 @@ public class QuestionGeneration {
         return generateQuestionFromTemplate(template, argumentIdx);
     }
 
-    private static QuestionTemplate getTemplate(int predicateIndex,
-                                                List<String> words,
-                                                List<Category> categories,
-                                                Collection<ResolvedDependency> dependencies) {
+    public QuestionTemplate getTemplate(int predicateIndex,
+                                        List<String> words,
+                                        List<Category> categories,
+                                        Collection<ResolvedDependency> dependencies) {
         Map<Integer, ResolvedDependency> slotToDependency = new HashMap<>();
         Category predicateCategory = categories.get(predicateIndex);
         int numArguments = predicateCategory.getNumberOfArguments();
@@ -165,7 +170,7 @@ public class QuestionGeneration {
         return null;
     }
 
-    private static List<String> generateQuestionFromTemplate(QuestionTemplate template, int targetArgNum) {
+    public List<String> generateQuestionFromTemplate(QuestionTemplate template, int targetArgNum) {
         int totalArgs = template.getNumArguments();
         List<String> question = new ArrayList<>();
         // If target is not part of the template, return.

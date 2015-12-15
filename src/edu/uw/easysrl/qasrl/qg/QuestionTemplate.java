@@ -51,7 +51,7 @@ public class QuestionTemplate {
                 String pp = PrepositionHelper.getPreposition(words, categories, slot.indexInSentence);
                 return new String[]{ "what", pp };
             }
-            return new String[] { "what", slot.resolvedPreposition.toString() };
+            return new String[] { "what", slot.resolvedPreposition.toString().toLowerCase() };
         }
         if (slot.category.isFunctionInto(Category.valueOf("S[to]\\NP"))) {
             return new String[] { "what", "to do" };

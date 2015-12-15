@@ -1,14 +1,23 @@
 package edu.uw.easysrl.syntax.training;
 
 import com.google.common.io.Files;
+import edu.stanford.nlp.util.StringUtils;
 import edu.uw.easysrl.corpora.ParallelCorpusReader;
 import edu.uw.easysrl.corpora.SRLParse;
 import edu.uw.easysrl.corpora.qa.QASentence;
+import edu.uw.easysrl.dependencies.QADependency;
+import edu.uw.easysrl.dependencies.ResolvedDependency;
+import edu.uw.easysrl.dependencies.SRLDependency;
 import edu.uw.easysrl.main.EasySRL;
+import edu.uw.easysrl.main.InputReader;
+import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
+import edu.uw.easysrl.qasrl.qg.QuestionSlot;
+import edu.uw.easysrl.qasrl.qg.QuestionTemplate;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.evaluation.ResultsTable;
 import edu.uw.easysrl.syntax.evaluation.SRLEvaluation;
 import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.syntax.model.CutoffsDictionary;
 import edu.uw.easysrl.syntax.model.feature.*;
 import edu.uw.easysrl.syntax.parser.SRLParser;
@@ -50,6 +59,8 @@ public class ALTraining {
     private final List<ParallelCorpusReader.Sentence> trainingSentences, evalSentences, alignedPBSentences;
     private final List<QASentence> qaTrainingSentences, alignedQASentences;
 
+    private final QuestionGenerator questionGenerator;
+
     private ALTraining(
             final TrainingDataParameters dataParameters,
             final TrainingParameters parameters,
@@ -74,6 +85,8 @@ public class ALTraining {
                 TagDict.readDict(dataParameters.getExistingModel(), new HashSet<>(lexicalCategoriesList)),
                 trainingParameters.getMaxDependencyLength(),
                 trainingSentences);
+
+        this.questionGenerator = new QuestionGenerator();
     }
 
     public static void main(final String[] args) throws IOException, InterruptedException, NotBoundException {
@@ -215,13 +228,108 @@ public class ALTraining {
                 Util.deserialize(new File(dataParameters.getExistingModel(), "labelClassifier")), posTagger));
         Collection<SRLParse> goldParses = evalSentences.stream()
                 .map(sentence -> sentence.getSrlParse()).collect(Collectors.toSet());
-        final Results pbDevResults = SRLEvaluation.evaluate(backoffParser, goldParses, maxSentenceLength);
+        // final Results pbDevResults = SRLEvaluation.evaluate(backoffParser, goldParses, maxSentenceLength);
         final ResultsTable alignedDev = SRLEvaluation.evaluate(backoffParser, alignedPBSentences, alignedQASentences,
                 maxSentenceLength);
-        resultsTable.add("pbDev", pbDevResults);
+        // resultsTable.add("pbDev", pbDevResults);
         resultsTable.addAll("alignedDev", alignedDev);
-        System.out.println("Final result: F1=" + pbDevResults.getF1());
+        // System.out.println("Final result: F1=" + pbDevResults.getF1());
         System.out.println("Final result: F1=" + alignedDev.get("F1").get(0) + " on aligned PB-QA sentences");
+
+        for (int sentIdx = 0; sentIdx < alignedPBSentences.size(); sentIdx ++) {
+            // For reference/evaluation only.
+            ParallelCorpusReader.Sentence pbSentence = alignedPBSentences.get(sentIdx);
+            QASentence qaSentence = alignedQASentences.get(sentIdx);
+            SRLParse goldParse = pbSentence.getSrlParse();
+
+            // TODO: get n-best.
+            List<String> words = pbSentence.getWords();
+            final List<SRLParser.CCGandSRLparse> parses = parser.parseTokens(
+                    InputReader.InputWord.listOf(goldParse.getWords()));
+
+            if (parses == null || parses.size() == 0) {
+                System.err.println("Failed to parse: " + pbSentence.toString());
+                continue;
+            }
+            final SRLParser.CCGandSRLparse parse = parses.get(0);
+            SyntaxTreeNode ccgParse = parse.getCcgParse();
+            List<Category> categories = new ArrayList<>();
+            for (int i = 0; i < words.size(); i++) {
+                categories.add(parse.getLeaf(i).getCategory());
+            }
+            Collection<ResolvedDependency> dependencies = parse.getDependencyParse();
+
+            // TODO: align output question information with gold dependency or QA dependency.
+            for (ResolvedDependency targetDependency : dependencies) {
+                SRLDependency matchedGold = matchGoldDependency(targetDependency, goldParse.getDependencies());
+                QADependency matchedQA = matchQADependency(targetDependency, qaSentence.getDependencies());
+
+                int predicateIndex = targetDependency.getHead();
+                int argumentNumber = targetDependency.getArgNumber();
+                // Get template.
+                QuestionTemplate template = questionGenerator.getTemplate(predicateIndex, words, categories,
+                        dependencies);
+                if (template == null) {
+                    continue;
+                }
+
+                // Get question.
+                List<String> question = questionGenerator.generateQuestionFromTemplate(template, argumentNumber);
+                if (question == null) {
+                    continue;
+                }
+
+                // Print sentence and template.
+                String ccgInfo = targetDependency.getCategory() + "_" + targetDependency.getArgNumber();
+                System.out.println("\n" + StringUtils.join(words) + "\n" + ccgInfo);
+                for (QuestionSlot slot : template.slots) {
+                    String slotStr = (slot.argumentNumber == argumentNumber ?
+                            String.format("{%s}", slot.toString(words)) : slot.toString(words));
+                    System.out.print(slotStr + "\t");
+                }
+                System.out.println();
+                // Print question
+                String questionStr = StringUtils.join(question) + " ?";
+                System.out.println(questionStr + "\t" + words.get(targetDependency.getArgumentIndex()));
+                // Print matching information.
+                System.out.println(matchedGold == null ? "[no-gold]" : matchedGold.toString(words));
+                System.out.println(matchedQA == null ? "[no-qa]" : matchedQA.toString(words));
+                System.out.println();
+            }
+        }
         return resultsTable;
+    }
+
+    private static SRLDependency matchGoldDependency(ResolvedDependency targetDependency,
+                                                     Collection<SRLDependency> goldDependencies) {
+        for (final SRLDependency goldDep : goldDependencies) {
+            if (goldDep.getArgumentPositions().size() == 0) {
+                continue;
+            }
+            int predicateIndex, argumentIndex;
+            if (goldDep.isCoreArgument()) {
+                predicateIndex = targetDependency.getHead();
+                argumentIndex = targetDependency.getArgumentIndex();
+            } else {
+                predicateIndex = targetDependency.getArgumentIndex();
+                argumentIndex = targetDependency.getHead();
+            }
+            if (goldDep.getPredicateIndex() == predicateIndex
+                    && (goldDep.getLabel() == targetDependency.getSemanticRole())
+                    && goldDep.getArgumentPositions().contains(argumentIndex)) {
+                return goldDep;
+            }
+        }
+        return null;
+    }
+
+    private static QADependency matchQADependency(ResolvedDependency targetDependency,
+                                                  Collection<QADependency> qaDependencies) {
+        for (final QADependency qaDep : qaDependencies) {
+            if (qaDep.unlabeledMatch(targetDependency)) {
+                return qaDep;
+            }
+        }
+        return null;
     }
 }
