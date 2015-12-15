@@ -92,10 +92,6 @@ public class VerbHelper {
         return auxliaryIndices;
     }
 
-    public boolean isVerb(List<String> words, List<Category> categories, int index) {
-        return index < words.size() && categories.get(index).isFunctionInto(Category.valueOf("(S\\NP)/NP"));
-    }
-
     public boolean isAuxiliaryVerb(List<String> words, List<Category> categories, int index) {
         return index < words.size() && enAuxiliaryVerbSet.contains(words.get(index).toLowerCase()) &&
                 categories.get(index).isFunctionInto(Category.valueOf("(S\\NP)|(S\\NP)"));
@@ -111,10 +107,6 @@ public class VerbHelper {
 
     public boolean isModifierWord(List<String> words, List<Category> categories, int index) {
         return index < words.size() && categories.get(index).isFunctionInto(Category.ADVERB);
-    }
-
-    public boolean isPassive(List<String> words, List<Category> categories, int index) {
-        return categories.get(index).isFunctionInto(Category.valueOf("(S[pss]\\NP)/NP"));
     }
 
     public boolean isCopula(List<String> words, int index) {

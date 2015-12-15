@@ -196,6 +196,14 @@ public class QuestionGenerationSandbox {
         writer.close();
     }
 
+    /**
+     * Given a set of CCG dependencies and a target predicate, generate a QuestionTemplate object.
+     * @param predicateIndex : target predicate
+     * @param words          : words in the sentence
+     * @param categories     : categories for each word
+     * @param dependencies   : all the gold CCG dependencies.
+     * @return questionTemplate
+     */
     private static QuestionTemplate getTemplateFromCCGBank(int predicateIndex,
                                                             List<String> words,
                                                             List<Category> categories,

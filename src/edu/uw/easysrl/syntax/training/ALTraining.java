@@ -24,17 +24,13 @@ import java.nio.file.StandardCopyOption;
 import java.rmi.NotBoundException;
 import java.rmi.registry.LocateRegistry;
 import java.util.*;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * A crippled version of PropBank training.
- * List<Sentence> training,
- * List<QASentence> qaTraining,
- * List<Sentence> eval
- * Created by luheng on 11/30/15.
+ * Active Learning for CCG/SRL, or maybe CCG only.
+ * Created by luheng on 12/14/15.
  */
-public class SSLTraining {
+public class ALTraining {
     public static final List<Category> ROOT_CATEGORIES = Arrays.asList(
             Category.valueOf("S[dcl]"),
             Category.valueOf("S[q]"),
@@ -44,7 +40,6 @@ public class SSLTraining {
             Category.valueOf("S[b]\\NP")
     );
 
-    private static final int numRandomSampleRuns = 5;
     private static final Random random = new Random(123456);
 
     private final TrainingDataParameters dataParameters;
@@ -55,7 +50,7 @@ public class SSLTraining {
     private final List<ParallelCorpusReader.Sentence> trainingSentences, evalSentences, alignedPBSentences;
     private final List<QASentence> qaTrainingSentences, alignedQASentences;
 
-    private SSLTraining(
+    private ALTraining(
             final TrainingDataParameters dataParameters,
             final TrainingParameters parameters,
             final List<ParallelCorpusReader.Sentence> trainingSentences,
@@ -99,7 +94,6 @@ public class SSLTraining {
         final double beta = TrainingUtils.parseDoubles(trainingSettings, "beta_for_training_charts").get(0);
         final double beam = TrainingUtils.parseDoubles(trainingSettings, "beta_for_decoding").get(0);
         final Double supertaggerWeight = 0.9;
-
         System.out.println(com.google.common.base.Objects.toStringHelper("Settings")
                 .add("DecodingBeam", beam)
                 .add("MinFeatureCount", minFeatureCount)
@@ -115,7 +109,7 @@ public class SSLTraining {
 
         String absolutePath = Util.getHomeFolder().getAbsolutePath();
         String tempFolder = trainingSettings.getProperty("output_folder");
-                // String.format("ntr%d_r%d/", numPropBankTrainingSentences, r);
+        // String.format("ntr%d_r%d/", numPropBankTrainingSentences, r);
         final File modelFolder = new File(tempFolder.replaceAll("~", absolutePath));
         modelFolder.mkdirs();
         Files.copy(propertiesFile, new File(modelFolder, "training.properties"));
@@ -146,29 +140,27 @@ public class SSLTraining {
         // Initialize corpora
         List<QASentence> qaTrainingSentences = new ArrayList<>(), alignedQASentences = new ArrayList<>();
         List<ParallelCorpusReader.Sentence> trainingPool = new ArrayList<>(), evalSentences = new ArrayList<>(),
-                                            alignedPBSentences = new ArrayList<>();
+                alignedPBSentences = new ArrayList<>();
         List<Integer> trainingSentenceIds = new ArrayList<>();
         SemiSupervisedLearningHelper.prepareCorpora(trainingPool, evalSentences, alignedPBSentences,
                 qaTrainingSentences, alignedQASentences, trainingSentenceIds);
         ResultsTable allResults = new ResultsTable();
         //for (int numPropBankTrainingSentences : new int[]{50, 100, 150, 200, 300, 500, 750, 1000, 1500, 2000}) {
-        for (int numPropBankTrainingSentences : new int[]{1500, 2000, 3000, 4000, 5000, 7500, 10000, 15000, 20000}) {
-            for (int r = 0; r < numRandomSampleRuns; r++) {
-                List<ParallelCorpusReader.Sentence> trainingSentences = SemiSupervisedLearningHelper.subsample(
-                        numPropBankTrainingSentences, trainingPool, trainingSentenceIds, random);
-                System.out.println(String.format("%d training, %d qa and (%d, %d) evaluation sentences.",
-                        trainingSentences.size(), qaTrainingSentences.size(), evalSentences.size(),
-                        alignedPBSentences.size()));
-                final SSLTraining training = new SSLTraining(dataParameters, standard, trainingSentences, evalSentences,
-                        alignedPBSentences, qaTrainingSentences, alignedQASentences);
-                training.trainLocal();
-                String resultKey = String.format("numTrainSents=%d", numPropBankTrainingSentences);
-                allResults.addAll(resultKey, training.evaluate(beam, Optional.of(supertaggerWeight)));
-            }
-            // Print aggregated results every time :)
-            System.out.println(allResults);
-            allResults.printAggregated();
-        }
+
+        final int numPropBankTrainingSentences = 100;
+        List<ParallelCorpusReader.Sentence> trainingSentences = SemiSupervisedLearningHelper.subsample(
+                numPropBankTrainingSentences, trainingPool, trainingSentenceIds, random);
+        System.out.println(String.format("%d training, %d qa and (%d, %d) evaluation sentences.",
+                trainingSentences.size(), qaTrainingSentences.size(), evalSentences.size(),
+                alignedPBSentences.size()));
+
+        final ALTraining training = new ALTraining(dataParameters, standard, trainingSentences, evalSentences,
+                alignedPBSentences, qaTrainingSentences, alignedQASentences);
+        training.trainLocal();
+        String resultKey = String.format("numTrainSents=%d", numPropBankTrainingSentences);
+        allResults.addAll(resultKey, training.evaluate(beam, Optional.of(supertaggerWeight)));
+
+        // Print aggregated results every time :)
         System.out.println(allResults);
         allResults.printAggregated();
     }
@@ -214,12 +206,12 @@ public class SSLTraining {
         final POSTagger posTagger = POSTagger
                 .getStanfordTagger(new File(dataParameters.getExistingModel(), "posTagger"));
         final SRLParser parser = new SRLParser.JointSRLParser(EasySRL.makeParser(trainingParameters.getModelFolder()
-                .getAbsolutePath(), testingSupertaggerBeam, EasySRL.ParsingAlgorithm.ASTAR, 20000, true,
+                        .getAbsolutePath(), testingSupertaggerBeam, EasySRL.ParsingAlgorithm.ASTAR, 20000, true,
                 supertaggerWeight, 1), posTagger);
         final SRLParser backoffParser = new SRLParser.BackoffSRLParser(
                 parser, new SRLParser.PipelineSRLParser(EasySRL.makeParser(
-                    dataParameters.getExistingModel().getAbsolutePath(),
-                    0.0001, EasySRL.ParsingAlgorithm.ASTAR, 100000, false, Optional.empty(), 1),
+                dataParameters.getExistingModel().getAbsolutePath(),
+                0.0001, EasySRL.ParsingAlgorithm.ASTAR, 100000, false, Optional.empty(), 1),
                 Util.deserialize(new File(dataParameters.getExistingModel(), "labelClassifier")), posTagger));
         Collection<SRLParse> goldParses = evalSentences.stream()
                 .map(sentence -> sentence.getSrlParse()).collect(Collectors.toSet());
