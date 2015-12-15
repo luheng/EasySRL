@@ -304,14 +304,23 @@ public class ALTraining {
             nbestOracle.add(ActiveLearningEvaluation.evaluate(goldParse.getDependencies(), allNBestDependencies));
             nbestQGOracle.add(ActiveLearningEvaluation.evaluate(goldParse.getDependencies(), allQGDependencies));
 
+            List<SRLDependency> goldDepsList = new ArrayList<>(goldParse.getDependencies());
+            Set<Integer> matchedGoldDeps = new HashSet<>();
+
             for (String questionStr : questionToDeps.keySet()) {
                 RerankingInfo rrDep = questionToDeps.get(questionStr);
                 ResolvedDependency targetDependency = rrDep.targetDependency;
                 QuestionTemplate template = rrDep.template;
                 int argumentNumber = targetDependency.getArgNumber();
 
-                SRLDependency matchedGold = matchGoldDependency(targetDependency, goldParse.getDependencies());
-                QADependency matchedQA = matchQADependency(targetDependency, qaSentence.getDependencies());
+                SRLDependency matchedGold = null;
+                for (int goldIdx = 0; goldIdx < goldDepsList.size(); goldIdx++) {
+                    SRLDependency goldDep = goldDepsList.get(goldIdx);
+                    if (goldDep.getArgumentPositions().size() > 0 && matchGoldDependency(goldDep, targetDependency)) {
+                        matchedGold = goldDep;
+                        matchedGoldDeps.add(goldIdx);
+                    }
+                }
 
                 // Print sentence and template.
                 String ccgInfo = targetDependency.getCategory() + "_" + targetDependency.getArgNumber();
@@ -323,20 +332,42 @@ public class ALTraining {
                     System.out.print(slotStr + "\t");
                 }
                 System.out.println();
-                // Print question
+                // Print question.
                 System.out.println(questionStr + "\t" + words.get(targetDependency.getArgumentIndex()));
+                // Print target dependency.
+                System.out.println(words.get(targetDependency.getHead()) + ":" + targetDependency.getSemanticRole() +
+                                    "\t" + words.get(targetDependency.getArgumentIndex()));
                 // Print matching information.
-                System.out.println(matchedGold == null ? "[no-gold]" : matchedGold.toString(words));
+                printPropBankLine(matchedGold, words);
+
                 // FIXME: are those indices not aligned? Weird.
-                System.out.println(matchedQA == null ? "[no-qa]" : matchedQA.toString(qaSentence.getWords()));
+                // System.out.println(matchedQA == null ? "[no-qa]" : matchedQA.toString(qaSentence.getWords()));
                 System.out.println();
             }
+            // Print unmatched gold dependencies.
+            System.out.println("[Missed PropBank]");
+            for (int goldIdx = 0; goldIdx < goldDepsList.size(); goldIdx++) {
+                if (!matchedGoldDeps.contains(goldIdx)) {
+                    printPropBankLine(goldDepsList.get(goldIdx), words);
+                }
+            }
+            System.out.println();
         }
 
         System.out.println("Final result: F1=" + alignedDev.get("F1").get(0) + " on aligned PB-QA sentences");
         System.out.println("N-Best oracle:\n" + nbestOracle.toString());
         System.out.println("N-Best oracle with QG:\n" + nbestQGOracle.toString());
         return resultsTable;
+    }
+
+    private static void printPropBankLine(SRLDependency srlDep, List<String> words) {
+        if (srlDep == null) {
+            System.out.println("[no-gold]");
+        } else {
+            System.out.print(srlDep.getPredicate() + ":" + srlDep.getLabel() + "\t");
+            srlDep.getArgumentPositions().forEach(aidx -> System.out.print(words.get(aidx) + " "));
+            System.out.println();
+        }
     }
 
     private static class RerankingInfo {
@@ -351,27 +382,24 @@ public class ALTraining {
         }
     }
 
-    private static SRLDependency matchGoldDependency(ResolvedDependency targetDependency,
-                                                     Collection<SRLDependency> goldDependencies) {
-        for (final SRLDependency goldDep : goldDependencies) {
-            if (goldDep.getArgumentPositions().size() == 0) {
-                continue;
-            }
-            int predicateIndex, argumentIndex;
-            if (goldDep.isCoreArgument()) {
-                predicateIndex = targetDependency.getHead();
-                argumentIndex = targetDependency.getArgumentIndex();
-            } else {
-                predicateIndex = targetDependency.getArgumentIndex();
-                argumentIndex = targetDependency.getHead();
-            }
-            if (goldDep.getPredicateIndex() == predicateIndex
-                    // && (goldDep.getLabel() == targetDependency.getSemanticRole())
-                    && goldDep.getArgumentPositions().contains(argumentIndex)) {
-                return goldDep;
-            }
+    private static boolean matchGoldDependency(SRLDependency goldDep, ResolvedDependency targetDependency) {
+        if (goldDep.getArgumentPositions().size() == 0) {
+            return false;
         }
-        return null;
+        int predicateIndex, argumentIndex;
+        if (goldDep.isCoreArgument()) {
+            predicateIndex = targetDependency.getHead();
+            argumentIndex = targetDependency.getArgumentIndex();
+        } else {
+            predicateIndex = targetDependency.getArgumentIndex();
+            argumentIndex = targetDependency.getHead();
+        }
+        if (goldDep.getPredicateIndex() == predicateIndex
+                // && (goldDep.getLabel() == targetDependency.getSemanticRole())
+                && goldDep.getArgumentPositions().contains(argumentIndex)) {
+            return true;
+        }
+        return false;
     }
 
     private static QADependency matchQADependency(ResolvedDependency targetDependency,

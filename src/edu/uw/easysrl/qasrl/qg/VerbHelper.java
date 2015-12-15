@@ -113,8 +113,8 @@ public class VerbHelper {
         return index < words.size() && categories.get(index).isFunctionInto(Category.ADVERB);
     }
 
-    public boolean isCopula(List<String> words, int index) {
-        return enCopulaVerbSet.contains(words.get(index).toLowerCase());
+    public static boolean isCopulaVerb(String word) {
+        return enCopulaVerbSet.contains(word.toLowerCase());
     }
 
     /**
@@ -145,10 +145,6 @@ public class VerbHelper {
         }
         // built (pt)
         return new String[] {"have", infl[4]};
-    }
-
-    public static boolean isCopulaVerb(String verb) {
-        return enAuxiliaryVerbSet.contains(verb.toLowerCase());
     }
 
     public boolean isUninflected(List<String> words, List<Category> categories, int index) {
