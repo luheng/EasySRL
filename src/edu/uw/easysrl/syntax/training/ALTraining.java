@@ -13,10 +13,12 @@ import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.qasrl.qg.QuestionSlot;
 import edu.uw.easysrl.qasrl.qg.QuestionTemplate;
+import edu.uw.easysrl.qasrl.qg.VerbHelper;
+import edu.uw.easysrl.syntax.evaluation.ActiveLearningEvaluation;
+import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.evaluation.ResultsTable;
 import edu.uw.easysrl.syntax.evaluation.SRLEvaluation;
 import edu.uw.easysrl.syntax.grammar.Category;
-import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.syntax.model.CutoffsDictionary;
 import edu.uw.easysrl.syntax.model.feature.*;
 import edu.uw.easysrl.syntax.parser.SRLParser;
@@ -59,8 +61,8 @@ public class ALTraining {
     private final List<QASentence> qaTrainingSentences, alignedQASentences;
 
     private final QuestionGenerator questionGenerator;
-    private static final int nBest = 10;
-    private static final int numPropBankTrainingSentences = 100;
+    private static final int nBest = 100;
+    private static final int numPropBankTrainingSentences = 500;
 
     private ALTraining(
             final TrainingDataParameters dataParameters,
@@ -237,13 +239,16 @@ public class ALTraining {
         resultsTable.addAll("alignedDev", alignedDev);
         System.out.println("Final result: F1=" + alignedDev.get("F1").get(0) + " on aligned PB-QA sentences");
 
+        Results nbestOracle = new Results(),   // upperbound on recall from n-best list.
+                nbestQGOracle = new Results(); // upperbound on recall where we can generate questions.
+
         for (int sentIdx = 0; sentIdx < alignedPBSentences.size(); sentIdx ++) {
             // For reference/evaluation only.
             ParallelCorpusReader.Sentence pbSentence = alignedPBSentences.get(sentIdx);
             QASentence qaSentence = alignedQASentences.get(sentIdx);
             SRLParse goldParse = pbSentence.getSrlParse();
 
-            // TODO: get n-best.
+            // TODO: remove duplicates in n-best dependencies
             List<String> words = pbSentence.getWords();
             final List<SRLParser.CCGandSRLparse> nbestParses = parser.parseTokens(
                     InputReader.InputWord.listOf(goldParse.getWords()));
@@ -255,6 +260,9 @@ public class ALTraining {
 
             List<List<Category>> nbestCategories = new ArrayList<>();
             Map<String, RerankingInfo> questionToDeps = new HashMap<>();
+            List<ResolvedDependency> allNBestDependencies = new ArrayList<>();
+            List<ResolvedDependency> allQGDependencies = new ArrayList<>();
+
             for (int nb = 0; nb < nbestParses.size(); nb++) {
                 final SRLParser.CCGandSRLparse parse = nbestParses.get(nb);
                 List<Category> categories = new ArrayList<>();
@@ -264,29 +272,39 @@ public class ALTraining {
                 nbestCategories.add(categories);
                 Collection<ResolvedDependency> dependencies = parse.getDependencyParse();
 
-                // TODO: align output question information with gold dependency or QA dependency.
+                allNBestDependencies.addAll(dependencies);
                 for (ResolvedDependency targetDependency : dependencies) {
                     int predicateIndex = targetDependency.getHead();
                     int argumentNumber = targetDependency.getArgNumber();
+                    // Skip copula verb.
+                    if (VerbHelper.isCopulaVerb(words.get(predicateIndex))) {
+                        continue;
+                    }
                     // Get template.
                     QuestionTemplate template = questionGenerator.getTemplate(predicateIndex, words, categories,
                             dependencies);
                     if (template == null) {
                         continue;
                     }
-
                     // Get question.
                     List<String> question = questionGenerator.generateQuestionFromTemplate(template, argumentNumber);
-                    if (question != null) {
-                        String questionStr = StringUtils.join(question) + " ?";
-                        if (!questionToDeps.containsKey(questionStr)) {
-                            questionToDeps.put(questionStr, new RerankingInfo(nb, targetDependency, template));
-                        }
+                    if (question == null) {
+                        continue;
                     }
-
+                    String questionStr = StringUtils.join(question) + " ?";
+                    if (!questionToDeps.containsKey(questionStr)) {
+                        questionToDeps.put(questionStr, new RerankingInfo(nb, targetDependency, template));
+                    }
+                    allQGDependencies.add(targetDependency);
                 }
             }
 
+            System.out.println(String.format("All NBest dependencies: %d. All NBest QG dependencies: %d.",
+                    allNBestDependencies.size(), allQGDependencies.size()));
+            nbestOracle.add(ActiveLearningEvaluation.evaluate(goldParse.getDependencies(), allNBestDependencies));
+            nbestQGOracle.add(ActiveLearningEvaluation.evaluate(goldParse.getDependencies(), allQGDependencies));
+
+            /*
             for (String questionStr : questionToDeps.keySet()) {
                 RerankingInfo rrDep = questionToDeps.get(questionStr);
                 ResolvedDependency targetDependency = rrDep.targetDependency;
@@ -298,7 +316,8 @@ public class ALTraining {
 
                 // Print sentence and template.
                 String ccgInfo = targetDependency.getCategory() + "_" + targetDependency.getArgNumber();
-                System.out.println("\n" + StringUtils.join(words) + "\n" + ccgInfo);
+                System.out.println(StringUtils.join(words));
+                System.out.println(String.format("#%d\t", rrDep.nBest) + ccgInfo);
                 for (QuestionSlot slot : template.slots) {
                     String slotStr = (slot.argumentNumber == argumentNumber ?
                             String.format("{%s}", slot.toString(words)) : slot.toString(words));
@@ -313,7 +332,12 @@ public class ALTraining {
                 System.out.println(matchedQA == null ? "[no-qa]" : matchedQA.toString(qaSentence.getWords()));
                 System.out.println();
             }
+            */
         }
+
+        System.out.println("Final result: F1=" + alignedDev.get("F1").get(0) + " on aligned PB-QA sentences");
+        System.out.println("N-Best oracle:\n" + nbestOracle.toString());
+        System.out.println("N-Best oracle with QG:\n" + nbestQGOracle.toString());
         return resultsTable;
     }
 
