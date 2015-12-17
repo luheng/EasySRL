@@ -26,6 +26,7 @@ import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.Preposition;
 import edu.uw.easysrl.syntax.model.feature.Clustering;
 import edu.uw.easysrl.syntax.training.ClassifierTrainer.AbstractFeature;
+import edu.uw.easysrl.syntax.training.ClassifierTrainer.AbstractTrainingExample;
 import edu.uw.easysrl.syntax.training.PipelineTrainer.TrainingExample;
 import edu.uw.easysrl.util.Util;
 
@@ -35,8 +36,7 @@ import edu.uw.easysrl.util.Util;
 public class PipelineTrainer extends
 		ClassifierTrainer<TrainingExample, AbstractFeature<TrainingExample, SRLLabel>, SRLLabel> {
 
-	static class TrainingExample extends
-			edu.uw.easysrl.syntax.training.ClassifierTrainer.AbstractTrainingExample<SRLLabel> {
+	static class TrainingExample extends AbstractTrainingExample<SRLLabel> {
 		private final UnlabelledDependency dep;
 		private final List<InputWord> sentence;
 		private final SRLLabel label;
@@ -57,14 +57,12 @@ public class PipelineTrainer extends
 		public SRLLabel getLabel() {
 			return label;
 		}
-
 	}
 
 	public static void main(final String[] args) throws IOException, LBFGSBException {
 		for (final double sigmaSquared : Arrays.asList(0.5)) {
 			Util.serialize(new LabelClassifier(new PipelineTrainer().train(3, sigmaSquared)), new File(
 					"labelClassifier" + sigmaSquared));
-
 		}
 	}
 
@@ -89,22 +87,19 @@ public class PipelineTrainer extends
 	@Override
 	public Collection<AbstractFeature<TrainingExample, SRLLabel>> getFeatures() {
 		final Collection<AbstractFeature<TrainingExample, SRLLabel>> result = new ArrayList<>();
-
 		final List<Clustering> clusterings = new ArrayList<>();
+		/*
 		clusterings.add(new Clustering(new File("testfiles/clusters/clusters.20"), false));
 		clusterings.add(new Clustering(new File("testfiles/clusters/clusters.50"), false));
 		clusterings.add(new Clustering(new File("testfiles/clusters/clusters.250"), false));
 		clusterings.add(new Clustering(new File("testfiles/clusters/clusters.1000"), false));
 		clusterings.add(new Clustering(new File("testfiles/clusters/clusters.2500"), false));
-
+		*/
 		result.addAll(edu.uw.easysrl.syntax.model.feature.BilexicalFeature.getBilexicalFeatures(clusterings, 3)
 				.stream().map(x -> new BilexicalFeatureAdaptor(x)).collect(Collectors.toList()));
-
 		result.addAll(edu.uw.easysrl.syntax.model.feature.ArgumentSlotFeature.argumentSlotFeatures.stream()
 				.map(x -> new ArgumentSlotFeatureAdaptor(x)).collect(Collectors.toList()));
-
 		return result;
-
 	}
 
 	@Override
@@ -193,5 +188,4 @@ public class PipelineTrainer extends
 			}
 		}
 	}
-
 }

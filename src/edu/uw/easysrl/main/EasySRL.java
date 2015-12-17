@@ -76,12 +76,14 @@ public class EasySRL {
 		@Option(shortName = "r", defaultValue = { "S[dcl]", "S[wq]", "S[q]", "S[b]\\NP", "NP" }, description = "(Optional) List of valid categories for the root node of the parse. Defaults to: S[dcl] S[wq] S[q] NP S[b]\\NP")
 		List<Category> getRootCategories();
 
+		@Option(shortName = "p", defaultValue = { "false" }, description = "(Optional) Use the pipeline parser instead of joint.")
+		boolean getUsePipeline();
+
 		@Option(defaultValue = "0.01", description = "(Optional) Prunes lexical categories whose probability is less than this ratio of the best category. Decreasing this value will slightly improve accuracy, and give more varied n-best output, but decrease speed. Defaults to 0.01.")
 		double getSupertaggerbeam();
 
 		@Option(helpRequest = true, description = "Display this message", shortName = "h")
 		boolean getHelp();
-
 	}
 
 	// Set of supported InputFormats
@@ -91,10 +93,14 @@ public class EasySRL {
 
 	// Set of supported OutputFormats
 	public enum OutputFormat {
-		CCGBANK(ParsePrinter.CCGBANK_PRINTER), HTML(ParsePrinter.HTML_PRINTER), SUPERTAGS(ParsePrinter.SUPERTAG_PRINTER), PROLOG(
-				ParsePrinter.PROLOG_PRINTER), EXTENDED(ParsePrinter.EXTENDED_CCGBANK_PRINTER), DEPENDENCIES(
-						new ParsePrinter.DependenciesPrinter()), SRL(ParsePrinter.SRL_PRINTER), LOGIC(
-				ParsePrinter.LOGIC_PRINTER);
+		CCGBANK(ParsePrinter.CCGBANK_PRINTER),
+		HTML(ParsePrinter.HTML_PRINTER),
+		SUPERTAGS(ParsePrinter.SUPERTAG_PRINTER),
+		PROLOG(ParsePrinter.PROLOG_PRINTER),
+		EXTENDED(ParsePrinter.EXTENDED_CCGBANK_PRINTER),
+		DEPENDENCIES(new ParsePrinter.DependenciesPrinter()),
+		SRL(ParsePrinter.SRL_PRINTER),
+		LOGIC(ParsePrinter.LOGIC_PRINTER);
 
 		public final ParsePrinter printer;
 
@@ -104,7 +110,6 @@ public class EasySRL {
 	}
 
 	public static void main(final String[] args) throws IOException, InterruptedException {
-
 		try {
 			final CommandLineArguments commandLineOptions = CliFactory.parseArguments(CommandLineArguments.class, args);
 			final InputFormat input = InputFormat.valueOf(commandLineOptions.getInputFormat().toUpperCase());
@@ -127,9 +132,13 @@ public class EasySRL {
 
 			final OutputFormat outputFormat = OutputFormat.valueOf(commandLineOptions.getOutputFormat().toUpperCase());
 			final ParsePrinter printer = outputFormat.printer;
+			//System.out.println("Use pipeline? " + commandLineOptions.getUsePipeline());
 
 			final SRLParser parser;
-			if (printer.outputsLogic()) {
+			if (commandLineOptions.getUsePipeline()){
+				System.err.println("Using pipeline parser.");
+				parser = pipeline;
+			} else if (printer.outputsLogic()) {
 				// If we're outputing logic, load a lexicon
 				final File lexiconFile = new File(modelFolder, "lexicon");
 				final Lexicon lexicon = lexiconFile.exists() ? CompositeLexicon.makeDefault(lexiconFile)
@@ -233,14 +242,16 @@ public class EasySRL {
 			for (final Category cat : Training.ROOT_CATEGORIES) {
 				rootCats = rootCats + cat + " ";
 			}
-
 			commandLineOptions = CliFactory.parseArguments(CommandLineArguments.class,
 					new String[] { "-m", modelFolder.toString() });
 		} catch (final ArgumentValidationException e) {
 			throw new RuntimeException(e);
 		}
+
 		return makeParser(commandLineOptions,
-				commandLineOptions.getParsingAlgorithm().equals("astar") ? 20000 : 400000, true, supertaggerWeight);
+						  	commandLineOptions.getParsingAlgorithm().equals("astar") ? 20000 : 400000,
+							true /* joint */,
+							supertaggerWeight);
 
 	}
 
