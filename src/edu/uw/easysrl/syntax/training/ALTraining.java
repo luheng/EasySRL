@@ -340,18 +340,21 @@ public class ALTraining {
                 // Print matching information.
                 printPropBankLine(matchedGold, words);
 
+
                 // FIXME: are those indices not aligned? Weird.
                 // System.out.println(matchedQA == null ? "[no-qa]" : matchedQA.toString(qaSentence.getWords()));
                 System.out.println();
             }
             // Print unmatched gold dependencies.
-            System.out.println("[Missed PropBank]");
-            for (int goldIdx = 0; goldIdx < goldDepsList.size(); goldIdx++) {
-                if (!matchedGoldDeps.contains(goldIdx)) {
-                    printPropBankLine(goldDepsList.get(goldIdx), words);
+            if (goldDepsList.size() > matchedGoldDeps.size()) {
+                System.out.println("[Missed PropBank]:");
+                for (int goldIdx = 0; goldIdx < goldDepsList.size(); goldIdx++) {
+                    if (!matchedGoldDeps.contains(goldIdx)) {
+                        printPropBankLine(goldDepsList.get(goldIdx), words);
+                    }
                 }
+                System.out.println();
             }
-            System.out.println();
         }
 
         System.out.println("Final result: F1=" + alignedDev.get("F1").get(0) + " on aligned PB-QA sentences");
