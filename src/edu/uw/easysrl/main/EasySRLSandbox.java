@@ -12,12 +12,23 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import edu.stanford.nlp.util.StringUtils;
+import edu.uw.easysrl.dependencies.Coindexation;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.qasrl.qg.QuestionSlot;
 import edu.uw.easysrl.qasrl.qg.QuestionTemplate;
 import edu.uw.easysrl.qasrl.qg.VerbHelper;
 import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.syntax.model.CutoffsDictionary;
+import edu.uw.easysrl.syntax.model.Model;
+import edu.uw.easysrl.syntax.model.SRLFactoredModel;
+import edu.uw.easysrl.syntax.model.SupertagFactoredModel;
+import edu.uw.easysrl.syntax.model.feature.FeatureSet;
+import edu.uw.easysrl.syntax.parser.Parser;
+import edu.uw.easysrl.syntax.parser.ParserAStar;
+import edu.uw.easysrl.syntax.parser.ParserCKY;
+import edu.uw.easysrl.syntax.tagger.Tagger;
+import edu.uw.easysrl.syntax.tagger.TaggerEmbeddings;
 import uk.co.flamingpenguin.jewel.cli.ArgumentValidationException;
 import uk.co.flamingpenguin.jewel.cli.CliFactory;
 
@@ -43,14 +54,15 @@ public class EasySRLSandbox {
             "The squirrel refused to leave .",
             "I promised the squirrel to give it a nut tomorrow .",
             "They increased the rent from $100,000 to $200,000 .",
-            "The squirrel increased the price from 1 nut to 2 nuts .",
+            "The squirrel increased the demand from 1 nut to 2 nuts .",
             "I want the mug on the table that I usually drink from .",
             "I want the mug on the table that I usually drink water from .",
-            //"Could you pass me the mug on the table that I usually drink from ?",
+            "Could you pass me the mug on the table that I usually drink from ?",
             "Pass me the mug on the table that I usually drink from !",
             "The man with mug was mugged by another man ."
     };
 
+    // TODO: run the same sentences over the pipeline model to see if there's any difference.
     private static QuestionGenerator questionGenerator;
 
     public static void main(final String[] args) throws IOException, InterruptedException {
@@ -72,15 +84,12 @@ public class EasySRLSandbox {
                         false /* joint */, Optional.empty(),
                     commandLineOptions.getNbest()),
                     Util.deserialize(new File(pipelineFolder, "labelClassifier")), posTagger);
-            final OutputFormat outputFormat = OutputFormat.valueOf(commandLineOptions.getOutputFormat().toUpperCase());
-            final ParsePrinter printer = outputFormat.printer;
+            final SRLParser.BackoffSRLParser joint = new SRLParser.BackoffSRLParser(new SRLParser.JointSRLParser(
+                    makeParser(commandLineOptions, 20000, true, Optional.empty()), posTagger), pipeline);
+
             final SRLParser parser = pipeline;
 
             final InputReader reader = InputReader.make(InputFormat.valueOf(commandLineOptions.getInputFormat().toUpperCase()));
-            if ((outputFormat == OutputFormat.PROLOG || outputFormat == OutputFormat.EXTENDED)
-                    && input != InputFormat.POSANDNERTAGGED) {
-                throw new Error("Must use \"-i POSandNERtagged\" for this output");
-            }
             System.err.println("===Model loaded: parsing...===");
 
             // Run over toy sentences.
@@ -101,54 +110,112 @@ public class EasySRLSandbox {
             System.out.println("Unable to parse.");
             return;
         }
+        int sentenceLength = inputWords.size();
         List<String> words = new ArrayList<>();
         List<Category> categories = new ArrayList<>();
-        for (int i = 0; i < inputWords.size(); i++) {
+        for (int i = 0; i < sentenceLength; i++) {
             words.add(parses.get(0).getLeaf(i).getWord());
             categories.add(parses.get(0).getLeaf(i).getCategory());
         }
 
         words.forEach(w -> System.out.print(w + " ")); System.out.println();
-        categories.forEach(cat -> System.out.print(cat + " ")); System.out.println();
+        categories.forEach(cat -> System.out.print(cat + " ")); System.out.println("\n");
 
+        // TODO: we are missing dependencies. Can we output all dependencies here?
         for (CCGandSRLparse parse : parses) {
             Collection<ResolvedDependency> dependencies = parse.getDependencyParse();
-            for (ResolvedDependency targetDependency : dependencies) {
-                int predicateIndex = targetDependency.getHead();
-                int argumentNumber = targetDependency.getArgNumber();
-                // Skip copula verb.
-                if (VerbHelper.isCopulaVerb(words.get(predicateIndex))) {
+            for (int predicateId = 0; predicateId < sentenceLength; predicateId++) {
+            //for (ResolvedDependency targetDependency : dependencies) {
+                String predicateWord = words.get(predicateId);
+                Category predicateCategory = categories.get(predicateId);
+                if (questionGenerator.filterPredicate(predicateWord, predicateCategory)) {
                     continue;
                 }
-                // Get template.
-                QuestionTemplate template = questionGenerator.getTemplate(predicateIndex, words, categories,
-                        dependencies);
-                if (template == null) {
+                System.out.println("\t" + predicateWord + "\t" + predicateCategory);
+                Collection<ResolvedDependency> deps = parse.getOrderedDependenciesAtPredicateIndex(predicateId);
+                if (deps == null || deps.size() == 0) {
+                    System.out.println("\tNo dependencies found for the predicate.");
                     continue;
                 }
-                // Get question.
-                List<String> question = questionGenerator.generateQuestionFromTemplate(template, argumentNumber);
-                if (question == null) {
-                    continue;
-                }
-                String questionStr = StringUtils.join(question) + " ?";
+                for (ResolvedDependency targetDependency : deps) {
+                    if (targetDependency == null) {
+                        continue;
+                    }
+                    int predicateIndex = targetDependency.getHead();
+                    int argumentNumber = targetDependency.getArgNumber();
+                    // TODO: get template using parser.getOrderedDependenciesAtPredicateIndex ..
+                    // Get template.
+                    QuestionTemplate template = questionGenerator.getTemplate(predicateIndex, words, categories,
+                            dependencies);
+                    if (template == null) {
+                        continue;
+                    }
+                    // Get question.
+                    List<String> question = questionGenerator.generateQuestionFromTemplate(template, argumentNumber);
+                    if (question == null) {
+                        continue;
+                    }
+                    String questionStr = StringUtils.join(question) + " ?";
 
-                // Print sentence and template.
-                String ccgInfo = targetDependency.getCategory() + "_" + targetDependency.getArgNumber();
-                System.out.println(ccgInfo);
-                for (QuestionSlot slot : template.slots) {
-                    String slotStr = (slot.argumentNumber == argumentNumber ?
-                            String.format("{%s}", slot.toString(words)) : slot.toString(words));
-                    System.out.print(slotStr + "\t");
+                    // Print sentence and template.
+                    String ccgInfo = targetDependency.getCategory() + "_" + targetDependency.getArgNumber();
+                    System.out.println("\t" + ccgInfo);
+                    System.out.print("\t");
+                    for (QuestionSlot slot : template.slots) {
+                        String slotStr = (slot.argumentNumber == argumentNumber ?
+                                String.format("{%s}", slot.toString(words)) : slot.toString(words));
+                        System.out.print(slotStr + "\t");
+                    }
+                    System.out.println();
+                    // Print question.
+                    System.out.println("\t" + questionStr + "\t" + words.get(targetDependency.getArgumentIndex()));
+                    // Print target dependency.
+                    System.out.println("\t" + words.get(targetDependency.getHead()) + ":" + targetDependency.getSemanticRole() +
+                            "\t" + words.get(targetDependency.getArgumentIndex()));
+                    System.out.println();
                 }
-                System.out.println();
-                // Print question.
-                System.out.println(questionStr + "\t" + words.get(targetDependency.getArgumentIndex()));
-                // Print target dependency.
-                System.out.println(words.get(targetDependency.getHead()) + ":" + targetDependency.getSemanticRole() +
-                        "\t" + words.get(targetDependency.getArgumentIndex()));
-                System.out.println();
             }
         }
+    }
+
+    private static Parser makeParser(final CommandLineArguments commandLineOptions, final int maxChartSize,
+                                     final boolean joint, final Optional<Double> supertaggerWeight) throws IOException {
+        final File modelFolder = Util.getFile(commandLineOptions.getModel());
+        Coindexation.parseMarkedUpFile(new File(modelFolder, "markedup"));
+        final File cutoffsFile = new File(modelFolder, "cutoffs");
+        final CutoffsDictionary cutoffs = cutoffsFile.exists() ? Util.deserialize(cutoffsFile) : null;
+
+        Model.ModelFactory modelFactory;
+        final ParsingAlgorithm algorithm = ParsingAlgorithm.valueOf(commandLineOptions.getParsingAlgorithm()
+                .toUpperCase());
+
+        if (joint) {
+            final double[] weights = Util.deserialize(new File(modelFolder, "weights"));
+            if (supertaggerWeight.isPresent()) {
+                weights[0] = supertaggerWeight.get();
+            }
+            modelFactory = new SRLFactoredModel.SRLFactoredModelFactory(weights,
+                    ((FeatureSet) Util.deserialize(new File(modelFolder, "features")))
+                            .setSupertaggingFeature(new File(modelFolder, "/pipeline"),
+                                    commandLineOptions.getSupertaggerbeam()),
+                    TaggerEmbeddings.loadCategories(new File(modelFolder, "categories")), cutoffs,
+                    Util.deserialize(new File(modelFolder, "featureToIndex")));
+        } else {
+            modelFactory = new SupertagFactoredModel.SupertagFactoredModelFactory(
+                    Tagger.make(modelFolder, commandLineOptions.getSupertaggerbeam(), 50, cutoffs));
+        }
+
+        final Parser parser;
+        final int nBest = commandLineOptions.getNbest();
+        if (algorithm == ParsingAlgorithm.CKY) {
+            parser = new ParserCKY(modelFactory, commandLineOptions.getMaxLength(), nBest,
+                    InputFormat.valueOf(commandLineOptions.getInputFormat().toUpperCase()),
+                    commandLineOptions.getRootCategories(), modelFolder, maxChartSize);
+        } else {
+            parser = new ParserAStar(modelFactory, commandLineOptions.getMaxLength(), nBest,
+                    InputFormat.valueOf(commandLineOptions.getInputFormat().toUpperCase()),
+                    commandLineOptions.getRootCategories(), modelFolder, maxChartSize);
+        }
+        return parser;
     }
 }

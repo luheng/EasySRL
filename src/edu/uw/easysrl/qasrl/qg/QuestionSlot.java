@@ -3,7 +3,6 @@ package edu.uw.easysrl.qasrl.qg;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 import edu.stanford.nlp.util.StringUtils;
-import edu.uw.easysrl.syntax.grammar.Preposition;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -56,26 +55,29 @@ public abstract class QuestionSlot {
     }
 
     public static class ArgumentSlot extends QuestionSlot {
-        public boolean hasPreposition;
-        public Preposition resolvedPreposition;
+        public String preposition;
         public boolean isVerb;
 
-        public ArgumentSlot(int indexInSentence, int argumentNumber, Category argumentCategory) {
+        public ArgumentSlot(int indexInSentence, int argumentNumber, Category argumentCategory, String preposition) {
             super(indexInSentence, argumentNumber, argumentCategory);
-            hasPreposition = argumentCategory.isFunctionInto(Category.PP);
-            resolvedPreposition = null;
+            //hasPreposition = argumentCategory.isFunctionInto(Category.PP);
+            this.preposition = preposition;
             isVerb = argumentCategory.isFunctionInto(Category.valueOf("S\\NP"));
         }
 
         @Override
         public String toString(List<String> sentenceWords) {
+            if (!preposition.isEmpty()) {
+                return String.format("T%d:%s:%s", argumentNumber, category,
+                        preposition + " " + sentenceWords.get(indexInSentence));
+            }
             return String.format("T%d:%s:%s", argumentNumber, category, sentenceWords.get(indexInSentence));
         }
     }
 
     public static class UnrealizedArgumentSlot extends ArgumentSlot {
         public UnrealizedArgumentSlot(int argumentNumber, Category argumentCategory) {
-            super(-1, argumentNumber, argumentCategory);
+            super(-1, argumentNumber, argumentCategory, "");
         }
 
         @Override

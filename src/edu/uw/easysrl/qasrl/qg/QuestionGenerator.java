@@ -135,11 +135,10 @@ public class QuestionGenerator {
             } else if (dep == null) {
                 slot = new UnrealizedArgumentSlot(argNum, argumentCategory);
             } else {
-                slot = new ArgumentSlot(dep.getArgumentIndex(), argNum, argumentCategory);
-                if (slot.hasPreposition && !dep.getPreposition().equals(Preposition.NONE)) {
-                    // TODO: pay attention to resolved PP.
-                    slot.resolvedPreposition = dep.getPreposition();
-                }
+                String ppStr = dep.getPreposition().equals(Preposition.NONE) ? "" :
+                        dep.getPreposition().toString().toLowerCase();
+                slot = new ArgumentSlot(dep.getArgumentIndex(), argNum, argumentCategory, ppStr);
+
             }
             arguments[argNum] = slot;
         }
@@ -181,7 +180,7 @@ public class QuestionGenerator {
             addAll(question, template.getActiveVerb(verbHelper));
             for (int slotId = 2; slotId < template.slots.length; slotId++) {
                 ArgumentSlot argSlot = (ArgumentSlot) template.slots[slotId];
-                if (totalArgs >= 3 && argSlot.hasPreposition) {
+                if (totalArgs >= 3 && !argSlot.preposition.isEmpty()) {
                     continue;
                 }
                 addAll(question, template.getPlaceHolderWordByArgNum(argSlot.argumentNumber));
@@ -200,7 +199,7 @@ public class QuestionGenerator {
         add(question, verb[1]);
         for (int slotId = 2; slotId < template.slots.length; slotId++) {
             ArgumentSlot argSlot = (ArgumentSlot) template.slots[slotId];
-            if (argSlot.argumentNumber == targetArgNum || (totalArgs >= 3 && argSlot.hasPreposition)) {
+            if (argSlot.argumentNumber == targetArgNum || (totalArgs >= 3 && !argSlot.preposition.isEmpty())) {
                 continue;
             }
             addAll(question, template.getPlaceHolderWordByArgNum(argSlot.argumentNumber));
@@ -275,13 +274,16 @@ public class QuestionGenerator {
         for (int argNum = 1; argNum <= numArguments; argNum++) {
             CCGBankDependency dep = argNumToDependency.get(argNum);
             Category argumentCategory = predicateCategory.getArgument(argNum);
-            QuestionSlot slot;
+            ArgumentSlot slot;
             if (dep == null) {
                 slot = new UnrealizedArgumentSlot(argNum, argumentCategory);
             } else if (argumentCategory.equals(Category.PR)) {
                 slot = null;
             } else {
-                slot = new ArgumentSlot(dep.getSentencePositionOfArgument(), argNum, argumentCategory);
+                int argumentIndex = dep.getSentencePositionOfArgument();
+                String ppStr = argumentCategory.isFunctionInto(Category.PP) ?
+                        PrepositionHelper.getPreposition(words, categories, argumentIndex) : "";
+                slot = new ArgumentSlot(argumentIndex, argNum, argumentCategory, ppStr);
             }
             arguments[argNum] = slot;
         }

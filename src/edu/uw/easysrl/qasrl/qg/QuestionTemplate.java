@@ -46,14 +46,6 @@ public class QuestionTemplate {
     public String[] getWhWordByArgNum(int argNum) {
         int slotId = argNumToSlotId.get(argNum);
         ArgumentSlot slot = (ArgumentSlot) slots[slotId];
-        if (slot.hasPreposition) {
-            if (slot.resolvedPreposition == null) {
-                // FIXME: this is a hack. How can we get PPs?
-                String pp = PrepositionHelper.getPreposition(words, categories, slot.indexInSentence);
-                return new String[]{ "what", pp };
-            }
-            return new String[] { "what", slot.resolvedPreposition.toString().toLowerCase() };
-        }
         if (slot.category.isFunctionInto(Category.valueOf("S[to]\\NP"))) {
             return new String[] { "what", "to do" };
         }
@@ -61,9 +53,9 @@ public class QuestionTemplate {
             return new String[] { "what", "doing" };
         }
         if (slotId == 0 && getNumArguments() > 1) {
-            return new String[] { "who", ""};
+            return new String[] { "who", "" };
         }
-        return new String[] { "what", ""};
+        return new String[] { "what", slot.preposition };
     }
 
     // phMapper
@@ -74,7 +66,7 @@ public class QuestionTemplate {
         ArgumentSlot slot = (ArgumentSlot) slots[slotId];
         int argumentIndex = slot.indexInSentence;
         if (UnrealizedArgumentSlot.class.isInstance(slot)) {
-            return new String [] { "", argNum == 1 && getNumArguments() > 1 ? "someone" : "something" };
+            return new String [] { slot.preposition, argNum == 1 && getNumArguments() > 1 ? "someone" : "something" };
         }
         // i.e. say something, says that ...
         if (slot.category.isFunctionInto(Category.valueOf("S"))) {
@@ -88,18 +80,13 @@ public class QuestionTemplate {
         }
         String phStr;
         if (categories.get(argumentIndex).equals(Category.NP)) {
-            //phStr = words.get(argumentIndex).equalsIgnoreCase("who") ? "someone" : "something";
             phStr =  words.get(argumentIndex);
         } else if (argumentIndex > 1 && categories.get(argumentIndex - 1).isFunctionInto(Category.valueOf("NP|N"))) {
             phStr =  words.get(argumentIndex - 1) + " " + words.get(argumentIndex);
         } else {
             phStr = (slotId == 0 && getNumArguments() > 1 ? "someone" : "something");
         }
-        if (slot.hasPreposition) {
-            String pp = PrepositionHelper.getPreposition(words, categories, argumentIndex);
-            return new String[] { pp, phStr };
-        }
-        return new String[] { "", phStr };
+        return new String[] { slot.preposition, phStr };
     }
 
     // i.e. {"", "built"}, or {"might", "build"}
@@ -168,6 +155,14 @@ public class QuestionTemplate {
             }
         }
         return result;
+    }
+
+    public String toString() {
+        String str = "";
+        for (QuestionSlot slot : slots) {
+            str += slot.toString(words) + "\t";
+        }
+        return str.trim();
     }
 
     // i.e. {"was", "built"}, {"have been", "built"}
