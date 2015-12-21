@@ -9,10 +9,6 @@ import java.util.List;
 
 import com.google.common.collect.ImmutableSet;
 
-import edu.uw.easysrl.syntax.model.feature.Feature.BinaryFeature;
-import edu.uw.easysrl.syntax.model.feature.Feature.RootCategoryFeature;
-import edu.uw.easysrl.syntax.model.feature.Feature.UnaryRuleFeature;
-
 public class FeatureSet implements Serializable {
 
 	/**
@@ -46,10 +42,12 @@ public class FeatureSet implements Serializable {
 
 	/**
 	 * Use after de-serializing. Means the supertagger folder can change.
+	 * 
+	 * @param supertaggerBeam
 	 */
-	public FeatureSet setSupertaggingFeature(final File model) throws IOException {
-		return new FeatureSet(new DenseLexicalFeature(model), dependencyFeatures, argumentSlotFeatures,
-				unaryRuleFeatures, prepositionFeatures, rootFeatures, binaryFeatures);
+	public FeatureSet setSupertaggingFeature(final File model, final double supertaggerBeam) throws IOException {
+		return new FeatureSet(new DenseLexicalFeature(model, supertaggerBeam), dependencyFeatures,
+				argumentSlotFeatures, unaryRuleFeatures, prepositionFeatures, rootFeatures, binaryFeatures);
 	}
 
 	public Collection<Feature> getAllFeatures() {

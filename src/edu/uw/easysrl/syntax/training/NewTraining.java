@@ -164,9 +164,9 @@ public class NewTraining {
                                         beta, 70, ROOT_CATEGORIES, baseModel, maxChart, goldBeam);
 
                                 // Features to use
-                                final FeatureSet allFeatures = new FeatureSet(new DenseLexicalFeature(pipeline),
+                                final FeatureSet allFeatures = new FeatureSet(new DenseLexicalFeature(pipeline, 0.0),
                                         BilexicalFeature.getBilexicalFeatures(clusterings, 3),
-                                        ArgumentSlotFeature.argumentSlotFeatures, Feature.unaryRules,
+                                        ArgumentSlotFeature.argumentSlotFeatures, UnaryRuleFeature.unaryRules,
                                         PrepositionFeature.prepositionFeaures, Collections.emptyList(),
                                         Collections.emptyList());
 

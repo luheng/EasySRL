@@ -1,5 +1,6 @@
 package edu.uw.easysrl.syntax.model;
 
+import edu.uw.easysrl.corpora.ParallelCorpusReader;
 import edu.uw.easysrl.dependencies.QALabels;
 import edu.uw.easysrl.dependencies.SRLFrame;
 import edu.uw.easysrl.syntax.grammar.Category;
@@ -20,7 +21,8 @@ public class DummyCutoffsDictionary extends CutoffsDictionary {
     }
 
     @Override
-    protected void make() {
+    protected void make(List<ParallelCorpusReader.Sentence> sentences) {
+        // do nothing
     }
 
     // TODO: I wanted to put this in make(), but then I got a ConcurrentModificationException. Why?

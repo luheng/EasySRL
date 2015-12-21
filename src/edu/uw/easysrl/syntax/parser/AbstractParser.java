@@ -24,9 +24,10 @@ import edu.uw.easysrl.main.EasySRL.InputFormat;
 import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.main.InputReader.InputToParser;
 import edu.uw.easysrl.main.InputReader.InputWord;
-import edu.uw.easysrl.semantics.Lexicon;
 import edu.uw.easysrl.semantics.Logic;
 import edu.uw.easysrl.semantics.LogicParser;
+import edu.uw.easysrl.semantics.lexicon.DefaultLexicon;
+import edu.uw.easysrl.semantics.lexicon.Lexicon;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.Category.Slash;
 import edu.uw.easysrl.syntax.grammar.Combinator;
@@ -45,24 +46,22 @@ import edu.uw.easysrl.util.Util.Scored;
 public abstract class AbstractParser implements Parser {
 
 	public AbstractParser(final Collection<Category> lexicalCategories, final int maxSentenceLength, final int nbest,
-			final double nbestBeam, final InputFormat inputFormat, final List<Category> validRootCategories,
-			final File modelFolder) throws IOException {
-		this(lexicalCategories, maxSentenceLength, nbest, nbestBeam, inputFormat, validRootCategories, new File(
-				modelFolder, "unaryRules"), new File(modelFolder, "binaryRules"), new File(modelFolder, "markedup"),
-				new File(modelFolder, "seenRules"));
+			final InputFormat inputFormat, final List<Category> validRootCategories, final File modelFolder)
+					throws IOException {
+		this(lexicalCategories, maxSentenceLength, nbest, inputFormat, validRootCategories, new File(modelFolder,
+				"unaryRules"), new File(modelFolder, "binaryRules"), new File(modelFolder, "markedup"), new File(
+						modelFolder, "seenRules"));
 	}
 
 	private AbstractParser(final Collection<Category> lexicalCategories, final int maxSentenceLength, final int nbest,
-			final double nbestBeam, final InputFormat inputFormat, final List<Category> validRootCategories,
-			final File unaryRulesFile, final File extraCombinatorsFile, final File markedupFile,
-			final File seenRulesFile) throws IOException {
+			final InputFormat inputFormat, final List<Category> validRootCategories, final File unaryRulesFile,
+			final File extraCombinatorsFile, final File markedupFile, final File seenRulesFile) throws IOException {
 		this.maxLength = maxSentenceLength;
 		this.nbest = nbest;
 		this.unaryRules = loadUnaryRules(unaryRulesFile);
 		this.reader = InputReader.make(inputFormat);
 		this.seenRules = new SeenRules(seenRulesFile, lexicalCategories);
-		this.nbestBeam = Math.log(nbestBeam);
-		DependencyStructure.parseMarkedUpFile(markedupFile);
+		Coindexation.parseMarkedUpFile(markedupFile);
 
 		final List<Combinator> combinators = new ArrayList<>(Combinator.STANDARD_COMBINATORS);
 
@@ -75,18 +74,13 @@ public abstract class AbstractParser implements Parser {
 	}
 
 	protected final int maxLength;
-
 	protected final Collection<Combinator> binaryRules;
 	protected final Multimap<Category, UnaryRule> unaryRules;
 	protected final int nbest;
-	protected final double nbestBeam;
 
 	private final InputReader reader;
-
 	protected final SeenRules seenRules;
-
 	protected final Collection<Category> possibleRootCategories;
-
 	private final Multimap<Integer, Long> sentenceLengthToParseTimeInNanos = HashMultimap.create();
 
 	@Override
@@ -138,6 +132,10 @@ public abstract class AbstractParser implements Parser {
 		public Logic apply(final Logic logic) {
 			return semantics.alphaReduce().apply(logic);
 		}
+
+		public boolean isTypeRaising() {
+			return getCategory().isTypeRaised();
+		}
 	}
 
 	/**
@@ -145,7 +143,7 @@ public abstract class AbstractParser implements Parser {
 	 */
 	public static Multimap<Category, UnaryRule> loadUnaryRules(final File file) throws IOException {
 		final Multimap<Category, UnaryRule> result = HashMultimap.create();
-		final Lexicon lexicon = new Lexicon();
+		final Lexicon lexicon = new DefaultLexicon();
 		for (String line : Util.readFile(file)) {
 			// Allow comments.
 			if (line.startsWith("#")) {
@@ -168,7 +166,7 @@ public abstract class AbstractParser implements Parser {
 			if (fields.length == 3) {
 				logic = LogicParser.fromString(fields[2], cat);
 			} else {
-				logic = lexicon.getEntry(null, "NULL", cat, Coindexation.fromString(to + "/" + from));
+				logic = lexicon.getEntry(null, "NULL", cat, Coindexation.fromString(to + "/" + from, -1));
 			}
 			result.put(Category.valueOf(from), new UnaryRule(result.size(), from, to, logic));
 			// LogicParser.fromString(logic,Category.make(Category.valueOf(to), Slash.FWD,
@@ -180,7 +178,7 @@ public abstract class AbstractParser implements Parser {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see uk.ac.ed.easyccg.syntax.ParserInterface#parse(java.lang.String)
 	 */
 	@Override
@@ -192,30 +190,27 @@ public abstract class AbstractParser implements Parser {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see uk.ac.ed.easyccg.syntax.ParserInterface#parseTokens(java.util.List)
 	 */
 	@Override
 	public List<Scored<SyntaxTreeNode>> parseTokens(final List<String> words) {
 		final InputToParser input = InputToParser.fromTokens(words);
 		final List<Scored<SyntaxTreeNode>> parses = doParsing(input);
-
 		return parses;
 	}
 
 	public static class SuperTaggingResults {
 		public AtomicInteger parsedSentences = new AtomicInteger();
 		public AtomicInteger totalSentences = new AtomicInteger();
-
 		public AtomicInteger rightCats = new AtomicInteger();
 		public AtomicInteger totalCats = new AtomicInteger();
-
 		public AtomicInteger exactMatch = new AtomicInteger();
 	}
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see uk.ac.ed.easyccg.syntax.ParserInterface#parseSentence(uk.ac.ed.easyccg .syntax.Parser.SuperTaggingResults,
 	 * uk.ac.ed.easyccg.syntax.InputReader.InputToParser)
 	 */
@@ -262,7 +257,7 @@ public abstract class AbstractParser implements Parser {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see uk.ac.ed.easyccg.syntax.ParserInterface#doParsing(uk.ac.ed.easyccg.syntax .InputReader.InputToParser)
 	 */
 	@Override
@@ -271,7 +266,6 @@ public abstract class AbstractParser implements Parser {
 			System.err.println("Skipping sentence of length " + input.length());
 			return null;
 		}
-
 		return parseAstar(input.getInputWords());
 	}
 
@@ -303,20 +297,17 @@ public abstract class AbstractParser implements Parser {
 			rightToRules = new HashMap<>();
 			ruleCache.put(left, rightToRules);
 		}
-
 		Collection<RuleProduction> result = rightToRules.get(right);
 		if (result == null) {
 			result = Combinator.getRules(left, right, binaryRules);
 			rightToRules.put(right, ImmutableList.copyOf(result));
 		}
-
 		return result;
 	}
 
 	/**
 	 * Converts a parse into a list of supercategories.
 	 */
-
 	private static List<Category> getSupertags(final SyntaxTreeNode parse) {
 		final GetSupertagsVisitor v = new GetSupertagsVisitor();
 		parse.accept(v);
@@ -455,9 +446,9 @@ public abstract class AbstractParser implements Parser {
 		abstract void addEntry(Object equivalenceClassKey, AgendaItem newEntry);
 
 		abstract int size();
-
 	}
 
+	@Override
 	public int getMaxSentenceLength() {
 		return maxLength;
 	}

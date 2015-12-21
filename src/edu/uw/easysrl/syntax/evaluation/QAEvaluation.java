@@ -2,7 +2,7 @@ package edu.uw.easysrl.syntax.evaluation;
 
 import com.google.common.base.Stopwatch;
 import edu.uw.easysrl.corpora.qa.QASentence;
-import edu.uw.easysrl.dependencies.DependencyStructure.ResolvedDependency;
+import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.dependencies.QADependency;
 import edu.uw.easysrl.dependencies.SRLFrame;
 import edu.uw.easysrl.main.InputReader.InputWord;

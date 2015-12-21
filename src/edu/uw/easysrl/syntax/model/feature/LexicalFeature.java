@@ -6,17 +6,13 @@ import java.util.List;
 import edu.uw.easysrl.main.InputReader.InputWord;
 
 public class LexicalFeature implements Serializable {
-	/**
-	 *
-	 */
 	private static final long serialVersionUID = 8405420478721990473L;
 	private final Clustering clustering;
 	private final String name;
 	private final int offset;
 
 	public LexicalFeature(final Clustering clustering, final int offset) {
-		this.name = (clustering == null ? "word" : clustering.getName())
-				+ ":o=" + offset;
+		this.name = (clustering == null ? "word" : clustering.getName()) + ":o=" + offset;
 		this.clustering = clustering;
 		this.offset = offset;
 	}
@@ -26,12 +22,10 @@ public class LexicalFeature implements Serializable {
 	}
 
 	Object getValue(final List<InputWord> sentence, final int pos) {
-
 		final int wordIndex = pos + getOffset();
 		if (wordIndex < 0 || wordIndex >= sentence.size()) {
 			return "OutOfRange";
 		}
-
 		final String word = sentence.get(wordIndex).lowerCase;
 		if (clustering == null) {
 			return word;
@@ -45,7 +39,6 @@ public class LexicalFeature implements Serializable {
 	}
 
 	public static class POSfeature extends LexicalFeature {
-
 		private static final long serialVersionUID = 1L;
 
 		public POSfeature(final int offset) {
@@ -54,12 +47,10 @@ public class LexicalFeature implements Serializable {
 
 		@Override
 		Object getValue(final List<InputWord> sentence, final int pos) {
-
 			final int wordIndex = pos + getOffset();
 			if (wordIndex < 0 || wordIndex >= sentence.size()) {
 				return "OutOfRange";
 			}
-
 			return sentence.get(wordIndex).pos;
 		}
 	}

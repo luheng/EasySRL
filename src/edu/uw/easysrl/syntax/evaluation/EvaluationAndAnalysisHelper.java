@@ -1,7 +1,7 @@
 package edu.uw.easysrl.syntax.evaluation;
 
 import edu.uw.easysrl.corpora.qa.QASentence;
-import edu.uw.easysrl.dependencies.DependencyStructure.ResolvedDependency;
+import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.dependencies.QADependency;
 import edu.uw.easysrl.dependencies.SRLFrame;
 import edu.uw.easysrl.syntax.parser.SRLParser;
@@ -70,7 +70,7 @@ public class EvaluationAndAnalysisHelper {
     }
 
     public void processMissingDependency(QASentence sentence, QADependency gold) {
-        String output = "missing:\t" + gold.toString(sentence.getWords()) + "\t\t";
+        String output = "missing:\t" + "[" + gold.getLabel() + "]" + gold.toString(sentence.getWords()) + "\t\t";
         addOutput(output);
         labelResults.get(gold.getLabel().toString()).add(new Results(0, 0, 1));
     }

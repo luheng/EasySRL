@@ -10,9 +10,6 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.Collection;
 
-/**
- * Created by luheng on 10/28/15.
- */
 public class TrainingParameters implements Serializable {
     private final int minimumFeatureFrequency;
     /**
@@ -40,9 +37,9 @@ public class TrainingParameters implements Serializable {
     private Object readResolve() {
         // Hack to deal with transient DenseLexicalFeature
         try {
-            return new TrainingParameters(maxDependencyLength, featureSet.setSupertaggingFeature(new File(
-                    modelFolder, "pipeline")), sigmaSquared, minimumFeatureFrequency, modelFolder,
-                    costFunctionWeight);
+            return new TrainingParameters(maxDependencyLength,
+                    featureSet.setSupertaggingFeature(new File(modelFolder, "pipeline"), 0.0),
+                    sigmaSquared, minimumFeatureFrequency, modelFolder, costFunctionWeight);
         } catch (final IOException e) {
             throw new RuntimeException(e);
         }

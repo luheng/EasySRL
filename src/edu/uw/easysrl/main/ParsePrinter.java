@@ -12,7 +12,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSet;
 
 import edu.uw.easysrl.corpora.CCGBankDependencies;
-import edu.uw.easysrl.dependencies.DependencyStructure.ResolvedDependency;
+import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.dependencies.SRLFrame;
 import edu.uw.easysrl.lemmatizer.MorphaStemmer;
 import edu.uw.easysrl.semantics.Logic;
@@ -81,15 +81,15 @@ public abstract class ParsePrinter {
 		return result.toString();
 	}
 
-	abstract void printFileHeader(StringBuilder result);
+  protected abstract void printFileHeader(StringBuilder result);
 
-	abstract void printFailure(StringBuilder result);
+	protected abstract void printFailure(StringBuilder result);
 
-	abstract void printHeader(int id, StringBuilder result);
+	protected abstract void printHeader(int id, StringBuilder result);
 
-	abstract void printFooter(StringBuilder result);
+	protected abstract void printFooter(StringBuilder result);
 
-	abstract void printParse(SyntaxTreeNode parse, int sentenceNumber, StringBuilder result);
+	protected abstract void printParse(SyntaxTreeNode parse, int sentenceNumber, StringBuilder result);
 
 	private abstract static class ParsePrinterVisitor implements SyntaxTreeNodeVisitor {
 		final StringBuilder result;
@@ -103,7 +103,7 @@ public abstract class ParsePrinter {
 	public static class CCGBankPrinter extends ParsePrinter {
 
 		@Override
-		void printFailure(final StringBuilder result) {
+		protected void printFailure(final StringBuilder result) {
 			result.append("(<L NP NN NN fail N>)");
 		}
 
@@ -177,25 +177,25 @@ public abstract class ParsePrinter {
 		}
 
 		@Override
-		void printHeader(final int id, final StringBuilder result) {
+		protected void printHeader(final int id, final StringBuilder result) {
 			result.append("ID=" + id + "\n");
 		}
 
 		@Override
-		void printFooter(final StringBuilder result) {
+		protected void printFooter(final StringBuilder result) {
 		}
 
 		@Override
-		void printParse(final SyntaxTreeNode parse, final int sentenceNumber, final StringBuilder result) {
+		protected void printParse(final SyntaxTreeNode parse, final int sentenceNumber, final StringBuilder result) {
 			printParse(parse, result);
 		}
 
-		void printParse(final SyntaxTreeNode parse, final StringBuilder result) {
+		protected void printParse(final SyntaxTreeNode parse, final StringBuilder result) {
 			parse.accept(new CCGBankParsePrinterVisitor(result));
 		}
 
 		@Override
-		void printFileHeader(final StringBuilder result) {
+		protected void printFileHeader(final StringBuilder result) {
 		}
 
 		public String print(final SyntaxTreeNode syntaxTreeNode) {
@@ -205,7 +205,7 @@ public abstract class ParsePrinter {
 		}
 
 		@Override
-		boolean outputsLogic() {
+		protected boolean outputsLogic() {
 			return false;
 		}
 	}
@@ -213,23 +213,23 @@ public abstract class ParsePrinter {
 	private static class SRLprinter extends ParsePrinter {
 
 		@Override
-		void printFileHeader(final StringBuilder result) {
+		protected void printFileHeader(final StringBuilder result) {
 		}
 
 		@Override
-		void printFailure(final StringBuilder result) {
+		protected void printFailure(final StringBuilder result) {
 		}
 
 		@Override
-		void printHeader(final int id, final StringBuilder result) {
+		protected void printHeader(final int id, final StringBuilder result) {
 		}
 
 		@Override
-		void printFooter(final StringBuilder result) {
+		protected void printFooter(final StringBuilder result) {
 		}
 
 		@Override
-		void printParse(final SyntaxTreeNode parse, final int sentenceNumber, final StringBuilder result) {
+		protected void printParse(final SyntaxTreeNode parse, final int sentenceNumber, final StringBuilder result) {
 			final List<ResolvedDependency> deps = parse.getAllLabelledDependencies();
 			for (final ResolvedDependency dep : deps) {
 				// output = output + "\n" + dep.toString();
@@ -270,7 +270,7 @@ public abstract class ParsePrinter {
 			for (int i = 1; i <= category.getNumberOfArguments(); i++) {
 				if (category.getArgument(i) == Category.PR) {
 					for (final ResolvedDependency dep : parse.getAllLabelledDependencies()) {
-						if (dep.getPredicateIndex() == index && dep.getArgNumber() == i) {
+						if (dep.getHead() == index && dep.getArgNumber() == i) {
 							final String particle = parse.getLeaves().get(dep.getArgumentIndex()).getWord();
 							return result + "_" + particle;
 						}
@@ -314,19 +314,19 @@ public abstract class ParsePrinter {
 		}
 
 		@Override
-		boolean outputsLogic() {
+		protected boolean outputsLogic() {
 			return false;
 		}
 	}
 
 	private static class HTMLPrinter extends ParsePrinter {
 		@Override
-		void printFailure(final StringBuilder result) {
+		protected void printFailure(final StringBuilder result) {
 			result.append("<p>Parse failed!</p>");
 		}
 
 		@Override
-		void printHeader(final int id, final StringBuilder result) {
+		protected void printHeader(final int id, final StringBuilder result) {
 
 			result.append("<script>\n"
 					+ "function drawArrowhead(ctx, locx, locy, angle, sizex, sizey) {\n"
@@ -352,13 +352,15 @@ public abstract class ParsePrinter {
 					+ "function draw(context, startElement, endElement, label, id) {\n"
 					+ "      var start  = document.getElementById('w' + startElement + '.' + id).getBoundingClientRect();;\n"
 					+ "      var end  = document.getElementById('w' + endElement + '.' + id).getBoundingClientRect();;\n"
-					+ "\n"
+					+ "      var margin = document.getElementById('myCanvas"
+					+ (parseID.get())
+					+ "').getBoundingClientRect().left;\n"
 					+ "      var sx = (start.left + start.right) / 2 - 0;\n"
 					+ "      var ex = (end.left + end.right) / 2  - 0;\n"
 					+ "      if (ex < sx) { ex = ex + 8; } else { ex = ex - 8; }"
 					+ ""
 					+ "\n"
-					+ "      var x = (sx + ex) / 2;\n"
+					+ "      var x = ((sx + ex) / 2) - margin;\n"
 					+ "\n"
 					+ "      var theta = 0.2 * Math.PI;\n"
 					+ "      var radius = Math.abs(ex - sx) / (2 * Math.sin(theta));\n"
@@ -396,7 +398,7 @@ public abstract class ParsePrinter {
 		}
 
 		@Override
-		void printFooter(final StringBuilder result) {
+		protected void printFooter(final StringBuilder result) {
 
 			result.append("</body>\n" + "</html>");
 		}
@@ -422,7 +424,7 @@ public abstract class ParsePrinter {
 		private final AtomicInteger parseID = new AtomicInteger();
 
 		@Override
-		void printParse(final SyntaxTreeNode parse, final int sentenceNumber, final StringBuilder result) {
+		protected void printParse(final SyntaxTreeNode parse, final int sentenceNumber, final StringBuilder result) {
 			final int numWords = parse.getLeaves().size();
 			final int id = parseID.getAndIncrement();
 
@@ -482,7 +484,7 @@ public abstract class ParsePrinter {
 					} else {
 						// Draw in some extra CCG dependencies for nouns and adjectives.
 						label = "";
-						from = dep.getPredicateIndex();
+						from = dep.getHead();
 						to = dep.getArgumentIndex();
 					}
 
@@ -497,8 +499,8 @@ public abstract class ParsePrinter {
 		 * Decide which dependencies are worth showing.
 		 */
 		private boolean showDependency(final ResolvedDependency dep, final SyntaxTreeNode parse) {
-			final SyntaxTreeNodeLeaf predicateNode = parse.getLeaves().get(dep.getPredicateIndex());
-			if (dep.getPredicateIndex() == dep.getArgumentIndex()) {
+			final SyntaxTreeNodeLeaf predicateNode = parse.getLeaves().get(dep.getHead());
+			if (dep.getHead() == dep.getArgumentIndex()) {
 				return false;
 			} else if (dep.getSemanticRole() != SRLFrame.NONE) {
 				return true;
@@ -541,7 +543,7 @@ public abstract class ParsePrinter {
 		}
 
 		@Override
-		void printFileHeader(final StringBuilder result) {
+		protected void printFileHeader(final StringBuilder result) {
 		}
 
 		int getRows(final SyntaxTreeNode node, final List<List<SyntaxTreeNode>> result, final int minIndentation) {
@@ -602,7 +604,7 @@ public abstract class ParsePrinter {
 		}
 
 		@Override
-		boolean outputsLogic() {
+		protected boolean outputsLogic() {
 			return true;
 		}
 	}
@@ -610,23 +612,23 @@ public abstract class ParsePrinter {
 	private static class SupertagPrinter extends ParsePrinter {
 
 		@Override
-		void printFileHeader(final StringBuilder result) {
+		protected void printFileHeader(final StringBuilder result) {
 		}
 
 		@Override
-		void printFailure(final StringBuilder result) {
+		protected void printFailure(final StringBuilder result) {
 		}
 
 		@Override
-		void printHeader(final int id, final StringBuilder result) {
+		protected void printHeader(final int id, final StringBuilder result) {
 		}
 
 		@Override
-		void printFooter(final StringBuilder result) {
+		protected void printFooter(final StringBuilder result) {
 		}
 
 		@Override
-		void printParse(final SyntaxTreeNode parse, final int sentenceNumber, final StringBuilder result) {
+		protected void printParse(final SyntaxTreeNode parse, final int sentenceNumber, final StringBuilder result) {
 			// word|pos|tag word|pos|tag word|pos|tag
 			boolean isFirst = true;
 			for (final SyntaxTreeNodeLeaf word : parse.getLeaves()) {
@@ -642,7 +644,7 @@ public abstract class ParsePrinter {
 		}
 
 		@Override
-		boolean outputsLogic() {
+		protected boolean outputsLogic() {
 			return false;
 		}
 	}
@@ -650,23 +652,23 @@ public abstract class ParsePrinter {
 	private static class LogicPrinter extends ParsePrinter {
 
 		@Override
-		void printFileHeader(final StringBuilder result) {
+		protected void printFileHeader(final StringBuilder result) {
 		}
 
 		@Override
-		void printFailure(final StringBuilder result) {
+		protected void printFailure(final StringBuilder result) {
 		}
 
 		@Override
-		void printHeader(final int id, final StringBuilder result) {
+		protected void printHeader(final int id, final StringBuilder result) {
 		}
 
 		@Override
-		void printFooter(final StringBuilder result) {
+		protected void printFooter(final StringBuilder result) {
 		}
 
 		@Override
-		void printParse(final SyntaxTreeNode parse, final int sentenceNumber, final StringBuilder result) {
+		protected void printParse(final SyntaxTreeNode parse, final int sentenceNumber, final StringBuilder result) {
 			final List<List<ResolvedDependency>> labels = new ArrayList<>();
 			for (final SyntaxTreeNodeLeaf leaf : parse.getLeaves()) {
 				labels.add(new ArrayList<>(leaf.getCategory().getNumberOfArguments()));
@@ -677,7 +679,7 @@ public abstract class ParsePrinter {
 
 			for (final ResolvedDependency dep : parse.getAllLabelledDependencies()) {
 
-				final List<ResolvedDependency> labelsForWord = labels.get(dep.getPredicateIndex());
+				final List<ResolvedDependency> labelsForWord = labels.get(dep.getHead());
 				if (dep.getArgumentIndex() > -1) {
 					labelsForWord.set(dep.getArgNumber() - 1, dep);
 				}
@@ -690,7 +692,7 @@ public abstract class ParsePrinter {
 		}
 
 		@Override
-		boolean outputsLogic() {
+		protected boolean outputsLogic() {
 			return true;
 		}
 	}
@@ -699,7 +701,7 @@ public abstract class ParsePrinter {
 
 		/*
 		 * ccg(2, ba('S[dcl]', lf(2,1,'NP'), fa('S[dcl]\NP', lf(2,2,'(S[dcl]\NP)/NP'), lex('N','NP', lf(2,3,'N'))))).
-		 * 
+		 *
 		 * w(2, 1, 'I', 'I', 'PRP', 'I-NP', 'O', 'NP'). w(2, 2, 'like', 'like', 'VBP', 'I-VP', 'O', '(S[dcl]\NP)/NP').
 		 * w(2, 3, 'cake', 'cake', 'NN', 'I-NP', 'O', 'N').
 		 */
@@ -732,25 +734,25 @@ public abstract class ParsePrinter {
 		}
 
 		@Override
-		void printFileHeader(final StringBuilder result) {
+		protected void printFileHeader(final StringBuilder result) {
 			result.append(":- multifile w/8, ccg/2, id/2.\n" + ":- discontiguous w/8, ccg/2, id/2.\n"
 					+ ":- dynamic w/8, ccg/2, id/2.\n" + "\n" + "");
 		}
 
 		@Override
-		void printFailure(final StringBuilder result) {
+		protected void printFailure(final StringBuilder result) {
 		}
 
 		@Override
-		void printHeader(final int id, final StringBuilder result) {
+		protected void printHeader(final int id, final StringBuilder result) {
 		}
 
 		@Override
-		void printFooter(final StringBuilder result) {
+		protected void printFooter(final StringBuilder result) {
 		}
 
 		@Override
-		void printParse(final SyntaxTreeNode parse, final int sentenceNumber, final StringBuilder result) {
+		protected void printParse(final SyntaxTreeNode parse, final int sentenceNumber, final StringBuilder result) {
 			printDerivation(parse, sentenceNumber, result);
 			result.append("\n");
 
@@ -826,7 +828,7 @@ public abstract class ParsePrinter {
 		}
 
 		@Override
-		boolean outputsLogic() {
+		protected boolean outputsLogic() {
 			return false;
 		}
 
@@ -843,7 +845,7 @@ public abstract class ParsePrinter {
 	private static class ExtendedCCGBankPrinter extends ParsePrinter {
 
 		@Override
-		void printFailure(final StringBuilder result) {
+		protected void printFailure(final StringBuilder result) {
 		}
 
 		private class CCGBankParsePrinterVisitor extends ParsePrinterVisitor {
@@ -914,25 +916,25 @@ public abstract class ParsePrinter {
 		}
 
 		@Override
-		void printHeader(final int id, final StringBuilder result) {
+		protected void printHeader(final int id, final StringBuilder result) {
 			result.append("ID=" + id + "\n");
 		}
 
 		@Override
-		void printFooter(final StringBuilder result) {
+		protected void printFooter(final StringBuilder result) {
 		}
 
 		@Override
-		void printParse(final SyntaxTreeNode parse, final int sentenceNumber, final StringBuilder result) {
+		protected void printParse(final SyntaxTreeNode parse, final int sentenceNumber, final StringBuilder result) {
 			parse.accept(new CCGBankParsePrinterVisitor(result));
 		}
 
 		@Override
-		void printFileHeader(final StringBuilder result) {
+		protected void printFileHeader(final StringBuilder result) {
 		}
 
 		@Override
-		boolean outputsLogic() {
+		protected boolean outputsLogic() {
 			return false;
 		}
 
@@ -941,26 +943,26 @@ public abstract class ParsePrinter {
 	public static class DependenciesPrinter extends ParsePrinter {
 
 		@Override
-		void printFileHeader(final StringBuilder result) {
+		protected void printFileHeader(final StringBuilder result) {
 			result.append("Empty header\n");
 			result.append("To keep C&C evaluate script happy\n");
 			result.append("\n");
 		}
 
 		@Override
-		void printFailure(final StringBuilder result) {
+		protected void printFailure(final StringBuilder result) {
 		}
 
 		@Override
-		void printHeader(final int id, final StringBuilder result) {
+		protected void printHeader(final int id, final StringBuilder result) {
 		}
 
 		@Override
-		void printFooter(final StringBuilder result) {
+		protected void printFooter(final StringBuilder result) {
 		}
 
 		@Override
-		void printParse(final SyntaxTreeNode parse, final int sentenceNumber, final StringBuilder result) {
+		protected void printParse(final SyntaxTreeNode parse, final int sentenceNumber, final StringBuilder result) {
 			/*
 			 * Pierre_1 (N{Y}/N{Y}<1>){_} 1 Vinken_2 0 61_4 (N{Y}/N{Y}<1>){_} 1 years_5 0 old_6
 			 * ((S[adj]{_}\NP{Y}<1>){_}\NP{Z}<2>){_} 2 years_5 0 old_6 ((S[adj]{_}\NP{Y}<1>){_}\NP{Z}<2>){_} 1 Vinken_2
@@ -995,13 +997,13 @@ public abstract class ParsePrinter {
 		}
 
 		@Override
-		boolean outputsLogic() {
+		protected boolean outputsLogic() {
 			return false;
 		}
 
 	}
 
-	abstract boolean outputsLogic();
+  protected abstract boolean outputsLogic();
 
 	public String printJointParses(final List<CCGandSRLparse> parses, final int id) {
 		return print(parses == null ? null : parses.stream().map(x -> x.getCcgParse()).collect(Collectors.toList()), id);

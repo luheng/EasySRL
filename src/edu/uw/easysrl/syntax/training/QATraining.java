@@ -17,7 +17,6 @@ import edu.uw.easysrl.syntax.tagger.TagDict;
 import edu.uw.easysrl.syntax.tagger.TaggerEmbeddings;
 import edu.uw.easysrl.util.TrainingUtils;
 import edu.uw.easysrl.util.Util;
-import lbfgsb.DifferentiableFunction;
 
 import java.io.File;
 import java.io.IOException;
@@ -61,36 +60,44 @@ public class QATraining {
         QATrainingDataLoader dataLoader = new QATrainingDataLoader(cutoffsDictionary, dataParameters,
                 true /* backoff */);
         final Set<Feature.FeatureKey> boundedFeatures = new HashSet<>();
+        /**
+         * Extract features.
+         */
         TrainingFeatureHelper featureHelper = new TrainingFeatureHelper(trainingParameters, dataParameters);
         final Map<FeatureKey, Integer> featureToIndex = featureHelper
                 .makeKeyToIndexMap(QACorpusReader.getReader(trainingDomain).readTrainingCorpus(),
                                    trainingParameters.getMinimumFeatureFrequency(),
                                    boundedFeatures);
         System.out.println("Number of features:\t" + featureToIndex.size());
-        final List<Optimization.TrainingExample> data =
-                dataLoader.makeTrainingData(QACorpusReader.getReader(trainingDomain).readEvaluationCorpus(), true);
+
+        /**
+         * Load training data.
+         */
+        final List<Optimization.TrainingExample> data = dataLoader.makeTrainingData(
+                QACorpusReader.getReader(trainingDomain).readTrainingCorpus(), true);
+
+        /**
+         * Create loss function.
+         */
         final Optimization.LossFunction lossFunction = Optimization.getLossFunction(data, featureToIndex,
                 trainingParameters, trainingLogger);
-        final double[] weights = train(lossFunction, featureToIndex, boundedFeatures);
-        return weights;
-    }
 
-    private double[] train(final DifferentiableFunction lossFunction,
-                           final Map<Feature.FeatureKey, Integer> featureToIndex,
-                           final Set<Feature.FeatureKey> boundedFeatures) throws IOException {
         trainingParameters.getModelFolder().mkdirs();
         final double[] weights = new double[featureToIndex.size()];
-        // Do training
+        /**
+         * Train!
+         */
         trainingLogger.log("Starting Training");
         Optimization.TrainingAlgorithm algorithm = Optimization.makeLBFGS(featureToIndex, boundedFeatures);
         algorithm.train(lossFunction, weights);
         trainingLogger.log("Training Completed");
 
-        // Save model
+        /**
+         * Save model.
+         */
         Util.serialize(weights, trainingParameters.getWeightsFile());
         Util.serialize(trainingParameters.getFeatureSet(), trainingParameters.getFeaturesFile());
         Util.serialize(featureToIndex, trainingParameters.getFeatureToIndexFile());
-
         final File modelFolder = trainingParameters.getModelFolder();
         modelFolder.mkdirs();
         Files.copy(new File(dataParameters.getExistingModel(), "categories"), new File(modelFolder, "categories"));
@@ -99,6 +106,7 @@ public class QATraining {
         Files.copy(new File(dataParameters.getExistingModel(), "unaryRules"), new File(modelFolder, "unaryRules"));
         Files.copy(new File(dataParameters.getExistingModel(), "markedup"), new File(modelFolder, "markedup"));
         Files.copy(new File(dataParameters.getExistingModel(), "seenRules"), new File(modelFolder, "seenRules"));
+
         return weights;
     }
 
@@ -124,6 +132,9 @@ public class QATraining {
                 QACorpusReader.getReader(evaluationDomain).getDevCorpus(),
                 maxSentenceLength,
                 trainingParameters.getResultsFile());
+        if (evaluationDomain.contains("newswire")) {
+            // TODO: get aligned sentences
+        }
         System.out.println("Final result: F1=" + results.getF1());
     }
 
@@ -171,10 +182,10 @@ public class QATraining {
                                 final TrainingDataParameters dataParameters = new TrainingDataParameters(
                                                 beta, 70, ROOT_CATEGORIES, baseModel, maxChart, goldBeam);
                                 final FeatureSet allFeatures = new FeatureSet(
-                                        new DenseLexicalFeature(pipeline),
+                                        new DenseLexicalFeature(pipeline, 0.0),
                                         BilexicalFeature.getBilexicalFeatures(clusterings, 3),
                                         ArgumentSlotFeature.argumentSlotFeatures,
-                                        Feature.unaryRules,
+                                        UnaryRuleFeature.unaryRules,
                                         PrepositionFeature.prepositionFeaures,
                                         Collections.emptyList(), /* root features */
                                         Collections.emptyList()  /* binary features */);

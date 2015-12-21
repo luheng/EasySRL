@@ -19,7 +19,7 @@ public class Results {
 		this(0, 0, 0);
 	}
 
-	void add(final Results other) {
+	public void add(final Results other) {
 		parseDependencies.addAndGet(other.parseDependencies.get());
 		correctDependencies.addAndGet(other.correctDependencies.get());
 		goldDependencies.addAndGet(other.goldDependencies.get());

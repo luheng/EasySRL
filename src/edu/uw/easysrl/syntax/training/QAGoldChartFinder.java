@@ -7,8 +7,8 @@ import edu.stanford.nlp.util.StringUtils;
 import edu.uw.easysrl.corpora.qa.QASentence;
 import edu.uw.easysrl.dependencies.DependencyStructure;
 import edu.uw.easysrl.dependencies.QADependency;
+import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.dependencies.SRLFrame;
-import edu.uw.easysrl.syntax.grammar.Preposition;
 import edu.uw.easysrl.syntax.model.CutoffsDictionary;
 
 
@@ -140,10 +140,10 @@ public class QAGoldChartFinder {
         if (children.size() == 0) {
             return new Scored<>(value, 0);
         }
-        final Collection<DependencyStructure.ResolvedDependency> dependencies = value.getDependencies();
+        final Collection<ResolvedDependency> dependencies = value.getDependencies();
         final Set<QADependency> missingDeps;
         int score;
-        final Set<DependencyStructure.ResolvedDependency> labelledDeps;
+        final Set<ResolvedDependency> labelledDeps;
         if (dependencies.size() > 0) {
             labelledDeps = new HashSet<>(dependencies.size());
             final Set<QADependency> matchedDeps = getMatchedDeps(goldDeps, dependencies, cutoffs, labelledDeps);
@@ -180,18 +180,18 @@ public class QAGoldChartFinder {
      * Finds the set of SRL dependencies that match dependencies resolved at this node
      */
     private Set<QADependency> getMatchedDeps(final Set<QADependency> goldDeps,
-                                             final Collection<DependencyStructure.ResolvedDependency> dependencies,
+                                             final Collection<ResolvedDependency> dependencies,
                                              final CutoffsDictionary cutoffs,
-                                             final Collection<DependencyStructure.ResolvedDependency> newDeps) {
+                                             final Collection<ResolvedDependency> newDeps) {
         final Set<QADependency> matchedDeps = new HashSet<>(dependencies.size());
-        for (final DependencyStructure.ResolvedDependency dep : dependencies) {
-            final int predicateIndex = dep.getPredicateIndex();
+        for (final ResolvedDependency dep : dependencies) {
+            final int predicateIndex = dep.getHead();
             final int argumentIndex = predicateIndex + dep.getOffset();
             boolean isSRL = false;
             for (final QADependency qa : goldDeps) {
                 if (!matchedDeps.contains(qa)
                         && cutoffs.isFrequent(dep.getCategory(), dep.getArgNumber(), qa.getLabel())
-                        && cutoffs.getRoles(completeChart.getWords().get(dep.getPredicateIndex()).word,
+                        && cutoffs.getRoles(completeChart.getWords().get(dep.getHead()).word,
                                             dep.getCategory(), dep.getPreposition(),
                                             dep.getArgNumber()).contains(qa.getLabel())
                         && qa.match(predicateIndex, argumentIndex, dep.getPreposition())) {

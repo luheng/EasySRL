@@ -2,9 +2,10 @@ package edu.uw.easysrl.syntax.model;
 
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Multiset;
+import edu.uw.easysrl.corpora.ParallelCorpusReader;
 import edu.uw.easysrl.corpora.qa.QACorpusReader;
 import edu.uw.easysrl.corpora.qa.QASentence;
-import edu.uw.easysrl.dependencies.DependencyStructure.ResolvedDependency;
+import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.dependencies.QADependency;
 import edu.uw.easysrl.dependencies.SRLFrame;
 import edu.uw.easysrl.main.InputReader;
@@ -28,19 +29,19 @@ public class QACutoffsDictionary extends CutoffsDictionary {
                                TrainingDataParameters dataParameters) {
         super(lexicalCategories, tagDict, maxDependencyLength);
         try {
-            makeAfterContruction(new CCGHelper(dataParameters, true /* backoff */));
+            makeAfterConstruction(new CCGHelper(dataParameters, true /* backoff */));
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
     @Override
-    protected void make() throws IOException {
+    protected void make(List<ParallelCorpusReader.Sentence> sentences) throws IOException {
         // do nothing
     }
 
     // Really hakcy ...
-    private void makeAfterContruction(CCGHelper ccgHelper) throws IOException {
+    private void makeAfterConstruction(CCGHelper ccgHelper) throws IOException {
         final Map<String, Multiset<SRLFrame.SRLLabel>> keyToRole = new HashMap<>();
         for (final SRLFrame.SRLLabel label : SRLFrame.getAllSrlLabels()) {
             srlToOffset.put(label, HashMultiset.create());
@@ -57,7 +58,7 @@ public class QACutoffsDictionary extends CutoffsDictionary {
             for (int wordIndex = 0; wordIndex < sentence.getSentenceLength(); wordIndex++) {
                 for (Category category : allCategories.get(wordIndex)) {
                     for (ResolvedDependency ccgDep : smallChart.getAllDependencies()) {
-                        if (ccgDep.getPredicateIndex() != wordIndex ||
+                        if (ccgDep.getHead() != wordIndex ||
                                 ccgDep.getArgNumber() > category.getNumberOfArguments()) {
                             // If CCG dependency corresponds to the category.
                             continue;
@@ -69,7 +70,7 @@ public class QACutoffsDictionary extends CutoffsDictionary {
                             continue;
                         }
                         for (QADependency qaDep : matchedQADependencies) {
-                            final int offset = ccgDep.getArgumentIndex() - ccgDep.getPredicateIndex();
+                            final int offset = ccgDep.getArgumentIndex() - ccgDep.getHead();
                             for (int i = Math.min(offset, 0); i <= Math.max(offset, 0); i++) {
                                 if (i != 0 && Math.abs(offset) <= maxDependencyLength) {
                                     // For a word at -5, also at -4,-3,-2,-1

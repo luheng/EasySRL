@@ -1,5 +1,6 @@
 package edu.uw.easysrl.dependencies;
 
+import edu.uw.easysrl.corpora.ParallelCorpusReader;
 import edu.uw.easysrl.corpora.qa.QASlots;
 import edu.uw.easysrl.corpora.qa.QuestionEncoder;
 import edu.uw.easysrl.dependencies.SRLFrame.SRLLabel;
@@ -94,6 +95,25 @@ public class QADependency implements Serializable {
         return question;
     }
 
+    public String getQuestionString() {
+        String result = "";
+        for (String w : question) {
+            if (!w.equals("_")) {
+                result += w + " ";
+            }
+        }
+        return result + "?";
+    }
+
+    public String getAnswerString(List<String> words) {
+        String result = "";
+        for (final int i : answerIndices) {
+            result += words.get(i) + " ";
+        }
+        return result.trim();
+    }
+
+
     public SRLLabel getLabel() {
         return label;
     }
@@ -126,12 +146,12 @@ public class QADependency implements Serializable {
 
     /** Below: various matching functions ... **/
 
-    public boolean labeledMatch(DependencyStructure.ResolvedDependency ccgDep) {
+    public boolean labeledMatch(ResolvedDependency ccgDep) {
         return label == ccgDep.getSemanticRole() && unlabeledMatch(ccgDep);
     }
 
-    public boolean unlabeledMatch(DependencyStructure.ResolvedDependency ccgDep) {
-        return unlabeledMatch(ccgDep.getPredicateIndex(), ccgDep.getArgumentIndex());
+    public boolean unlabeledMatch(ResolvedDependency ccgDep) {
+        return unlabeledMatch(ccgDep.getHead(), ccgDep.getArgumentIndex());
     }
 
     public boolean match(final int otherPredicate, final int otherArgument, final Preposition otherPreposition) {
@@ -139,8 +159,8 @@ public class QADependency implements Serializable {
                 Preposition.fromString(preposition) == otherPreposition;
     }
 
-    public boolean forwardUnlabeledMatch(DependencyStructure.ResolvedDependency ccgDep) {
-        return predicateIndex == ccgDep.getPredicateIndex() && answerIndices.contains(ccgDep.getArgumentIndex());
+    public boolean forwardUnlabeledMatch(ResolvedDependency ccgDep) {
+        return predicateIndex == ccgDep.getHead() && answerIndices.contains(ccgDep.getArgumentIndex());
     }
 
     private boolean unlabeledMatch(final int otherPredicate, final int otherArgument) {

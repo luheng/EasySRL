@@ -2,22 +2,16 @@ package edu.uw.easysrl.syntax.model;
 
 import java.io.IOException;
 import java.io.Serializable;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
 
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Multiset;
 import com.google.common.collect.Table;
 
-import edu.uw.easysrl.corpora.ParallelCorpusReader;
 import edu.uw.easysrl.corpora.CCGBankDependencies.CCGBankDependency;
+import edu.uw.easysrl.corpora.ParallelCorpusReader;
 import edu.uw.easysrl.corpora.ParallelCorpusReader.Sentence;
 import edu.uw.easysrl.dependencies.SRLDependency;
 import edu.uw.easysrl.dependencies.SRLFrame;
@@ -49,13 +43,37 @@ public class CutoffsDictionary implements Serializable {
 							 final int maxDependencyLength) {
 		try {
 			this.maxDependencyLength = maxDependencyLength;
-			make();
+			Iterator<Sentence> iterator = ParallelCorpusReader.READER.readCorpus(false /* read training */);
+			List<Sentence> trainingSentences = new ArrayList<>();
+			while (iterator.hasNext()) {
+				trainingSentences.add(iterator.next());
+			}
+			make(trainingSentences);
 			if (tagDict != null) {
 				for (final Collection<Category> tagsForWord : tagDict.values()) {
 					tagsForWord.retainAll(lexicalCategories);
 				}
 			}
 			this.wordToCategory = tagDict;
+			this.lexicalCategories.addAll(lexicalCategories);
+		} catch (final IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	public CutoffsDictionary(final Collection<Category> lexicalCategories,
+							 final Map<String, Collection<Category>> tagDict,
+							 final int maxDependencyLength,
+							 List<Sentence> trainingSentences) {
+		try {
+			this.maxDependencyLength = maxDependencyLength;
+			make(trainingSentences);
+			if (tagDict != null) {
+				for (final Collection<Category> tagsForWord : tagDict.values()) {
+					tagsForWord.retainAll(lexicalCategories);
+				}
+			}
+			wordToCategory = tagDict;
 			this.lexicalCategories.addAll(lexicalCategories);
 		} catch (final IOException e) {
 			throw new RuntimeException(e);
@@ -74,14 +92,12 @@ public class CutoffsDictionary implements Serializable {
 		}
 	}
 
-	protected void make() throws IOException {
+	protected void make(List<Sentence> sentences) throws IOException {
 		final Map<String, Multiset<SRLLabel>> keyToRole = new HashMap<>();
 		for (final SRLLabel label : SRLFrame.getAllSrlLabels()) {
 			srlToOffset.put(label, HashMultiset.create());
 		}
-		final Iterator<Sentence> sentences = ParallelCorpusReader.READER.readCorpus(false);
-		while (sentences.hasNext()) {
-			final Sentence sentence = sentences.next();
+		for (final Sentence sentence : sentences) {
 			final List<InputWord> words = sentence.getInputWords();
 			final List<Category> goldCategories = sentence.getLexicalCategories();
 			final Map<SRLDependency, CCGBankDependency> depMap = sentence.getCorrespondingCCGBankDependencies();
@@ -169,5 +185,8 @@ public class CutoffsDictionary implements Serializable {
 
 	public Map<String, Collection<Category>> getTagDict() {
 		return wordToCategory;
+	}
+	public Collection<Integer> getOffsetsForLabel(final SRLLabel label) {
+		return srlToOffset.get(label).elementSet();
 	}
 }

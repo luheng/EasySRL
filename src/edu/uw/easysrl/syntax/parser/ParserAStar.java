@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.PriorityQueue;
 
 import edu.uw.easysrl.dependencies.DependencyStructure;
-import edu.uw.easysrl.dependencies.DependencyStructure.UnlabelledDependency;
+import edu.uw.easysrl.dependencies.UnlabelledDependency;
 import edu.uw.easysrl.main.EasySRL.InputFormat;
 import edu.uw.easysrl.main.InputReader.InputWord;
 import edu.uw.easysrl.syntax.grammar.Category;
@@ -29,17 +29,16 @@ public class ParserAStar extends AbstractParser {
 	private final int maxChartSize;
 
 	public ParserAStar(final ModelFactory modelFactory, final int maxSentenceLength, final int nbest,
-			final double nbestBeam, final InputFormat inputFormat, final List<Category> validRootCategories,
-			final File modelFolder, final int maxChartSize) throws IOException {
-		super(modelFactory.getLexicalCategories(), maxSentenceLength, nbest, nbestBeam, inputFormat,
-				validRootCategories, modelFolder);
+			final InputFormat inputFormat, final List<Category> validRootCategories, final File modelFolder,
+			final int maxChartSize) throws IOException {
+		super(modelFactory.getLexicalCategories(), maxSentenceLength, nbest, inputFormat, validRootCategories,
+				modelFolder);
 		this.modelFactory = modelFactory;
 		this.maxChartSize = maxChartSize;
 	}
 
 	@Override
 	List<Scored<SyntaxTreeNode>> parseAstar(final List<InputWord> sentence) {
-
 		final Model model = modelFactory.make(sentence);
 		final int sentenceLength = sentence.size();
 		final PriorityQueue<AgendaItem> agenda = new PriorityQueue<>();
@@ -49,10 +48,7 @@ public class ParserAStar extends AbstractParser {
 		final List<Scored<SyntaxTreeNode>> result = new ArrayList<>();
 		int chartSize = 0;
 
-		while (chartSize < maxChartSize && (result.isEmpty() || (result.size() < nbest
-		// TODO && agenda.peek() != null && agenda.peek().getCost() >
-		// result.get(0).getProbability() + nbestBeam
-				))) {
+		while (chartSize < maxChartSize && (result.isEmpty() || (result.size() < nbest))) {
 			// Add items from the agenda, until we have enough parses.
 
 			final AgendaItem agendaItem = agenda.poll();
@@ -81,7 +77,7 @@ public class ParserAStar extends AbstractParser {
 
 				for (final UnaryRule unaryRule : unaryRules.get(agendaItem.getParse().getCategory())) {
 					if ((agendaItem.getParse().getRuleType() != RuleType.LP && agendaItem.getParse().getRuleType() != RuleType.RP)
-							|| unaryRule.getCategory().isTypeRaised()) {
+							|| unaryRule.isTypeRaising()) {
 						// Don't allow unary rules to apply to the output of non-type-raising rules.
 						// i.e. don't allow both (NP (N ,))
 						// The reason for allowing type-raising is to simplify Eisner Normal Form contraints (a
@@ -94,7 +90,7 @@ public class ParserAStar extends AbstractParser {
 								new SyntaxTreeNodeUnary(unaryRule.getResult(), agendaItem.getParse(), unaryRule
 										.getDependencyStructureTransformation().apply(
 												agendaItem.getParse().getDependencyStructure(), resolvedDependencies),
-												unaryRule, resolvedDependencies), unaryRule));
+										unaryRule, resolvedDependencies), unaryRule));
 					}
 				}
 
@@ -104,16 +100,16 @@ public class ParserAStar extends AbstractParser {
 						- agendaItem.getStartOfSpan(); spanLength++) {
 
 					final ChartCell rightCell = chart[agendaItem.getStartOfSpan() + agendaItem.getSpanLength()][spanLength
-							- agendaItem.getSpanLength() - 1];
+					                                                                                            - agendaItem.getSpanLength() - 1];
 					if (rightCell == null) {
 						continue;
 					}
 
 					for (final AgendaItem rightEntry : rightCell.getEntries()) {
-						if (rightEntry.getParse().getResolvedUnlabelledDependencies().isEmpty()) {
-							updateAgenda(agenda, agendaItem, rightEntry, sentenceLength, model);
+						// if (rightEntry.getParse().getResolvedUnlabelledDependencies().isEmpty()) {
+						updateAgenda(agenda, agendaItem, rightEntry, sentenceLength, model);
 
-						}
+						// }
 
 					}
 				}
@@ -128,9 +124,9 @@ public class ParserAStar extends AbstractParser {
 						continue;
 					}
 					for (final AgendaItem leftEntry : leftCell.getEntries()) {
-						if (leftEntry.getParse().getResolvedUnlabelledDependencies().isEmpty()) {
-							updateAgenda(agenda, leftEntry, agendaItem, sentenceLength, model);
-						}
+						// if (leftEntry.getParse().getResolvedUnlabelledDependencies().isEmpty()) {
+						updateAgenda(agenda, leftEntry, agendaItem, sentenceLength, model);
+						// }
 					}
 				}
 
@@ -141,9 +137,7 @@ public class ParserAStar extends AbstractParser {
 			// Parse failure.
 			return null;
 		}
-
 		return result;
-
 	}
 
 	/**
@@ -170,7 +164,6 @@ public class ParserAStar extends AbstractParser {
 				// allow unary rules in spanning cell.
 				continue;
 			} else {
-
 				final List<UnlabelledDependency> resolvedDependencies = new ArrayList<>();
 				final DependencyStructure newDependencies = production.getCombinator().apply(
 						leftChild.getDependencyStructure(), rightChild.getDependencyStructure(), resolvedDependencies);

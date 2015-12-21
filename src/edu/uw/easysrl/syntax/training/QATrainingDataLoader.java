@@ -3,6 +3,7 @@ package edu.uw.easysrl.syntax.training;
 import com.google.common.collect.Multimap;
 import com.google.common.util.concurrent.AtomicDouble;
 import edu.uw.easysrl.corpora.qa.QASentence;
+import edu.uw.easysrl.dependencies.Coindexation;
 import edu.uw.easysrl.dependencies.DependencyStructure;
 import edu.uw.easysrl.main.InputReader.InputWord;
 import edu.uw.easysrl.syntax.grammar.Category;
@@ -45,7 +46,7 @@ public class QATrainingDataLoader {
         this.backoff = backoff;
         try {
             unaryRules = AbstractParser.loadUnaryRules(new File(this.dataParameters.getExistingModel(), "unaryRules"));
-            DependencyStructure.parseMarkedUpFile(new File(dataParameters.getExistingModel(), "markedup"));
+            Coindexation.parseMarkedUpFile(new File(dataParameters.getExistingModel(), "markedup"));
             // Build set of possible parses
             this.parser = new CKY(
                     dataParameters.getExistingModel(),

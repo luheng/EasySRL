@@ -11,11 +11,11 @@ import java.util.Optional;
 import com.google.common.base.Preconditions;
 
 import edu.uw.easysrl.dependencies.DependencyStructure;
-import edu.uw.easysrl.dependencies.DependencyStructure.ResolvedDependency;
-import edu.uw.easysrl.dependencies.DependencyStructure.UnlabelledDependency;
+import edu.uw.easysrl.dependencies.ResolvedDependency;
+import edu.uw.easysrl.dependencies.UnlabelledDependency;
 import edu.uw.easysrl.main.ParsePrinter;
-import edu.uw.easysrl.semantics.Lexicon;
 import edu.uw.easysrl.semantics.Logic;
+import edu.uw.easysrl.semantics.lexicon.Lexicon;
 import edu.uw.easysrl.syntax.grammar.Combinator.RuleClass;
 import edu.uw.easysrl.syntax.grammar.Combinator.RuleType;
 import edu.uw.easysrl.syntax.parser.AbstractParser.UnaryRule;
@@ -32,7 +32,7 @@ public abstract class SyntaxTreeNode implements Serializable {
 	private final DependencyStructure dependencyStructure;
 	private final List<UnlabelledDependency> resolvedUnlabelledDependencies;
 	private final int length;
-	private final Optional<Logic> semantics;
+	private final Logic semantics;
 
 	public abstract SyntaxTreeNodeLeaf getHead();
 
@@ -44,7 +44,7 @@ public abstract class SyntaxTreeNode implements Serializable {
 		this.dependencyStructure = dependencyStructure;
 		this.resolvedUnlabelledDependencies = resolvedUnlabelledDependencies;
 		this.length = length;
-		this.semantics = semantics;
+		this.semantics = semantics.orElse(null);
 		this.word = word;
 	}
 
@@ -126,7 +126,6 @@ public abstract class SyntaxTreeNode implements Serializable {
 		@Override
 		public Collection<ResolvedDependency> getDependenciesLabelledAtThisNode() {
 			return Collections.emptyList();
-
 		}
 
 		public SyntaxTreeNode getLeftChild() {
@@ -154,7 +153,7 @@ public abstract class SyntaxTreeNode implements Serializable {
 			} else {
 				newLeft = leftChild.addSemantics(lexicon, semanticDependencies);
 				newRight = rightChild.addSemantics(lexicon, semanticDependencies);
-				semantics = Combinator.fromRule(ruleType).apply(newLeft.semantics.get(), newRight.semantics.get());
+				semantics = Combinator.fromRule(ruleType).apply(newLeft.semantics, newRight.semantics);
 
 			}
 			return new SyntaxTreeNodeBinary(super.category, newLeft, newRight, ruleType, headIsLeft,
@@ -356,13 +355,14 @@ public abstract class SyntaxTreeNode implements Serializable {
 		public SyntaxTreeNode addSemantics(final Lexicon lexicon, final CCGandSRLparse semanticDependencies) {
 			final SyntaxTreeNode newChild;
 			final Logic semantics;
-			if (lexicon.isMultiWordExpression(this)) {
+			if (lexicon.isMultiWordExpression(this) && !unaryRule.isTypeRaising()) {
+				// Collapse this MWE. Apply type-raising after building semantics for an entity.
 				newChild = child;
 				semantics = lexicon.getEntry(getWord(), "MW", super.category,
 						super.dependencyStructure.getCoindexation());
 			} else {
 				newChild = child.addSemantics(lexicon, semanticDependencies);
-				semantics = unaryRule.apply(newChild.semantics.get());
+				semantics = unaryRule.apply(newChild.semantics);
 			}
 
 			return new SyntaxTreeNodeUnary(super.category, newChild, super.dependencyStructure, unaryRule,
@@ -465,7 +465,7 @@ public abstract class SyntaxTreeNode implements Serializable {
 		public SyntaxTreeNodeLabelling(final SyntaxTreeNode child, final Collection<ResolvedDependency> labelled,
 				final List<UnlabelledDependency> unlabelled) {
 			super(child.category, child.getHeadIndex(), child.getDependencyStructure(), unlabelled, child.length, child
-					.getWord(), child.semantics);
+					.getWord(), child.getSemantics());
 			this.labelled = labelled;
 			this.child = child;
 		}
@@ -516,7 +516,6 @@ public abstract class SyntaxTreeNode implements Serializable {
 		public RuleClass getRuleClass() {
 			return child.getRuleClass();
 		}
-
 	}
 
 	public List<ResolvedDependency> getAllLabelledDependencies() {
@@ -537,7 +536,7 @@ public abstract class SyntaxTreeNode implements Serializable {
 	}
 
 	public Optional<Logic> getSemantics() {
-		return semantics;
+		return Optional.ofNullable(semantics);
 	}
 
 }
