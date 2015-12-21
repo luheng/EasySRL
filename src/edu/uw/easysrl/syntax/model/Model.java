@@ -39,20 +39,15 @@ public abstract class Model {
 		double total = 0.0;
 		final double[] fromLeft = new double[sentenceLength + 1];
 		final double[] fromRight = new double[sentenceLength + 1];
-
 		fromLeft[0] = 0.0;
 		fromRight[sentenceLength] = 0.0;
-
 		for (int i = 0; i < sentenceLength - 1; i++) {
 			final int j = sentenceLength - i;
-
 			fromLeft[i + 1] = fromLeft[i] + getUpperBoundForWord(i);
 			fromRight[j - 1] = fromRight[j] + getUpperBoundForWord(j - 1);
 			total += getUpperBoundForWord(i);
 		}
-
 		total += getUpperBoundForWord(sentenceLength - 1);
-
 		for (int i = 0; i < sentenceLength + 1; i++) {
 			for (int j = i; j < sentenceLength + 1; j++) {
 				outsideScoresUpperBound[i][j] = fromLeft[i] + fromRight[j];

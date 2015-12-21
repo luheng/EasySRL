@@ -39,7 +39,6 @@ public class ParserAStar extends AbstractParser {
 
 	@Override
 	List<Scored<SyntaxTreeNode>> parseAstar(final List<InputWord> sentence) {
-
 		final Model model = modelFactory.make(sentence);
 		final int sentenceLength = sentence.size();
 		final PriorityQueue<AgendaItem> agenda = new PriorityQueue<>();
@@ -138,9 +137,7 @@ public class ParserAStar extends AbstractParser {
 			// Parse failure.
 			return null;
 		}
-
 		return result;
-
 	}
 
 	/**
@@ -167,7 +164,6 @@ public class ParserAStar extends AbstractParser {
 				// allow unary rules in spanning cell.
 				continue;
 			} else {
-
 				final List<UnlabelledDependency> resolvedDependencies = new ArrayList<>();
 				final DependencyStructure newDependencies = production.getCombinator().apply(
 						leftChild.getDependencyStructure(), rightChild.getDependencyStructure(), resolvedDependencies);

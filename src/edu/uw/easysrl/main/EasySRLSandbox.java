@@ -1,15 +1,8 @@
 package edu.uw.easysrl.main;
 
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.text.DecimalFormat;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import edu.stanford.nlp.util.StringUtils;
 import edu.uw.easysrl.dependencies.Coindexation;
@@ -17,7 +10,6 @@ import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.qasrl.qg.QuestionSlot;
 import edu.uw.easysrl.qasrl.qg.QuestionTemplate;
-import edu.uw.easysrl.qasrl.qg.VerbHelper;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.model.CutoffsDictionary;
 import edu.uw.easysrl.syntax.model.Model;
@@ -27,19 +19,16 @@ import edu.uw.easysrl.syntax.model.feature.FeatureSet;
 import edu.uw.easysrl.syntax.parser.Parser;
 import edu.uw.easysrl.syntax.parser.ParserAStar;
 import edu.uw.easysrl.syntax.parser.ParserCKY;
+import edu.uw.easysrl.syntax.parser.SRLParser;
 import edu.uw.easysrl.syntax.tagger.Tagger;
 import edu.uw.easysrl.syntax.tagger.TaggerEmbeddings;
 import uk.co.flamingpenguin.jewel.cli.ArgumentValidationException;
 import uk.co.flamingpenguin.jewel.cli.CliFactory;
 
-import com.google.common.base.Stopwatch;
 
 import edu.uw.easysrl.main.EasySRL.CommandLineArguments;
 import edu.uw.easysrl.main.EasySRL.InputFormat;
-import edu.uw.easysrl.main.EasySRL.OutputFormat;
 import edu.uw.easysrl.main.EasySRL.ParsingAlgorithm;
-import edu.uw.easysrl.syntax.evaluation.Results;
-import edu.uw.easysrl.syntax.parser.SRLParser;
 import edu.uw.easysrl.syntax.parser.SRLParser.CCGandSRLparse;
 import edu.uw.easysrl.syntax.parser.SRLParser.PipelineSRLParser;
 import edu.uw.easysrl.syntax.tagger.POSTagger;
@@ -81,15 +70,14 @@ public class EasySRLSandbox {
             final POSTagger posTagger = POSTagger.getStanfordTagger(new File(pipelineFolder, "posTagger"));
             final PipelineSRLParser pipeline = new PipelineSRLParser(
                         EasySRL.makeParser(pipelineFolder.getAbsolutePath(), 0.0001, ParsingAlgorithm.ASTAR, 200000,
-                        false /* joint */, Optional.empty(),
-                    commandLineOptions.getNbest()),
+                        false /* joint */, Optional.empty(), commandLineOptions.getNbest()),
                     Util.deserialize(new File(pipelineFolder, "labelClassifier")), posTagger);
             final SRLParser.BackoffSRLParser joint = new SRLParser.BackoffSRLParser(new SRLParser.JointSRLParser(
                     makeParser(commandLineOptions, 20000, true, Optional.empty()), posTagger), pipeline);
 
             final SRLParser parser = pipeline;
-
-            final InputReader reader = InputReader.make(InputFormat.valueOf(commandLineOptions.getInputFormat().toUpperCase()));
+            final InputReader reader = InputReader.make(InputFormat.valueOf(commandLineOptions.getInputFormat()
+                    .toUpperCase()));
             System.err.println("===Model loaded: parsing...===");
 
             // Run over toy sentences.
@@ -98,7 +86,6 @@ public class EasySRLSandbox {
                 final List<CCGandSRLparse> parses = parser.parseTokens(words);
                 generateQuestions(words, parses);
             }
-
         } catch (final ArgumentValidationException e) {
             System.err.println(e.getMessage());
             System.err.println(CliFactory.createCli(CommandLineArguments.class).getHelpMessage());
@@ -128,15 +115,18 @@ public class EasySRLSandbox {
             //for (ResolvedDependency targetDependency : dependencies) {
                 String predicateWord = words.get(predicateId);
                 Category predicateCategory = categories.get(predicateId);
-                if (questionGenerator.filterPredicate(predicateWord, predicateCategory)) {
-                    continue;
-                }
-                System.out.println("\t" + predicateWord + "\t" + predicateCategory);
                 Collection<ResolvedDependency> deps = parse.getOrderedDependenciesAtPredicateIndex(predicateId);
                 if (deps == null || deps.size() == 0) {
-                    System.out.println("\tNo dependencies found for the predicate.");
                     continue;
                 }
+                /*
+                System.out.println("\t" + predicateWord + "\t" + predicateCategory);
+                System.out.println("# deps found for " + predicateWord + " : " + deps.size());
+                if (questionGenerator.filterPredicate(predicateWord, predicateCategory)) {
+                    System.out.println("Skip this predicate.");
+                    continue;
+                }
+                */
                 for (ResolvedDependency targetDependency : deps) {
                     if (targetDependency == null) {
                         continue;
@@ -148,11 +138,13 @@ public class EasySRLSandbox {
                     QuestionTemplate template = questionGenerator.getTemplate(predicateIndex, words, categories,
                             dependencies);
                     if (template == null) {
+                        System.out.println("Cannot generate template for " + targetDependency.toString(words));
                         continue;
                     }
                     // Get question.
                     List<String> question = questionGenerator.generateQuestionFromTemplate(template, argumentNumber);
                     if (question == null) {
+                        System.out.println("Cannot generate question for " + template.toString());
                         continue;
                     }
                     String questionStr = StringUtils.join(question) + " ?";

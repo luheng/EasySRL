@@ -126,7 +126,6 @@ public abstract class SyntaxTreeNode implements Serializable {
 		@Override
 		public Collection<ResolvedDependency> getDependenciesLabelledAtThisNode() {
 			return Collections.emptyList();
-
 		}
 
 		public SyntaxTreeNode getLeftChild() {
@@ -517,7 +516,6 @@ public abstract class SyntaxTreeNode implements Serializable {
 		public RuleClass getRuleClass() {
 			return child.getRuleClass();
 		}
-
 	}
 
 	public List<ResolvedDependency> getAllLabelledDependencies() {

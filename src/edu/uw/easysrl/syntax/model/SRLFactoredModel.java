@@ -31,16 +31,16 @@ public class SRLFactoredModel extends Model {
 	private final List<ExtendedLexicalEntry> forests;
 	private final Collection<UnaryRuleFeature> unaryRuleFeatures;
 
-	private SRLFactoredModel(final List<ExtendedLexicalEntry> forests,
-			final Collection<UnaryRuleFeature> unaryRuleFeatures, final ObjectDoubleHashMap<FeatureKey> featureToScore,
-			final Collection<BinaryFeature> binaryFeatures, final Collection<RootCategoryFeature> rootFeatures,
-			final List<InputWord> sentence
-
-	) {
+	private SRLFactoredModel(
+			final List<ExtendedLexicalEntry> forests,
+			final Collection<UnaryRuleFeature> unaryRuleFeatures,
+			final ObjectDoubleHashMap<FeatureKey> featureToScore,
+			final Collection<BinaryFeature> binaryFeatures,
+			final Collection<RootCategoryFeature> rootFeatures,
+			final List<InputWord> sentence) {
 		super(forests.size());
 		this.forests = forests;
 		this.unaryRuleFeatures = unaryRuleFeatures;
-
 		this.featureToScore = featureToScore;
 		this.binaryFeatures = binaryFeatures;
 		this.rootFeatures = rootFeatures;
@@ -54,33 +54,27 @@ public class SRLFactoredModel extends Model {
 				upperBoundForWord = Math.max(upperBoundForWord,
 						forests.get(i).getLogUnnormalizedViterbiScore(cat.getCategory()));
 			}
-
 			upperBoundsForWord.add(upperBoundForWord);
 			globalUpperBound += upperBoundForWord;
 		}
-
 		this.globalUpperBound = globalUpperBound;
 	}
 
 	@Override
 	public void buildAgenda(final PriorityQueue<AgendaItem> queue, final List<InputWord> words) {
-
 		for (int i = 0; i < words.size(); i++) {
 			final InputWord word = words.get(i);
 			final ExtendedLexicalEntry forest = forests.get(i);
 
 			final double outsideScoreUpperBound = globalUpperBound - upperBoundsForWord.get(i);
-
 			for (final ConjunctiveCategoryNode node : forests.get(i).getCategoryNodes()) {
 				final Category category = node.getCategory();
 				final double score = forest.scoreNode(node);
 				final double dependenciesUpperBound = getInsideDependenciesUpperBound(forest, category, score);
-
 				queue.add(new AgendaItem(new SyntaxTreeNodeLeaf(word.word, word.pos, word.ner, category, i), score,
 						dependenciesUpperBound + outsideScoreUpperBound, i, 1, true));
 			}
 		}
-
 	}
 
 	@Override
@@ -97,7 +91,6 @@ public class SRLFactoredModel extends Model {
 
 	@Override
 	public AgendaItem combineNodes(final AgendaItem leftChild, final AgendaItem rightChild, final SyntaxTreeNode node) {
-
 		double binaryRuleScore = 0.0;
 		for (final BinaryFeature feature : binaryFeatures) {
 			binaryRuleScore += feature.getFeatureScore(node.getCategory(), node.getRuleType(), leftChild.getParse()
@@ -132,12 +125,9 @@ public class SRLFactoredModel extends Model {
 		final List<UnlabelledDependency> resolvedUnlabelledDependencies = node.getResolvedUnlabelledDependencies();
 		int i = 0;
 		for (final UnlabelledDependency dep : resolvedUnlabelledDependencies) {
-
 			final ExtendedLexicalEntry forest = forests.get(dep.getHead());
 			final Scored<SRLLabel> scoredLabel = forest.getBestLabels(dep);
-
 			final double newInsideScore = result.getInsideScore() + scoredLabel.getScore();
-
 			final SyntaxTreeNode labelling = new SyntaxTreeNodeLabelling(result.getParse(), dep.setLabel(scoredLabel
 					.getObject()), resolvedUnlabelledDependencies.subList(i + 1, resolvedUnlabelledDependencies.size()));
 
@@ -154,24 +144,19 @@ public class SRLFactoredModel extends Model {
 	double getInsideDependenciesUpperBound(final ExtendedLexicalEntry forest, final Category category,
 			final double insideScore) {
 		final double dependenciesUpperBound = forest.getLogUnnormalizedViterbiScore(category) - insideScore;
-
 		return dependenciesUpperBound;
 	}
 
 	@Override
 	public AgendaItem unary(final AgendaItem child, final SyntaxTreeNode result, final UnaryRule rule) {
-
 		double insideScore = child.getInsideScore();
 		for (final UnaryRuleFeature feature : unaryRuleFeatures) {
 			insideScore += feature.getFeatureScore(rule.getID(), sentence, child.startOfSpan, child.startOfSpan
 					+ child.spanLength, featureToScore);
 		}
-
 		AgendaItem agendaItem = new AgendaItem(result, insideScore, child.outsideScoreUpperbound, child.startOfSpan,
 				child.spanLength, true);
-
 		agendaItem = labelDependencies(agendaItem, agendaItem.parse);
-
 		return agendaItem;
 	}
 
@@ -194,37 +179,28 @@ public class SRLFactoredModel extends Model {
 			this.lexicalCategories = lexicalCategories;
 			this.usingDependencyFeatures = !featureSet.dependencyFeatures.isEmpty();
 			this.usingSlotFeatures = !featureSet.argumentSlotFeatures.isEmpty();
-
 			featureToScore = new ObjectDoubleHashMap<>(featureToIndex.size(), 0.1);
-
 			for (final java.util.Map.Entry<FeatureKey, Integer> entry : featureToIndex.entrySet()) {
 				featureToScore.put(entry.getKey(), weights[entry.getValue()]);
 			}
-
 			final FeatureKey supertaggingFeatureKey = featureSet.lexicalCategoryFeatures.getDefault();
 			supertaggingFeatureScore = weights[featureToIndex.get(supertaggingFeatureKey)];
 			featureToScore.put(supertaggingFeatureKey, supertaggingFeatureScore);
-
 			this.slotFeatureCache = new SlotFeatureCache(featureSet, featureToScore);
-
 		}
 
 		@Override
 		public Model make(final List<InputWord> sentence) {
 			final FeatureCache featureCache = new FeatureCache(sentence, featureToScore, featureSet,
 					supertaggingFeatureScore, slotFeatureCache);
-
 			final List<ExtendedLexicalEntry> forests = new ArrayList<>(sentence.size());
 			int wordIndex = 0;
 			for (final InputWord word : sentence) {
-
 				final Forest forest = ExtendedLexicalEntry.makeUnlexicalizedForest(word.word,
 						featureCache.getCategoriesAtIndex(wordIndex), 50, cutoffsDictionary, usingSlotFeatures,
 						usingDependencyFeatures);
-
 				forests.add(new ExtendedLexicalEntry(featureSet, wordIndex, sentence, forest, featureToScore,
 						featureCache));
-
 				wordIndex++;
 			}
 
@@ -236,6 +212,5 @@ public class SRLFactoredModel extends Model {
 		public Collection<Category> getLexicalCategories() {
 			return lexicalCategories;
 		}
-
 	}
 }

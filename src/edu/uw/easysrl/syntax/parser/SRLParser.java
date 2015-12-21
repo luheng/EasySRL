@@ -77,13 +77,10 @@ public abstract class SRLParser {
 
 		@Override
 		protected List<CCGandSRLparse> parseTokens2(final List<InputWord> tokens) {
-
 			List<CCGandSRLparse> parse = parser.parseTokens(tokens);
-
 			if (parse != null) {
 				parse = parse.stream().map(x -> x.addSemantics(lexicon)).collect(Collectors.toList());
 			}
-
 			return parse;
 		}
 
@@ -107,8 +104,7 @@ public abstract class SRLParser {
 			if (parses == null) {
 				return null;
 			} else {
-				return parses
-						.stream()
+				return parses.stream()
 						.map(x -> new CCGandSRLparse(x.getObject(), x.getObject().getAllLabelledDependencies(), tokens))
 						.collect(Collectors.toList());
 			}
@@ -169,7 +165,6 @@ public abstract class SRLParser {
 	public static class PipelineSRLParser extends JointSRLParser {
 		public PipelineSRLParser(final Parser parser, final LabelClassifier classifier, final POSTagger tagger) {
 			super(parser, tagger);
-
 			this.classifier = classifier;
 		}
 
@@ -177,13 +172,25 @@ public abstract class SRLParser {
 
 		@Override
 		public List<CCGandSRLparse> parseTokens2(final List<InputWord> tokens) {
-
-			final List<CCGandSRLparse> parse = super.parseTokens2(tokens);
-			if (parse == null) {
+			final List<CCGandSRLparse> parses = super.parseTokens2(tokens);
+			if (parses == null) {
 				return null;
 			}
-
-			return parse.stream().map(x -> addDependencies(tokens, x)).collect(Collectors.toList());
+			return parses.stream().map(x -> addDependencies(tokens, x)).collect(Collectors.toList());
+			/*
+			final List<Scored<SyntaxTreeNode>> parses = super.parser.doParsing(new InputToParser(tokens, null, null, false));
+			if (parses == null) {
+				return null;
+			}
+			// debug: output all dependencies
+			SyntaxTreeNode parse = parses.get(0).getObject();
+			List<String> words = tokens.stream().map(t -> t.word).collect(Collectors.toList());
+			parse.getAllLabelledDependencies().forEach(d -> System.out.println(d.toString(words)));
+			return parses.stream()
+						.map(x -> new CCGandSRLparse(x.getObject(), x.getObject().getAllLabelledDependencies(), tokens))
+						.map(x2 -> addDependencies(tokens, x2))
+						.collect(Collectors.toList());
+			*/
 		}
 
 		private CCGandSRLparse addDependencies(final List<InputWord> tokens, final CCGandSRLparse parse) {

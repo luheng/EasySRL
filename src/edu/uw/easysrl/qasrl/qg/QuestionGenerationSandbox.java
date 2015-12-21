@@ -19,6 +19,9 @@ import java.util.*;
  * Now able to generate 3541 (76.20% of 4647 dependencies, 74.72% of 3979 aligned dependencies) questions.
  * 615 (17.37%) exact matches among all generated.
  *
+ * Now able to generate 4600 (98.99% of 4647 dependencies, 89.32% of 3979 aligned dependencies) questions.
+ * 653 (14.20%) exact matches among all generated.
+ *
  * Created by luheng on 12/8/15.
  */
 public class QuestionGenerationSandbox {
@@ -68,7 +71,6 @@ public class QuestionGenerationSandbox {
                 }
                 String word = words.get(ccgDep.getSentencePositionOfPredicate());
                 Category category = ccgDep.getCategory();
-                // Skip copula verbs for now.
                 if (questionGenerator.filterPredicate(word, category)) {
                     continue;
                 }

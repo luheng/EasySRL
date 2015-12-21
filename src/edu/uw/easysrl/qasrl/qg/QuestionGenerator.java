@@ -1,15 +1,11 @@
 package edu.uw.easysrl.qasrl.qg;
 
-import edu.stanford.nlp.util.StringUtils;
 import edu.uw.easysrl.corpora.CCGBankDependencies.CCGBankDependency;
-import edu.uw.easysrl.corpora.ParallelCorpusReader.Sentence;
-import edu.uw.easysrl.dependencies.QADependency;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.qg.QuestionSlot.*;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.Preposition;
 
-import java.io.*;
 import java.util.*;
 
 /**
@@ -31,12 +27,17 @@ public class QuestionGenerator {
             // T1, T2 said, or T1, said T2
             Category.valueOf("(S[dcl]\\S[dcl])|NP"),
             // T1 agreed to do T2
-            Category.valueOf("(S\\NP)/(S[to]\\NP)")
+            Category.valueOf("(S\\NP)/(S[to]\\NP)"),
+
     };
 
     private static final Category[] ditransitiveVerbs = {
+            // T1 made T3 T2
             Category.valueOf("((S\\NP)/NP)/NP"),
-            Category.valueOf("((S\\NP)/PP)/NP")
+            // T1 gave T3 to T2
+            Category.valueOf("((S\\NP)/PP)/NP"),
+            // T1 promised T3 to do T2
+            Category.valueOf("((S\\NP)/(S[to]\\NP))/NP"), // Category.valueOf("((S[dcl]\\NP)/(S[to]\\NP))/NP")
     };
 
     private static final Category[] adjuncts = {
@@ -104,7 +105,7 @@ public class QuestionGenerator {
         Map<Integer, ResolvedDependency> argNumToDependency = new HashMap<>();
         Category predicateCategory = categories.get(predicateIndex);
         int numArguments = predicateCategory.getNumberOfArguments();
-        if (numArguments == 0 || belongsTo(predicateCategory, adjuncts)) {
+        if (numArguments == 0 || filterPredicate(words.get(predicateIndex), predicateCategory)) {
             return null;
         }
         for (ResolvedDependency dep : dependencies) {
@@ -147,21 +148,16 @@ public class QuestionGenerator {
             QuestionSlot[] slots = new QuestionSlot[] { arguments[2], verb, arguments[1] };
             return new QuestionTemplate(slots, words, categories);
         }
-        if (predicateCategory.isFunctionInto(intransitiveVerb) ||
-                belongsTo(predicateCategory, transitiveVerbs) ||
-                belongsTo(predicateCategory, ditransitiveVerbs)) {
-            List<QuestionSlot> slots = new ArrayList<>();
-            slots.add(arguments[1]);
-            slots.add(verb);
-            for (int i = numArguments; i > 1; i--) {
-                if (arguments[i] != null) {
-                    slots.add(arguments[i]);
-                }
+        List<QuestionSlot> slots = new ArrayList<>();
+        slots.add(arguments[1]);
+        slots.add(verb);
+        for (int i = numArguments; i > 1; i--) {
+            if (arguments[i] != null) {
+                slots.add(arguments[i]);
             }
-            QuestionSlot[] slotList = slots.toArray(new QuestionSlot[slots.size()]);
-            return new QuestionTemplate(slotList, words, categories);
         }
-        return null;
+        QuestionSlot[] slotList = slots.toArray(new QuestionSlot[slots.size()]);
+        return new QuestionTemplate(slotList, words, categories);
     }
 
     public List<String> generateQuestionFromTemplate(QuestionTemplate template, int targetArgNum) {
@@ -208,29 +204,6 @@ public class QuestionGenerator {
         return question;
     }
 
-    public boolean filterPredicate(String word, Category category) {
-        if (VerbHelper.isCopulaVerb(word)) {
-            return true;
-        }
-        // Generate question for the target dependency.
-        if (category.isFunctionInto(prepositions) ||
-                category.isFunctionInto(auxiliaries) ||
-                category.isFunctionInto(controlParticles) ||
-                category.isFunctionInto(pastParticiples) ||
-                otherFilteredCategorySet.contains(category.toString())) {
-            return true;
-        }
-        if (!category.isFunctionInto(somethingVerbal) &&
-                !category.isFunctionInto(somethingAdjunctive)) {
-            return true;
-        }
-        /*
-        if (!category.isFunctionInto(intransitiveVerb) &&
-                !belongsTo(category, transitiveVerbs) &&
-                !belongsTo(category, ditransitiveVerbs)) {
-        }*/
-        return false;
-    }
 
     /**
      * Given a set of CCG dependencies and a target predicate, generate a QuestionTemplate object.
@@ -247,7 +220,7 @@ public class QuestionGenerator {
         Map<Integer, CCGBankDependency> argNumToDependency = new HashMap<>();
         Category predicateCategory = categories.get(predicateIndex);
         int numArguments = predicateCategory.getNumberOfArguments();
-        if (numArguments == 0 || belongsTo(predicateCategory, adjuncts)) {
+        if (numArguments == 0 || filterPredicate(words.get(predicateIndex), predicateCategory)) {
             return null;
         }
         // Map argument id to dependency.
@@ -302,6 +275,39 @@ public class QuestionGenerator {
         }
         QuestionSlot[] slotList = slots.toArray(new QuestionSlot[slots.size()]);
         return new QuestionTemplate(slotList, words, categories);
+    }
+
+    // FIXME ...
+    public boolean filterPredicate(String word, Category category) {
+        if (VerbHelper.isCopulaVerb(word)) {
+            //System.out.println("skipping because copula");
+            return true;
+        }
+        if (!category.isFunctionInto(somethingVerbal) &&
+                !category.isFunctionInto(somethingAdjunctive)) {
+            //System.out.println("skipping because not verb or adjunct");
+            return true;
+        }
+        // Generate question for the target dependency.
+        if (category.isFunctionInto(prepositions) ||
+                category.isFunctionInto(auxiliaries) ||
+                category.isFunctionInto(controlParticles) ||
+                category.isFunctionInto(pastParticiples) ||
+                otherFilteredCategorySet.contains(category.toString())) {
+           // System.out.println("skipping because in other filtered list");
+            return true;
+        }
+        if (category.isFunctionInto(intransitiveVerb) ||
+                belongsTo(category, transitiveVerbs) ||
+                belongsTo(category, ditransitiveVerbs)) {
+            //System.out.println("NOT skipping because is verb");
+            return false;
+        }
+        if (belongsTo(category, adjuncts)) {
+            //System.out.println("skipping because is adjunct");
+            return true;
+        }
+        return false;
     }
 
     private static void add(List<String> question, String word) {

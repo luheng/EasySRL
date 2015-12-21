@@ -272,7 +272,6 @@ public class EasySRL {
 			throw new RuntimeException(e);
 		}
 		return makeParser(commandLineOptions, maxChartSize, joint, supertaggerWeight);
-
 	}
 
 	private static Parser makeParser(final CommandLineArguments commandLineOptions, final int maxChartSize,
@@ -282,42 +281,31 @@ public class EasySRL {
 		final File cutoffsFile = new File(modelFolder, "cutoffs");
 		final CutoffsDictionary cutoffs = cutoffsFile.exists() ? Util.deserialize(cutoffsFile) : null;
 
-		ModelFactory modelFactory;
 		final ParsingAlgorithm algorithm = ParsingAlgorithm.valueOf(commandLineOptions.getParsingAlgorithm()
 				.toUpperCase());
+		double supertaggerBeam = commandLineOptions.getSupertaggerbeam();
+		final int nBest = commandLineOptions.getNbest();
+		int maxSentenceLength = commandLineOptions.getMaxLength();
+		InputFormat inputFormat = InputFormat.valueOf(commandLineOptions.getInputFormat().toUpperCase());
+		List<Category> rootCategories = commandLineOptions.getRootCategories();
 
+		ModelFactory modelFactory;
 		if (joint) {
 			final double[] weights = Util.deserialize(new File(modelFolder, "weights"));
 			if (supertaggerWeight.isPresent()) {
 				weights[0] = supertaggerWeight.get();
 			}
-
-			modelFactory = new SRLFactoredModelFactory(weights, ((FeatureSet) Util.deserialize(new File(modelFolder,
-					"features"))).setSupertaggingFeature(new File(modelFolder, "/pipeline"),
-							commandLineOptions.getSupertaggerbeam()), TaggerEmbeddings.loadCategories(new File(modelFolder,
-					"categories")), cutoffs, Util.deserialize(new File(modelFolder, "featureToIndex")));
-
+			modelFactory = new SRLFactoredModelFactory(weights,
+					((FeatureSet) Util.deserialize(new File(modelFolder, "features")))
+							.setSupertaggingFeature(new File(modelFolder, "/pipeline"), supertaggerBeam),
+					TaggerEmbeddings.loadCategories(new File(modelFolder, "categories")), cutoffs,
+					Util.deserialize(new File(modelFolder, "featureToIndex")));
 		} else {
-			modelFactory = new SupertagFactoredModelFactory(Tagger.make(modelFolder,
-					commandLineOptions.getSupertaggerbeam(), 50, cutoffs));
-
+			modelFactory = new SupertagFactoredModelFactory(Tagger.make(modelFolder, supertaggerBeam, 50, cutoffs));
 		}
-
-		final Parser parser;
-		final int nBest = commandLineOptions.getNbest();
-		if (algorithm == ParsingAlgorithm.CKY) {
-			parser = new ParserCKY(
-
-					modelFactory, commandLineOptions.getMaxLength(), nBest, InputFormat.valueOf(commandLineOptions
-					.getInputFormat().toUpperCase()), commandLineOptions.getRootCategories(), modelFolder, maxChartSize);
-		} else {
-			parser = new ParserAStar(
-
-					modelFactory, commandLineOptions.getMaxLength(), nBest, InputFormat.valueOf(commandLineOptions
-					.getInputFormat().toUpperCase()), commandLineOptions.getRootCategories(), modelFolder, maxChartSize);
-		}
-
-		return parser;
+		return algorithm == ParsingAlgorithm.CKY ?
+			new ParserCKY(modelFactory, maxSentenceLength, nBest, inputFormat, rootCategories, modelFolder, maxChartSize) :
+			new ParserAStar(modelFactory, maxSentenceLength, nBest, inputFormat, rootCategories, modelFolder, maxChartSize);
 	}
 
 }
