@@ -147,6 +147,10 @@ public class VerbHelper {
         return new String[] {"have", infl[4]};
     }
 
+    public boolean hasInflectedForms(String word) {
+        return inflectionDictionary.getBestInflections(word.toLowerCase()) != null;
+    }
+
     public boolean isUninflected(List<String> words, List<Category> categories, int index) {
         String verbStr = words.get(index).toLowerCase();
         String[] infl = inflectionDictionary.getBestInflections(verbStr.toLowerCase());

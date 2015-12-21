@@ -74,17 +74,13 @@ public abstract class AbstractParser implements Parser {
 	}
 
 	protected final int maxLength;
-
 	protected final Collection<Combinator> binaryRules;
 	protected final Multimap<Category, UnaryRule> unaryRules;
 	protected final int nbest;
 
 	private final InputReader reader;
-
 	protected final SeenRules seenRules;
-
 	protected final Collection<Category> possibleRootCategories;
-
 	private final Multimap<Integer, Long> sentenceLengthToParseTimeInNanos = HashMultimap.create();
 
 	@Override
@@ -201,17 +197,14 @@ public abstract class AbstractParser implements Parser {
 	public List<Scored<SyntaxTreeNode>> parseTokens(final List<String> words) {
 		final InputToParser input = InputToParser.fromTokens(words);
 		final List<Scored<SyntaxTreeNode>> parses = doParsing(input);
-
 		return parses;
 	}
 
 	public static class SuperTaggingResults {
 		public AtomicInteger parsedSentences = new AtomicInteger();
 		public AtomicInteger totalSentences = new AtomicInteger();
-
 		public AtomicInteger rightCats = new AtomicInteger();
 		public AtomicInteger totalCats = new AtomicInteger();
-
 		public AtomicInteger exactMatch = new AtomicInteger();
 	}
 
@@ -273,7 +266,6 @@ public abstract class AbstractParser implements Parser {
 			System.err.println("Skipping sentence of length " + input.length());
 			return null;
 		}
-
 		return parseAstar(input.getInputWords());
 	}
 
@@ -305,20 +297,17 @@ public abstract class AbstractParser implements Parser {
 			rightToRules = new HashMap<>();
 			ruleCache.put(left, rightToRules);
 		}
-
 		Collection<RuleProduction> result = rightToRules.get(right);
 		if (result == null) {
 			result = Combinator.getRules(left, right, binaryRules);
 			rightToRules.put(right, ImmutableList.copyOf(result));
 		}
-
 		return result;
 	}
 
 	/**
 	 * Converts a parse into a list of supercategories.
 	 */
-
 	private static List<Category> getSupertags(final SyntaxTreeNode parse) {
 		final GetSupertagsVisitor v = new GetSupertagsVisitor();
 		parse.accept(v);
@@ -457,7 +446,6 @@ public abstract class AbstractParser implements Parser {
 		abstract void addEntry(Object equivalenceClassKey, AgendaItem newEntry);
 
 		abstract int size();
-
 	}
 
 	@Override

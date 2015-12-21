@@ -182,7 +182,6 @@ public abstract class SRLParser {
 			if (parses == null) {
 				return null;
 			}
-			// debug: output all dependencies
 			SyntaxTreeNode parse = parses.get(0).getObject();
 			List<String> words = tokens.stream().map(t -> t.word).collect(Collectors.toList());
 			parse.getAllLabelledDependencies().forEach(d -> System.out.println(d.toString(words)));

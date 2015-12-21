@@ -68,12 +68,16 @@ public class EasySRLSandbox {
             final File pipelineFolder = new File(modelFolder, "/pipeline");
             System.err.println("====Starting loading model====");
             final POSTagger posTagger = POSTagger.getStanfordTagger(new File(pipelineFolder, "posTagger"));
+
+            // Use CKY here, because we want marginal scores ..
             final PipelineSRLParser pipeline = new PipelineSRLParser(
-                        EasySRL.makeParser(pipelineFolder.getAbsolutePath(), 0.0001, ParsingAlgorithm.ASTAR, 200000,
+                        EasySRL.makeParser(pipelineFolder.getAbsolutePath(), 0.0001, ParsingAlgorithm.CKY, 200000,
                         false /* joint */, Optional.empty(), commandLineOptions.getNbest()),
                     Util.deserialize(new File(pipelineFolder, "labelClassifier")), posTagger);
-            final SRLParser.BackoffSRLParser joint = new SRLParser.BackoffSRLParser(new SRLParser.JointSRLParser(
-                    makeParser(commandLineOptions, 20000, true, Optional.empty()), posTagger), pipeline);
+
+            final SRLParser.BackoffSRLParser joint = new SRLParser.BackoffSRLParser(
+                    new SRLParser.JointSRLParser(makeParser(commandLineOptions, 20000, true, Optional.empty()), posTagger),
+                    pipeline);
 
             final SRLParser parser = pipeline;
             final InputReader reader = InputReader.make(InputFormat.valueOf(commandLineOptions.getInputFormat()
@@ -108,11 +112,11 @@ public class EasySRLSandbox {
         words.forEach(w -> System.out.print(w + " ")); System.out.println();
         categories.forEach(cat -> System.out.print(cat + " ")); System.out.println("\n");
 
-        // TODO: we are missing dependencies. Can we output all dependencies here?
+        // TODO: get some scores for the dependencies
+
         for (CCGandSRLparse parse : parses) {
             Collection<ResolvedDependency> dependencies = parse.getDependencyParse();
             for (int predicateId = 0; predicateId < sentenceLength; predicateId++) {
-            //for (ResolvedDependency targetDependency : dependencies) {
                 String predicateWord = words.get(predicateId);
                 Category predicateCategory = categories.get(predicateId);
                 Collection<ResolvedDependency> deps = parse.getOrderedDependenciesAtPredicateIndex(predicateId);
@@ -133,7 +137,6 @@ public class EasySRLSandbox {
                     }
                     int predicateIndex = targetDependency.getHead();
                     int argumentNumber = targetDependency.getArgNumber();
-                    // TODO: get template using parser.getOrderedDependenciesAtPredicateIndex ..
                     // Get template.
                     QuestionTemplate template = questionGenerator.getTemplate(predicateIndex, words, categories,
                             dependencies);

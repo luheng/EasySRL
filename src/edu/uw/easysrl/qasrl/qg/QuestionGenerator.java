@@ -283,6 +283,9 @@ public class QuestionGenerator {
             //System.out.println("skipping because copula");
             return true;
         }
+        if (!verbHelper.hasInflectedForms(word)) {
+            return true;
+        }
         if (!category.isFunctionInto(somethingVerbal) &&
                 !category.isFunctionInto(somethingAdjunctive)) {
             //System.out.println("skipping because not verb or adjunct");
