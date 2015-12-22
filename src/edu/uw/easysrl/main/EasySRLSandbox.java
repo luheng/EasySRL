@@ -67,7 +67,6 @@ public class EasySRLSandbox {
         questionGenerator = new QuestionGenerator();
         try {
             final CommandLineArguments commandLineOptions = CliFactory.parseArguments(CommandLineArguments.class, args);
-            final InputFormat input = InputFormat.valueOf(commandLineOptions.getInputFormat().toUpperCase());
             final File modelFolder = Util.getFile(commandLineOptions.getModel());
             final InputReader reader = InputReader.make(InputFormat.valueOf(commandLineOptions.getInputFormat()
                     .toUpperCase()));
@@ -85,30 +84,32 @@ public class EasySRLSandbox {
                         makeParser(pipelineFolder.getAbsolutePath(), 0.0001, ParsingAlgorithm.CKY, 200000,
                                 false /* joint */, Optional.empty(), commandLineOptions.getNbest()),
                     Util.deserialize(new File(pipelineFolder, "labelClassifier")), posTagger);
-
+            // FIXME: it causes some bugs ...
+            /*
             final SRLParser.BackoffSRLParser joint = new SRLParser.BackoffSRLParser(
                     new SRLParser.JointSRLParser(makeParser(commandLineOptions, 20000, true, Optional.empty()), posTagger),
-                    pipeline);
+                    pipeline);*/
 
             final SRLParser parser = pipeline;
 
             System.err.println("===Model loaded: parsing...===");
 
             // Read sentences.
-            List<List<String>> sentences = new ArrayList<>();
-            List<List<List<Tagger.ScoredCategory>>> sentenceTags = new ArrayList<>();
-            //readTaggedInput(new File(commandLineOptions.getTaggedInput()), sentences, sentenceTags);
-
-            final Iterator<String> inputLines = Util.readFile(Util.getFile(commandLineOptions.getInputFile())).iterator();
-            while (inputLines.hasNext()) {
-                final String line = inputLines instanceof Scanner ? ((Scanner) inputLines).nextLine().trim()
-                        : inputLines.next();
-                if (!line.isEmpty() && !line.startsWith("#")) {
-                    InputReader.InputToParser parserInput = reader.readInput(line);
-                    final List<CCGandSRLparse> parses = parser.parseTokens(parserInput.getInputWords());
+            BufferedReader fileReader = new BufferedReader(new FileReader(new File(commandLineOptions.getInputFile())));
+            String buffer = "";
+            String line;
+            while ((line = fileReader.readLine()) != null) {
+                if (line.trim().isEmpty() && !buffer.isEmpty()) {
+                    // System.out.println(buffer + "\n\n\n");
+                    InputReader.InputToParser parserInput = reader.readInput(buffer);
+                    final List<CCGandSRLparse> parses = parser.parseSupertaggedSentence(parserInput);
                     generateQuestions(parserInput.getInputWords(), parses);
+                    buffer = "";
+                } else {
+                    buffer += (buffer.isEmpty() ? "" : "\n") + line.trim();
                 }
             }
+            fileReader.close();
         } catch (final ArgumentValidationException e) {
             System.err.println(e.getMessage());
             System.err.println(CliFactory.createCli(CommandLineArguments.class).getHelpMessage());
@@ -132,7 +133,7 @@ public class EasySRLSandbox {
         categories.forEach(cat -> System.out.print(cat + " ")); System.out.println("\n");
 
         // TODO: get some scores for the dependencies
-
+        System.out.println(parses.size());
         for (CCGandSRLparse parse : parses) {
             Collection<ResolvedDependency> dependencies = parse.getDependencyParse();
             for (int predicateId = 0; predicateId < sentenceLength; predicateId++) {
@@ -160,7 +161,7 @@ public class EasySRLSandbox {
                     QuestionTemplate template = questionGenerator.getTemplate(predicateIndex, words, categories,
                             dependencies);
                     if (template == null) {
-                        System.out.println("Cannot generate template for " + targetDependency.toString(words));
+                        // System.out.println("Cannot generate template for " + targetDependency.toString(words));
                         continue;
                     }
                     // Get question.
@@ -189,6 +190,7 @@ public class EasySRLSandbox {
                     System.out.println();
                 }
             }
+            break;
         }
     }
 

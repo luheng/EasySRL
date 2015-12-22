@@ -68,15 +68,15 @@ public class QuestionTemplate {
         if (UnrealizedArgumentSlot.class.isInstance(slot)) {
             return new String [] { slot.preposition, argNum == 1 && getNumArguments() > 1 ? "someone" : "something" };
         }
-        // i.e. say something, says that ...
-        if (slot.category.isFunctionInto(Category.valueOf("S"))) {
-            return new String[] { "", "something" };
-        }
         if (slot.category.isFunctionInto(Category.valueOf("S[to]\\NP"))) {
             return new String[] { "to do", "something" };
         }
         if (slot.category.isFunctionInto(Category.valueOf("S[ng]\\NP"))) {
             return new String[] { "doing", "something" };
+        }
+        // i.e. say something, says that ...
+        if (slot.category.isFunctionInto(Category.valueOf("S"))) {
+            return new String[] { "", "something" };
         }
         String phStr;
         if (categories.get(argumentIndex).equals(Category.NP)) {
