@@ -21,7 +21,6 @@ public class TaggerLSTM extends Tagger {
 
 	TaggerLSTM(final File modelFolder, final double beta, final int maxTagsPerWord, final CutoffsDictionary cutoffs)
 			throws IOException {
-
 		this(makeDeepTagger(modelFolder), beta, maxTagsPerWord, cutoffs);
 	}
 

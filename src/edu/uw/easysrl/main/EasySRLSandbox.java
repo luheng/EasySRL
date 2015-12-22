@@ -22,6 +22,7 @@ import edu.uw.easysrl.syntax.parser.ParserCKY;
 import edu.uw.easysrl.syntax.parser.SRLParser;
 import edu.uw.easysrl.syntax.tagger.Tagger;
 import edu.uw.easysrl.syntax.tagger.TaggerEmbeddings;
+import edu.uw.easysrl.syntax.training.Training;
 import uk.co.flamingpenguin.jewel.cli.ArgumentValidationException;
 import uk.co.flamingpenguin.jewel.cli.CliFactory;
 
@@ -71,8 +72,8 @@ public class EasySRLSandbox {
 
             // Use CKY here, because we want marginal scores ..
             final PipelineSRLParser pipeline = new PipelineSRLParser(
-                        EasySRL.makeParser(pipelineFolder.getAbsolutePath(), 0.0001, ParsingAlgorithm.CKY, 200000,
-                        false /* joint */, Optional.empty(), commandLineOptions.getNbest()),
+                        makeParser(pipelineFolder.getAbsolutePath(), 0.0001, ParsingAlgorithm.CKY, 200000,
+                                false /* joint */, Optional.empty(), commandLineOptions.getNbest()),
                     Util.deserialize(new File(pipelineFolder, "labelClassifier")), posTagger);
 
             final SRLParser.BackoffSRLParser joint = new SRLParser.BackoffSRLParser(
@@ -173,9 +174,26 @@ public class EasySRLSandbox {
         }
     }
 
+    private static Parser makeParser(final String modelFolder, final double supertaggerBeam,
+                                     final ParsingAlgorithm parsingAlgorithm, final int maxChartSize,
+                                     final boolean joint,
+                                     final Optional<Double> supertaggerWeight, final int nbest) throws IOException {
+        CommandLineArguments commandLineOptions;
+        try {
+            commandLineOptions = CliFactory.parseArguments(CommandLineArguments.class, new String[] { "-m",
+                    modelFolder, "--supertaggerbeam", "" + supertaggerBeam, "-a", parsingAlgorithm.toString(),
+                    "--nbest", "" + nbest });
+
+        } catch (final ArgumentValidationException e) {
+            throw new RuntimeException(e);
+        }
+        return makeParser(commandLineOptions, maxChartSize, joint, supertaggerWeight);
+    }
+
     private static Parser makeParser(final CommandLineArguments commandLineOptions, final int maxChartSize,
                                      final boolean joint, final Optional<Double> supertaggerWeight) throws IOException {
         final File modelFolder = Util.getFile(commandLineOptions.getModel());
+        final File taggedInput = new File(commandLineOptions.getTaggedInput());
         Coindexation.parseMarkedUpFile(new File(modelFolder, "markedup"));
         final File cutoffsFile = new File(modelFolder, "cutoffs");
         final CutoffsDictionary cutoffs = cutoffsFile.exists() ? Util.deserialize(cutoffsFile) : null;
@@ -197,7 +215,8 @@ public class EasySRLSandbox {
                     Util.deserialize(new File(modelFolder, "featureToIndex")));
         } else {
             modelFactory = new SupertagFactoredModel.SupertagFactoredModelFactory(
-                    Tagger.make(modelFolder, commandLineOptions.getSupertaggerbeam(), 50, cutoffs));
+                    Tagger.makeDummyTagger(modelFolder, taggedInput, commandLineOptions.getSupertaggerbeam(), 50, cutoffs)
+                );
         }
 
         final Parser parser;
@@ -212,5 +231,9 @@ public class EasySRLSandbox {
                     commandLineOptions.getRootCategories(), modelFolder, maxChartSize);
         }
         return parser;
+    }
+
+    public void readTaggedInput(File taggedInputFile) {
+        // TODO
     }
 }

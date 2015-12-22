@@ -44,6 +44,11 @@ public abstract class Tagger {
 		}
 	}
 
+	public static Tagger makeDummyTagger(final File folder, final File taggedFile, final double beam,
+										 final int maxTagsPerWord, final CutoffsDictionary cutoffs) throws IOException {
+		return new TaggerDummy(folder, taggedFile, beam, maxTagsPerWord, cutoffs);
+	}
+
 	public static class ScoredCategory implements Comparable<ScoredCategory> {
 		private final Category category;
 		private final double score;
