@@ -86,8 +86,8 @@ public class EasySRL {
 		@Option(shortName = "p", defaultValue = { "false" }, description = "(Optional) Use the pipeline parser instead of joint.")
 		boolean getUsePipeline();
 
-		@Option(shortName = "t", defaultValue = { "toy.txt.stagged" }, description = "Tagged input file because supertagger does not work on server ...")
-		String getTaggedInput();
+		//@Option(shortName = "t", defaultValue = { "toy.txt.stagged" }, description = "Tagged input file because supertagger does not work on server ...")
+		//String getTaggedInput();
 	}
 
 	// Set of supported InputFormats

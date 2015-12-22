@@ -1,9 +1,13 @@
 package edu.uw.easysrl.main;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collectors;
 
+import edu.stanford.nlp.ling.Word;
 import edu.stanford.nlp.util.StringUtils;
 import edu.uw.easysrl.dependencies.Coindexation;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
@@ -21,8 +25,10 @@ import edu.uw.easysrl.syntax.parser.ParserAStar;
 import edu.uw.easysrl.syntax.parser.ParserCKY;
 import edu.uw.easysrl.syntax.parser.SRLParser;
 import edu.uw.easysrl.syntax.tagger.Tagger;
+import edu.uw.easysrl.syntax.tagger.TaggerDummy;
 import edu.uw.easysrl.syntax.tagger.TaggerEmbeddings;
 import edu.uw.easysrl.syntax.training.Training;
+import sun.security.krb5.internal.ASRep;
 import uk.co.flamingpenguin.jewel.cli.ArgumentValidationException;
 import uk.co.flamingpenguin.jewel.cli.CliFactory;
 
@@ -37,6 +43,7 @@ import edu.uw.easysrl.util.Util;
 
 public class EasySRLSandbox {
 
+    /*
     public static String[] spielzeuge = {
             "I saw a squirrel .",
             "I saw a squirrel with a nut yesterday .",
@@ -51,6 +58,7 @@ public class EasySRLSandbox {
             "Pass me the mug on the table that I usually drink from !",
             "The man with mug was mugged by another man ."
     };
+    */
 
     // TODO: run the same sentences over the pipeline model to see if there's any difference.
     private static QuestionGenerator questionGenerator;
@@ -61,6 +69,8 @@ public class EasySRLSandbox {
             final CommandLineArguments commandLineOptions = CliFactory.parseArguments(CommandLineArguments.class, args);
             final InputFormat input = InputFormat.valueOf(commandLineOptions.getInputFormat().toUpperCase());
             final File modelFolder = Util.getFile(commandLineOptions.getModel());
+            final InputReader reader = InputReader.make(InputFormat.valueOf(commandLineOptions.getInputFormat()
+                    .toUpperCase()));
 
             if (!modelFolder.exists()) {
                 throw new InputMismatchException("Couldn't load model from from: " + modelFolder);
@@ -81,15 +91,23 @@ public class EasySRLSandbox {
                     pipeline);
 
             final SRLParser parser = pipeline;
-            final InputReader reader = InputReader.make(InputFormat.valueOf(commandLineOptions.getInputFormat()
-                    .toUpperCase()));
+
             System.err.println("===Model loaded: parsing...===");
 
-            // Run over toy sentences.
-            for (String rawSentence : spielzeuge) {
-                List<InputReader.InputWord> words = reader.readInput(rawSentence).getInputWords();
-                final List<CCGandSRLparse> parses = parser.parseTokens(words);
-                generateQuestions(words, parses);
+            // Read sentences.
+            List<List<String>> sentences = new ArrayList<>();
+            List<List<List<Tagger.ScoredCategory>>> sentenceTags = new ArrayList<>();
+            //readTaggedInput(new File(commandLineOptions.getTaggedInput()), sentences, sentenceTags);
+
+            final Iterator<String> inputLines = Util.readFile(Util.getFile(commandLineOptions.getInputFile())).iterator();
+            while (inputLines.hasNext()) {
+                final String line = inputLines instanceof Scanner ? ((Scanner) inputLines).nextLine().trim()
+                        : inputLines.next();
+                if (!line.isEmpty() && !line.startsWith("#")) {
+                    InputReader.InputToParser parserInput = reader.readInput(line);
+                    final List<CCGandSRLparse> parses = parser.parseTokens(parserInput.getInputWords());
+                    generateQuestions(parserInput.getInputWords(), parses);
+                }
             }
         } catch (final ArgumentValidationException e) {
             System.err.println(e.getMessage());
@@ -193,7 +211,6 @@ public class EasySRLSandbox {
     private static Parser makeParser(final CommandLineArguments commandLineOptions, final int maxChartSize,
                                      final boolean joint, final Optional<Double> supertaggerWeight) throws IOException {
         final File modelFolder = Util.getFile(commandLineOptions.getModel());
-        final File taggedInput = new File(commandLineOptions.getTaggedInput());
         Coindexation.parseMarkedUpFile(new File(modelFolder, "markedup"));
         final File cutoffsFile = new File(modelFolder, "cutoffs");
         final CutoffsDictionary cutoffs = cutoffsFile.exists() ? Util.deserialize(cutoffsFile) : null;
@@ -215,8 +232,7 @@ public class EasySRLSandbox {
                     Util.deserialize(new File(modelFolder, "featureToIndex")));
         } else {
             modelFactory = new SupertagFactoredModel.SupertagFactoredModelFactory(
-                    Tagger.makeDummyTagger(modelFolder, taggedInput, commandLineOptions.getSupertaggerbeam(), 50, cutoffs)
-                );
+                    new TaggerDummy(modelFolder, 0, 0, cutoffs));
         }
 
         final Parser parser;
@@ -233,7 +249,40 @@ public class EasySRLSandbox {
         return parser;
     }
 
-    public void readTaggedInput(File taggedInputFile) {
-        // TODO
+    /*
+    public static void readTaggedInput(File taggedInputFile, List<List<String>> sentences,
+                                       List<List<List<Tagger.ScoredCategory>>> sentenceTags) {
+        BufferedReader reader;
+        String line;
+        assert sentences != null && sentenceTags != null;
+        try {
+            int sentenceIdx = 0;
+            reader = new BufferedReader(new FileReader(taggedInputFile));
+            while ((line = reader.readLine()) != null) {
+                if (line.trim().isEmpty()) {
+                    sentenceIdx ++;
+                    continue;
+                }
+                if (sentenceIdx == sentences.size()) {
+                    sentences.add(new ArrayList<>());
+                    sentenceTags.add(new ArrayList<>());
+                }
+                String[] info = line.trim().split("\\s+");
+                List<Tagger.ScoredCategory> scoredCategories = new ArrayList<>();
+                int numCategories = Integer.parseInt(info[2]);
+                for (int i = 0; i < numCategories; i++) {
+                    int j = i * 2 + 3;
+                    scoredCategories.add(new Tagger.ScoredCategory(
+                            Category.valueOf(info[j]), Double.parseDouble(info[j + 1])));
+                }
+                sentences.get(sentenceIdx).add(info[0]);
+                sentenceTags.get(sentenceIdx).add(scoredCategories);
+            }
+            reader.close();
+        } catch (IOException e) {
+        }
+        assert sentences.size() == sentenceTags.size();
+        System.out.println("Read " + sentences.size() + " sentences from " + taggedInputFile.getName());
     }
+    */
 }

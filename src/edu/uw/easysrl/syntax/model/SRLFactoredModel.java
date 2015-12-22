@@ -25,6 +25,7 @@ import edu.uw.easysrl.syntax.model.feature.FeatureCache;
 import edu.uw.easysrl.syntax.model.feature.FeatureCache.SlotFeatureCache;
 import edu.uw.easysrl.syntax.model.feature.FeatureSet;
 import edu.uw.easysrl.syntax.parser.AbstractParser.UnaryRule;
+import edu.uw.easysrl.syntax.tagger.Tagger;
 import edu.uw.easysrl.util.Util.Scored;
 
 public class SRLFactoredModel extends Model {
@@ -206,6 +207,11 @@ public class SRLFactoredModel extends Model {
 
 			return new SRLFactoredModel(forests, featureSet.unaryRuleFeatures, featureToScore,
 					featureSet.binaryFeatures, featureSet.rootFeatures, sentence);
+		}
+
+		@Override
+		public Model make(List<InputWord> sentence, List<List<Tagger.ScoredCategory>> scoredCategories) {
+			throw new RuntimeException("unimplemented");
 		}
 
 		@Override

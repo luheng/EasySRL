@@ -94,6 +94,11 @@ public class SupertagFactoredModel extends Model {
 		}
 
 		@Override
+		public Model make(List<InputWord> sentence, List<List<Tagger.ScoredCategory>> scoredCategories) {
+			return new SupertagFactoredModel(scoredCategories);
+		}
+
+		@Override
 		public Collection<Category> getLexicalCategories() {
 			return tagger.getLexicalCategories();
 		}

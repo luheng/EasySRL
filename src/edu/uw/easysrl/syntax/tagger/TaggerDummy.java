@@ -20,15 +20,16 @@ public class TaggerDummy extends Tagger {
 
     private Map<String, List<List<ScoredCategory>>> taggedSentences;
 
-    public TaggerDummy(final File modelFolder, final File taggedFile, final double beta, final int maxTagsPerWord,
+    public TaggerDummy(final File modelFolder, final double beta, final int maxTagsPerWord,
                        final CutoffsDictionary cutoffs) throws IOException {
         super(cutoffs, beta, TaggerEmbeddings.loadCategories(new File(modelFolder, "categories")), maxTagsPerWord);
         taggedSentences = new HashMap<>();
-        // TODO: read tagged file
     }
 
     @Override
     public List<List<ScoredCategory>> tag(final List<InputReader.InputWord> words) {
+        throw new RuntimeException("this is not in my job description");
+        /*
         final List<String> input = words.stream().map(x -> x.word).collect(Collectors.toList());
         String sentenceKey = getSentenceKey(input);
 
@@ -37,6 +38,7 @@ public class TaggerDummy extends Tagger {
             throw new RuntimeException("sentence is not tagged.");
         }
         return tagged;
+        */
     }
 
     @Override

@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.PriorityQueue;
 
+import com.sun.tools.doclets.internal.toolkit.util.DocFinder;
 import edu.uw.easysrl.dependencies.DependencyStructure;
 import edu.uw.easysrl.dependencies.UnlabelledDependency;
 import edu.uw.easysrl.main.EasySRL.InputFormat;
@@ -20,6 +21,7 @@ import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeUnary;
 import edu.uw.easysrl.syntax.model.AgendaItem;
 import edu.uw.easysrl.syntax.model.Model;
 import edu.uw.easysrl.syntax.model.Model.ModelFactory;
+import edu.uw.easysrl.syntax.tagger.Tagger;
 import edu.uw.easysrl.util.Util.Scored;
 
 public class ParserAStar extends AbstractParser {
@@ -38,8 +40,17 @@ public class ParserAStar extends AbstractParser {
 	}
 
 	@Override
+	List<Scored<SyntaxTreeNode>> parseAstar(final List<InputWord> sentence,
+											final List<List<Tagger.ScoredCategory>> scoredCategories) {
+		return parse(sentence, modelFactory.make(sentence, scoredCategories));
+	}
+
+	@Override
 	List<Scored<SyntaxTreeNode>> parseAstar(final List<InputWord> sentence) {
-		final Model model = modelFactory.make(sentence);
+		return parse(sentence, modelFactory.make(sentence));
+	}
+
+	private List<Scored<SyntaxTreeNode>> parse(List<InputWord> sentence, Model model) {
 		final int sentenceLength = sentence.size();
 		final PriorityQueue<AgendaItem> agenda = new PriorityQueue<>();
 		model.buildAgenda(agenda, sentence);

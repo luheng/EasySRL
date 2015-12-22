@@ -40,6 +40,7 @@ import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeLeaf;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeUnary;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeVisitor;
 import edu.uw.easysrl.syntax.model.AgendaItem;
+import edu.uw.easysrl.syntax.tagger.Tagger;
 import edu.uw.easysrl.util.Util;
 import edu.uw.easysrl.util.Util.Scored;
 
@@ -255,6 +256,19 @@ public abstract class AbstractParser implements Parser {
 		return parses;
 	}
 
+	@Override
+	public List<Scored<SyntaxTreeNode>> parseSupertaggedSentence(final InputToParser input) {
+		if (input.length() >= maxLength) {
+			System.err.println("Skipping sentence of length " + input.length());
+			return null;
+		}
+		if (input.getScoredCategories() == null) {
+			System.err.println("Sentence is not supertagged " + input.length());
+			return null;
+		}
+		return parseAstar(input.getInputWords(), input.getScoredCategories());
+	}
+
 	/*
 	 * (non-Javadoc)
 	 *
@@ -285,6 +299,9 @@ public abstract class AbstractParser implements Parser {
 	 * Returns null if the parse fails.
 	 */
 	abstract List<Scored<SyntaxTreeNode>> parseAstar(List<InputWord> sentence);
+
+	abstract List<Scored<SyntaxTreeNode>> parseAstar(List<InputWord> sentence,
+													 List<List<Tagger.ScoredCategory>> scoredCategories);
 
 	private final Map<Category, Map<Category, Collection<RuleProduction>>> ruleCache = new HashMap<>();
 
