@@ -7,14 +7,15 @@ import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import edu.stanford.nlp.ling.Word;
 import edu.stanford.nlp.util.StringUtils;
 import edu.uw.easysrl.dependencies.Coindexation;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
+import edu.uw.easysrl.dependencies.SRLFrame;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.qasrl.qg.QuestionSlot;
 import edu.uw.easysrl.qasrl.qg.QuestionTemplate;
 import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.syntax.grammar.Preposition;
 import edu.uw.easysrl.syntax.model.CutoffsDictionary;
 import edu.uw.easysrl.syntax.model.Model;
 import edu.uw.easysrl.syntax.model.SRLFactoredModel;
@@ -42,9 +43,7 @@ import edu.uw.easysrl.syntax.tagger.POSTagger;
 import edu.uw.easysrl.util.Util;
 
 public class EasySRLSandbox {
-
-    /*
-    public static String[] spielzeuge = {
+    /* public static String[] spielzeuge = {
             "I saw a squirrel .",
             "I saw a squirrel with a nut yesterday .",
             "I saw a squirrel eating a nut yesterday .",
@@ -57,14 +56,20 @@ public class EasySRLSandbox {
             "Could you pass me the mug on the table that I usually drink from ?",
             "Pass me the mug on the table that I usually drink from !",
             "The man with mug was mugged by another man ."
-    };
-    */
+    }; */
 
     // TODO: run the same sentences over the pipeline model to see if there's any difference.
     private static QuestionGenerator questionGenerator;
 
     public static void main(final String[] args) throws IOException, InterruptedException {
+        // Read results from another parser ..
+        List<Collection<ResolvedDependency>> bharatDeps = readBharatParserDependencies(
+                new File("/Users/luheng/Workspace/EasySRL/toy.txt.parg"));
+        List<List<InputReader.InputWord>> sentences = new ArrayList<>();
+        List<CCGandSRLparse> easyCcgParses = new ArrayList<>();
         questionGenerator = new QuestionGenerator();
+
+        // Read sentences to parse.
         try {
             final CommandLineArguments commandLineOptions = CliFactory.parseArguments(CommandLineArguments.class, args);
             final File modelFolder = Util.getFile(commandLineOptions.getModel());
@@ -85,8 +90,7 @@ public class EasySRLSandbox {
                                 false /* joint */, Optional.empty(), commandLineOptions.getNbest()),
                     Util.deserialize(new File(pipelineFolder, "labelClassifier")), posTagger);
             // FIXME: it causes some bugs ...
-            /*
-            final SRLParser.BackoffSRLParser joint = new SRLParser.BackoffSRLParser(
+            /* final SRLParser.BackoffSRLParser joint = new SRLParser.BackoffSRLParser(
                     new SRLParser.JointSRLParser(makeParser(commandLineOptions, 20000, true, Optional.empty()), posTagger),
                     pipeline);*/
 
@@ -98,13 +102,16 @@ public class EasySRLSandbox {
             BufferedReader fileReader = new BufferedReader(new FileReader(new File(commandLineOptions.getInputFile())));
             String buffer = "";
             String line;
+            int sentenceIdx = 0;
             while ((line = fileReader.readLine()) != null) {
                 if (line.trim().isEmpty() && !buffer.isEmpty()) {
-                    // System.out.println(buffer + "\n\n\n");
                     InputReader.InputToParser parserInput = reader.readInput(buffer);
                     final List<CCGandSRLparse> parses = parser.parseSupertaggedSentence(parserInput);
-                    generateQuestions(parserInput.getInputWords(), parses);
+                    easyCcgParses.add(parses.get(0));
+                    sentences.add(parserInput.getInputWords());
+                    //generateQuestions(parserInput.getInputWords(), parses, bharatDeps.get(sentenceIdx));
                     buffer = "";
+                    sentenceIdx ++;
                 } else {
                     buffer += (buffer.isEmpty() ? "" : "\n") + line.trim();
                 }
@@ -114,9 +121,58 @@ public class EasySRLSandbox {
             System.err.println(e.getMessage());
             System.err.println(CliFactory.createCli(CommandLineArguments.class).getHelpMessage());
         }
+
+        // Compare parses.
+        compareDependencies(sentences, easyCcgParses, bharatDeps);
     }
 
-    private static void generateQuestions(List<InputReader.InputWord> inputWords, List<CCGandSRLparse> parses) {
+    private static void compareDependencies(List<List<InputReader.InputWord>> sentences,
+                                            List<CCGandSRLparse> easyCcgParses,
+                                            List<Collection<ResolvedDependency>> bharatDeps) {
+        for (int sentIdx = 0; sentIdx < sentences.size(); sentIdx++) {
+            List<InputReader.InputWord> sentence = sentences.get(sentIdx);
+            List<String> words = sentence.stream().map(w -> w.word).collect(Collectors.toList());
+            List<ResolvedDependency> parse1 = new ArrayList<>(easyCcgParses.get(sentIdx).getDependencyParse());
+            List<ResolvedDependency> parse2 = new ArrayList<>(bharatDeps.get(sentIdx));
+
+            int[] matched1 = new int[parse1.size()];
+            int[] matched2 = new int[parse2.size()];
+            Arrays.fill(matched1, -1);
+            Arrays.fill(matched2, -1);
+
+            for (int i1 = 0; i1 < parse1.size(); i1++) {
+                for (int i2 = 0; i2 < parse2.size(); i2++) {
+                    ResolvedDependency d1 = parse1.get(i1);
+                    ResolvedDependency d2 = parse1.get(i2);
+                    if (d1.getHead() == d2.getHead() && d1.getArgumentIndex() == d2.getArgumentIndex()) {
+                        matched1[i1] = i2;
+                        matched2[i2] = i1;
+                    }
+                }
+            }
+
+            System.out.println("[UNMATCHED DEPENDENCIES]");
+            for (int i1 = 0; i1 < parse1.size(); i1++) {
+                if (matched1[i1] < 0) {
+                    System.out.println("easyccg\t" + parse1.get(i1).toString(words));
+                }
+            }
+            for (int i2 = 0; i2 < parse2.size(); i2++) {
+                if (matched2[i2] < 0) {
+                    System.out.println("bharat\t" + parse2.get(i2).toString(words));
+                }
+            }
+            System.out.println("[MATCHED DEPENDENCIES]");
+            for (int i1 = 0; i1 < parse1.size(); i1++) {
+                if (matched1[i1] >= 0) {
+                    System.out.println("matched\t" + parse1.get(i1).toString(words));
+                }
+            }
+        }
+    }
+
+    private static void generateQuestions(List<InputReader.InputWord> inputWords, List<CCGandSRLparse> parses,
+                                          Collection<ResolvedDependency> referenceDeps) {
         if (parses == null || parses.size() == 0) {
             System.out.println("Unable to parse.");
             return;
@@ -137,8 +193,6 @@ public class EasySRLSandbox {
         for (CCGandSRLparse parse : parses) {
             Collection<ResolvedDependency> dependencies = parse.getDependencyParse();
             for (int predicateId = 0; predicateId < sentenceLength; predicateId++) {
-                String predicateWord = words.get(predicateId);
-                Category predicateCategory = categories.get(predicateId);
                 Collection<ResolvedDependency> deps = parse.getOrderedDependenciesAtPredicateIndex(predicateId);
                 if (deps == null || deps.size() == 0) {
                     continue;
@@ -157,11 +211,20 @@ public class EasySRLSandbox {
                     }
                     int predicateIndex = targetDependency.getHead();
                     int argumentNumber = targetDependency.getArgNumber();
+                    boolean matched = false;
+                    for (ResolvedDependency dep : referenceDeps) {
+                        if (dep.getHead() == predicateIndex &&
+                                dep.getArgumentIndex() == targetDependency.getArgumentIndex()) {
+                            matched = true;
+                            break;
+                        }
+                    }
+                    System.out.println(matched ? "[matched]" : "[unmatched]");
                     // Get template.
                     QuestionTemplate template = questionGenerator.getTemplate(predicateIndex, words, categories,
                             dependencies);
                     if (template == null) {
-                        // System.out.println("Cannot generate template for " + targetDependency.toString(words));
+                        System.out.println("Cannot generate template for " + targetDependency.toString(words));
                         continue;
                     }
                     // Get question.
@@ -251,6 +314,50 @@ public class EasySRLSandbox {
         return parser;
     }
 
+    public static List<Collection<ResolvedDependency>> readBharatParserDependencies(File dependenciesFile) {
+        BufferedReader reader;
+        String line;
+        List<Collection<ResolvedDependency>> dependencies = new ArrayList<>();
+        try {
+            int sentenceIdx = 0;
+            reader = new BufferedReader(new FileReader(dependenciesFile));
+            while ((line = reader.readLine()) != null) {
+                if (line.startsWith("#") || line.startsWith("<c> ")) {
+                    continue;
+                }
+                if (line.trim().isEmpty()) {
+                    if (sentenceIdx < dependencies.size()) {
+                        sentenceIdx++;
+                    }
+                    continue;
+                }
+                if (sentenceIdx == dependencies.size()) {
+                    dependencies.add(new HashSet<>());
+                }
+                // Parse the f--king line:
+                // saw_2(S[dcl]\NP)/NP1 I_1 0
+                // in_29((S\NP)\(S\NP))/NP3 hours_33 0
+                // in ((S\NP)\(S\NP))/NP hours
+                String[] stringsInfo = line.trim().split("[_\\d]+");
+                // _ 29 3 33 0
+                String[] indicesInfo = line.trim().split("[^\\d]+");
+
+                int predIdx = Integer.parseInt(indicesInfo[1]);
+                Category predCateogory = Category.valueOf(stringsInfo[1]);
+                int argNum = Integer.parseInt(indicesInfo[2]);
+                int argIdx = Integer.parseInt(indicesInfo[3]);
+
+                // System.out.println(line);
+                // System.out.println(predIdx + "\t" + predCateogory + "\t" + argNum + "\t" + argIdx);
+
+                dependencies.get(sentenceIdx).add(new ResolvedDependency(predIdx, predCateogory, argNum, argIdx,
+                        SRLFrame.NONE, Preposition.NONE));
+            }
+        } catch (IOException e) {
+            return null;
+        }
+        return dependencies;
+    }
     /*
     public static void readTaggedInput(File taggedInputFile, List<List<String>> sentences,
                                        List<List<List<Tagger.ScoredCategory>>> sentenceTags) {
