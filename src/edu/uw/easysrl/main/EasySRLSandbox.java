@@ -102,7 +102,6 @@ public class EasySRLSandbox {
             BufferedReader fileReader = new BufferedReader(new FileReader(new File(commandLineOptions.getInputFile())));
             String buffer = "";
             String line;
-            int sentenceIdx = 0;
             while ((line = fileReader.readLine()) != null) {
                 if (line.trim().isEmpty() && !buffer.isEmpty()) {
                     InputReader.InputToParser parserInput = reader.readInput(buffer);
@@ -111,7 +110,6 @@ public class EasySRLSandbox {
                     sentences.add(parserInput.getInputWords());
                     //generateQuestions(parserInput.getInputWords(), parses, bharatDeps.get(sentenceIdx));
                     buffer = "";
-                    sentenceIdx ++;
                 } else {
                     buffer += (buffer.isEmpty() ? "" : "\n") + line.trim();
                 }
@@ -143,7 +141,7 @@ public class EasySRLSandbox {
             for (int i1 = 0; i1 < parse1.size(); i1++) {
                 for (int i2 = 0; i2 < parse2.size(); i2++) {
                     ResolvedDependency d1 = parse1.get(i1);
-                    ResolvedDependency d2 = parse1.get(i2);
+                    ResolvedDependency d2 = parse2.get(i2);
                     if (d1.getHead() == d2.getHead() && d1.getArgumentIndex() == d2.getArgumentIndex()) {
                         matched1[i1] = i2;
                         matched2[i2] = i1;
@@ -151,21 +149,26 @@ public class EasySRLSandbox {
                 }
             }
 
+            System.out.println("\n" + StringUtils.join(words));
+
             System.out.println("[UNMATCHED DEPENDENCIES]");
             for (int i1 = 0; i1 < parse1.size(); i1++) {
                 if (matched1[i1] < 0) {
-                    System.out.println("easyccg\t" + parse1.get(i1).toString(words));
+                    ResolvedDependency d1 = parse1.get(i1);
+                    System.out.println("easyccg\t" + d1.getCategory() + "\t" + d1.toString(words));
                 }
             }
             for (int i2 = 0; i2 < parse2.size(); i2++) {
                 if (matched2[i2] < 0) {
-                    System.out.println("bharat\t" + parse2.get(i2).toString(words));
+                    ResolvedDependency d2 = parse2.get(i2);
+                    System.out.println("bharat\t" + d2.getCategory() + "\t" + d2.toString(words));
                 }
             }
             System.out.println("[MATCHED DEPENDENCIES]");
             for (int i1 = 0; i1 < parse1.size(); i1++) {
                 if (matched1[i1] >= 0) {
-                    System.out.println("matched\t" + parse1.get(i1).toString(words));
+                    System.out.print("\t\t" + parse1.get(i1).toString(words));
+                    System.out.println("\t\t" + parse2.get(matched1[i1]).toString(words));
                 }
             }
         }
@@ -342,13 +345,13 @@ public class EasySRLSandbox {
                 // _ 29 3 33 0
                 String[] indicesInfo = line.trim().split("[^\\d]+");
 
-                int predIdx = Integer.parseInt(indicesInfo[1]);
+                int predIdx = Integer.parseInt(indicesInfo[1]) - 1;
                 Category predCateogory = Category.valueOf(stringsInfo[1]);
                 int argNum = Integer.parseInt(indicesInfo[2]);
-                int argIdx = Integer.parseInt(indicesInfo[3]);
+                int argIdx = Integer.parseInt(indicesInfo[indicesInfo.length - 2]) - 1;
 
-                // System.out.println(line);
-                // System.out.println(predIdx + "\t" + predCateogory + "\t" + argNum + "\t" + argIdx);
+                //System.out.println(line);
+                //System.out.println(predIdx + "\t" + predCateogory + "\t" + argNum + "\t" + argIdx);
 
                 dependencies.get(sentenceIdx).add(new ResolvedDependency(predIdx, predCateogory, argNum, argIdx,
                         SRLFrame.NONE, Preposition.NONE));
@@ -358,6 +361,7 @@ public class EasySRLSandbox {
         }
         return dependencies;
     }
+
     /*
     public static void readTaggedInput(File taggedInputFile, List<List<String>> sentences,
                                        List<List<List<Tagger.ScoredCategory>>> sentenceTags) {
