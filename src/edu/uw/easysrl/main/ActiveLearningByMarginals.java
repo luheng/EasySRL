@@ -42,8 +42,8 @@ import edu.uw.easysrl.syntax.parser.SRLParser.PipelineSRLParser;
 import edu.uw.easysrl.syntax.tagger.POSTagger;
 import edu.uw.easysrl.util.Util;
 
-public class EasySRLSandbox {
-    /* public static String[] spielzeuge = {
+public class ActiveLearningByMarginals {
+        public static String[] spielzeuge = {
             "I saw a squirrel .",
             "I saw a squirrel with a nut yesterday .",
             "I saw a squirrel eating a nut yesterday .",
@@ -56,15 +56,12 @@ public class EasySRLSandbox {
             "Could you pass me the mug on the table that I usually drink from ?",
             "Pass me the mug on the table that I usually drink from !",
             "The man with mug was mugged by another man ."
-    }; */
+    };
 
     // TODO: run the same sentences over the pipeline model to see if there's any difference.
     private static QuestionGenerator questionGenerator;
 
     public static void main(final String[] args) throws IOException, InterruptedException {
-        // Read results from another parser ..
-        List<Collection<ResolvedDependency>> bharatDeps = readBharatParserDependencies(
-                new File("/Users/luheng/Workspace/EasySRL/toy.txt.parg"));
         List<List<InputReader.InputWord>> sentences = new ArrayList<>();
         List<CCGandSRLparse> easyCcgParses = new ArrayList<>();
         questionGenerator = new QuestionGenerator();
@@ -86,96 +83,31 @@ public class EasySRLSandbox {
 
             // Use CKY here, because we want marginal scores ..
             final PipelineSRLParser pipeline = new PipelineSRLParser(
-                        makeParser(pipelineFolder.getAbsolutePath(), 0.0001, ParsingAlgorithm.CKY, 200000,
-                                false /* joint */, Optional.empty(), commandLineOptions.getNbest()),
+                    makeParser(pipelineFolder.getAbsolutePath(), 0.0001, ParsingAlgorithm.CKY, 200000,
+                            false /* joint */, Optional.empty(), commandLineOptions.getNbest()),
                     Util.deserialize(new File(pipelineFolder, "labelClassifier")), posTagger);
-            // FIXME: it causes some bugs ...
-            /* final SRLParser.BackoffSRLParser joint = new SRLParser.BackoffSRLParser(
+            final SRLParser.BackoffSRLParser joint = new SRLParser.BackoffSRLParser(
                     new SRLParser.JointSRLParser(makeParser(commandLineOptions, 20000, true, Optional.empty()), posTagger),
-                    pipeline);*/
-
+                    pipeline);
             final SRLParser parser = pipeline;
 
             System.err.println("===Model loaded: parsing...===");
 
-            // Read sentences.
-            BufferedReader fileReader = new BufferedReader(new FileReader(new File(commandLineOptions.getInputFile())));
-            String buffer = "";
-            String line;
-            while ((line = fileReader.readLine()) != null) {
-                if (line.trim().isEmpty() && !buffer.isEmpty()) {
-                    InputReader.InputToParser parserInput = reader.readInput(buffer);
-                    final List<CCGandSRLparse> parses = parser.parseSupertaggedSentence(parserInput);
-                    easyCcgParses.add(parses.get(0));
-                    sentences.add(parserInput.getInputWords());
-                    //generateQuestions(parserInput.getInputWords(), parses, bharatDeps.get(sentenceIdx));
-                    buffer = "";
-                } else {
-                    buffer += (buffer.isEmpty() ? "" : "\n") + line.trim();
-                }
+            // Go over sample sentences.
+            for (String sentence : spielzeuge) {
+                InputReader.InputToParser parserInput = reader.readInput(sentence);
+                final List<CCGandSRLparse> parses = parser.parseTokens(parserInput.getInputWords());
+                easyCcgParses.add(parses.get(0));
+                sentences.add(parserInput.getInputWords());
+                generateQuestions(parserInput.getInputWords(), parses);
             }
-            fileReader.close();
         } catch (final ArgumentValidationException e) {
             System.err.println(e.getMessage());
             System.err.println(CliFactory.createCli(CommandLineArguments.class).getHelpMessage());
         }
-
-        // Compare parses.
-        compareDependencies(sentences, easyCcgParses, bharatDeps);
     }
 
-    private static void compareDependencies(List<List<InputReader.InputWord>> sentences,
-                                            List<CCGandSRLparse> easyCcgParses,
-                                            List<Collection<ResolvedDependency>> bharatDeps) {
-        for (int sentIdx = 0; sentIdx < sentences.size(); sentIdx++) {
-            List<InputReader.InputWord> sentence = sentences.get(sentIdx);
-            List<String> words = sentence.stream().map(w -> w.word).collect(Collectors.toList());
-            List<ResolvedDependency> parse1 = new ArrayList<>(easyCcgParses.get(sentIdx).getDependencyParse());
-            List<ResolvedDependency> parse2 = new ArrayList<>(bharatDeps.get(sentIdx));
-
-            int[] matched1 = new int[parse1.size()];
-            int[] matched2 = new int[parse2.size()];
-            Arrays.fill(matched1, -1);
-            Arrays.fill(matched2, -1);
-
-            for (int i1 = 0; i1 < parse1.size(); i1++) {
-                for (int i2 = 0; i2 < parse2.size(); i2++) {
-                    ResolvedDependency d1 = parse1.get(i1);
-                    ResolvedDependency d2 = parse2.get(i2);
-                    if (d1.getHead() == d2.getHead() && d1.getArgumentIndex() == d2.getArgumentIndex()) {
-                        matched1[i1] = i2;
-                        matched2[i2] = i1;
-                    }
-                }
-            }
-
-            System.out.println("\n" + StringUtils.join(words));
-
-            System.out.println("[UNMATCHED DEPENDENCIES]");
-            for (int i1 = 0; i1 < parse1.size(); i1++) {
-                if (matched1[i1] < 0) {
-                    ResolvedDependency d1 = parse1.get(i1);
-                    System.out.println("easyccg\t" + d1.getCategory() + "\t" + d1.toString(words));
-                }
-            }
-            for (int i2 = 0; i2 < parse2.size(); i2++) {
-                if (matched2[i2] < 0) {
-                    ResolvedDependency d2 = parse2.get(i2);
-                    System.out.println("bharat\t" + d2.getCategory() + "\t" + d2.toString(words));
-                }
-            }
-            System.out.println("[MATCHED DEPENDENCIES]");
-            for (int i1 = 0; i1 < parse1.size(); i1++) {
-                if (matched1[i1] >= 0) {
-                    System.out.print("\t\t" + parse1.get(i1).toString(words));
-                    System.out.println("\t\t" + parse2.get(matched1[i1]).toString(words));
-                }
-            }
-        }
-    }
-
-    private static void generateQuestions(List<InputReader.InputWord> inputWords, List<CCGandSRLparse> parses,
-                                          Collection<ResolvedDependency> referenceDeps) {
+    private static void generateQuestions(List<InputReader.InputWord> inputWords, List<CCGandSRLparse> parses) {
         if (parses == null || parses.size() == 0) {
             System.out.println("Unable to parse.");
             return;
@@ -214,15 +146,6 @@ public class EasySRLSandbox {
                     }
                     int predicateIndex = targetDependency.getHead();
                     int argumentNumber = targetDependency.getArgNumber();
-                    boolean matched = false;
-                    for (ResolvedDependency dep : referenceDeps) {
-                        if (dep.getHead() == predicateIndex &&
-                                dep.getArgumentIndex() == targetDependency.getArgumentIndex()) {
-                            matched = true;
-                            break;
-                        }
-                    }
-                    System.out.println(matched ? "[matched]" : "[unmatched]");
                     // Get template.
                     QuestionTemplate template = questionGenerator.getTemplate(predicateIndex, words, categories,
                             dependencies);
@@ -361,41 +284,4 @@ public class EasySRLSandbox {
         }
         return dependencies;
     }
-
-    /*
-    public static void readTaggedInput(File taggedInputFile, List<List<String>> sentences,
-                                       List<List<List<Tagger.ScoredCategory>>> sentenceTags) {
-        BufferedReader reader;
-        String line;
-        assert sentences != null && sentenceTags != null;
-        try {
-            int sentenceIdx = 0;
-            reader = new BufferedReader(new FileReader(taggedInputFile));
-            while ((line = reader.readLine()) != null) {
-                if (line.trim().isEmpty()) {
-                    sentenceIdx ++;
-                    continue;
-                }
-                if (sentenceIdx == sentences.size()) {
-                    sentences.add(new ArrayList<>());
-                    sentenceTags.add(new ArrayList<>());
-                }
-                String[] info = line.trim().split("\\s+");
-                List<Tagger.ScoredCategory> scoredCategories = new ArrayList<>();
-                int numCategories = Integer.parseInt(info[2]);
-                for (int i = 0; i < numCategories; i++) {
-                    int j = i * 2 + 3;
-                    scoredCategories.add(new Tagger.ScoredCategory(
-                            Category.valueOf(info[j]), Double.parseDouble(info[j + 1])));
-                }
-                sentences.get(sentenceIdx).add(info[0]);
-                sentenceTags.get(sentenceIdx).add(scoredCategories);
-            }
-            reader.close();
-        } catch (IOException e) {
-        }
-        assert sentences.size() == sentenceTags.size();
-        System.out.println("Read " + sentences.size() + " sentences from " + taggedInputFile.getName());
-    }
-    */
 }
