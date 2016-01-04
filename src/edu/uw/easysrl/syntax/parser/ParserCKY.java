@@ -9,6 +9,7 @@ import java.util.PriorityQueue;
 import java.util.stream.Collectors;
 
 import edu.uw.easysrl.dependencies.DependencyStructure;
+import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.dependencies.UnlabelledDependency;
 import edu.uw.easysrl.main.EasySRL.InputFormat;
 import edu.uw.easysrl.main.InputReader.InputWord;
@@ -126,12 +127,30 @@ public class ParserCKY extends AbstractParser {
 						continue;
 					}
 					final List<UnlabelledDependency> resolvedDependencies = new ArrayList<>();
-					final DependencyStructure deps = rule.getCombinator().apply(l.getParse().getDependencyStructure(),
-							r.getParse().getDependencyStructure(), resolvedDependencies);
-					final SyntaxTreeNode newNode = new SyntaxTreeNodeBinary(rule.getCategory(), l.getParse(),
-							r.getParse(), ruleType, rule.isHeadIsLeft(), deps, resolvedDependencies);
+					final DependencyStructure deps = rule.getCombinator().apply(
+							l.getParse().getDependencyStructure(),
+							r.getParse().getDependencyStructure(),
+							resolvedDependencies);
+					final SyntaxTreeNode newNode = new SyntaxTreeNodeBinary(
+							rule.getCategory(),
+							l.getParse(),
+							r.getParse(),
+							ruleType,
+							rule.isHeadIsLeft(),
+							deps,
+							resolvedDependencies);
 					final AgendaItem newItem = model.combineNodes(l, r, newNode);
 					addEntry(result, newItem, model);
+					// TODO: hmmm
+					List<ResolvedDependency> rdeps = newNode.getAllLabelledDependencies();
+					if (rdeps != null && rdeps.size() > 0) {
+						System.out.println(
+								newItem.getStartOfSpan() + "\t" +
+								(newItem.getStartOfSpan() + newItem.getSpanLength()) + "\t" +
+								newItem.getInsideScore() + "\t" + newItem.getCost());
+						rdeps.forEach(d -> System.out.println(
+								d.getCategory() + "\t" + d.toString()));
+					}
 				}
 			}
 		}

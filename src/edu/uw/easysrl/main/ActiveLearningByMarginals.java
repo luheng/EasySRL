@@ -1,35 +1,10 @@
 package edu.uw.easysrl.main;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;
-import java.util.stream.Collectors;
 
-import edu.stanford.nlp.util.StringUtils;
-import edu.uw.easysrl.dependencies.Coindexation;
-import edu.uw.easysrl.dependencies.ResolvedDependency;
-import edu.uw.easysrl.dependencies.SRLFrame;
-import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
-import edu.uw.easysrl.qasrl.qg.QuestionSlot;
-import edu.uw.easysrl.qasrl.qg.QuestionTemplate;
-import edu.uw.easysrl.syntax.grammar.Category;
-import edu.uw.easysrl.syntax.grammar.Preposition;
-import edu.uw.easysrl.syntax.model.CutoffsDictionary;
-import edu.uw.easysrl.syntax.model.Model;
-import edu.uw.easysrl.syntax.model.SRLFactoredModel;
-import edu.uw.easysrl.syntax.model.SupertagFactoredModel;
-import edu.uw.easysrl.syntax.model.feature.FeatureSet;
-import edu.uw.easysrl.syntax.parser.Parser;
-import edu.uw.easysrl.syntax.parser.ParserAStar;
-import edu.uw.easysrl.syntax.parser.ParserCKY;
-import edu.uw.easysrl.syntax.parser.SRLParser;
-import edu.uw.easysrl.syntax.tagger.Tagger;
-import edu.uw.easysrl.syntax.tagger.TaggerDummy;
-import edu.uw.easysrl.syntax.tagger.TaggerEmbeddings;
-import edu.uw.easysrl.syntax.training.Training;
-import sun.security.krb5.internal.ASRep;
+import edu.uw.easysrl.syntax.parser.*;
 import uk.co.flamingpenguin.jewel.cli.ArgumentValidationException;
 import uk.co.flamingpenguin.jewel.cli.CliFactory;
 
@@ -58,13 +33,9 @@ public class ActiveLearningByMarginals {
             "The man with mug was mugged by another man ."
     };
 
-    // TODO: run the same sentences over the pipeline model to see if there's any difference.
-    private static QuestionGenerator questionGenerator;
-
     public static void main(final String[] args) throws IOException, InterruptedException {
         List<List<InputReader.InputWord>> sentences = new ArrayList<>();
         List<CCGandSRLparse> easyCcgParses = new ArrayList<>();
-        questionGenerator = new QuestionGenerator();
 
         // Read sentences to parse.
         try {
@@ -83,12 +54,14 @@ public class ActiveLearningByMarginals {
 
             // Use CKY here, because we want marginal scores ..
             final PipelineSRLParser pipeline = new PipelineSRLParser(
-                    makeParser(pipelineFolder.getAbsolutePath(), 0.0001, ParsingAlgorithm.CKY, 200000,
-                            false /* joint */, Optional.empty(), commandLineOptions.getNbest()),
+                    ActiveLearningHelper
+                            .makeParser(pipelineFolder.getAbsolutePath(), 0.0001, ParsingAlgorithm.CKY, 200000,
+                                    false /* joint */, Optional.empty(), commandLineOptions.getNbest()),
                     Util.deserialize(new File(pipelineFolder, "labelClassifier")), posTagger);
             final SRLParser.BackoffSRLParser joint = new SRLParser.BackoffSRLParser(
-                    new SRLParser.JointSRLParser(makeParser(commandLineOptions, 20000, true, Optional.empty()), posTagger),
-                    pipeline);
+                    new SRLParser.JointSRLParser(
+                            ActiveLearningHelper
+                                    .makeParser(commandLineOptions, 20000, true, Optional.empty()), posTagger), pipeline);
             final SRLParser parser = pipeline;
 
             System.err.println("===Model loaded: parsing...===");
@@ -97,9 +70,10 @@ public class ActiveLearningByMarginals {
             for (String sentence : spielzeuge) {
                 InputReader.InputToParser parserInput = reader.readInput(sentence);
                 final List<CCGandSRLparse> parses = parser.parseTokens(parserInput.getInputWords());
+
                 easyCcgParses.add(parses.get(0));
                 sentences.add(parserInput.getInputWords());
-                generateQuestions(parserInput.getInputWords(), parses);
+                ActiveLearningHelper.generateQuestions(parserInput.getInputWords(), parses);
             }
         } catch (final ArgumentValidationException e) {
             System.err.println(e.getMessage());
@@ -107,181 +81,5 @@ public class ActiveLearningByMarginals {
         }
     }
 
-    private static void generateQuestions(List<InputReader.InputWord> inputWords, List<CCGandSRLparse> parses) {
-        if (parses == null || parses.size() == 0) {
-            System.out.println("Unable to parse.");
-            return;
-        }
-        int sentenceLength = inputWords.size();
-        List<String> words = new ArrayList<>();
-        List<Category> categories = new ArrayList<>();
-        for (int i = 0; i < sentenceLength; i++) {
-            words.add(parses.get(0).getLeaf(i).getWord());
-            categories.add(parses.get(0).getLeaf(i).getCategory());
-        }
 
-        words.forEach(w -> System.out.print(w + " ")); System.out.println();
-        categories.forEach(cat -> System.out.print(cat + " ")); System.out.println("\n");
-
-        // TODO: get some scores for the dependencies
-        System.out.println(parses.size());
-        for (CCGandSRLparse parse : parses) {
-            Collection<ResolvedDependency> dependencies = parse.getDependencyParse();
-            for (int predicateId = 0; predicateId < sentenceLength; predicateId++) {
-                Collection<ResolvedDependency> deps = parse.getOrderedDependenciesAtPredicateIndex(predicateId);
-                if (deps == null || deps.size() == 0) {
-                    continue;
-                }
-                /*
-                System.out.println("\t" + predicateWord + "\t" + predicateCategory);
-                System.out.println("# deps found for " + predicateWord + " : " + deps.size());
-                if (questionGenerator.filterPredicate(predicateWord, predicateCategory)) {
-                    System.out.println("Skip this predicate.");
-                    continue;
-                }
-                */
-                for (ResolvedDependency targetDependency : deps) {
-                    if (targetDependency == null) {
-                        continue;
-                    }
-                    int predicateIndex = targetDependency.getHead();
-                    int argumentNumber = targetDependency.getArgNumber();
-                    // Get template.
-                    QuestionTemplate template = questionGenerator.getTemplate(predicateIndex, words, categories,
-                            dependencies);
-                    if (template == null) {
-                        System.out.println("Cannot generate template for " + targetDependency.toString(words));
-                        continue;
-                    }
-                    // Get question.
-                    List<String> question = questionGenerator.generateQuestionFromTemplate(template, argumentNumber);
-                    if (question == null) {
-                        System.out.println("Cannot generate question for " + template.toString());
-                        continue;
-                    }
-                    String questionStr = StringUtils.join(question) + " ?";
-
-                    // Print sentence and template.
-                    String ccgInfo = targetDependency.getCategory() + "_" + targetDependency.getArgNumber();
-                    System.out.println("\t" + ccgInfo);
-                    System.out.print("\t");
-                    for (QuestionSlot slot : template.slots) {
-                        String slotStr = (slot.argumentNumber == argumentNumber ?
-                                String.format("{%s}", slot.toString(words)) : slot.toString(words));
-                        System.out.print(slotStr + "\t");
-                    }
-                    System.out.println();
-                    // Print question.
-                    System.out.println("\t" + questionStr + "\t" + words.get(targetDependency.getArgumentIndex()));
-                    // Print target dependency.
-                    System.out.println("\t" + words.get(targetDependency.getHead()) + ":" + targetDependency.getSemanticRole() +
-                            "\t" + words.get(targetDependency.getArgumentIndex()));
-                    System.out.println();
-                }
-            }
-            break;
-        }
-    }
-
-    private static Parser makeParser(final String modelFolder, final double supertaggerBeam,
-                                     final ParsingAlgorithm parsingAlgorithm, final int maxChartSize,
-                                     final boolean joint,
-                                     final Optional<Double> supertaggerWeight, final int nbest) throws IOException {
-        CommandLineArguments commandLineOptions;
-        try {
-            commandLineOptions = CliFactory.parseArguments(CommandLineArguments.class, new String[] { "-m",
-                    modelFolder, "--supertaggerbeam", "" + supertaggerBeam, "-a", parsingAlgorithm.toString(),
-                    "--nbest", "" + nbest });
-
-        } catch (final ArgumentValidationException e) {
-            throw new RuntimeException(e);
-        }
-        return makeParser(commandLineOptions, maxChartSize, joint, supertaggerWeight);
-    }
-
-    private static Parser makeParser(final CommandLineArguments commandLineOptions, final int maxChartSize,
-                                     final boolean joint, final Optional<Double> supertaggerWeight) throws IOException {
-        final File modelFolder = Util.getFile(commandLineOptions.getModel());
-        Coindexation.parseMarkedUpFile(new File(modelFolder, "markedup"));
-        final File cutoffsFile = new File(modelFolder, "cutoffs");
-        final CutoffsDictionary cutoffs = cutoffsFile.exists() ? Util.deserialize(cutoffsFile) : null;
-
-        Model.ModelFactory modelFactory;
-        final ParsingAlgorithm algorithm = ParsingAlgorithm.valueOf(commandLineOptions.getParsingAlgorithm()
-                .toUpperCase());
-
-        if (joint) {
-            final double[] weights = Util.deserialize(new File(modelFolder, "weights"));
-            if (supertaggerWeight.isPresent()) {
-                weights[0] = supertaggerWeight.get();
-            }
-            modelFactory = new SRLFactoredModel.SRLFactoredModelFactory(weights,
-                    ((FeatureSet) Util.deserialize(new File(modelFolder, "features")))
-                            .setSupertaggingFeature(new File(modelFolder, "/pipeline"),
-                                    commandLineOptions.getSupertaggerbeam()),
-                    TaggerEmbeddings.loadCategories(new File(modelFolder, "categories")), cutoffs,
-                    Util.deserialize(new File(modelFolder, "featureToIndex")));
-        } else {
-            modelFactory = new SupertagFactoredModel.SupertagFactoredModelFactory(
-                    new TaggerDummy(modelFolder, 0, 0, cutoffs));
-        }
-
-        final Parser parser;
-        final int nBest = commandLineOptions.getNbest();
-        if (algorithm == ParsingAlgorithm.CKY) {
-            parser = new ParserCKY(modelFactory, commandLineOptions.getMaxLength(), nBest,
-                    InputFormat.valueOf(commandLineOptions.getInputFormat().toUpperCase()),
-                    commandLineOptions.getRootCategories(), modelFolder, maxChartSize);
-        } else {
-            parser = new ParserAStar(modelFactory, commandLineOptions.getMaxLength(), nBest,
-                    InputFormat.valueOf(commandLineOptions.getInputFormat().toUpperCase()),
-                    commandLineOptions.getRootCategories(), modelFolder, maxChartSize);
-        }
-        return parser;
-    }
-
-    public static List<Collection<ResolvedDependency>> readBharatParserDependencies(File dependenciesFile) {
-        BufferedReader reader;
-        String line;
-        List<Collection<ResolvedDependency>> dependencies = new ArrayList<>();
-        try {
-            int sentenceIdx = 0;
-            reader = new BufferedReader(new FileReader(dependenciesFile));
-            while ((line = reader.readLine()) != null) {
-                if (line.startsWith("#") || line.startsWith("<c> ")) {
-                    continue;
-                }
-                if (line.trim().isEmpty()) {
-                    if (sentenceIdx < dependencies.size()) {
-                        sentenceIdx++;
-                    }
-                    continue;
-                }
-                if (sentenceIdx == dependencies.size()) {
-                    dependencies.add(new HashSet<>());
-                }
-                // Parse the f--king line:
-                // saw_2(S[dcl]\NP)/NP1 I_1 0
-                // in_29((S\NP)\(S\NP))/NP3 hours_33 0
-                // in ((S\NP)\(S\NP))/NP hours
-                String[] stringsInfo = line.trim().split("[_\\d]+");
-                // _ 29 3 33 0
-                String[] indicesInfo = line.trim().split("[^\\d]+");
-
-                int predIdx = Integer.parseInt(indicesInfo[1]) - 1;
-                Category predCateogory = Category.valueOf(stringsInfo[1]);
-                int argNum = Integer.parseInt(indicesInfo[2]);
-                int argIdx = Integer.parseInt(indicesInfo[indicesInfo.length - 2]) - 1;
-
-                //System.out.println(line);
-                //System.out.println(predIdx + "\t" + predCateogory + "\t" + argNum + "\t" + argIdx);
-
-                dependencies.get(sentenceIdx).add(new ResolvedDependency(predIdx, predCateogory, argNum, argIdx,
-                        SRLFrame.NONE, Preposition.NONE));
-            }
-        } catch (IOException e) {
-            return null;
-        }
-        return dependencies;
-    }
 }
