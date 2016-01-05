@@ -277,7 +277,7 @@ public class ActiveLearningHelper {
                 Collection<ResolvedDependency> dependencies = allDependencies.stream()
                         .filter(dep -> (dep.getHead() != d0.getHead() || dep.getCategory().equals(d0.getCategory())))
                         .collect(Collectors.toSet());
-                List<String> question = generateQuestion(words, categories, d0, dependencies);
+                List<String> question = questionGenerator.generateQuestion(d0, words, categories, dependencies);
                 if (question != null) {
                     System.out.println(StringUtils.join(question) + "?");
                 } else {
@@ -286,22 +286,6 @@ public class ActiveLearningHelper {
             }
             System.out.println();
         }
-    }
-
-    public static List<String> generateQuestion(List<String> words,
-                                                List<Category> categories,
-                                                ResolvedDependency targetDependency,
-                                                Collection<ResolvedDependency> dependencies) {
-        int predicateIndex = targetDependency.getHead();
-        int argumentNumber = targetDependency.getArgNumber();
-        // Get template.
-        // FIXME: what categories and dependencies are involved in template generation ..
-        QuestionTemplate template = questionGenerator.getTemplate(predicateIndex, words, categories, dependencies);
-        if (template == null) {
-            return null;
-        }
-        // Get question.
-        return questionGenerator.generateQuestionFromTemplate(template, argumentNumber);
     }
 
     public static void generateQuestions(List<InputReader.InputWord> inputWords, List<SRLParser.CCGandSRLparse> parses) {
@@ -344,30 +328,14 @@ public class ActiveLearningHelper {
                     int predicateIndex = targetDependency.getHead();
                     int argumentNumber = targetDependency.getArgNumber();
                     // Get template.
-                    QuestionTemplate template = questionGenerator.getTemplate(predicateIndex, words, categories,
+                    List<String> question = questionGenerator.generateQuestion(targetDependency, words, categories,
                             dependencies);
-                    if (template == null) {
-                        System.out.println("Cannot generate template for " + targetDependency.toString(words));
-                        continue;
-                    }
-                    // Get question.
-                    List<String> question = questionGenerator.generateQuestionFromTemplate(template, argumentNumber);
-                    if (question == null) {
-                        System.out.println("Cannot generate question for " + template.toString());
-                        continue;
-                    }
                     String questionStr = StringUtils.join(question) + " ?";
 
                     // Print sentence and template.
                     String ccgInfo = targetDependency.getCategory() + "_" + targetDependency.getArgNumber();
                     System.out.println("\t" + ccgInfo);
                     System.out.print("\t");
-                    for (QuestionSlot slot : template.slots) {
-                        String slotStr = (slot.argumentNumber == argumentNumber ?
-                                String.format("{%s}", slot.toString(words)) : slot.toString(words));
-                        System.out.print(slotStr + "\t");
-                    }
-                    System.out.println();
                     // Print question.
                     System.out.println("\t" + questionStr + "\t" + words.get(targetDependency.getArgumentIndex()));
                     // Print target dependency.
