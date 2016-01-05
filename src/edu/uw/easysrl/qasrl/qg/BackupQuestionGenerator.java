@@ -9,9 +9,9 @@ import edu.uw.easysrl.syntax.grammar.Preposition;
 import java.util.*;
 
 /**
- * Created by luheng on 12/8/15.
+ * BACKUP ONLY!!!!
  */
-public class QuestionGeneratorBackup {
+public class BackupQuestionGenerator {
     private static final Category somethingVerbal = Category.valueOf("S|NP");
     private static final Category somethingAdjunctive = Category.valueOf("S|S");
 
@@ -73,7 +73,7 @@ public class QuestionGeneratorBackup {
 
     public VerbHelper verbHelper;
 
-    public QuestionGeneratorBackup() {
+    public BackupQuestionGenerator() {
         // FIXME: build from unlabeled corpora.
         verbHelper = new VerbHelper(VerbInflectionDictionary.buildFromPropBankTraining());
     }

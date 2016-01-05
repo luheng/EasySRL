@@ -26,7 +26,6 @@ public class QuestionTemplate {
         this.words = words;
         this.categories = categories;
         this.argNumToSlotId = new HashMap<>();
-        // do something ...
         for (int slotId = 0; slotId < slots.length; slotId++) {
             argNumToSlotId.put(slots[slotId].argumentNumber, slotId);
             if (VerbSlot.class.isInstance(slots[slotId])) {
@@ -36,6 +35,7 @@ public class QuestionTemplate {
         }
     }
 
+    // Total number of slots, minus the verb.
     public int getNumArguments() {
         return slots.length - 1;
     }
@@ -166,8 +166,8 @@ public class QuestionTemplate {
     }
 
     // i.e. {"was", "built"}, {"have been", "built"}
-    public List<String> getPassiveVerb() {
+    /*public List<String> getPassiveVerb() {
         return null;
-    }
+    }*/
 
 }

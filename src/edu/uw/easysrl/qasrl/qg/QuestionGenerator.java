@@ -143,14 +143,14 @@ public class QuestionGenerator {
         // Create the verb slot.
         List<Integer> auxChain = verbHelper.getAuxiliaryChain(words, categories, predicateIndex);
         QuestionSlot verb;
-        boolean hasParticle = predicateCategory.getArgument(numArguments).equals(Category.PR);
-        if (hasParticle) {
+        // If last argument is PR, as in "sweep out"
+        if (predicateCategory.getArgument(numArguments).equals(Category.PR)) {
             int particleIndex = argNumToPosition[numArguments];
             verb = new VerbSlot(predicateIndex, particleIndex, auxChain, predicateCategory);
         } else {
             verb = new VerbSlot(predicateIndex, auxChain, predicateCategory);
         }
-        // Generate slots. Skipping PR.
+        // Generate slots. Skipping PR argument.
         QuestionSlot[] arguments = new QuestionSlot[numArguments + 1];
         for (int argNum = 1; argNum <= numArguments; argNum++) {
             int argIdx = argNumToPosition[argNum];
@@ -161,6 +161,7 @@ public class QuestionGenerator {
             } else if (argumentCategory.equals(Category.PR)) {
                 slot = null;
             } else {
+                // TODO: maybe we should use the identified PP? Add later.
                 String ppStr = argumentCategory.isFunctionInto(Category.PP) ?
                         PrepositionHelper.getPreposition(words, categories, argIdx) : "";
                 slot = new ArgumentSlot(argIdx, argNum, argumentCategory, ppStr);
@@ -172,6 +173,8 @@ public class QuestionGenerator {
             QuestionSlot[] slots = new QuestionSlot[] { arguments[2], verb, arguments[1] };
             return new QuestionTemplate(slots, words, categories);
         }
+        // Otherwise it follows this order: T1 verb Tn Tn-1 ... T2
+        // The first argument is always the subject. Why is this always true in English?
         List<QuestionSlot> slots = new ArrayList<>();
         slots.add(arguments[1]);
         slots.add(verb);
@@ -184,7 +187,7 @@ public class QuestionGenerator {
         return new QuestionTemplate(slotList, words, categories);
     }
 
-    // FIXME ...
+    // FIXME: there must be a better way to do this.
     public boolean filterPredicate(String word, Category category) {
         if (VerbHelper.isCopulaVerb(word)) {
             //System.out.println("skipping because copula");
@@ -223,47 +226,36 @@ public class QuestionGenerator {
     public List<String> generateQuestionFromTemplate(QuestionTemplate template, int targetArgNum) {
         int totalArgs = template.getNumArguments();
         List<String> question = new ArrayList<>();
-        // If target is not part of the template, return.
         if (!template.argNumToSlotId.containsKey(targetArgNum)) {
             return question;
         }
         String[] wh = template.getWhWordByArgNum(targetArgNum);
-        // {Pat} built a robot -> Who built a robot ?
-        // Who gave T3 T2?
-        // T2 said T1
-        if (targetArgNum == template.slots[0].argumentNumber) {
-            add(question, wh[0]);
-            addAll(question, template.getActiveVerb(verbHelper));
-            for (int slotId = 2; slotId < template.slots.length; slotId++) {
-                ArgumentSlot argSlot = (ArgumentSlot) template.slots[slotId];
-                if (totalArgs >= 3 && !argSlot.preposition.isEmpty()) {
-                    continue;
-                }
-                addAll(question, template.getPlaceHolderWordByArgNum(argSlot.argumentNumber));
-            }
-            add(question, wh[1]);
-            return question;
-        }
-
-        // {Pat} built a robot* -> What did Pat build / What was built ?
-        // What did T1 give T3?, i.e. What did John give Pat?
-        // (to) Who did T1 give T3?, Who did John give a robot to?
-        String[] verb = template.getActiveSplitVerb(verbHelper);
+        // Wh-word for the argument.
         add(question, wh[0]);
-        add(question, verb[0]);
-        addAll(question, template.getPlaceHolderWordByArgNum(template.slots[0].argumentNumber));
-        add(question, verb[1]);
+        // Add verb or aux-subject-verb.
+        if (targetArgNum == template.slots[0].argumentNumber) {
+            // If target argument is the subject (occupies the first slot).
+            // Not necessary Arg#1, for example, "xxxx", said she.
+            addAll(question, template.getActiveVerb(verbHelper));
+        } else {
+            String[] verb = template.getActiveSplitVerb(verbHelper);
+            // Add auxiliaries, as "did" in "What did someone build?".
+            add(question, verb[0]);
+            addAll(question, template.getPlaceHolderWordByArgNum(template.slots[0].argumentNumber));
+            add(question, verb[1]);
+        }
+        // Add other Arguments.
         for (int slotId = 2; slotId < template.slots.length; slotId++) {
             ArgumentSlot argSlot = (ArgumentSlot) template.slots[slotId];
-            if (argSlot.argumentNumber == targetArgNum || (totalArgs >= 3 && !argSlot.preposition.isEmpty())) {
+            if (targetArgNum == argSlot.argumentNumber || (totalArgs >= 3 && !argSlot.preposition.isEmpty())) {
                 continue;
             }
             addAll(question, template.getPlaceHolderWordByArgNum(argSlot.argumentNumber));
         }
+        // Put preposition to the end.
         add(question, wh[1]);
         return question;
     }
-
 
     private static void add(List<String> question, String word) {
         if (!word.isEmpty()) {
