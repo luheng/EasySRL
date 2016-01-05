@@ -88,6 +88,9 @@ public class EasySRL {
 
 		//@Option(shortName = "t", defaultValue = { "toy.txt.stagged" }, description = "Tagged input file because supertagger does not work on server ...")
 		//String getTaggedInput();
+
+		@Option(shortName = "b", defaultValue = "", description = "(Optional) Path to the input text file by Bharat parser.")
+		String getBharatInputFile();
 	}
 
 	// Set of supported InputFormats

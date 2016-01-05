@@ -114,7 +114,6 @@ public class Preposition implements Serializable {
 					return prep;
 				}
 			}
-
 			return OTHER;
 		}
 	}

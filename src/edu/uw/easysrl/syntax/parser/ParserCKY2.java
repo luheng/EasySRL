@@ -142,6 +142,7 @@ public class ParserCKY2 extends AbstractParser {
                             resolvedDependencies);
                     final AgendaItem newItem = model.combineNodes(l, r, newNode);
                     addEntry(result, newItem, model);
+                    /*
                     // TODO: hmmm
                     List<ResolvedDependency> rdeps = newNode.getAllLabelledDependencies();
                     if (rdeps != null && rdeps.size() > 0) {
@@ -152,6 +153,7 @@ public class ParserCKY2 extends AbstractParser {
                         rdeps.forEach(d -> System.out.println(
                                 d.getCategory() + "\t" + d.toString()));
                     }
+                    */
                 }
             }
         }

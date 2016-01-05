@@ -1,35 +1,11 @@
-package edu.uw.easysrl.main;
+package edu.uw.easysrl.active_learning;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;
-import java.util.stream.Collectors;
 
-import edu.stanford.nlp.util.StringUtils;
-import edu.uw.easysrl.dependencies.Coindexation;
-import edu.uw.easysrl.dependencies.ResolvedDependency;
-import edu.uw.easysrl.dependencies.SRLFrame;
-import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
-import edu.uw.easysrl.qasrl.qg.QuestionSlot;
-import edu.uw.easysrl.qasrl.qg.QuestionTemplate;
-import edu.uw.easysrl.syntax.grammar.Category;
-import edu.uw.easysrl.syntax.grammar.Preposition;
-import edu.uw.easysrl.syntax.model.CutoffsDictionary;
-import edu.uw.easysrl.syntax.model.Model;
-import edu.uw.easysrl.syntax.model.SRLFactoredModel;
-import edu.uw.easysrl.syntax.model.SupertagFactoredModel;
-import edu.uw.easysrl.syntax.model.feature.FeatureSet;
-import edu.uw.easysrl.syntax.parser.Parser;
-import edu.uw.easysrl.syntax.parser.ParserAStar;
-import edu.uw.easysrl.syntax.parser.ParserCKY;
-import edu.uw.easysrl.syntax.parser.SRLParser;
-import edu.uw.easysrl.syntax.tagger.Tagger;
-import edu.uw.easysrl.syntax.tagger.TaggerDummy;
-import edu.uw.easysrl.syntax.tagger.TaggerEmbeddings;
-import edu.uw.easysrl.syntax.training.Training;
-import sun.security.krb5.internal.ASRep;
+import edu.uw.easysrl.main.InputReader;
+import edu.uw.easysrl.syntax.parser.*;
 import uk.co.flamingpenguin.jewel.cli.ArgumentValidationException;
 import uk.co.flamingpenguin.jewel.cli.CliFactory;
 
@@ -42,8 +18,8 @@ import edu.uw.easysrl.syntax.parser.SRLParser.PipelineSRLParser;
 import edu.uw.easysrl.syntax.tagger.POSTagger;
 import edu.uw.easysrl.util.Util;
 
-public class ActiveLearningByCommittee {
-    public static String[] spielzeuge = {
+public class ActiveLearningByMarginals {
+        public static String[] spielzeuge = {
             "I saw a squirrel .",
             "I saw a squirrel with a nut yesterday .",
             "I saw a squirrel eating a nut yesterday .",
@@ -58,11 +34,7 @@ public class ActiveLearningByCommittee {
             "The man with mug was mugged by another man ."
     };
 
-    // TODO: run the same sentences over the pipeline model to see if there's any difference.
     public static void main(final String[] args) throws IOException, InterruptedException {
-        // Read results from another parser ..
-        List<Collection<ResolvedDependency>> bharatDeps = ActiveLearningHelper.readBharatParserDependencies(
-                new File("/Users/luheng/Workspace/EasySRL/toy.txt.parg"));
         List<List<InputReader.InputWord>> sentences = new ArrayList<>();
         List<CCGandSRLparse> easyCcgParses = new ArrayList<>();
 
@@ -89,38 +61,26 @@ public class ActiveLearningByCommittee {
                     Util.deserialize(new File(pipelineFolder, "labelClassifier")), posTagger);
             final SRLParser.BackoffSRLParser joint = new SRLParser.BackoffSRLParser(
                     new SRLParser.JointSRLParser(
-                            ActiveLearningHelper.makeParser(
-                                    commandLineOptions, 20000, true, Optional.empty()), posTagger), pipeline);
-
+                            ActiveLearningHelper
+                                    .makeParser(commandLineOptions, 20000, true, Optional.empty()), posTagger), pipeline);
             final SRLParser parser = pipeline;
 
             System.err.println("===Model loaded: parsing...===");
 
-            // Read sentences.
-            BufferedReader fileReader = new BufferedReader(new FileReader(new File(commandLineOptions.getInputFile())));
-            String buffer = "";
-            String line;
-            while ((line = fileReader.readLine()) != null) {
-                if (line.trim().isEmpty() && !buffer.isEmpty()) {
-                    InputReader.InputToParser parserInput = reader.readInput(buffer);
-                    //final List<CCGandSRLparse> parses = parser.parseSupertaggedSentence(parserInput);
-                    final List<CCGandSRLparse> parses = parser.parseTokens(parserInput.getInputWords());
-                    easyCcgParses.add(parses.get(0));
-                    sentences.add(parserInput.getInputWords());
-                    //generateQuestions(parserInput.getInputWords(), parses, bharatDeps.get(sentenceIdx));
-                    buffer = "";
-                } else {
-                    buffer += (buffer.isEmpty() ? "" : "\n") + line.trim();
-                }
+            // Go over sample sentences.
+            for (String sentence : spielzeuge) {
+                InputReader.InputToParser parserInput = reader.readInput(sentence);
+                final List<CCGandSRLparse> parses = parser.parseTokens(parserInput.getInputWords());
+
+                easyCcgParses.add(parses.get(0));
+                sentences.add(parserInput.getInputWords());
+                ActiveLearningHelper.generateQuestions(parserInput.getInputWords(), parses);
             }
-            fileReader.close();
         } catch (final ArgumentValidationException e) {
             System.err.println(e.getMessage());
             System.err.println(CliFactory.createCli(CommandLineArguments.class).getHelpMessage());
         }
-
-        // Compare parses.
-        ActiveLearningHelper.compareDependencies(sentences, easyCcgParses, bharatDeps);
     }
+
 
 }

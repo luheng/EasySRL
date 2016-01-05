@@ -141,16 +141,6 @@ public class ParserCKY extends AbstractParser {
 							resolvedDependencies);
 					final AgendaItem newItem = model.combineNodes(l, r, newNode);
 					addEntry(result, newItem, model);
-					// TODO: hmmm
-					List<ResolvedDependency> rdeps = newNode.getAllLabelledDependencies();
-					if (rdeps != null && rdeps.size() > 0) {
-						System.out.println(
-								newItem.getStartOfSpan() + "\t" +
-								(newItem.getStartOfSpan() + newItem.getSpanLength()) + "\t" +
-								newItem.getInsideScore() + "\t" + newItem.getCost());
-						rdeps.forEach(d -> System.out.println(
-								d.getCategory() + "\t" + d.toString()));
-					}
 				}
 			}
 		}

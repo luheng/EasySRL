@@ -1,9 +1,11 @@
-package edu.uw.easysrl.main;
+package edu.uw.easysrl.active_learning;
 
 import edu.stanford.nlp.util.StringUtils;
 import edu.uw.easysrl.dependencies.Coindexation;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.dependencies.SRLFrame;
+import edu.uw.easysrl.main.EasySRL;
+import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.qasrl.qg.QuestionSlot;
 import edu.uw.easysrl.qasrl.qg.QuestionTemplate;
@@ -29,6 +31,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * Created by luheng on 1/3/16.
@@ -102,6 +105,7 @@ public class ActiveLearningHelper {
                 }
                 if (line.trim().isEmpty()) {
                     if (sentenceIdx < dependencies.size()) {
+                        dependencies.set(sentenceIdx, propagatePrepositions(dependencies.get(sentenceIdx)));
                         sentenceIdx++;
                     }
                     continue;
@@ -118,20 +122,49 @@ public class ActiveLearningHelper {
                 String[] indicesInfo = line.trim().split("[^\\d]+");
 
                 int predIdx = Integer.parseInt(indicesInfo[1]) - 1;
-                Category predCateogory = Category.valueOf(stringsInfo[1]);
+                Category category = Category.valueOf(stringsInfo[1].trim());
                 int argNum = Integer.parseInt(indicesInfo[2]);
                 int argIdx = Integer.parseInt(indicesInfo[indicesInfo.length - 2]) - 1;
 
                 //System.out.println(line);
                 //System.out.println(predIdx + "\t" + predCateogory + "\t" + argNum + "\t" + argIdx);
-
-                dependencies.get(sentenceIdx).add(new ResolvedDependency(predIdx, predCateogory, argNum, argIdx,
-                        SRLFrame.NONE, Preposition.NONE));
+                //System.out.println("xxxxx\t" + StringUtils.join(stringsInfo));
+                Preposition preposition = Preposition.NONE;
+                if (category.getArgument(argNum).equals(Category.PP)) {
+                    preposition = Preposition.fromString(stringsInfo[2].trim());
+                    //System.out.println("PREP:\t" + preposition + " ... " + stringsInfo[2].trim());
+                }
+                dependencies.get(sentenceIdx).add(new ResolvedDependency(predIdx, category, argNum, argIdx,
+                        SRLFrame.NONE, preposition));
             }
         } catch (IOException e) {
             return null;
         }
         return dependencies;
+    }
+
+    private static Collection<ResolvedDependency> propagatePrepositions(Collection<ResolvedDependency> dependencies) {
+        Collection<ResolvedDependency> result = new HashSet<>();
+        for (ResolvedDependency dep : dependencies) {
+            Category argCat = dep.getCategory().getArgument(dep.getArgNumber());
+            if (!argCat.equals(Category.PP) && !argCat.equals(Category.valueOf("S[to]\\NP"))) {
+                result.add(dep);
+                continue;
+            }
+            for (ResolvedDependency d2 : dependencies) {
+                if (d2.getCategory().isFunctionInto(argCat) && d2.getHead() == dep.getArgument()) {
+                    result.add(new ResolvedDependency(
+                            dep.getHead(),
+                            dep.getCategory(),
+                            dep.getArgNumber(),
+                            d2.getArgument(),
+                            SRLFrame.NONE,
+                            dep.getPreposition()));
+                    break;
+                }
+            }
+        }
+        return result;
     }
 
     public static void compareDependencies(List<List<InputReader.InputWord>> sentences,
@@ -183,6 +216,92 @@ public class ActiveLearningHelper {
                 }
             }
         }
+    }
+
+
+    // TODO: count double scored dependencies
+    public static void scoreDependencies(List<List<InputReader.InputWord>> sentences,
+                                         List<SRLParser.CCGandSRLparse> easyCcgParses,
+                                         List<Collection<ResolvedDependency>> bharatDeps) {
+        for (int sentIdx = 0; sentIdx < sentences.size(); sentIdx++) {
+            List<InputReader.InputWord> sentence = sentences.get(sentIdx);
+            List<String> words = sentence.stream().map(w -> w.word).collect(Collectors.toList());
+            SRLParser.CCGandSRLparse ccgParse = easyCcgParses.get(sentIdx);
+            List<ResolvedDependency> parse1 = new ArrayList<>(ccgParse.getDependencyParse());
+            List<ResolvedDependency> parse2 = new ArrayList<>(bharatDeps.get(sentIdx));
+            Map<String, List<ResolvedDependency>> dependencyMap = new HashMap<>();
+            Map<String, Double> dependencyScores = new HashMap<>();
+            Collection<ResolvedDependency> allDependencies = new HashSet<>();
+
+            for (ResolvedDependency dep : parse1) {
+                // functor, category, argnum, preposition, argument
+                String depStr = String.format("%d %s %d %s %d",
+                        dep.getHead(), dep.getCategory(), dep.getArgNumber(), dep.getPreposition(), dep.getArgument());
+                dependencyMap.put(depStr, new ArrayList<>());
+                dependencyMap.get(depStr).add(dep);
+                dependencyScores.put(depStr, 1.0);
+                allDependencies.add(dep);
+            }
+
+            for (ResolvedDependency dep : parse2) {
+                if (questionGenerator.filterPredicate(words.get(dep.getHead()), dep.getCategory())) {
+                    continue;
+                }
+                String depStr = String.format("%d %s %d %s %d",
+                        dep.getHead(), dep.getCategory(), dep.getArgNumber(), dep.getPreposition(), dep.getArgument());
+                double score = 1.0;
+                List<ResolvedDependency> depList = new ArrayList<>();
+                if (dependencyScores.containsKey(depStr)) {
+                    depList = dependencyMap.get(depStr);
+                    score += dependencyScores.get(depStr);
+                }
+                depList.add(dep);
+                dependencyMap.put(depStr, depList);
+                dependencyScores.put(depStr, score);
+                allDependencies.add(dep);
+            }
+            System.out.println(StringUtils.join(words));
+            // Print dependency scores for sentence
+            for (String depStr : dependencyMap.keySet()) {
+                ResolvedDependency d0 = dependencyMap.get(depStr).get(0);
+                if (questionGenerator.filterPredicate(words.get(d0.getHead()), d0.getCategory())) {
+                    continue;
+                }
+                // TODO: generate questions for the dependencies
+                System.out.print(String.format("%f\t%s\t", dependencyScores.get(depStr), depStr));
+                dependencyMap.get(depStr).forEach(dep -> System.out.print(dep.toString(words) + "\t"));
+                List<Category> categories = IntStream.range(0, sentence.size())
+                        .mapToObj(idx -> ccgParse.getLeaf(idx).getCategory())
+                        .collect(Collectors.toList());
+                categories.set(d0.getHead(), d0.getCategory());
+                Collection<ResolvedDependency> dependencies = allDependencies.stream()
+                        .filter(dep -> (dep.getHead() != d0.getHead() || dep.getCategory().equals(d0.getCategory())))
+                        .collect(Collectors.toSet());
+                List<String> question = generateQuestion(words, categories, d0, dependencies);
+                if (question != null) {
+                    System.out.println(StringUtils.join(question) + "?");
+                } else {
+                    System.out.println("___");
+                }
+            }
+            System.out.println();
+        }
+    }
+
+    public static List<String> generateQuestion(List<String> words,
+                                                List<Category> categories,
+                                                ResolvedDependency targetDependency,
+                                                Collection<ResolvedDependency> dependencies) {
+        int predicateIndex = targetDependency.getHead();
+        int argumentNumber = targetDependency.getArgNumber();
+        // Get template.
+        // FIXME: what categories and dependencies are involved in template generation ..
+        QuestionTemplate template = questionGenerator.getTemplate(predicateIndex, words, categories, dependencies);
+        if (template == null) {
+            return null;
+        }
+        // Get question.
+        return questionGenerator.generateQuestionFromTemplate(template, argumentNumber);
     }
 
     public static void generateQuestions(List<InputReader.InputWord> inputWords, List<SRLParser.CCGandSRLparse> parses) {
