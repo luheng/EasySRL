@@ -83,7 +83,6 @@ public class QuestionGenerator {
         String word = words.get(targetDependency.getHead());
         Category category = targetDependency.getCategory();
         int predicateIdx = targetDependency.getHead();
-        int argumentIdx = targetDependency.getArgument();
         // Filter.
         if (filterPredicate(word, category)) {
             return null;
@@ -99,7 +98,7 @@ public class QuestionGenerator {
         if (template == null) {
             return null;
         }
-        return generateQuestionFromTemplate(template, argumentIdx);
+        return generateQuestionFromTemplate(template, targetDependency.getArgNumber());
     }
 
     public QuestionTemplate getTemplateFromCCGBank(int predicateIndex,

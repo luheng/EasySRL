@@ -10,26 +10,22 @@ import edu.uw.easysrl.util.Util;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Collection;
-import java.util.InputMismatchException;
-import java.util.List;
-import java.util.Optional;
-import java.util.stream.IntStream;
+import java.util.*;
 
 /**
  * Calls a parser. Input: List<InputWord>, Output: List<Category>, Set<ResolvedDependency>
  * Created by luheng on 1/5/16.
  */
-public abstract class ActiveLearingBaseParser {
+public abstract class BaseCcgParser {
 
     public abstract void parse(List<InputReader.InputWord> sentence, List<Category> categories,
-                               Collection<ResolvedDependency> dependencies);
+                               Set<ResolvedDependency> dependencies);
 
-    public static class EasyCCGParser extends ActiveLearingBaseParser {
+    public static class EasyCCGParser extends BaseCcgParser {
 
-        private static SRLParser parser = null;
+        private SRLParser parser = null;
 
-        public static void initialzieParser(String modelFolderPath, int nBest)  {
+        public EasyCCGParser(String modelFolderPath, int nBest)  {
             final File modelFolder = Util.getFile(modelFolderPath);
             if (!modelFolder.exists()) {
                 throw new InputMismatchException("Couldn't load model from from: " + modelFolder);
@@ -49,7 +45,7 @@ public abstract class ActiveLearingBaseParser {
 
         @Override
         public void parse(List<InputReader.InputWord> sentence, List<Category> categories,
-                          Collection<ResolvedDependency> dependencies) {
+                          Set<ResolvedDependency> dependencies) {
             if (parser == null) {
                 throw new RuntimeException("Parser uninitialized");
             }
@@ -66,10 +62,10 @@ public abstract class ActiveLearingBaseParser {
         }
     }
 
-    public static class BharatParser extends ActiveLearingBaseParser {
+    public static class BharatParser extends BaseCcgParser {
         @Override
         public void parse(List<InputReader.InputWord> sentence, List<Category> categories,
-                          Collection<ResolvedDependency> dependencies) {
+                          Set<ResolvedDependency> dependencies) {
             // TODO
         }
     }
