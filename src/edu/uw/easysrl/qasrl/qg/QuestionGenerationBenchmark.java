@@ -24,7 +24,7 @@ import java.util.*;
  *
  * Created by luheng on 12/8/15.
  */
-public class QuestionGenerationSandbox {
+public class QuestionGenerationBenchmark {
     private static QuestionGenerator questionGenerator;
 
     /**
