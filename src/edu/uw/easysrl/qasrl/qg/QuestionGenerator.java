@@ -52,11 +52,16 @@ public class QuestionGenerator {
     private static final Category pastParticiples = Category.valueOf("(S[dcl]\\NP)/(S[pt]\\NP)");
 
     private static final String[] otherFilteredCategories = new String[] {
-            "(S/S)/NP", "(S\\NP)\\(S\\NP)",
-            "S[em]/S[dcl]", "(S/S)/(S/S)",
-            "(S[b]\\NP)/(S[pt]\\NP)", "S[qem]/S[dcl]",
-            "(S\\S)/S[dcl]", "(S[adj]\\NP)/(S[to]\\NP)",
+            "(S/S)/NP",
+            "(S\\NP)\\(S\\NP)",
+            "S[em]/S[dcl]",
+            "(S/S)/(S/S)",
+            "(S[b]\\NP)/(S[pt]\\NP)",
+            "S[qem]/S[dcl]",
+            "(S\\S)/S[dcl]",
+            "(S[adj]\\NP)/(S[to]\\NP)",
             "S/S",
+            "((S\\NP)/(S\\NP))/((S\\NP)/(S\\NP))",
             "((S\\NP)\\(S\\NP))/((S\\NP)\\(S\\NP))",
             "((S\\NP)\\(S\\NP))\\((S\\NP)\\(S\\NP))",
             "((S\\NP)\\(S\\NP))/(S[b]\\NP)",

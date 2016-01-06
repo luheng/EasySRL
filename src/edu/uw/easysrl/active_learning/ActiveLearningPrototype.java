@@ -69,7 +69,9 @@ public class ActiveLearningPrototype {
             // Print sentence info.
             List<InputWord> sentence = sentences.get(sentIdx);
             List<String> words = sentence.stream().map(w->w.word).collect(Collectors.toList());
-            System.out.println("\n" + StringUtils.join(words));
+
+            StringBuffer debugOutput = new StringBuffer();
+            Set<Integer> debugPredicates = new HashSet<>();
 
             // Parse using all the base parsers.
             List<List<Category>> tagged = new ArrayList<>();
@@ -128,16 +130,29 @@ public class ActiveLearningPrototype {
                     // Debugging information;
                     boolean matched = DependencyEvaluation.matchesAnyGoldDependency(targetDependency, goldDependencies);
                     if ((matched && fixed) || (!matched && !fixed)) {
-                        System.out.println(targetDependency.toString(words) + "\t"
-                                + targetDependency.getCategory() + "\t"
-                                + StringUtils.join(question) + "?\t"
-                                + words.get(expectedAnswer) + "\t"
-                                + simulatedAnswerStr + "\t"
-                                + matched + "\t" + fixed);
+                        debugOutput.append(targetDependency.toString(words) + "\t" +
+                                           targetDependency.getCategory() + "\t");
+                        debugOutput.append(StringUtils.join(question) + "?\t");
+                        debugOutput.append(words.get(expectedAnswer) + "\t" + simulatedAnswerStr + "\t");
+                        debugOutput.append(matched + "\t" + fixed + "\n");
+
+                        debugPredicates.add(targetDependency.getHead());
+                    }
+                    // TODO: output recall losses
+                }
+                if (debugPredicates.size() > 0) {
+                    System.out.println(String.format("\n[S%d]:\t", sentIdx) + StringUtils.join(words) + "\n" +
+                            debugOutput + "******");
+                    for (ResolvedDependency dep : goldDependencies) {
+                        if (debugPredicates.contains(dep.getHead())) {
+                            List<String> question = questionGenerator.generateQuestion(
+                                    dep, words, goldCategories.get(sentIdx), goldDependencies);
+                            String questionStr = (question == null || question.size() == 0) ? "---" :
+                                    StringUtils.join(question);
+                            System.out.println(dep.toString(words) + "\t" + dep.getCategory() + "\t" + questionStr);
+                        }
                     }
                 }
-                System.out.println();
-
                 before.add(DependencyEvaluation.evaluate(dependencies, goldDependencies));
                 after.add(DependencyEvaluation.evaluate(fixedDependencies, goldDependencies));
                 numQuestionsAsked ++;
