@@ -63,6 +63,7 @@ public class ActiveLearningPrototype {
         Results before = new Results();
         Results after = new Results();
         int numQuestionsAsked = 0;
+        int numEffectiveQuestionsAsked = 0;
 
         for (int sentIdx = 0; sentIdx < sentences.size(); sentIdx++) {
             // Print sentence info.
@@ -107,6 +108,8 @@ public class ActiveLearningPrototype {
                         continue;
                     }
 
+
+
                     String questionStr = StringUtils.join(question);
                     int expectedAnswer = targetDependency.getArgumentIndex();
                     List<Integer> simulatedAnswer = responseSimulator.answerQuestion(question, words, targetDependency,
@@ -138,6 +141,11 @@ public class ActiveLearningPrototype {
                             }
                         }
                         fixed = true;
+                    }
+
+                    numQuestionsAsked ++;
+                    if (fixed) {
+                        numEffectiveQuestionsAsked ++;
                     }
                     //if (!matched || fixed) {
                         extendedDebugOutput.append(
@@ -195,13 +203,13 @@ public class ActiveLearningPrototype {
                 }
                 before.add(DependencyEvaluation.evaluate(dependencies, goldDependencies));
                 after.add(DependencyEvaluation.evaluate(newDependencies, goldDependencies));
-                numQuestionsAsked ++;
             }
         }
         System.out.println(before);
         System.out.println("After fixing dependencies.");
         System.out.println(after);
         System.out.println("Number of questions asked:\t" + numQuestionsAsked);
+        System.out.println("Number of effective questions asked:\t" + numEffectiveQuestionsAsked);
     }
 
     private static String getDependencyKey(ResolvedDependency dep) {
