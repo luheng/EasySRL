@@ -1,6 +1,5 @@
 package edu.uw.easysrl.active_learning;
 
-import com.google.common.collect.Sets;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.syntax.evaluation.Results;
 

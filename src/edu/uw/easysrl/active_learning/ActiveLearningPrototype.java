@@ -5,6 +5,7 @@ import edu.uw.easysrl.dependencies.SRLFrame;
 import edu.uw.easysrl.main.EasySRL;
 import edu.uw.easysrl.main.InputReader.InputWord;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
+import edu.uw.easysrl.qasrl.qg.VerbHelper;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.Preposition;
@@ -12,10 +13,7 @@ import uk.co.flamingpenguin.jewel.cli.CliFactory;
 
 import edu.stanford.nlp.util.StringUtils;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -25,6 +23,7 @@ import java.util.stream.Collectors;
 public class ActiveLearningPrototype {
     // Training pool.
     static List<List<InputWord>> sentences;
+    // TODO: change name ...
     static List<List<Category>> goldCategories;
     static List<Set<ResolvedDependency>> goldParses;
     static List<BaseCcgParser> parsers;
@@ -71,7 +70,10 @@ public class ActiveLearningPrototype {
             List<String> words = sentence.stream().map(w->w.word).collect(Collectors.toList());
 
             StringBuffer debugOutput = new StringBuffer();
+            StringBuffer extendedDebugOutput = new StringBuffer(); // contains information about every dependency.
             Set<Integer> debugPredicates = new HashSet<>();
+
+            extendedDebugOutput.append("*** predicted ***\n");
 
             // Parse using all the base parsers.
             List<List<Category>> tagged = new ArrayList<>();
@@ -85,23 +87,27 @@ public class ActiveLearningPrototype {
                 parsed.add(dependencies);
 
                 Set<ResolvedDependency> goldDependencies = goldParses.get(sentIdx);
-                Set<ResolvedDependency> fixedDependencies = new HashSet<>();
+                HashMap<String, List<ResolvedDependency>> fixedDependencies = new HashMap<>();
 
                 // Generate possible questions over predicted dependencies.
                 for (ResolvedDependency targetDependency : dependencies) {
-                    if (questionGenerator.filterPredicate(words.get(targetDependency.getHead()),
-                            targetDependency.getCategory())) {
-                        fixedDependencies.add(targetDependency);
-                        continue;
-                    }
+                    boolean matched = DependencyEvaluation.matchesAnyGoldDependency(targetDependency, goldDependencies);
                     // Need question scorer here.
                     List<String> question =
                             questionGenerator.generateQuestion(targetDependency, words, categories, dependencies);
                     if (question == null || question.size() == 0) {
-                        fixedDependencies.add(targetDependency);
+                        if (!matched) {
+                            extendedDebugOutput.append(
+                                    String.format("%s\t%s\t%d\t%s\t%s\t%s\t%s\t", words.get(targetDependency.getHead()),
+                                            targetDependency.getCategory(), targetDependency.getArgNumber(),
+                                            targetDependency.getCategory().getArgument(targetDependency.getArgNumber()),
+                                            "-noq-", words.get(targetDependency.getArgument()), "---"));
+                            extendedDebugOutput.append(matched ? "matched\n" : "wrong\n");
+                        }
                         continue;
                     }
 
+                    String questionStr = StringUtils.join(question);
                     int expectedAnswer = targetDependency.getArgumentIndex();
                     List<Integer> simulatedAnswer = responseSimulator.answerQuestion(question, words, targetDependency,
                             goldCategories.get(sentIdx), goldDependencies);
@@ -111,62 +117,117 @@ public class ActiveLearningPrototype {
 
                     // Fix dependency according to answer response. Ideally we can do self-training.
                     // TODO: debug on N/A cases
+                    // TODO: better logic here
                     boolean fixed = false;
-                    if (simulatedAnswer.get(0) >= 0 && !simulatedAnswer.contains(targetDependency.getArgument())) {
-                        for (int answerHead : simulatedAnswer) {
-                            fixedDependencies.add(new ResolvedDependency(
-                                    targetDependency.getHead(),
-                                    targetDependency.getCategory(),
-                                    targetDependency.getArgNumber(),
-                                    answerHead,
-                                    targetDependency.getSemanticRole(),
-                                    targetDependency.getPreposition()));
+                    if (simulatedAnswer.get(0) >= 0 && (!simulatedAnswer.contains(targetDependency.getArgument()) ||
+                            simulatedAnswer.size() > 1)) {
+                        fixedDependencies.put(
+                                getDependencyKey(targetDependency),
+                                simulatedAnswer.stream().map(ans -> getFixedDependency(targetDependency, ans))
+                                        .collect(Collectors.toList()));
+                        // TODO: Additional fixes: look up aux verb chain
+                        List<Integer> auxChain = questionGenerator.verbHelper.getAuxiliaryChain(words, categories,
+                                targetDependency.getHead());
+                        if (auxChain.size() > 0) {
+                            for (ResolvedDependency dep : dependencies) {
+                                if (auxChain.contains(dep.getHead()) && dep.getArgument() == expectedAnswer) {
+                                    System.out.println("!!!!additional fixing:\t" + dep.toString(words));
+                                    fixedDependencies.put(getDependencyKey(dep), simulatedAnswer.stream()
+                                            .map(ans -> getFixedDependency(dep, ans)).collect(Collectors.toList()));
+                                }
+                            }
                         }
                         fixed = true;
-                    } else {
-                        fixedDependencies.add(targetDependency);
                     }
-
+                    //if (!matched || fixed) {
+                        extendedDebugOutput.append(
+                                String.format("%s\t%s\t%d\t%s\t%s\t%s\t%s\t", words.get(targetDependency.getHead()),
+                                        targetDependency.getCategory(), targetDependency.getArgNumber(),
+                                        targetDependency.getCategory().getArgument(targetDependency.getArgNumber()),
+                                        questionStr, words.get(expectedAnswer), simulatedAnswerStr));
+                        extendedDebugOutput.append(matched ? "matched\t" : "wrong\t");
+                        extendedDebugOutput.append(fixed ? "fixed\n" : "unfixed\n");
+                    //}
                     // Debugging information;
-                    boolean matched = DependencyEvaluation.matchesAnyGoldDependency(targetDependency, goldDependencies);
                     if ((matched && fixed) || (!matched && !fixed)) {
                         debugOutput.append(targetDependency.toString(words) + "\t" +
                                            targetDependency.getCategory() + "\t");
                         debugOutput.append(StringUtils.join(question) + "?\t");
                         debugOutput.append(words.get(expectedAnswer) + "\t" + simulatedAnswerStr + "\t");
                         debugOutput.append(matched + "\t" + fixed + "\n");
-
                         debugPredicates.add(targetDependency.getHead());
                     }
-                    // TODO: output recall losses
                 }
-                if (debugPredicates.size() > 0) {
-                    System.out.println(String.format("\n[S%d]:\t", sentIdx) + StringUtils.join(words) + "\n" +
-                            debugOutput + "******");
-                    for (ResolvedDependency dep : goldDependencies) {
-                        if (debugPredicates.contains(dep.getHead())) {
-                            List<String> question = questionGenerator.generateQuestion(
-                                    dep, words, goldCategories.get(sentIdx), goldDependencies);
-                            String questionStr = (question == null || question.size() == 0) ? "---" :
-                                    StringUtils.join(question);
-                            System.out.println(dep.toString(words) + "\t" + dep.getCategory() + "\t" + questionStr);
+                for (ResolvedDependency dep : dependencies) {
+                    String depKey = getDependencyKey(dep);
+                    if (!fixedDependencies.containsKey(depKey)) {
+                        fixedDependencies.put(depKey, Collections.singletonList(dep));
+                    }
+                }
+                extendedDebugOutput.append("*** gold ***\n");
+
+                Set<ResolvedDependency> newDependencies = new HashSet<>();
+                fixedDependencies.values().forEach(deps -> newDependencies.addAll(deps));
+
+                // TODO: output recall losses in extendedDebugOutput
+                for (ResolvedDependency goldDep : goldDependencies) {
+                    if (!DependencyEvaluation.matchesAnyGoldDependency(goldDep, newDependencies)) {
+                        List<String> question = questionGenerator.generateQuestion(
+                                goldDep, words, goldCategories.get(sentIdx), goldDependencies);
+                        String questionStr = (question == null || question.size() == 0) ? "-noq-" :
+                                StringUtils.join(question);
+                        extendedDebugOutput.append(
+                                String.format("%s\t%s\t%d\t%s\t%s\t%s\t%s\t", words.get(goldDep.getHead()),
+                                        goldDep.getCategory(), goldDep.getArgNumber(),
+                                        goldDep.getCategory().getArgument(goldDep.getArgNumber()),
+                                        questionStr, "---", words.get(goldDep.getArgument())));
+                        if (questionStr.equals("-noq-") || categories.size() == 0) {
+                            extendedDebugOutput.append("recall loss\n");
+                        } else {
+                            extendedDebugOutput.append("tagging error\t");
+                            extendedDebugOutput.append(categories.get(goldDep.getHead()) + "\n");
                         }
                     }
                 }
+                if (extendedDebugOutput.length() > 0) {
+                    System.out.println(String.format("\n[S%d]:\t", sentIdx) + StringUtils.join(words) + "\n" +
+                            extendedDebugOutput);
+                }
                 before.add(DependencyEvaluation.evaluate(dependencies, goldDependencies));
-                after.add(DependencyEvaluation.evaluate(fixedDependencies, goldDependencies));
+                after.add(DependencyEvaluation.evaluate(newDependencies, goldDependencies));
                 numQuestionsAsked ++;
             }
         }
-
         System.out.println(before);
         System.out.println("After fixing dependencies.");
         System.out.println(after);
         System.out.println("Number of questions asked:\t" + numQuestionsAsked);
     }
 
+    private static String getDependencyKey(ResolvedDependency dep) {
+        return dep.getHead() + "_" + dep.getArgNumber();
+    }
+
+    private static ResolvedDependency getFixedDependency(ResolvedDependency dep, int newArgumentIndex) {
+        return new ResolvedDependency(dep.getHead(), dep.getCategory(), dep.getArgNumber(), newArgumentIndex,
+                dep.getSemanticRole(), dep.getPreposition());
+    }
+
+
     public static void main(String[] args) {
         initialize(args);
         run();
     }
 }
+
+ /*
+for (ResolvedDependency dep : goldDependencies) {
+    if (debugPredicates.contains(dep.getHead())) {
+        List<String> question = questionGenerator.generateQuestion(
+                dep, words, goldCategories.get(sentIdx), goldDependencies);
+        String questionStr = (question == null || question.size() == 0) ? "---" :
+                StringUtils.join(question);
+        System.out.println(dep.toString(words) + "\t" + dep.getCategory() + "\t" + questionStr);
+    }
+}
+*/

@@ -44,6 +44,12 @@ public class QuestionGenerator {
             Category.valueOf("((S\\NP)\\(S\\NP))/(S[ng]\\NP)"), // ``by'' as in ``by doing something''.
     };
 
+    // TODO: special cases:
+    // according (to): ((S\NP)\(S\NP))/PP
+    // down (from): ((S\NP)\(S\NP))/PP
+    // Possible questions: What is the case, according to someone? What is down from something?
+    // What is something according to? What something down from?
+
     // Categories to skip ..
     private static final Category prepositions = Category.valueOf("((S\\NP)\\(S\\NP))/NP");
     private static final Category auxiliaries = Category.valueOf("(S[dcl]\\NP)/(S[b]\\NP)");
@@ -61,7 +67,7 @@ public class QuestionGenerator {
             "(S\\S)/S[dcl]",
             "(S[adj]\\NP)/(S[to]\\NP)",
             "S/S",
-            "((S\\NP)/(S\\NP))/((S\\NP)/(S\\NP))",
+            "((S\\NP)/(S\\NP))/((S\\NP)/(S\\NP))", // i.e. more
             "((S\\NP)\\(S\\NP))/((S\\NP)\\(S\\NP))",
             "((S\\NP)\\(S\\NP))\\((S\\NP)\\(S\\NP))",
             "((S\\NP)\\(S\\NP))/(S[b]\\NP)",
@@ -197,7 +203,7 @@ public class QuestionGenerator {
             //System.out.println("skipping because copula");
             return true;
         }
-        if (!verbHelper.hasInflectedForms(word)) {
+        if (!verbHelper.hasInflectedForms(word) && !category.equals(Category.valueOf("(S[adj]\\NP)/(S[to]\\NP)"))  ) {
             return true;
         }
         if (!category.isFunctionInto(somethingVerbal) &&
