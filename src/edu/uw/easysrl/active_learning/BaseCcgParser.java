@@ -17,6 +17,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.SynchronousQueue;
 import java.util.stream.Collectors;
 
 /**
@@ -138,12 +139,13 @@ public abstract class BaseCcgParser {
                     if (line.startsWith("<c> ")) {
                         String[] info = line.trim().split("\\s+");
                         for (int i = 1; i < info.length; i++) {
-                            sentStr += (i > 0 ?  " " : "") + info[i].split("|")[0];
+                            sentStr += (i > 1 ?  " " : "") + info[i].split("\\|")[0];
                         }
-                        assert sentenceIdx == parsed.size() - 1;
-                        sentences.put(sentStr, sentenceIdx);
-                        parsed.set(sentenceIdx, propagatePrepositions(parsed.get(sentenceIdx)));
-                        sentenceIdx++;
+                        if (sentenceIdx == parsed.size() - 1) {
+                            sentences.put(sentStr, sentenceIdx);
+                            parsed.set(sentenceIdx, propagatePrepositions(parsed.get(sentenceIdx)));
+                            sentenceIdx++;
+                        }
                         continue;
                     }
                     if (sentenceIdx == parsed.size()) {
@@ -153,22 +155,37 @@ public abstract class BaseCcgParser {
                     // saw_2(S[dcl]\NP)/NP1 I_1 0
                     // in_29((S\NP)\(S\NP))/NP3 hours_33 0
                     // Getting: in ((S\NP)\(S\NP))/NP hours
-                    String[] stringsInfo = line.trim().split("[_\\d]+");
+                    // String[] stringsInfo = line.trim().split("[_\\d]+");
                     // Getting: _ 29 3 33 0
-                    String[] indicesInfo = line.trim().split("[^\\d]+");
-                    int predIdx = Integer.parseInt(indicesInfo[1]) - 1;
-                    Category category = Category.valueOf(stringsInfo[1].trim());
-                    int argNum = Integer.parseInt(indicesInfo[2]);
-                    int argIdx = Integer.parseInt(indicesInfo[indicesInfo.length - 2]) - 1;
-                    Preposition preposition = Preposition.NONE;
-                    if (category.getArgument(argNum).equals(Category.PP)) {
-                        preposition = Preposition.fromString(stringsInfo[2].trim());
-                    }
+                    // String[] indicesInfo = line.trim().split("[^\\d]+");
+                    /*
+                     int predIdx = Integer.parseInt(indicesInfo[1]) - 1;
+                     Category category = Category.valueOf(stringsInfo[1].trim());
+                     int argNum = Integer.parseInt(indicesInfo[2]);
+                     int argIdx = Integer.parseInt(indicesInfo[indicesInfo.length - 2]) - 1;
+                     Preposition preposition = Preposition.NONE;
+                        if (category.getArgument(argNum).equals(Category.PP)) {
+                            preposition = Preposition.fromString(stringsInfo[2].trim());
+                        }
+                    */
+                   // System.out.print(line + "\t:\t");
+                    // saw_2(S[dcl]\NP)/NP1
+                    String chunk1 = line.trim().split("\\s+")[0];
+                    String[] stringsInfo = chunk1.split("[_\\d]+");
+                    String[] indicesInfo = chunk1.split("[^\\d]+");
+                    Category category = Category.valueOf(stringsInfo[stringsInfo.length - 1].trim());
+                    int predIdx = Integer.parseInt(indicesInfo[indicesInfo.length - 2]) - 1;
+                    int argNum = Integer.parseInt(indicesInfo[indicesInfo.length - 1]);
+                    // I_1
+                    String chunk2 = line.trim().split("\\s+")[1];
+                    int argIdx = Integer.parseInt(chunk2.substring(chunk2.lastIndexOf('_') + 1)) - 1;
+                  //  System.out.println(predIdx + "\t" + category + "\t" + argNum + "\t" + argIdx);
                     parsed.get(sentenceIdx).add(new ResolvedDependency(predIdx, category, argNum, argIdx, SRLFrame.NONE,
-                            preposition));
+                            Preposition.NONE));
                 }
             } catch (IOException e) {
             }
+            System.out.println(String.format("Read %d pre-parsed sentences", sentences.size()));
         }
 
         private static Set<ResolvedDependency> propagatePrepositions(Set<ResolvedDependency> dependencies) {
@@ -182,7 +199,8 @@ public abstract class BaseCcgParser {
                 for (ResolvedDependency d2 : dependencies) {
                     if (d2.getCategory().isFunctionInto(argCat) && d2.getHead() == dep.getArgument()) {
                         result.add(new ResolvedDependency(dep.getHead(), dep.getCategory(), dep.getArgNumber(),
-                                d2.getArgument(), SRLFrame.NONE, dep.getPreposition()));
+                                d2.getArgument(), // this is changed ...
+                                dep.getSemanticRole(), dep.getPreposition()));
                         break;
                     }
                 }
@@ -198,18 +216,29 @@ public abstract class BaseCcgParser {
                 System.err.println("unable to parse:\t" + sentStr);
                 return;
             }
-            dependencies.addAll(parsed.get(sentences.get(sentStr)));
             for (int i = 0; i < sentence.size(); i++) {
                 categories.add(null);
             }
-            for (ResolvedDependency dep : dependencies) {
-                categories.set(dep.getHead(), dep.getCategory());
+            for (ResolvedDependency dep : parsed.get(sentences.get(sentStr))) {
+                /*if (dep.getHead() >= sentence.size() || dep.getArgument() >= sentence.size()) {
+                    continue;
+                }*/
+                dependencies.add(dep);
+                if (dep.getHead() < categories.size()) {
+                    categories.set(dep.getHead(), dep.getCategory());
+                }
                 int argId = dep.getArgument();
                 Category argCat = dep.getCategory().getArgument(dep.getArgNumber());
                 // Simple heuristic that writes N over NP.
                 if (categories.get(argId) == null ||
                         categories.get(argId).toString().length() > argCat.toString().length()) {
                     categories.set(argId, argCat);
+                }
+            }
+            for (int i = 0; i < sentence.size(); i++) {
+                // This of course doesn't work. i.e. auxiliary verb and so.
+                if (categories.get(i) == null) {
+                    categories.set(i, Category.valueOf("N"));
                 }
             }
         }

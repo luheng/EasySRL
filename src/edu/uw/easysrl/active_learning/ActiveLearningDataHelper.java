@@ -1,6 +1,10 @@
 package edu.uw.easysrl.active_learning;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
@@ -59,6 +63,27 @@ public class ActiveLearningDataHelper {
             goldCategories.add(sentence.getLexicalCategories());
         }
         System.out.println(String.format("Read %d sentences to the training pool.", sentences.size()));
+    }
+
+    public static void main(String[] args) {
+        List<List<InputReader.InputWord>> sentences = new ArrayList<>();
+        List<List<Category>> goldCategories = new ArrayList<>();
+        List<Set<ResolvedDependency>> goldParses = new ArrayList<>();
+
+        readDevPool(sentences, goldCategories, goldParses);
+
+        String outputFile = "propbank.dev.txt";
+        try {
+            BufferedWriter writer = new BufferedWriter(new FileWriter(new File(outputFile)));
+            for (List<InputReader.InputWord> sentence : sentences) {
+                for (int i = 0; i < sentence.size(); i++) {
+                    writer.write(sentence.get(i).word + (i == sentence.size() - 1 ? "\n" : " "));
+                }
+            }
+            writer.close();
+        } catch (IOException e) {
+
+        }
     }
 }
 
