@@ -49,7 +49,8 @@ public class ActiveLearningPrototype {
 
         // Initialize parsers.
         parsers = new ArrayList<>();
-        parsers.add(new BaseCcgParser.EasyCCGParser(commandLineOptions.getModel(), 1 /* nBest */));
+        //parsers.add(new BaseCcgParser.EasyCCGParser(commandLineOptions.getModel(), 1 /* nBest */));
+        parsers.add(new BaseCcgParser.EasySRLParser(commandLineOptions.getModel(), 1 /* nBest */));
         // TODO: add Bharat parser.
 
         // Initialize the other modules.

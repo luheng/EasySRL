@@ -5,6 +5,7 @@ import edu.uw.easysrl.dependencies.Coindexation;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.dependencies.SRLFrame;
 import edu.uw.easysrl.main.EasySRL;
+import edu.uw.easysrl.main.EasySRL.ParsingAlgorithm;
 import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.qasrl.qg.QuestionSlot;
@@ -16,14 +17,14 @@ import edu.uw.easysrl.syntax.model.Model;
 import edu.uw.easysrl.syntax.model.SRLFactoredModel;
 import edu.uw.easysrl.syntax.model.SupertagFactoredModel;
 import edu.uw.easysrl.syntax.model.feature.FeatureSet;
-import edu.uw.easysrl.syntax.parser.Parser;
-import edu.uw.easysrl.syntax.parser.ParserCKY2;
-import edu.uw.easysrl.syntax.parser.SRLParser;
+import edu.uw.easysrl.syntax.parser.*;
 import edu.uw.easysrl.syntax.tagger.Tagger;
 import edu.uw.easysrl.syntax.tagger.TaggerEmbeddings;
 import edu.uw.easysrl.util.Util;
 import uk.co.flamingpenguin.jewel.cli.ArgumentValidationException;
 import uk.co.flamingpenguin.jewel.cli.CliFactory;
+
+
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -56,7 +57,7 @@ public class ActiveLearningHelper {
     }
 
     public static Parser makeParser(final EasySRL.CommandLineArguments commandLineOptions, final int maxChartSize,
-                                     final boolean joint, final Optional<Double> supertaggerWeight) throws IOException {
+                                    final boolean joint, final Optional<Double> supertaggerWeight) throws IOException {
         final File modelFolder = Util.getFile(commandLineOptions.getModel());
         Coindexation.parseMarkedUpFile(new File(modelFolder, "markedup"));
         final File cutoffsFile = new File(modelFolder, "cutoffs");
@@ -86,11 +87,13 @@ public class ActiveLearningHelper {
         }
 
         final int nBest = 1; // commandLineOptions.getNbest();
-        return new ParserCKY2(modelFactory, commandLineOptions.getMaxLength(), nBest,
-                EasySRL.InputFormat.valueOf(commandLineOptions.getInputFormat().toUpperCase()),
-                commandLineOptions.getRootCategories(), modelFolder, maxChartSize);
+        final int maxSentenceLength = commandLineOptions.getMaxLength();
+        final EasySRL.InputFormat inputFormat = EasySRL.InputFormat.valueOf(commandLineOptions.getInputFormat().toUpperCase());
+        final List<Category> rootCategories = commandLineOptions.getRootCategories();
+        return algorithm == ParsingAlgorithm.CKY ?
+                new ParserCKY(modelFactory, maxSentenceLength, nBest, inputFormat, rootCategories, modelFolder, maxChartSize) :
+                new ParserAStar(modelFactory, maxSentenceLength, nBest, inputFormat, rootCategories, modelFolder, maxChartSize);
     }
-
 
     public static List<Collection<ResolvedDependency>> readBharatParserDependencies(File dependenciesFile) {
         BufferedReader reader;
