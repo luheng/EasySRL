@@ -31,6 +31,8 @@ public abstract class BaseCcgParser {
     public static class EasyCCGParser extends BaseCcgParser {
 
         private SRLParser parser = null;
+        private final double supertaggerBeam = 0.0001;
+        private final Optional<Double> supertaggerWeight = Optional.of(0.9);
 
         public EasyCCGParser(String modelFolderPath, int nBest)  {
             final File modelFolder = Util.getFile(modelFolderPath);
@@ -44,10 +46,12 @@ public abstract class BaseCcgParser {
             try {
                 parser = new SRLParser.PipelineSRLParser(
                         //ActiveLearningHelper.makeParser(pipelineFolder.getAbsolutePath(), 0.0001,
-                        EasySRL.makeParser(pipelineFolder.getAbsolutePath(), 0.0001,
+                        EasySRL.makeParser(pipelineFolder.getAbsolutePath(), supertaggerBeam,
                                 //EasySRL.ParsingAlgorithm.CKY,
                                 EasySRL.ParsingAlgorithm.ASTAR,
-                                200000, false /* joint */, Optional.empty(), nBest),
+                                100000, false /* joint */,
+                                supertaggerWeight, //Optional.empty(),
+                                nBest),
                         Util.deserialize(new File(pipelineFolder, "labelClassifier")), posTagger);
             } catch (IOException e) {
             }
