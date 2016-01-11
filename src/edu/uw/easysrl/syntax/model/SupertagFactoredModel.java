@@ -54,9 +54,19 @@ public class SupertagFactoredModel extends Model {
 					resolvedUnlabelledDependencies.subList(i + 1, resolvedUnlabelledDependencies.size()));
 			i++;
 		}
+
+		// Add a penalty based on length of dependency.
+		final int depLength = Math.abs(leftChild.getParse().getHeadIndex() - rightChild.getParse().getHeadIndex());
+		double lengthPenalty = 0.00001 * depLength;
+
+		// Extra penalty for clitics, to really make sure they attach locally.
+		if (rightChild.getSpanLength() == 1 && rightChild.getParse().getWord().startsWith("'")) {
+			lengthPenalty = lengthPenalty * 10;
+		}
+
 		return new AgendaItem(
 				node,
-				leftChild.getInsideScore() + rightChild.getInsideScore(),
+				leftChild.getInsideScore() + rightChild.getInsideScore() - lengthPenalty,
 				getOutsideUpperBound(leftChild.startOfSpan, leftChild.startOfSpan + length),
 				leftChild.startOfSpan,
 				length,

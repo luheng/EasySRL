@@ -17,7 +17,6 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.SynchronousQueue;
 import java.util.stream.Collectors;
 
 /**
@@ -38,11 +37,13 @@ public abstract class BaseCcgParser {
             if (!modelFolder.exists()) {
                 throw new InputMismatchException("Couldn't load model from from: " + modelFolder);
             }
-            final File pipelineFolder = new File(modelFolder, "/pipeline");
+            //final File pipelineFolder = new File(modelFolder, "/pipeline");
+            final File pipelineFolder = new File(modelFolder, "/");
             System.err.println("====Starting loading model====");
             final POSTagger posTagger = POSTagger.getStanfordTagger(new File(pipelineFolder, "posTagger"));
             try {
                 parser = new SRLParser.PipelineSRLParser(
+                        //ActiveLearningHelper.makeParser(pipelineFolder.getAbsolutePath(), 0.0001,
                         EasySRL.makeParser(pipelineFolder.getAbsolutePath(), 0.0001,
                                 //EasySRL.ParsingAlgorithm.CKY,
                                 EasySRL.ParsingAlgorithm.ASTAR,

@@ -1,14 +1,11 @@
 package edu.uw.easysrl.active_learning;
 
 import edu.uw.easysrl.dependencies.ResolvedDependency;
-import edu.uw.easysrl.dependencies.SRLFrame;
 import edu.uw.easysrl.main.EasySRL;
 import edu.uw.easysrl.main.InputReader.InputWord;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
-import edu.uw.easysrl.qasrl.qg.VerbHelper;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
-import edu.uw.easysrl.syntax.grammar.Preposition;
 import uk.co.flamingpenguin.jewel.cli.CliFactory;
 
 import edu.stanford.nlp.util.StringUtils;
@@ -85,7 +82,13 @@ public class ActiveLearningPrototype {
             List<Category> categories = new ArrayList<>();
             Set<ResolvedDependency> dependencies = new HashSet<>();
             // TODO: change the interface.
-            parser.parse(sentences.get(sentIdx), categories, dependencies);
+            // TODO: debug nullpointer exception.
+            // probably difference between EasyCCG.makeParser and ActiveLearningHelper.makeParser or we are using the wrong model
+            try {
+                parser.parse(sentences.get(sentIdx), categories, dependencies);
+            } catch (Exception e) {
+                continue;
+            }
             tagged.add(categories);
             parsed.add(dependencies);
 
