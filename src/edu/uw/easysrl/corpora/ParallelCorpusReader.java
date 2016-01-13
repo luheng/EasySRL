@@ -3,13 +3,8 @@ package edu.uw.easysrl.corpora;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import com.google.common.collect.Table;
 import com.google.common.collect.Table.Cell;
@@ -258,6 +253,79 @@ public class ParallelCorpusReader {
 					words.add(leaf.getWord());
 				}
 				return words;
+			}
+		};
+	}
+
+	public Iterator<Sentence> readCcgCorpus(final boolean isDev) throws IOException {
+		System.err.println("I am reading the CcgBank.");
+		synchronized (this) {
+			if (PTB == null) {
+				PTB = new PennTreebank().readCorpus(treebank);
+			}
+			if (CoNLL == null) {
+				CoNLL = new DependencyTreebank().readCorpus(treebank);
+			}
+			if (srlParses == null) {
+				srlParses = SRLParse.parseCorpus(
+						PTB,
+						Util.readFileLineByLine(new File(propbank,  "prop.txt")),
+						nombank != null ? Util.readFileLineByLine(nombank) : null);
+			}
+		}
+		List<SyntaxTreeNode> parses;
+		List<DependencyParse> depParses;
+		if (isDev) {
+			synchronized (ccgbank) {
+				if (parsesDev == null) {
+					parsesDev = CCGBankParseReader.loadCorpus(ccgbank, true);
+				}
+				if (depParsesDev == null) {
+					depParsesDev = CCGBankDependencies.loadCorpus(ccgbank, Partition.DEV);
+				}
+				parses = parsesDev;
+				depParses = depParsesDev;
+			}
+		} else {
+			synchronized (ccgbank) {
+				if (parsesTrain == null) {
+					parsesTrain = CCGBankParseReader.loadCorpus(ccgbank, false);
+				}
+				if (depParsesTrain == null) {
+					depParsesTrain = CCGBankDependencies.loadCorpus(ccgbank, Partition.TRAIN);
+				}
+				parses = parsesTrain;
+				depParses = depParsesTrain;
+			}
+		}
+
+		return new Iterator<Sentence>() {
+			int i = 0;
+
+			@Override
+			public boolean hasNext() {
+				return i < parses.size();
+			}
+
+			@Override
+			public Sentence next() {
+				final SyntaxTreeNode parse = parses.get(i);
+				final DependencyParse depParse = depParses.get(i);
+				SRLParse srl = srlParses.get(depParse.getFile(),
+						depParse.getSentenceNumber());
+				final SyntacticDependencyParse conll = CoNLL.get(
+						depParse.getFile(), depParse.getSentenceNumber());
+				i++;
+				if (srl == null) {
+					final List<String> words = getWords(parse);
+					srl = new SRLParse(words);
+				}
+				return new Sentence(parse, depParse, conll, srl,
+						PTB.get(depParse.getFile(), depParse.getSentenceNumber()));
+			}
+
+			private List<String> getWords(final SyntaxTreeNode parse) {
+				return parse.getLeaves().stream().map(l -> l.getWord()).collect(Collectors.toList());
 			}
 		};
 	}

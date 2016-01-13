@@ -79,27 +79,33 @@ public class ActiveLearningPrototype {
             List<Set<ResolvedDependency>> parsed = new ArrayList<>();
             BaseCcgParser parser = parsers.get(0);
 
-            List<Category> categories = new ArrayList<>();
-            Set<ResolvedDependency> dependencies = new HashSet<>();
+            Parse parse;
             // TODO: change the interface.
             // TODO: debug nullpointer exception.
             // probably difference between EasyCCG.makeParser and ActiveLearningHelper.makeParser or we are using the wrong model
             try {
-                parser.parse(sentences.get(sentIdx), categories, dependencies);
+                parse = parser.parse(sentences.get(sentIdx));
+                if (parse == null) {
+                    // TODO: add 0 result
+                    continue;
+                }
             } catch (Exception e) {
                 continue;
             }
+            List<Category> categories = parse.categories;
+            Set<ResolvedDependency> dependencies = parse.dependencies;
+
             tagged.add(categories);
             parsed.add(dependencies);
-
             Set<ResolvedDependency> goldDependencies = goldParses.get(sentIdx);
 
-            Set<String> fixedDependencies = new HashSet<>();
-            Set<ResolvedDependency> newDependencies = new HashSet<>();
+            //Set<String> fixedDependencies = new HashSet<>();
+            //Set<ResolvedDependency> newDependencies = new HashSet<>();
 
             // Generate possible questions over predicted dependencies.
+            /*
             for (ResolvedDependency targetDependency : dependencies) {
-                boolean matched = DependencyEvaluation.matchesAnyGoldDependency(targetDependency, goldDependencies);
+                boolean matched = DependencyEvaluation.matchesAny(targetDependency, goldDependencies);
                 // Need question scorer here.
                 List<String> question =
                         questionGenerator.generateQuestion(targetDependency, words, categories, dependencies);
@@ -132,13 +138,11 @@ public class ActiveLearningPrototype {
                     fixedDependencies.add(getDependencyKey(targetDependency));
                     simulatedAnswer.forEach(ans -> newDependencies.add(getFixedDependency(targetDependency, ans)));
 
-                    // TODO: Additional fixes: look up aux verb chain
                     List<Integer> auxChain = questionGenerator.verbHelper.getAuxiliaryChain(words, categories,
                             targetDependency.getHead());
                     if (auxChain.size() > 0) {
                         for (ResolvedDependency dep : dependencies) {
                             if (auxChain.contains(dep.getHead()) && dep.getArgument() == expectedAnswer) {
-                                // System.out.println("!!!!additional fixing:\t" + dep.toString(words));
                                 fixedDependencies.add(getDependencyKey(dep));
                                 simulatedAnswer.forEach(ans -> newDependencies.add(getFixedDependency(dep, ans)));
                             }
@@ -150,15 +154,16 @@ public class ActiveLearningPrototype {
                 if (fixed) {
                     numEffectiveQuestionsAsked ++;
                 }
-                //if (!matched || fixed) {
+                if (!matched || fixed) {
                     extendedDebugOutput.append(
                             String.format("%s\t%s\t%d\t%s\t%s\t%s\t%s\t", words.get(targetDependency.getHead()),
                                     targetDependency.getCategory(), targetDependency.getArgNumber(),
                                     targetDependency.getCategory().getArgument(targetDependency.getArgNumber()),
-                                    questionStr, words.get(expectedAnswer), simulatedAnswerStr));
+                                    StringUtils.capitalize(questionStr) + "?",
+                                    words.get(expectedAnswer), simulatedAnswerStr));
                     extendedDebugOutput.append(matched ? "matched\t" : "wrong\t");
                     extendedDebugOutput.append(fixed ? "fixed\n" : "unfixed\n");
-                //}
+                }
                 // Debugging information;
                 if ((matched && fixed) || (!matched && !fixed)) {
                     debugOutput.append(targetDependency.toString(words) + "\t" +
@@ -170,11 +175,28 @@ public class ActiveLearningPrototype {
                 }
             }
             dependencies.forEach(dep -> {
-                if (!fixedDependencies.contains(getDependencyKey(dep))) { newDependencies.add(dep); }});
+                if (!fixedDependencies.contains(getDependencyKey(dep))) {
+                    newDependencies.add(dep);
+                }
+            });
+            */
+            //newDependencies.addAll(dependencies);
 
+            System.out.println(String.format("\n[S%d]:\t", sentIdx) + StringUtils.join(words));
+            System.out.println(dependencies.size());
+            for (ResolvedDependency dep : dependencies) {
+                //if (!DependencyEvaluation.matchesAny(goldDep, newDependencies)) {
+                System.out.println(
+                        String.format("%s\t%s.%d\t%s\t", words.get(dep.getHead()),
+                                dep.getCategory(), dep.getArgNumber(),
+                                dep.getCategory().getArgument(dep.getArgNumber())));
+                //}
+            }
+
+            /*
             extendedDebugOutput.append("*** gold ***\n");
             for (ResolvedDependency goldDep : goldDependencies) {
-                if (!DependencyEvaluation.matchesAnyGoldDependency(goldDep, newDependencies)) {
+                if (!DependencyEvaluation.matchesAny(goldDep, newDependencies)) {
                     List<String> question = questionGenerator.generateQuestion(
                             goldDep, words, goldCategories.get(sentIdx), goldDependencies);
                     String questionStr = (question == null || question.size() == 0) ? "-noq-" :
@@ -183,7 +205,8 @@ public class ActiveLearningPrototype {
                             String.format("%s\t%s\t%d\t%s\t%s\t%s\t%s\t", words.get(goldDep.getHead()),
                                     goldDep.getCategory(), goldDep.getArgNumber(),
                                     goldDep.getCategory().getArgument(goldDep.getArgNumber()),
-                                    questionStr, "---", words.get(goldDep.getArgument())));
+                                    StringUtils.capitalize(questionStr) + "?",
+                                    "---", words.get(goldDep.getArgument())));
                     if (questionStr.equals("-noq-") || categories.size() == 0) {
                         extendedDebugOutput.append("recall loss\n");
                     } else {
@@ -192,12 +215,16 @@ public class ActiveLearningPrototype {
                     }
                 }
             }
-            if (extendedDebugOutput.length() > 0) {
+            */
+            // If there is actually precision and recall loss.
+            /*
+            if (extendedDebugOutput.length() > "*** predicted ***\n*** gold ***\n".length()) {
                 System.out.println(String.format("\n[S%d]:\t", sentIdx) + StringUtils.join(words) + "\n" +
                         extendedDebugOutput);
             }
+            */
             before.add(DependencyEvaluation.evaluate(dependencies, goldDependencies));
-            after.add(DependencyEvaluation.evaluate(newDependencies, goldDependencies));
+            //after.add(DependencyEvaluation.evaluate(newDependencies, goldDependencies));
         }
         System.out.println(before);
         System.out.println("After fixing dependencies.");

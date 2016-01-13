@@ -210,19 +210,6 @@ public abstract class SRLParser {
 				return null;
 			}
 			return parses.stream().map(x -> addDependencies(tokens, x)).collect(Collectors.toList());
-			/*
-			final List<Scored<SyntaxTreeNode>> parses = super.parser.doParsing(new InputToParser(tokens, null, null, false));
-			if (parses == null) {
-				return null;
-			}
-			SyntaxTreeNode parse = parses.get(0).getObject();
-			List<String> words = tokens.stream().map(t -> t.word).collect(Collectors.toList());
-			parse.getAllLabelledDependencies().forEach(d -> System.out.println(d.toString(words)));
-			return parses.stream()
-						.map(x -> new CCGandSRLparse(x.getObject(), x.getObject().getAllLabelledDependencies(), tokens))
-						.map(x2 -> addDependencies(tokens, x2))
-						.collect(Collectors.toList());
-			*/
 		}
 
 		@Override

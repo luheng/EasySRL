@@ -4,19 +4,21 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
+import com.google.common.collect.Table;
+import edu.uw.easysrl.corpora.CCGBankParseReader;
 import edu.uw.easysrl.corpora.ParallelCorpusReader;
 import edu.uw.easysrl.corpora.ParallelCorpusReader.Sentence;
+import edu.uw.easysrl.corpora.SRLParse;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.dependencies.SRLFrame;
 import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.Preposition;
+import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
+import edu.uw.easysrl.util.Util;
 
 /**
  * Read gold input for active learning simulation.
@@ -27,22 +29,22 @@ public class ActiveLearningDataHelper {
     public static void readDevPool(List<List<InputReader.InputWord>> sentences,
                                    List<List<Category>> goldCategories,
                                    List<Set<ResolvedDependency>> goldParses) {
-        readGoldSentences(sentences, goldCategories, goldParses, true);
+        readFromPropBank(sentences, goldCategories, goldParses, true);
     }
 
     public static void readTrainingPool(List<List<InputReader.InputWord>> sentences,
                                         List<List<Category>> goldCategories,
                                         List<Set<ResolvedDependency>> goldParses) {
-        readGoldSentences(sentences, goldCategories, goldParses, false);
+        readFromPropBank(sentences, goldCategories, goldParses, false);
     }
 
-    private static void readGoldSentences(List<List<InputReader.InputWord>> sentences,
-                                          List<List<Category>> goldCategories,
-                                          List<Set<ResolvedDependency>> goldParses,
-                                          boolean readDev) {
+    private static void readFromPropBank(List<List<InputReader.InputWord>> sentences,
+                                         List<List<Category>> goldCategories,
+                                         List<Set<ResolvedDependency>> goldParses,
+                                         boolean readDev) {
         Iterator<ParallelCorpusReader.Sentence> sentenceIterator;
         try {
-            sentenceIterator = ParallelCorpusReader.READER.readCorpus(readDev);
+            sentenceIterator = ParallelCorpusReader.READER.readCcgCorpus(readDev);
         } catch (IOException e) {
             return;
         }
@@ -64,6 +66,30 @@ public class ActiveLearningDataHelper {
         }
         System.out.println(String.format("Read %d sentences to the training pool.", sentences.size()));
     }
+
+    /*
+    private static void readFromCCGBank(List<List<InputReader.InputWord>> sentences,
+                                        List<List<Category>> goldCategories,
+                                        List<Set<ResolvedDependency>> goldParses,
+                                        boolean readDev) {
+        List<SyntaxTreeNode> ccgParses;
+        Table<String, Integer, SRLParse> srlParses;
+        try {
+            ccgParses = CCGBankParseReader.loadCorpus(ParallelCorpusReader.CCGREBANK, readDev);
+
+        } catch (IOException e) {
+            return;
+        }
+        for (SyntaxTreeNode parse : ccgParses) {
+            List<ResolvedDependency> deps = parse.getAllLabelledDependencies();
+            goldCategories.add(
+                    IntStrea
+            );
+            goldParses.add(new HashSet(deps));
+            sentences.add(parse.getAllLabelledDependencies());
+        }
+    }
+    */
 
     public static void main(String[] args) {
         List<List<InputReader.InputWord>> sentences = new ArrayList<>();

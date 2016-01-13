@@ -18,6 +18,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * Calls a parser. Input: List<InputWord>, Output: List<Category>, Set<ResolvedDependency>
@@ -25,59 +26,110 @@ import java.util.stream.Collectors;
  */
 public abstract class BaseCcgParser {
 
-    public abstract void parse(List<InputReader.InputWord> sentence, List<Category> categories,
-                               Set<ResolvedDependency> dependencies);
+    private static final String[] dependencyFilter = {
+            "be:(S[b]\\NP)/(S[pss]\\NP).1", "be:(S[b]\\NP)/(S[adj]\\NP).1", "been:(S[pt]\\NP)/(S[pss]\\NP).1",
+            "have:(S[b]\\NP)/(S[pt]\\NP).1", "been:(S[pt]\\NP)/(S[ng]\\NP).1", "been:(S[pt]\\NP)/(S[adj]\\NP).1",
+            "going:(S[ng]\\NP)/(S[to]\\NP).1", "have:(S[b]\\NP)/(S[to]\\NP).1", "be:(S[b]\\NP)/(S[ng]\\NP).1"
+    };
+    private static Set<String> dependencyFilterSet;
+    private static CountDictionary dependencyCutoffs;
+    private static final int minDependencyCount = 10;
+
+    static {
+        initializeFilter();
+    }
+
+    private static void initializeFilter() {
+        dependencyFilterSet = new HashSet<>();
+        dependencyFilterSet.addAll(Arrays.asList(dependencyFilter));
+        dependencyCutoffs = new CountDictionary();
+        List<List<InputReader.InputWord>> sentences = new ArrayList<>();
+        List<List<Category>> goldCategories = new ArrayList<>();
+        List<Set<ResolvedDependency>> goldParses = new ArrayList<>();
+        ActiveLearningDataHelper.readTrainingPool(sentences, goldCategories, goldParses);
+        goldParses.forEach(parse -> parse.forEach(dep ->
+                dependencyCutoffs.addString(dep.getCategory() + "." + dep.getArgNumber())));
+    }
+
+    protected static boolean acceptDependency(List<InputReader.InputWord> sentence,
+                                              ResolvedDependency dependency) {
+        int predIdx = dependency.getHead(), argIdx = dependency.getArgument();
+        if (predIdx == argIdx) {
+            return false;
+        }
+        String depStr1 = dependency.getCategory() + "." + dependency.getArgNumber();
+        String depStr2 = sentence.get(predIdx).word + ":" + depStr1;
+        return dependencyCutoffs.getCount(depStr1) >= minDependencyCount && !dependencyFilterSet.contains(depStr2);
+    }
+
+    protected Parse getParse(List<InputReader.InputWord> sentence, SRLParser.CCGandSRLparse ccgParse) {
+        // TODO: tagger accuracy
+        List<Category> categories = IntStream.range(0, sentence.size())
+                .mapToObj(i -> ccgParse.getLeaf(i).getCategory())
+                .collect(Collectors.toList());
+        Set<ResolvedDependency> dependencies = //ccgParse.getDependencyParse().stream()
+                            ccgParse.getCcgParse().getAllLabelledDependencies().stream()
+                .filter(dep -> acceptDependency(sentence, dep))
+                .collect(Collectors.toSet());
+        return new Parse(categories, dependencies);
+    }
+
+    public abstract Parse parse(List<InputReader.InputWord> sentence);
+
+    public abstract List<Parse> parseNBest(List<InputReader.InputWord> sentence);
 
     public static class EasyCCGParser extends BaseCcgParser {
-
         private SRLParser parser = null;
-        private final double supertaggerBeam = 0.0001;
-        private final Optional<Double> supertaggerWeight = Optional.of(0.9);
+        private final double supertaggerBeam = 0.000001;
+        private final int maxChartSize = 200000;
 
         public EasyCCGParser(String modelFolderPath, int nBest)  {
             final File modelFolder = Util.getFile(modelFolderPath);
             if (!modelFolder.exists()) {
                 throw new InputMismatchException("Couldn't load model from from: " + modelFolder);
             }
-            //final File pipelineFolder = new File(modelFolder, "/pipeline");
             final File pipelineFolder = new File(modelFolder, "/");
             System.err.println("====Starting loading model====");
             final POSTagger posTagger = POSTagger.getStanfordTagger(new File(pipelineFolder, "posTagger"));
             try {
                 parser = new SRLParser.PipelineSRLParser(
-                        //ActiveLearningHelper.makeParser(pipelineFolder.getAbsolutePath(), 0.0001,
                         EasySRL.makeParser(pipelineFolder.getAbsolutePath(), supertaggerBeam,
-                                //EasySRL.ParsingAlgorithm.CKY,
                                 EasySRL.ParsingAlgorithm.ASTAR,
-                                100000, false /* joint */,
-                                supertaggerWeight, //Optional.empty(),
+                                maxChartSize,
+                                false /* joint */,
+                                Optional.empty(),
                                 nBest),
                         Util.deserialize(new File(pipelineFolder, "labelClassifier")), posTagger);
             } catch (IOException e) {
             }
         }
 
-
         @Override
-        public void parse(List<InputReader.InputWord> sentence, List<Category> categories,
-                          Set<ResolvedDependency> dependencies) {
+        public Parse parse(List<InputReader.InputWord> sentence) {
             if (parser == null) {
                 throw new RuntimeException("Parser uninitialized");
             }
             List<SRLParser.CCGandSRLparse> parses = parser.parseTokens(sentence);
             if (parses == null || parses.size() == 0) {
-                return;
+                return null;
             }
-            // 1-best here..
-            assert categories != null && dependencies != null;
-            for (int i = 0; i < sentence.size(); i++) {
-                categories.add(parses.get(0).getLeaf(i).getCategory());
+            return getParse(sentence, parses.get(0));
+        }
+
+        @Override
+        public List<Parse> parseNBest(List<InputReader.InputWord> sentence) {
+            if (parser == null) {
+                throw new RuntimeException("Parser uninitialized");
             }
-            dependencies.addAll(parses.get(0).getDependencyParse());
+            List<SRLParser.CCGandSRLparse> parses = parser.parseTokens(sentence);
+            if (parses == null || parses.size() == 0) {
+                return null;
+            }
+            return parses.stream().map(p -> getParse(sentence, p)).collect(Collectors.toList());
         }
     }
 
-    // TODO: debug
+    /*
     public static class EasySRLParser extends BaseCcgParser {
 
         private SRLParser parser = null;
@@ -94,12 +146,12 @@ public abstract class BaseCcgParser {
                 SRLParser pipelineParser = new SRLParser.PipelineSRLParser(
                         EasySRL.makeParser(pipelineFolder.getAbsolutePath(), 0.0001,
                                 EasySRL.ParsingAlgorithm.ASTAR,
-                                200000, false /* joint */, Optional.empty(), nBest),
+                                200000, false , Optional.empty(), nBest),
                         Util.deserialize(new File(pipelineFolder, "labelClassifier")), posTagger);
                 parser = new SRLParser.BackoffSRLParser(new SRLParser.JointSRLParser(
                                 ActiveLearningHelper.makeParser(modelFolderPath, 0.0001,
                                         EasySRL.ParsingAlgorithm.ASTAR,
-                                        200000, true /* joint */, Optional.empty(), nBest), posTagger), pipelineParser);
+                                        200000, true , Optional.empty(), nBest), posTagger), pipelineParser);
             } catch (IOException e) {
             }
         }
@@ -122,6 +174,7 @@ public abstract class BaseCcgParser {
             dependencies.addAll(parses.get(0).getDependencyParse());
         }
     }
+*/
 
     public static class BharatParser extends BaseCcgParser {
 
@@ -214,13 +267,15 @@ public abstract class BaseCcgParser {
         }
 
         @Override
-        public void parse(List<InputReader.InputWord> sentence, List<Category> categories,
-                          Set<ResolvedDependency> dependencies) {
+        public Parse parse(List<InputReader.InputWord> sentence) {
             String sentStr = StringUtils.join(sentence.stream().map(w->w.word).collect(Collectors.toList()));
             if (!sentences.containsKey(sentStr)) {
                 System.err.println("unable to parse:\t" + sentStr);
-                return;
+                return null;
             }
+
+            List<Category> categories = new ArrayList<>();
+            Set<ResolvedDependency> dependencies = new HashSet<>();
             for (int i = 0; i < sentence.size(); i++) {
                 categories.add(null);
             }
@@ -246,6 +301,12 @@ public abstract class BaseCcgParser {
                     categories.set(i, Category.valueOf("N"));
                 }
             }
+            return new Parse(categories, dependencies);
+        }
+
+        @Override
+        public List<Parse> parseNBest(List<InputReader.InputWord> sentence) {
+            throw new RuntimeException("unsupported");
         }
     }
 }
