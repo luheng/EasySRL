@@ -18,6 +18,7 @@ import edu.uw.easysrl.syntax.tagger.Tagger.ScoredCategory;
 public class SupertagFactoredModel extends Model {
 
 	private final List<List<ScoredCategory>> tagsForWords;
+	private static final boolean includeDeps = false;
 
 	public SupertagFactoredModel(final List<List<ScoredCategory>> tagsForWords) {
 		super(tagsForWords.size());
@@ -36,7 +37,7 @@ public class SupertagFactoredModel extends Model {
 						getOutsideUpperBound(i, i + 1), /* outside score upperbound */
 						i,    /* start index */
 						1,    /* length */
-						false /* includeDeps */
+						includeDeps
 				));
 			}
 		}
@@ -50,7 +51,7 @@ public class SupertagFactoredModel extends Model {
 		for (final UnlabelledDependency dep : resolvedUnlabelledDependencies) {
 			node = new SyntaxTreeNodeLabelling(
 					node,
-					dep.setLabel(SRLFrame.NONE),
+					dep.setLabel(SRLFrame.UNLABELLED_ARGUMENT),
 					resolvedUnlabelledDependencies.subList(i + 1, resolvedUnlabelledDependencies.size()));
 			i++;
 		}
@@ -70,7 +71,7 @@ public class SupertagFactoredModel extends Model {
 				getOutsideUpperBound(leftChild.startOfSpan, leftChild.startOfSpan + length),
 				leftChild.startOfSpan,
 				length,
-				false);
+				includeDeps);
 	}
 
 	@Override
@@ -81,7 +82,7 @@ public class SupertagFactoredModel extends Model {
 				child.outsideScoreUpperbound,
 				child.startOfSpan,
 				child.spanLength,
-				false /* includeDeps */);
+				includeDeps);
 	}
 
 	@Override

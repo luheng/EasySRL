@@ -32,6 +32,8 @@ public class SRLFactoredModel extends Model {
 	private final List<ExtendedLexicalEntry> forests;
 	private final Collection<UnaryRuleFeature> unaryRuleFeatures;
 
+	boolean hasDeps = true;
+
 	private SRLFactoredModel(
 			final List<ExtendedLexicalEntry> forests,
 			final Collection<UnaryRuleFeature> unaryRuleFeatures,
@@ -73,7 +75,7 @@ public class SRLFactoredModel extends Model {
 				final double score = forest.scoreNode(node);
 				final double dependenciesUpperBound = getInsideDependenciesUpperBound(forest, category, score);
 				queue.add(new AgendaItem(new SyntaxTreeNodeLeaf(word.word, word.pos, word.ner, category, i), score,
-						dependenciesUpperBound + outsideScoreUpperBound, i, 1, true));
+						dependenciesUpperBound + outsideScoreUpperBound, i, 1, hasDeps));
 			}
 		}
 	}
@@ -113,7 +115,7 @@ public class SRLFactoredModel extends Model {
 				+ rootScore;
 
 		final AgendaItem result = new AgendaItem(node, newInsideScore, leftChild.outsideScoreUpperbound
-				+ rightChild.outsideScoreUpperbound - globalUpperBound, leftChild.getStartOfSpan(), length, true);
+				+ rightChild.outsideScoreUpperbound - globalUpperBound, leftChild.getStartOfSpan(), length, hasDeps);
 
 		return labelDependencies(result, node);
 	}
@@ -134,7 +136,7 @@ public class SRLFactoredModel extends Model {
 
 			result = new AgendaItem(labelling, newInsideScore, result.outsideScoreUpperbound
 					- forest.getLogUnnormalizedViterbiScore(dep.getCategory(), dep.getArgNumber()),
-					result.getStartOfSpan(), result.getSpanLength(), true);
+					result.getStartOfSpan(), result.getSpanLength(), hasDeps);
 			i++;
 
 		}
@@ -156,7 +158,7 @@ public class SRLFactoredModel extends Model {
 					+ child.spanLength, featureToScore);
 		}
 		AgendaItem agendaItem = new AgendaItem(result, insideScore, child.outsideScoreUpperbound, child.startOfSpan,
-				child.spanLength, true);
+				child.spanLength, hasDeps);
 		agendaItem = labelDependencies(agendaItem, agendaItem.parse);
 		return agendaItem;
 	}

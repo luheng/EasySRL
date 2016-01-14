@@ -64,13 +64,11 @@ public class AgendaItem implements Comparable<AgendaItem> {
 	}
 
 	public Object getEquivalenceClassKey() {
-
 		// Same category
 		// Same unused SRL labels
-		// Same depenency structure
+		// Same dependency structure
 		// Same rule
 		final RuleClass ruleClass = parse.getRuleClass();
-
 		return includeDeps ? new KeyWithDeps(parse.getCategory(), ruleClass, parse.getDependencyStructure(),
 				parse.getResolvedUnlabelledDependencies()) : new KeyNoDeps(parse.getCategory(), ruleClass);
 	}
@@ -94,7 +92,6 @@ public class AgendaItem implements Comparable<AgendaItem> {
 		@Override
 		public int hashCode() {
 			return Objects.hash(category, deps, rule, unlabelledDependencies);
-
 		}
 
 		@Override
@@ -103,9 +100,7 @@ public class AgendaItem implements Comparable<AgendaItem> {
 			return Objects.equals(category, other.category) && Objects.equals(deps, other.deps)
 					&& Objects.equals(rule, other.rule)
 					&& Objects.equals(unlabelledDependencies, other.unlabelledDependencies);
-
 		}
-
 	}
 
 	private static class KeyNoDeps {
@@ -125,7 +120,6 @@ public class AgendaItem implements Comparable<AgendaItem> {
 
 		@Override
 		public boolean equals(final Object obj) {
-
 			final AgendaItem.KeyNoDeps other = (AgendaItem.KeyNoDeps) obj;
 			return Objects.equals(category, other.category) && Objects.equals(rule, other.rule);
 		}

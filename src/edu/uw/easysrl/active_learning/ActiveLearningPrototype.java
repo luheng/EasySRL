@@ -62,6 +62,7 @@ public class ActiveLearningPrototype {
         Results after = new Results();
         int numQuestionsAsked = 0;
         int numEffectiveQuestionsAsked = 0;
+        int numMultiArgs = 0, numGoldMultiArgs = 0;
 
         for (int sentIdx = 0; sentIdx < sentences.size(); sentIdx++) {
             // Print sentence info.
@@ -75,10 +76,10 @@ public class ActiveLearningPrototype {
             extendedDebugOutput.append("*** predicted ***\n");
 
             // Parse using all the base parsers.
+            Set<ResolvedDependency> goldDependencies = goldParses.get(sentIdx);
             List<List<Category>> tagged = new ArrayList<>();
             List<Set<ResolvedDependency>> parsed = new ArrayList<>();
             BaseCcgParser parser = parsers.get(0);
-
             Parse parse;
             // TODO: change the interface.
             // TODO: debug nullpointer exception.
@@ -86,7 +87,6 @@ public class ActiveLearningPrototype {
             try {
                 parse = parser.parse(sentences.get(sentIdx));
                 if (parse == null) {
-                    // TODO: add 0 result
                     continue;
                 }
             } catch (Exception e) {
@@ -95,14 +95,80 @@ public class ActiveLearningPrototype {
             List<Category> categories = parse.categories;
             Set<ResolvedDependency> dependencies = parse.dependencies;
 
+            Set<String> multiArgs = new HashSet<>();
+            for (ResolvedDependency dep : dependencies) {
+                String dk = dep.getHead() + "." + dep.getArgNumber();
+                if (multiArgs.contains(dk)) {
+                    ++ numMultiArgs;
+                }
+                multiArgs.add(dk);
+            }
+
+            multiArgs.clear();
+            for (ResolvedDependency dep : goldDependencies) {
+                String dk = dep.getHead() + "." + dep.getArgNumber();
+                if (multiArgs.contains(dk)) {
+                    ++ numGoldMultiArgs;
+                }
+                multiArgs.add(dk);
+            }
+
+
             tagged.add(categories);
             parsed.add(dependencies);
-            Set<ResolvedDependency> goldDependencies = goldParses.get(sentIdx);
+            System.out.println(String.format("\n[S%d]:\t", sentIdx) + StringUtils.join(words));
+            System.out.println(dependencies.size());
+            for (ResolvedDependency dep : dependencies) {
+                System.out.println(
+                        String.format("%s\t%s.%d\t%s\t", words.get(dep.getHead()),
+                                dep.getCategory(), dep.getArgNumber(),
+                                dep.getCategory().getArgument(dep.getArgNumber())));
+            }
+            System.out.println("Multi args:\t" + numMultiArgs + "\t Gold multi args:\t" + numGoldMultiArgs);
+            /*
+            extendedDebugOutput.append("*** gold ***\n");
+            for (ResolvedDependency goldDep : goldDependencies) {
+                if (!DependencyEvaluation.matchesAny(goldDep, newDependencies)) {
+                    List<String> question = questionGenerator.generateQuestion(
+                            goldDep, words, goldCategories.get(sentIdx), goldDependencies);
+                    String questionStr = (question == null || question.size() == 0) ? "-noq-" :
+                            StringUtils.join(question);
+                    extendedDebugOutput.append(
+                            String.format("%s\t%s\t%d\t%s\t%s\t%s\t%s\t", words.get(goldDep.getHead()),
+                                    goldDep.getCategory(), goldDep.getArgNumber(),
+                                    goldDep.getCategory().getArgument(goldDep.getArgNumber()),
+                                    StringUtils.capitalize(questionStr) + "?",
+                                    "---", words.get(goldDep.getArgument())));
+                    if (questionStr.equals("-noq-") || categories.size() == 0) {
+                        extendedDebugOutput.append("recall loss\n");
+                    } else {
+                        extendedDebugOutput.append("tagging error\t");
+                        extendedDebugOutput.append(categories.get(goldDep.getHead()) + "\n");
+                    }
+                }
+            }
+            */
+            // If there is actually precision and recall loss.
+            /*
+            if (extendedDebugOutput.length() > "*** predicted ***\n*** gold ***\n".length()) {
+                System.out.println(String.format("\n[S%d]:\t", sentIdx) + StringUtils.join(words) + "\n" +
+                        extendedDebugOutput);
+            }
+            */
+            before.add(DependencyEvaluation.evaluate(dependencies, goldDependencies));
+            //after.add(DependencyEvaluation.evaluate(newDependencies, goldDependencies));
+        }
+        System.out.println("\n" + before);
+        //System.out.println("After fixing dependencies."); System.out.println(after);
+        System.out.println("Number of questions asked:\t" + numQuestionsAsked);
+        System.out.println("Number of effective questions asked:\t" + numEffectiveQuestionsAsked);
+    }
 
-            //Set<String> fixedDependencies = new HashSet<>();
-            //Set<ResolvedDependency> newDependencies = new HashSet<>();
+    private Set<ResolvedDependency> fixDependencies() {
+        //Set<String> fixedDependencies = new HashSet<>();
+        Set<ResolvedDependency> newDependencies = new HashSet<>();
 
-            // Generate possible questions over predicted dependencies.
+        // Generate possible questions over predicted dependencies.
             /*
             for (ResolvedDependency targetDependency : dependencies) {
                 boolean matched = DependencyEvaluation.matchesAny(targetDependency, goldDependencies);
@@ -180,57 +246,8 @@ public class ActiveLearningPrototype {
                 }
             });
             */
-            //newDependencies.addAll(dependencies);
-
-            System.out.println(String.format("\n[S%d]:\t", sentIdx) + StringUtils.join(words));
-            System.out.println(dependencies.size());
-            for (ResolvedDependency dep : dependencies) {
-                //if (!DependencyEvaluation.matchesAny(goldDep, newDependencies)) {
-                System.out.println(
-                        String.format("%s\t%s.%d\t%s\t", words.get(dep.getHead()),
-                                dep.getCategory(), dep.getArgNumber(),
-                                dep.getCategory().getArgument(dep.getArgNumber())));
-                //}
-            }
-
-            /*
-            extendedDebugOutput.append("*** gold ***\n");
-            for (ResolvedDependency goldDep : goldDependencies) {
-                if (!DependencyEvaluation.matchesAny(goldDep, newDependencies)) {
-                    List<String> question = questionGenerator.generateQuestion(
-                            goldDep, words, goldCategories.get(sentIdx), goldDependencies);
-                    String questionStr = (question == null || question.size() == 0) ? "-noq-" :
-                            StringUtils.join(question);
-                    extendedDebugOutput.append(
-                            String.format("%s\t%s\t%d\t%s\t%s\t%s\t%s\t", words.get(goldDep.getHead()),
-                                    goldDep.getCategory(), goldDep.getArgNumber(),
-                                    goldDep.getCategory().getArgument(goldDep.getArgNumber()),
-                                    StringUtils.capitalize(questionStr) + "?",
-                                    "---", words.get(goldDep.getArgument())));
-                    if (questionStr.equals("-noq-") || categories.size() == 0) {
-                        extendedDebugOutput.append("recall loss\n");
-                    } else {
-                        extendedDebugOutput.append("tagging error\t");
-                        extendedDebugOutput.append(categories.get(goldDep.getHead()) + "\n");
-                    }
-                }
-            }
-            */
-            // If there is actually precision and recall loss.
-            /*
-            if (extendedDebugOutput.length() > "*** predicted ***\n*** gold ***\n".length()) {
-                System.out.println(String.format("\n[S%d]:\t", sentIdx) + StringUtils.join(words) + "\n" +
-                        extendedDebugOutput);
-            }
-            */
-            before.add(DependencyEvaluation.evaluate(dependencies, goldDependencies));
-            //after.add(DependencyEvaluation.evaluate(newDependencies, goldDependencies));
-        }
-        System.out.println(before);
-        System.out.println("After fixing dependencies.");
-        System.out.println(after);
-        System.out.println("Number of questions asked:\t" + numQuestionsAsked);
-        System.out.println("Number of effective questions asked:\t" + numEffectiveQuestionsAsked);
+        //newDependencies.addAll(dependencies);
+        return newDependencies;
     }
 
     private static String getDependencyKey(ResolvedDependency dep) {

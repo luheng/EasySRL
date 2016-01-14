@@ -311,21 +311,11 @@ public class ParallelCorpusReader {
 			public Sentence next() {
 				final SyntaxTreeNode parse = parses.get(i);
 				final DependencyParse depParse = depParses.get(i);
-				SRLParse srl = srlParses.get(depParse.getFile(),
-						depParse.getSentenceNumber());
 				final SyntacticDependencyParse conll = CoNLL.get(
 						depParse.getFile(), depParse.getSentenceNumber());
 				i++;
-				if (srl == null) {
-					final List<String> words = getWords(parse);
-					srl = new SRLParse(words);
-				}
-				return new Sentence(parse, depParse, conll, srl,
+				return new Sentence(parse, depParse, conll, null /* SRL */,
 						PTB.get(depParse.getFile(), depParse.getSentenceNumber()));
-			}
-
-			private List<String> getWords(final SyntaxTreeNode parse) {
-				return parse.getLeaves().stream().map(l -> l.getWord()).collect(Collectors.toList());
 			}
 		};
 	}

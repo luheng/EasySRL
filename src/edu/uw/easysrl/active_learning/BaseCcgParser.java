@@ -67,8 +67,7 @@ public abstract class BaseCcgParser {
         List<Category> categories = IntStream.range(0, sentence.size())
                 .mapToObj(i -> ccgParse.getLeaf(i).getCategory())
                 .collect(Collectors.toList());
-        Set<ResolvedDependency> dependencies = //ccgParse.getDependencyParse().stream()
-                            ccgParse.getCcgParse().getAllLabelledDependencies().stream()
+        Set<ResolvedDependency> dependencies = ccgParse.getCcgParse().getAllLabelledDependencies().stream()
                 .filter(dep -> acceptDependency(sentence, dep))
                 .collect(Collectors.toSet());
         return new Parse(categories, dependencies);
