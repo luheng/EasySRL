@@ -15,17 +15,42 @@ import java.util.stream.Collectors;
 /**
  * Single parser baseline on dev set.
  *
+ * Model loading time: 78 seconds.
+ *
  * 1-best results (on luheng's mac):
  *      Tagging accuracy = 0.9447142825167312
  *       Precision = 87.42
  *       Recall    = 86.62
  *       F1        = 87.02
  *
- *   Averaged parsing time (in sec):	0.00472193074501574
+ *   Averaged parsing time (in sec):	0.0
  *   Averaged evaluation time (in sec):	0.0
  *
  * Created by luheng on 1/13/16.
  */
+
+/*
+10-best:
+ 0.9534445217625536
+ Precision = 90.62
+ Recall    = 89.86
+ F1        = 90.24
+ Avg. n-best:	9.823529411764707	 Avg. best-k:	1.41859243697479
+ Averaged parsing time (in sec):	0.0
+ Averaged evaluation time (in sec):	0.0
+*/
+
+/*
+20-best
+0.9574190354016159
+Precision = 91.65
+Recall    = 90.86
+F1        = 91.26
+Avg. n-best:	19.41062039957939	 Avg. best-k:	2.854889589905363
+Averaged parsing time (in sec):	0.0
+Averaged evaluation time (in sec):	0.0
+*/
+
 public class TriTrainCCGBenchmark {
     static List<List<InputReader.InputWord>> sentences;
     static List<Parse> goldParses;
@@ -44,7 +69,7 @@ public class TriTrainCCGBenchmark {
         goldParses = new ArrayList<>();
         DataLoader.readDevPool(sentences, goldParses);
         parser = new BaseCcgParser.EasyCCGParser(commandLineOptions.getModel(), nBest);
-        System.out.println("Model loading time:\t" + TicToc.toc());
+        System.out.println("Model loading time:\t" + TicToc.toc() + " seconds.");
     }
 
     private static void run(boolean verbose) {
@@ -174,6 +199,6 @@ public class TriTrainCCGBenchmark {
 
     public static void main(String[] args) {
         //run1BestExperiment(args);
-        runNBestOracleExperiment(args, 100);
+        runNBestOracleExperiment(args, 50);
     }
 }

@@ -31,42 +31,44 @@ public abstract class BaseCcgParser {
             "have:(S[b]\\NP)/(S[pt]\\NP).1", "been:(S[pt]\\NP)/(S[ng]\\NP).1", "been:(S[pt]\\NP)/(S[adj]\\NP).1",
             "going:(S[ng]\\NP)/(S[to]\\NP).1", "have:(S[b]\\NP)/(S[to]\\NP).1", "be:(S[b]\\NP)/(S[ng]\\NP).1"
     };
-    private static Set<String> dependencyFilterSet;
-    private static CountDictionary dependencyCutoffs;
+    private static HashSet<String> badDependenciesSet;
+    private static HashSet<String> frequentDependenciesSet;
     private static final int minDependencyCount = 10;
-
     static {
         initializeFilter();
     }
 
     private static void initializeFilter() {
-        dependencyFilterSet = new HashSet<>();
-        dependencyFilterSet.addAll(Arrays.asList(dependencyFilter));
-        dependencyCutoffs = new CountDictionary();
+        badDependenciesSet = new HashSet<>();
+        badDependenciesSet.addAll(Arrays.asList(dependencyFilter));
+        CountDictionary dependencyDict = new CountDictionary();
         List<List<InputReader.InputWord>> sentences = new ArrayList<>();
         List<Parse> goldParses = new ArrayList<>();
         DataLoader.readTrainingPool(sentences, goldParses);
         goldParses.forEach(parse -> parse.dependencies.forEach(dep ->
-                dependencyCutoffs.addString(dep.getCategory() + "." + dep.getArgNumber())));
+                dependencyDict.addString(dep.getCategory() + "." + dep.getArgNumber())));
+        frequentDependenciesSet = IntStream.range(0, dependencyDict.size())
+                .filter(i -> dependencyDict.getCount(i) >= minDependencyCount)
+                .mapToObj(dependencyDict::getString)
+                .collect(Collectors.toCollection(HashSet::new));
     }
 
-    protected static boolean acceptDependency(List<InputReader.InputWord> sentence,
-                                              ResolvedDependency dependency) {
+    protected static boolean acceptDependency(final List<InputReader.InputWord> sentence,
+                                              final ResolvedDependency dependency) {
         int predIdx = dependency.getHead(), argIdx = dependency.getArgument();
         if (predIdx == argIdx) {
             return false;
         }
         String depStr1 = dependency.getCategory() + "." + dependency.getArgNumber();
-        String depStr2 = sentence.get(predIdx).word + ":" + depStr1;
-        return dependencyCutoffs.getCount(depStr1) >= minDependencyCount && !dependencyFilterSet.contains(depStr2);
+        return frequentDependenciesSet.contains(depStr1) &&
+                !badDependenciesSet.contains(sentence.get(predIdx).word + ":" + depStr1);
     }
 
-    protected Parse getParse(List<InputReader.InputWord> sentence, SRLParser.CCGandSRLparse ccgParse) {
-        // TODO: tagger accuracy
+    protected Parse getParse(final List<InputReader.InputWord> sentence, final SRLParser.CCGandSRLparse ccgParse) {
         List<Category> categories = IntStream.range(0, sentence.size())
                 .mapToObj(i -> ccgParse.getLeaf(i).getCategory())
                 .collect(Collectors.toList());
-        Set<ResolvedDependency> dependencies = ccgParse.getCcgParse().getAllLabelledDependencies().stream()
+        Set<ResolvedDependency> dependencies = ccgParse.getDependencyParse().stream()
                 .filter(dep -> acceptDependency(sentence, dep))
                 .collect(Collectors.toSet());
         return new Parse(categories, dependencies);
@@ -90,23 +92,20 @@ public abstract class BaseCcgParser {
             System.err.println("====Starting loading model====");
             final POSTagger posTagger = POSTagger.getStanfordTagger(new File(pipelineFolder, "posTagger"));
             try {
-                parser = new SRLParser.PipelineSRLParser(
+                parser = new SRLParser.CcgParser(
                         EasySRL.makeParser(pipelineFolder.getAbsolutePath(), supertaggerBeam,
                                 EasySRL.ParsingAlgorithm.ASTAR,
                                 maxChartSize,
                                 false /* joint */,
                                 Optional.empty(),
-                                nBest),
-                        Util.deserialize(new File(pipelineFolder, "labelClassifier")), posTagger);
+                                nBest), posTagger);
+                        // Util.deserialize(new File(pipelineFolder, "labelClassifier")), posTagger);
             } catch (IOException e) {
             }
         }
 
         @Override
         public Parse parse(List<InputReader.InputWord> sentence) {
-            if (parser == null) {
-                throw new RuntimeException("Parser uninitialized");
-            }
             List<SRLParser.CCGandSRLparse> parses = parser.parseTokens(sentence);
             if (parses == null || parses.size() == 0) {
                 return null;
@@ -116,9 +115,6 @@ public abstract class BaseCcgParser {
 
         @Override
         public List<Parse> parseNBest(List<InputReader.InputWord> sentence) {
-            if (parser == null) {
-                throw new RuntimeException("Parser uninitialized");
-            }
             List<SRLParser.CCGandSRLparse> parses = parser.parseTokens(sentence);
             if (parses == null || parses.size() == 0) {
                 return null;

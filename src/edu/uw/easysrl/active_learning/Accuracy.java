@@ -1,6 +1,7 @@
 package edu.uw.easysrl.active_learning;
 
 /**
+ * Accuracy ...
  * Created by luheng on 1/11/16.
  */
 public class Accuracy {

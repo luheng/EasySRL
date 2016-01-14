@@ -74,7 +74,6 @@ public abstract class SRLParser {
 		public int getMaxSentenceLength() {
 			return parsers[parsers.length - 1].getMaxSentenceLength();
 		}
-
 	}
 
 	public abstract int getMaxSentenceLength();
@@ -234,6 +233,29 @@ public abstract class SRLParser {
 			}
 			return new CCGandSRLparse(parse.getCcgParse(), result, tokens);
 		}
+	}
 
+	public static class CcgParser extends JointSRLParser {
+		public CcgParser(final Parser parser, final POSTagger tagger) {
+			super(parser, tagger);
+		}
+
+		@Override
+		public List<CCGandSRLparse> parseTokens2(final List<InputWord> tokens) {
+			return super.parseTokens2(tokens);
+		}
+
+		@Override
+		public List<CCGandSRLparse> parseSupertaggedSentence(final InputToParser inputToParser) {
+			final List<CCGandSRLparse> parses = super.parseSupertaggedSentence(inputToParser);
+			if (parses == null) {
+				return null;
+			}
+			return parses.stream().map(parse -> new CCGandSRLparse(
+					parse.getCcgParse(),
+					parse.getDependencyParse().stream()
+							.filter(dep -> (dep.getArgumentIndex() != dep.getHead())).collect(Collectors.toList()),
+					inputToParser.getInputWords())).collect(Collectors.toList());
+		}
 	}
 }

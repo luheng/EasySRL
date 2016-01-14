@@ -1,6 +1,7 @@
 package edu.uw.easysrl.active_learning;
 
 /**
+ * Siimilar to tic() toc() in Matlab...
  * Created by luheng on 1/14/16.
  */
 public class TicToc {

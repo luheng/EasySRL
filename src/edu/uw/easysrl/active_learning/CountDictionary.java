@@ -1,5 +1,6 @@
 package edu.uw.easysrl.active_learning;
 
+import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.hash.TObjectIntHashMap;
 
 import java.util.ArrayList;
@@ -7,12 +8,12 @@ import java.util.ArrayList;
 public class CountDictionary {
 	TObjectIntHashMap<String> str2index;
 	ArrayList<String> index2str;
-	ArrayList<Integer> index2count;
+	TIntArrayList index2count;
 	
 	public CountDictionary() {
-		this.str2index = new TObjectIntHashMap<String>();
-		this.index2str = new ArrayList<String>();
-		this.index2count = new ArrayList<Integer>();
+		this.str2index = new TObjectIntHashMap<>();
+		this.index2str = new ArrayList<>();
+		this.index2count = new TIntArrayList();
 	}
 	
 	// Copy from existing dictionary.
@@ -149,8 +150,8 @@ public class CountDictionary {
 	
 	public int getTotalCount() {
 		int totalCount = 0;
-		for (int c : index2count) {
-			totalCount += c;
+		for (int i = 0; i < index2count.size(); i++) {
+			totalCount += index2count.get(i);
 		}
 		return totalCount;
 	}
