@@ -20,9 +20,7 @@ import java.util.stream.Collectors;
 public class ActiveLearningPrototype {
     // Training pool.
     static List<List<InputWord>> sentences;
-    // TODO: change name ...
-    static List<List<Category>> goldCategories;
-    static List<Set<ResolvedDependency>> goldParses;
+    static List<Parse> goldParses;
     static List<BaseCcgParser> parsers;
 
     // Modules :)
@@ -40,9 +38,8 @@ public class ActiveLearningPrototype {
         // Initialize corpora.
         // TODO: better data structure ...
         sentences = new ArrayList<>();
-        goldCategories = new ArrayList<>();
         goldParses = new ArrayList<>();
-        ActiveLearningDataHelper.readDevPool(sentences, goldCategories, goldParses);
+        DataLoader.readDevPool(sentences, goldParses);
 
         // Initialize parsers.
         parsers = new ArrayList<>();
@@ -76,7 +73,7 @@ public class ActiveLearningPrototype {
             extendedDebugOutput.append("*** predicted ***\n");
 
             // Parse using all the base parsers.
-            Set<ResolvedDependency> goldDependencies = goldParses.get(sentIdx);
+            Set<ResolvedDependency> goldDependencies = goldParses.get(sentIdx).dependencies;
             List<List<Category>> tagged = new ArrayList<>();
             List<Set<ResolvedDependency>> parsed = new ArrayList<>();
             BaseCcgParser parser = parsers.get(0);
@@ -128,7 +125,7 @@ public class ActiveLearningPrototype {
             /*
             extendedDebugOutput.append("*** gold ***\n");
             for (ResolvedDependency goldDep : goldDependencies) {
-                if (!DependencyEvaluation.matchesAny(goldDep, newDependencies)) {
+                if (!CcgEvaluation.matchesAny(goldDep, newDependencies)) {
                     List<String> question = questionGenerator.generateQuestion(
                             goldDep, words, goldCategories.get(sentIdx), goldDependencies);
                     String questionStr = (question == null || question.size() == 0) ? "-noq-" :
@@ -155,8 +152,8 @@ public class ActiveLearningPrototype {
                         extendedDebugOutput);
             }
             */
-            before.add(DependencyEvaluation.evaluate(dependencies, goldDependencies));
-            //after.add(DependencyEvaluation.evaluate(newDependencies, goldDependencies));
+            before.add(CcgEvaluation.evaluate(dependencies, goldDependencies));
+            //after.add(CcgEvaluation.evaluate(newDependencies, goldDependencies));
         }
         System.out.println("\n" + before);
         //System.out.println("After fixing dependencies."); System.out.println(after);
@@ -171,7 +168,7 @@ public class ActiveLearningPrototype {
         // Generate possible questions over predicted dependencies.
             /*
             for (ResolvedDependency targetDependency : dependencies) {
-                boolean matched = DependencyEvaluation.matchesAny(targetDependency, goldDependencies);
+                boolean matched = CcgEvaluation.matchesAny(targetDependency, goldDependencies);
                 // Need question scorer here.
                 List<String> question =
                         questionGenerator.generateQuestion(targetDependency, words, categories, dependencies);

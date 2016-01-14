@@ -44,10 +44,9 @@ public abstract class BaseCcgParser {
         dependencyFilterSet.addAll(Arrays.asList(dependencyFilter));
         dependencyCutoffs = new CountDictionary();
         List<List<InputReader.InputWord>> sentences = new ArrayList<>();
-        List<List<Category>> goldCategories = new ArrayList<>();
-        List<Set<ResolvedDependency>> goldParses = new ArrayList<>();
-        ActiveLearningDataHelper.readTrainingPool(sentences, goldCategories, goldParses);
-        goldParses.forEach(parse -> parse.forEach(dep ->
+        List<Parse> goldParses = new ArrayList<>();
+        DataLoader.readTrainingPool(sentences, goldParses);
+        goldParses.forEach(parse -> parse.dependencies.forEach(dep ->
                 dependencyCutoffs.addString(dep.getCategory() + "." + dep.getArgNumber())));
     }
 
@@ -80,7 +79,7 @@ public abstract class BaseCcgParser {
     public static class EasyCCGParser extends BaseCcgParser {
         private SRLParser parser = null;
         private final double supertaggerBeam = 0.000001;
-        private final int maxChartSize = 200000;
+        private final int maxChartSize = 20000;
 
         public EasyCCGParser(String modelFolderPath, int nBest)  {
             final File modelFolder = Util.getFile(modelFolderPath);

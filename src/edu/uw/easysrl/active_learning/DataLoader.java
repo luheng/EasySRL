@@ -24,23 +24,17 @@ import edu.uw.easysrl.util.Util;
  * Read gold input for active learning simulation.
  * Created by luheng on 1/4/16.
  */
-public class ActiveLearningDataHelper {
+public class DataLoader {
 
-    public static void readDevPool(List<List<InputReader.InputWord>> sentences,
-                                   List<List<Category>> goldCategories,
-                                   List<Set<ResolvedDependency>> goldParses) {
-        readFromPropBank(sentences, goldCategories, goldParses, true);
+    public static void readDevPool(List<List<InputReader.InputWord>> sentences, List<Parse> goldParses) {
+        readFromPropBank(sentences, goldParses, true);
     }
 
-    public static void readTrainingPool(List<List<InputReader.InputWord>> sentences,
-                                        List<List<Category>> goldCategories,
-                                        List<Set<ResolvedDependency>> goldParses) {
-        readFromPropBank(sentences, goldCategories, goldParses, false);
+    public static void readTrainingPool(List<List<InputReader.InputWord>> sentences, List<Parse> goldParses) {
+        readFromPropBank(sentences, goldParses, false);
     }
 
-    private static void readFromPropBank(List<List<InputReader.InputWord>> sentences,
-                                         List<List<Category>> goldCategories,
-                                         List<Set<ResolvedDependency>> goldParses,
+    private static void readFromPropBank(List<List<InputReader.InputWord>> sentences, List<Parse> goldParses,
                                          boolean readDev) {
         Iterator<ParallelCorpusReader.Sentence> sentenceIterator;
         try {
@@ -61,8 +55,7 @@ public class ActiveLearningDataHelper {
                                     SRLFrame.NONE,
                                     Preposition.NONE)
                     ).collect(Collectors.toSet());
-            goldParses.add(goldDependencies);
-            goldCategories.add(sentence.getLexicalCategories());
+            goldParses.add(new Parse(sentence.getLexicalCategories(), goldDependencies));
         }
         System.out.println(String.format("Read %d sentences to the training pool.", sentences.size()));
     }
@@ -90,27 +83,6 @@ public class ActiveLearningDataHelper {
         }
     }
     */
-
-    public static void main(String[] args) {
-        List<List<InputReader.InputWord>> sentences = new ArrayList<>();
-        List<List<Category>> goldCategories = new ArrayList<>();
-        List<Set<ResolvedDependency>> goldParses = new ArrayList<>();
-
-        readDevPool(sentences, goldCategories, goldParses);
-
-        String outputFile = "propbank.dev.txt";
-        try {
-            BufferedWriter writer = new BufferedWriter(new FileWriter(new File(outputFile)));
-            for (List<InputReader.InputWord> sentence : sentences) {
-                for (int i = 0; i < sentence.size(); i++) {
-                    writer.write(sentence.get(i).word + (i == sentence.size() - 1 ? "\n" : " "));
-                }
-            }
-            writer.close();
-        } catch (IOException e) {
-
-        }
-    }
 }
 
 /*

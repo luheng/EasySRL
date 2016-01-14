@@ -18,7 +18,16 @@ public class Accuracy {
         ++ numTotal;
     }
 
+    public void add(Accuracy other) {
+        numCorrect += other.numCorrect;
+        numTotal += other.numTotal;
+    }
+
     public double getAccuracy() {
         return 1.0 * numCorrect / numTotal;
+    }
+
+    public String toString() {
+        return String.valueOf(getAccuracy());
     }
 }
