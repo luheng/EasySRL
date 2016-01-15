@@ -81,7 +81,8 @@ public abstract class BaseCcgParser {
     public static class EasyCCGParser extends BaseCcgParser {
         private SRLParser parser = null;
         private final double supertaggerBeam = 0.000001;
-        private final int maxChartSize = 20000;
+        // TODO: adaptive chart-size based on nbest
+        private final int maxChartSize = 400000;
 
         public EasyCCGParser(String modelFolderPath, int nBest)  {
             final File modelFolder = Util.getFile(modelFolderPath);

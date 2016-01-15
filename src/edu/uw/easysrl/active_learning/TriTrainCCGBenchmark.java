@@ -51,6 +51,107 @@ Averaged parsing time (in sec):	0.0
 Averaged evaluation time (in sec):	0.0
 */
 
+/*
+50-best
+0.9627737560707413
+Precision = 92.86
+Recall    = 92.20
+F1        = 92.53
+Avg. n-best:	47.50795334040297	 Avg. best-k:	6.695121951219512
+Averaged parsing time (in sec):	0.002651113467656416
+Averaged evaluation time (in sec):	0.0
+*/
+
+/*
+100-best
+0.9662051270197175
+Precision = 93.68
+Recall    = 93.02
+F1        = 93.35
+Avg. n-best:	93.07725093233884	 Avg. best-k:	12.103889184869473
+Averaged parsing time (in sec):	0.005327650506126798
+Averaged evaluation time (in sec):	0.0
+
+Increased chart size:
+0.9649484074579762
+Precision = 93.38
+Recall    = 92.71
+F1        = 93.04
+Avg. n-best:	93.53357817418677	 Avg. best-k:	12.396117523609654
+Averaged parsing time (in sec):	0.022035676810073453
+Averaged evaluation time (in sec):	0.0
+*/
+
+/*
+250-best
+0.9709006707884749
+Precision = 94.74
+Recall    = 94.10
+F1        = 94.42
+Avg. n-best:	220.6863488624052	 Avg. best-k:	24.675514626218852
+Averaged parsing time (in sec):	0.004875406283856988
+Averaged evaluation time (in sec):	0.0
+*/
+
+/*
+500-best
+0.9728454778381743
+Precision = 95.11
+Recall    = 94.48
+F1        = 94.79
+Avg. n-best:	389.30982094411286	 Avg. best-k:	39.003255561584375
+Averaged parsing time (in sec):	0.005968529571351058
+Averaged evaluation time (in sec):	0.0
+
+1000-best (chartsize=20000)
+0.9737314719475109
+Precision = 95.33
+Recall    = 94.67
+F1        = 95.00
+Avg. n-best:	552.0689093868692	 Avg. best-k:	54.53879544221378
+Averaged parsing time (in sec):	0.010851871947911014
+Averaged evaluation time (in sec):	0.0
+
+1000-best (chart size=100000)
+0.9756712178136168
+Precision = 95.65
+Recall    = 94.97
+F1        = 95.31
+Avg. n-best:	867.3950159066808
+Avg. best-k:	95.09066808059384
+Averaged parsing time (in sec):	0.5397667020148462
+Averaged evaluation time (in sec):	0.0
+
+
+2500-best
+0.9738990924546826
+Precision = 95.37
+Recall    = 94.70
+F1        = 95.03
+Avg. n-best:	610.953336950624	 Avg. best-k:	57.16115029842648
+Averaged parsing time (in sec):	0.011937059142702116
+Averaged evaluation time (in sec):	0.0
+
+5000-best
+0.9739230382414215
+Precision = 95.37
+Recall    = 94.70
+F1        = 95.03
+Avg. n-best:	614.7015735214325	 Avg. best-k:	58.33532284319045
+Averaged parsing time (in sec):	0.009766684753119913
+Averaged evaluation time (in sec):	0.0
+
+5000-best (chart-size=200000)
+0.979585326953748
+Precision = 96.50
+Recall    = 95.79
+F1        = 96.14
+Avg. n-best:	3796.759915388683
+Avg. best-k:	315.4717080909572
+Averaged parsing time (in sec):	2.8529878371232154
+Averaged evaluation time (in sec):	5.288207297726071E-4
+ */
+
 public class TriTrainCCGBenchmark {
     static List<List<InputReader.InputWord>> sentences;
     static List<Parse> goldParses;
@@ -86,13 +187,8 @@ public class TriTrainCCGBenchmark {
             List<InputReader.InputWord> sentence = sentences.get(sentIdx);
             List<String> words = sentence.stream().map(w->w.word).collect(Collectors.toList());
             Parse gold = goldParses.get(sentIdx);
-            Parse predict;
-            try {
-                predict = parser.parse(sentences.get(sentIdx));
-                if (predict == null) {
-                    continue;
-                }
-            } catch (Exception e) {
+            Parse predict = parser.parse(sentences.get(sentIdx));
+            if (predict == null) {
                 continue;
             }
             numParsed ++;
@@ -135,13 +231,8 @@ public class TriTrainCCGBenchmark {
             List<InputReader.InputWord> sentence = sentences.get(sentIdx);
             List<String> words = sentence.stream().map(w->w.word).collect(Collectors.toList());
             Parse gold = goldParses.get(sentIdx);
-            List<Parse> parses;
-            try {
-                parses = parser.parseNBest(sentence);
-                if (parses == null) {
-                    continue;
-                }
-            } catch (Exception e) {
+            List<Parse> parses = parser.parseNBest(sentence);
+            if (parses == null) {
                 continue;
             }
             avgParsingTime += TicToc.toc();
@@ -179,8 +270,8 @@ public class TriTrainCCGBenchmark {
             }
         }
         System.out.println("\n" + taggingAcc + "\n" + parsingAcc);
-        System.out.println("Avg. n-best:\t" + 1.0 * avgNBest / numParsed +
-                           "\t Avg. best-k:\t" + 1.0 * avgBestK / numParsed);
+        System.out.println("Avg. n-best:\t" + 1.0 * avgNBest / numParsed);
+        System.out.println("Avg. best-k:\t" + 1.0 * avgBestK / numParsed);
         System.out.println("Averaged parsing time (in sec):\t" + 1.0 * avgParsingTime / numParsed);
         System.out.println("Averaged evaluation time (in sec):\t" + 1.0 * avgEvalTime / numParsed);
     }
@@ -199,6 +290,6 @@ public class TriTrainCCGBenchmark {
 
     public static void main(String[] args) {
         //run1BestExperiment(args);
-        runNBestOracleExperiment(args, 50);
+        runNBestOracleExperiment(args, 10000);
     }
 }
