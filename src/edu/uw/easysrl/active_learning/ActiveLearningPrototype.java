@@ -14,9 +14,10 @@ import edu.stanford.nlp.util.StringUtils;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
- * Active Learning experiments.
+ * Active Learning experiments (n-best reranking).
  * Created by luheng on 1/5/16.
  */
 public class ActiveLearningPrototype {
@@ -32,7 +33,7 @@ public class ActiveLearningPrototype {
     public static StringBuffer debugOutput;
 
     public static void main(String[] args) {
-        initialize(args, 10);
+        initialize(args, 100);
         run();
     }
 
@@ -45,15 +46,11 @@ public class ActiveLearningPrototype {
             return;
         }
         // Initialize corpora.
-        // TODO: better data structure ...
         sentences = new ArrayList<>();
         goldParses = new ArrayList<>();
         DataLoader.readDevPool(sentences, goldParses);
-
         // Initialize parser.
         parser = new BaseCcgParser.EasyCCGParser(commandLineOptions.getModel(), nBest);
-        //parsers.add(new BaseCcgParser.BharatParser("propbank.dev.txt.parg"));
-
         // Initialize the other modules.
         questionGenerator = new QuestionGenerator();
         responseSimulator = new ResponseSimulator(questionGenerator);
@@ -63,29 +60,28 @@ public class ActiveLearningPrototype {
         debugOutput = new StringBuffer();
 
         // TODO: shuffle input
-        Results before = new Results();
-        Results after = new Results();
+        Results oneBest = new Results();
+        Results reRanked = new Results();
         Results oracle = new Results();
-        Accuracy beforeAcc = new Accuracy();
-        Accuracy afterAcc = new Accuracy();
+        Accuracy oneBestAcc = new Accuracy();
+        Accuracy reRankedAcc = new Accuracy();
         Accuracy oracleAcc = new Accuracy();
-        int numQuestionsAsked = 0;
-        int numEffectiveQuestionsAsked = 0;
+        // Effect query: a query whose response boosts the score of a non-top parse but not the top one.
+        int numQueries = 0, numEffectiveQueries = 0;
 
         for (int sentIdx = 0; sentIdx < sentences.size(); sentIdx++) {
             List<InputWord> sentence = sentences.get(sentIdx);
             List<String> words = sentence.stream().map(w->w.word).collect(Collectors.toList());
             Parse goldParse = goldParses.get(sentIdx);
-            // TODO: get parse scores
-            Map<String, Query> allQueries = new HashMap<>();
+            // TODO: get parse scores.
+            /****************** Base n-best Parser ***************/
             List<Parse> parses = parser.parseNBest(sentences.get(sentIdx));
-            List<Results> results = CcgEvaluation.evaluate(parses, goldParse.dependencies);
             if (parses == null) {
                 continue;
             }
-            for (int k = 0; k < parses.size(); k++) {
-                generateQueries(allQueries, words, parses.get(k), k);
-            }
+            /****************** QueryGenerator ******************/
+            Map<String, Query> allQueries = new HashMap<>();
+            IntStream.range(0, parses.size()).forEach(k -> generateQueries(allQueries, words, parses.get(k), k));
             List<Query> queryList = new ArrayList<>(allQueries.values());
             // TODO: sort with lambda
             Collections.sort(queryList, new Comparator<Query>() {
@@ -97,24 +93,34 @@ public class ActiveLearningPrototype {
                     return o1.answerScores.size() == o2.answerScores.size() ? 0 : 1;
                 }
             });
+            /******************* Response simulator ************/
             // TODO: re-ranker; get simulated response and fix dependencies
-
+            List<Response> responseList = queryList.stream()
+                    .map(q -> responseSimulator.answerQuestion(q, words, goldParse))
+                    .collect(Collectors.toList());
             double[] votes = parses.stream().mapToDouble(p->0.0).toArray();
+            /******************* ReRanker ******************/
             for (int i = 0; i < queryList.size(); i++) {
                 Query query = queryList.get(i);
-                List<Integer> answers = responseSimulator.answerQuestion(query.question, words, goldParse.categories,
-                        goldParse.dependencies);
-                // Vote.
-                for (int answerId : answers) {
+                Response response = responseList.get(i);
+                int minK = parses.size();
+                for (int answerId : response.answerIds) {
                     if (query.answerToParses.containsKey(answerId)) {
                         for (int k : query.answerToParses.get(answerId)) {
                             votes[k] += 1.0;
+                            if (k < minK) {
+                                minK = k;
+                            }
                         }
                     }
                 }
-                // TODO: at some point, make a decision to stop asking.
+                ++ numQueries;
+                if (minK > 0 && minK < parses.size()) {
+                    ++ numEffectiveQueries;
+                }
             }
-            // Rerank and oracle.
+            /******************* Evaluate *******************/
+            List<Results> results = CcgEvaluation.evaluate(parses, goldParse.dependencies);
             int bestK = 0, oracleK = 0;
             for (int k = 1; k < parses.size(); k++) {
                 if (votes[k] > votes[bestK]) {
@@ -124,23 +130,18 @@ public class ActiveLearningPrototype {
                     oracleK = k;
                 }
             }
-            // If there is actually precision and recall loss.
-            if (debugOutput.length() > "*** predicted ***\n*** gold ***\n".length()) {
-                System.out.println(String.format("\n[S%d]:\t", sentIdx) + StringUtils.join(words) + "\n" +
-                        debugOutput);
-            }
-            before.add(results.get(0));
-            after.add(results.get(bestK));
+            oneBest.add(results.get(0));
+            reRanked.add(results.get(bestK));
             oracle.add(results.get(oracleK));
-            beforeAcc.add(CcgEvaluation.evaluateTags(parses.get(0).categories, goldParse.categories));
-            afterAcc.add(CcgEvaluation.evaluateTags(parses.get(bestK).categories, goldParse.categories));
+            oneBestAcc.add(CcgEvaluation.evaluateTags(parses.get(0).categories, goldParse.categories));
+            reRankedAcc.add(CcgEvaluation.evaluateTags(parses.get(bestK).categories, goldParse.categories));
             oracleAcc.add(CcgEvaluation.evaluateTags(parses.get(oracleK).categories, goldParse.categories));
         }
-        System.out.println("\n" + beforeAcc + "\t" + afterAcc + "\t" + oracleAcc);
-        System.out.println("\n" + before + "\n" + after + "\n" + oracle);
-
-        System.out.println("Number of questions asked:\t" + numQuestionsAsked);
-        System.out.println("Number of effective questions asked:\t" + numEffectiveQuestionsAsked);
+        System.out.println("\n1-best:\n" + oneBestAcc + "\n" + oneBest);
+        System.out.println("\nre-ranked:\n" + reRankedAcc + "\n" + reRanked);
+        System.out.println("\noracle:\n" + oracleAcc + "\n" + oracle);
+        System.out.println("Number of queries:\t" + numQueries);
+        System.out.println("Number of effective queries:\t" + numEffectiveQueries);
     }
 
     private static void generateQueries(Map<String, Query> queries, List<String> words, Parse parse, int rankId) {

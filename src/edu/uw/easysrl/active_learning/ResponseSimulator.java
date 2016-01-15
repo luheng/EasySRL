@@ -26,20 +26,18 @@ public class ResponseSimulator {
 
     /**
      * If exists a gold dependency that generates the same question ...
-     * @param question: question
+     * @param query: question
      * @param sentence: sentence
-     * @param goldDependencies: gold dependencies, for simulating user response.
+     * @param goldParse: gold categories and dependencies.
      * @return Answer is represented a list of indices in the sentence.
      *          A single -1 in the list means ``unintelligible/unanswerable question.
      */
-    public List<Integer> answerQuestion(List<String> question, List<String> sentence,
-                                        List<Category> goldCategories,
-                                        Set<ResolvedDependency> goldDependencies) {
+    public Response answerQuestion(Query query, List<String> sentence, Parse goldParse) {
         List<Integer> answerIndices = new ArrayList<>();
-        String questionStr = StringUtils.join(question);
-        for (ResolvedDependency dep : goldDependencies) {
-            List<String> goldQuestion = questionGenerator.generateQuestion(dep, sentence, goldCategories,
-                    goldDependencies);
+        String questionStr = StringUtils.join(query.question);
+        for (ResolvedDependency dep : goldParse.dependencies) {
+            List<String> goldQuestion = questionGenerator.generateQuestion(dep, sentence, goldParse.categories,
+                    goldParse.dependencies);
             if (goldQuestion == null || goldQuestion.size() == 0) {
                 continue;
             }
@@ -50,6 +48,6 @@ public class ResponseSimulator {
         if (answerIndices.size() == 0) {
             answerIndices.add(-1);
         }
-        return answerIndices;
+        return new Response(answerIndices);
     }
 }
