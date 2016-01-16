@@ -82,7 +82,7 @@ public abstract class BaseCcgParser {
         private SRLParser parser = null;
         private final double supertaggerBeam = 0.000001;
         // TODO: adaptive chart-size based on nbest
-        private final int maxChartSize = 400000;
+        private final int maxChartSize = 100000;
 
         public EasyCCGParser(String modelFolderPath, int nBest)  {
             final File modelFolder = Util.getFile(modelFolderPath);
@@ -93,15 +93,11 @@ public abstract class BaseCcgParser {
             System.err.println("====Starting loading model====");
             final POSTagger posTagger = POSTagger.getStanfordTagger(new File(pipelineFolder, "posTagger"));
             try {
-                parser = new SRLParser.CcgParser(
-                        EasySRL.makeParser(pipelineFolder.getAbsolutePath(), supertaggerBeam,
-                                EasySRL.ParsingAlgorithm.ASTAR,
-                                maxChartSize,
-                                false /* joint */,
-                                Optional.empty(),
+                parser = new SRLParser.CcgParser(EasySRL.makeParser(pipelineFolder.getAbsolutePath(), supertaggerBeam,
+                                EasySRL.ParsingAlgorithm.ASTAR, maxChartSize, false /* joint */, Optional.empty(),
                                 nBest), posTagger);
-                        // Util.deserialize(new File(pipelineFolder, "labelClassifier")), posTagger);
             } catch (IOException e) {
+                System.err.println("Parser initialization failed.");
             }
         }
 
@@ -126,9 +122,7 @@ public abstract class BaseCcgParser {
 
     /*
     public static class EasySRLParser extends BaseCcgParser {
-
         private SRLParser parser = null;
-
         public EasySRLParser(String modelFolderPath, int nBest)  {
             final File modelFolder = Util.getFile(modelFolderPath);
             if (!modelFolder.exists()) {
@@ -172,7 +166,6 @@ public abstract class BaseCcgParser {
 */
 
     public static class BharatParser extends BaseCcgParser {
-
         Map<String, Integer> sentences;
         List<Set<ResolvedDependency>> parsed;
 

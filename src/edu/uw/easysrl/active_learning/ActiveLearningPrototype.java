@@ -1,13 +1,10 @@
 package edu.uw.easysrl.active_learning;
 
-import com.google.common.collect.Table;
-import com.google.common.collect.TreeBasedTable;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.main.EasySRL;
 import edu.uw.easysrl.main.InputReader.InputWord;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
-import edu.uw.easysrl.syntax.grammar.Category;
 import uk.co.flamingpenguin.jewel.cli.CliFactory;
 
 import edu.stanford.nlp.util.StringUtils;
@@ -33,7 +30,8 @@ public class ActiveLearningPrototype {
     public static StringBuffer debugOutput;
 
     public static void main(String[] args) {
-        initialize(args, 100);
+        // TODO: timer
+        initialize(args, 5000);
         run();
     }
 
@@ -66,6 +64,9 @@ public class ActiveLearningPrototype {
         Accuracy oneBestAcc = new Accuracy();
         Accuracy reRankedAcc = new Accuracy();
         Accuracy oracleAcc = new Accuracy();
+
+        int numSentencesParsed = 0;
+        int avgBestK = 0, avgOracleK = 0;
         // Effect query: a query whose response boosts the score of a non-top parse but not the top one.
         int numQueries = 0, numEffectiveQueries = 0;
 
@@ -79,10 +80,15 @@ public class ActiveLearningPrototype {
             if (parses == null) {
                 continue;
             }
+            numSentencesParsed ++;
             /****************** QueryGenerator ******************/
             Map<String, Query> allQueries = new HashMap<>();
             IntStream.range(0, parses.size()).forEach(k -> generateQueries(allQueries, words, parses.get(k), k));
-            List<Query> queryList = new ArrayList<>(allQueries.values());
+            /***************** QueryFilter **********************/
+            List<Query> queryList = allQueries.values().stream().filter(
+                    query -> !(query.answerToParses.size() == 1 &&
+                            query.answerToParses.values().iterator().next().size() == parses.size())
+            ).collect(Collectors.toList());
             // TODO: sort with lambda
             Collections.sort(queryList, new Comparator<Query>() {
                 @Override
@@ -93,6 +99,14 @@ public class ActiveLearningPrototype {
                     return o1.answerScores.size() == o2.answerScores.size() ? 0 : 1;
                 }
             });
+            // Debug: print queries.
+            // TODO: print gold response along with query info.
+            /*
+            System.out.println("\n" + String.format("S[%d]:\t", sentIdx) +
+                    words.stream().collect(Collectors.joining(" ")));
+            queryList.forEach(query -> query.print(words));
+             */
+
             /******************* Response simulator ************/
             // TODO: re-ranker; get simulated response and fix dependencies
             List<Response> responseList = queryList.stream()
@@ -130,6 +144,8 @@ public class ActiveLearningPrototype {
                     oracleK = k;
                 }
             }
+            avgBestK += bestK;
+            avgOracleK += oracleK;
             oneBest.add(results.get(0));
             reRanked.add(results.get(bestK));
             oracle.add(results.get(oracleK));
@@ -137,11 +153,11 @@ public class ActiveLearningPrototype {
             reRankedAcc.add(CcgEvaluation.evaluateTags(parses.get(bestK).categories, goldParse.categories));
             oracleAcc.add(CcgEvaluation.evaluateTags(parses.get(oracleK).categories, goldParse.categories));
         }
-        System.out.println("\n1-best:\n" + oneBestAcc + "\n" + oneBest);
-        System.out.println("\nre-ranked:\n" + reRankedAcc + "\n" + reRanked);
-        System.out.println("\noracle:\n" + oracleAcc + "\n" + oracle);
-        System.out.println("Number of queries:\t" + numQueries);
-        System.out.println("Number of effective queries:\t" + numEffectiveQueries);
+        System.out.println("\n1-best:\navg-k = 1.0\n" + oneBestAcc + "\n" + oneBest);
+        System.out.println("re-ranked:\navg-k = " + 1.0 * avgBestK / numSentencesParsed + "\n" + reRankedAcc + "\n" + reRanked);
+        System.out.println("oracle:\navg-k = " + 1.0 * avgOracleK / numSentencesParsed + "\n"+ oracleAcc + "\n" + oracle);
+        System.out.println("Number of queries = " + numQueries);
+        System.out.println("Number of effective queries = " + numEffectiveQueries);
     }
 
     private static void generateQueries(Map<String, Query> queries, List<String> words, Parse parse, int rankId) {

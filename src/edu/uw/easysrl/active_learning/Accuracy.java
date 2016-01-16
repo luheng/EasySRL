@@ -29,6 +29,6 @@ public class Accuracy {
     }
 
     public String toString() {
-        return String.valueOf(getAccuracy());
+        return "Acc = " + getAccuracy();
     }
 }
