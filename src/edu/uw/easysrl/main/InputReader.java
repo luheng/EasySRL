@@ -16,8 +16,8 @@ import java.util.concurrent.TimeUnit;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
 
-import edu.uw.Taggerflow;
-import edu.uw.TaggingResult;
+//import edu.uw.Taggerflow;
+//import edu.uw.TaggingResult;
 import edu.uw.easysrl.main.EasySRL.InputFormat;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeLeaf;
@@ -379,6 +379,7 @@ public abstract class InputReader {
 	/**
 	 * Runs a TensorFlow library which deals with loading and tagging the file.
 	 */
+	/*
 	public static class TensorFlowInputReader extends InputReader {
 		private final Taggerflow tagger;
 		private final List<Category> categories;
@@ -469,5 +470,6 @@ public abstract class InputReader {
 			};
 		}
 	}
+	*/
 
 }
