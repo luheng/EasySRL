@@ -320,7 +320,7 @@ class FeatureForest {
 		Collection<Integer> getFeatureIndices(final List<InputWord> words, final FeatureSet featureSet,
 				final Map<FeatureKey, Integer> featureToIndexMap) {
 			final Collection<Integer> result = new ArrayList<>(featureSet.unaryRuleFeatures.size());
-			for (final UnaryRuleFeature feature : featureSet.unaryRuleFeatures) {
+			for (final Feature.UnaryRuleFeature feature : featureSet.unaryRuleFeatures) {
 				final int index = feature.getFeatureIndex(getUnaryRuleID(), words, child.startIndex,
 						child.lastIndex + 1, featureToIndexMap);
 				if (index >= featureToIndexMap.size()) {
@@ -374,7 +374,7 @@ class FeatureForest {
 		Collection<Integer> getFeatureIndices(final List<InputWord> words, final FeatureSet featureSet,
 				final Map<FeatureKey, Integer> featureToIndexMap) {
 			final List<Integer> result = new ArrayList<>(featureSet.binaryFeatures.size());
-			for (final BinaryFeature feature : featureSet.binaryFeatures) {
+			for (final Feature.BinaryFeature feature : featureSet.binaryFeatures) {
 				final int index = feature.getFeatureIndex(parent.category, parent.ruleClass, left.category,
 						left.ruleClass.getNormalFormClassForRule(), left.lastIndex - left.startIndex + 1,
 						right.category, right.ruleClass.getNormalFormClassForRule(),
@@ -387,7 +387,7 @@ class FeatureForest {
 			}
 
 			if (parent.lastIndex - parent.startIndex == words.size() - 1) {
-				for (final RootCategoryFeature feature : featureSet.rootFeatures) {
+				for (final Feature.RootCategoryFeature feature : featureSet.rootFeatures) {
 					final int index = feature.getFeatureIndex(words, parent.category, featureToIndexMap);
 					if (index >= featureToIndexMap.size()) {
 						System.err.println("RootCategoryFeature Error: index out of bound.");

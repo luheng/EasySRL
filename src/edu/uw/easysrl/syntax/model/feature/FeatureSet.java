@@ -19,9 +19,10 @@ public class FeatureSet implements Serializable {
 	public FeatureSet(final DenseLexicalFeature lexicalCategoryFeatures,
 			final Collection<BilexicalFeature> dependencyFeatures,
 			final Collection<ArgumentSlotFeature> argumentSlotFeatures,
-			final Collection<UnaryRuleFeature> unaryRuleFeatures,
+			final Collection<Feature.UnaryRuleFeature> unaryRuleFeatures,
 			final Collection<PrepositionFeature> prepositionFeatures,
-			final Collection<RootCategoryFeature> rootFeatures, final Collection<BinaryFeature> binaryFeatures) {
+			final Collection<Feature.RootCategoryFeature> rootFeatures,
+					  final Collection<Feature.BinaryFeature> binaryFeatures) {
 		super();
 		this.lexicalCategoryFeatures = lexicalCategoryFeatures;
 		this.dependencyFeatures = ImmutableSet.copyOf(dependencyFeatures);
@@ -35,10 +36,10 @@ public class FeatureSet implements Serializable {
 	public final transient DenseLexicalFeature lexicalCategoryFeatures;
 	public final Collection<BilexicalFeature> dependencyFeatures;
 	public final Collection<ArgumentSlotFeature> argumentSlotFeatures;
-	public final Collection<UnaryRuleFeature> unaryRuleFeatures;
+	public final Collection<Feature.UnaryRuleFeature> unaryRuleFeatures;
 	public final Collection<PrepositionFeature> prepositionFeatures;
-	public final Collection<RootCategoryFeature> rootFeatures;
-	public final Collection<BinaryFeature> binaryFeatures;
+	public final Collection<Feature.RootCategoryFeature> rootFeatures;
+	public final Collection<Feature.BinaryFeature> binaryFeatures;
 
 	/**
 	 * Use after de-serializing. Means the supertagger folder can change.

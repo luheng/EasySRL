@@ -289,7 +289,7 @@ public class TriTrainCCGBenchmark {
     }
 
     public static void main(String[] args) {
-        //run1BestExperiment(args);
-        runNBestOracleExperiment(args, 10000);
+        run1BestExperiment(args);
+        //runNBestOracleExperiment(args, 10000);
     }
 }

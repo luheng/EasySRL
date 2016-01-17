@@ -166,7 +166,7 @@ public class NewTraining {
                                 // Features to use
                                 final FeatureSet allFeatures = new FeatureSet(new DenseLexicalFeature(pipeline, 0.0),
                                         BilexicalFeature.getBilexicalFeatures(clusterings, 3),
-                                        ArgumentSlotFeature.argumentSlotFeatures, UnaryRuleFeature.unaryRules,
+                                        ArgumentSlotFeature.argumentSlotFeatures, Feature.UnaryRuleFeature.unaryRules,
                                         PrepositionFeature.prepositionFeaures, Collections.emptyList(),
                                         Collections.emptyList());
 

@@ -51,6 +51,7 @@ public abstract class BaseCcgParser {
                 .filter(i -> dependencyDict.getCount(i) >= minDependencyCount)
                 .mapToObj(dependencyDict::getString)
                 .collect(Collectors.toCollection(HashSet::new));
+        System.out.println("Filter set:\t" + frequentDependenciesSet.size());
     }
 
     protected static boolean acceptDependency(final List<InputReader.InputWord> sentence,

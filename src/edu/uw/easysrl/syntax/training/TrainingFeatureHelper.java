@@ -74,7 +74,7 @@ public class TrainingFeatureHelper {
             }
             getFromDerivation(sentence.getCcgbankParse(), binaryFeatureCount, sentence.getInputWords(), 0,
                     sentence.getInputWords().size());
-            for (final RootCategoryFeature rootFeature : featureSet.rootFeatures) {
+            for (final Feature.RootCategoryFeature rootFeature : featureSet.rootFeatures) {
                 final Feature.FeatureKey key = rootFeature.getFeatureKey(sentence.getCcgbankParse().getCategory(),
                         sentence.getInputWords());
                 boundedFeatures.add(key);
@@ -148,7 +148,7 @@ public class TrainingFeatureHelper {
             }
             getFromDerivation(sentence.getCcgbankParse(), binaryFeatureCount, sentence.getInputWords(), 0,
                     sentence.getInputWords().size());
-            for (final RootCategoryFeature rootFeature : featureSet.rootFeatures) {
+            for (final Feature.RootCategoryFeature rootFeature : featureSet.rootFeatures) {
                 final Feature.FeatureKey key = rootFeature.getFeatureKey(sentence.getCcgbankParse().getCategory(),
                         sentence.getInputWords());
                 boundedFeatures.add(key);
@@ -224,7 +224,7 @@ public class TrainingFeatureHelper {
                     }
                 }
             }
-            for (final RootCategoryFeature rootFeature : featureSet.rootFeatures) {
+            for (final Feature.RootCategoryFeature rootFeature : featureSet.rootFeatures) {
                 for (CompressedChart.Key root : smallChart.getRoots()) {
                     Category rootCategory = root.category;
                     final FeatureKey key = rootFeature.getFeatureKey(rootCategory, sentence.getInputWords());
@@ -255,7 +255,7 @@ public class TrainingFeatureHelper {
             for (final Combinator.RuleProduction rule :
                     Combinator.getRules(left.getCategory(), right.getCategory(), Combinator.STANDARD_COMBINATORS)) {
                 if (rule.getCategory().equals(node.getCategory())) {
-                    for (final BinaryFeature feature : trainingParameters.getFeatureSet().binaryFeatures) {
+                    for (final Feature.BinaryFeature feature : trainingParameters.getFeatureSet().binaryFeatures) {
                         final Feature.FeatureKey featureKey = feature.getFeatureKey(node.getCategory(),
                                 node.getRuleType(), left.getCategory(), left.getRuleType().getNormalFormClassForRule(),
                                 0, right.getCategory(), right.getRuleType().getNormalFormClassForRule(), 0, null);
@@ -266,7 +266,7 @@ public class TrainingFeatureHelper {
         }
         if (node.getChildren().size() == 1) {
             for (final AbstractParser.UnaryRule rule : dataParameters.getUnaryRules().values()) {
-                for (final UnaryRuleFeature feature : trainingParameters.getFeatureSet().unaryRuleFeatures) {
+                for (final Feature.UnaryRuleFeature feature : trainingParameters.getFeatureSet().unaryRuleFeatures) {
                     final Feature.FeatureKey key = feature.getFeatureKey(rule.getID(), words, startIndex, endIndex);
                     binaryFeatureCount.add(key);
                 }
