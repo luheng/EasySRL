@@ -169,7 +169,8 @@ public class TriTrainCCGBenchmark {
         sentences = new ArrayList<>();
         goldParses = new ArrayList<>();
         DataLoader.readDevPool(sentences, goldParses);
-        parser = new BaseCcgParser.EasyCCGParser(commandLineOptions.getModel(), nBest);
+        //parser = new BaseCcgParser.EasyCCGParser(commandLineOptions.getModel(), nBest);
+        parser = new BaseCcgParser.PipelineCCGParser(commandLineOptions.getModel(), nBest);
         System.out.println("Model loading time:\t" + TicToc.toc() + " seconds.");
     }
 
@@ -289,7 +290,7 @@ public class TriTrainCCGBenchmark {
     }
 
     public static void main(String[] args) {
-        //run1BestExperiment(args);
-        runNBestOracleExperiment(args, 10000);
+        run1BestExperiment(args);
+        //runNBestOracleExperiment(args, 10000);
     }
 }

@@ -9,6 +9,7 @@ import edu.uw.easysrl.corpora.ParallelCorpusReader.Sentence;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.dependencies.SRLFrame;
 import edu.uw.easysrl.main.InputReader;
+import edu.uw.easysrl.syntax.evaluation.CCGBankEvaluation;
 import edu.uw.easysrl.syntax.grammar.Preposition;
 
 /**
@@ -46,6 +47,7 @@ public class DataLoader {
                                     SRLFrame.NONE,
                                     Preposition.NONE)
                     ).collect(Collectors.toSet());
+            // TODO: convert gold with CCGBankEvaluation.
             goldParses.add(new Parse(sentence.getLexicalCategories(), goldDependencies));
         }
         System.out.println(String.format("Read %d sentences to the training pool.", sentences.size()));

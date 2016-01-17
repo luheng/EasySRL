@@ -1,13 +1,18 @@
 package edu.uw.easysrl.qasrl;
 
-import edu.uw.easysrl.dependencies.ResolvedDependency;
-import edu.uw.easysrl.dependencies.SRLFrame;
+import edu.uw.easysrl.dependencies.*;
 import edu.uw.easysrl.main.EasySRL;
 import edu.uw.easysrl.main.InputReader;
+import edu.uw.easysrl.syntax.evaluation.CCGBankEvaluation;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.Preposition;
-import edu.uw.easysrl.syntax.parser.SRLParser;
+import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
+import edu.uw.easysrl.syntax.model.CutoffsDictionaryInterface;
+import edu.uw.easysrl.syntax.model.Model;
+import edu.uw.easysrl.syntax.model.SupertagFactoredModel;
+import edu.uw.easysrl.syntax.parser.*;
 import edu.uw.easysrl.syntax.tagger.POSTagger;
+import edu.uw.easysrl.syntax.tagger.Tagger;
 import edu.uw.easysrl.util.Util;
 
 import edu.stanford.nlp.util.StringUtils;
@@ -51,6 +56,7 @@ public abstract class BaseCcgParser {
                 .filter(i -> dependencyDict.getCount(i) >= minDependencyCount)
                 .mapToObj(dependencyDict::getString)
                 .collect(Collectors.toCollection(HashSet::new));
+        System.out.println("Initialized frequent dependency set:\t" + frequentDependenciesSet.size());
     }
 
     protected static boolean acceptDependency(final List<InputReader.InputWord> sentence,
@@ -59,16 +65,29 @@ public abstract class BaseCcgParser {
         if (predIdx == argIdx) {
             return false;
         }
-        String depStr1 = dependency.getCategory() + "." + dependency.getArgNumber();
+        String depStr1 = dependency.getCategory() + "." + dependency.getArgument();
         return frequentDependenciesSet.contains(depStr1) &&
                 !badDependenciesSet.contains(sentence.get(predIdx).word + ":" + depStr1);
     }
 
-    protected Parse getParse(final List<InputReader.InputWord> sentence, final SRLParser.CCGandSRLparse ccgParse) {
-        List<Category> categories = IntStream.range(0, sentence.size())
-                .mapToObj(i -> ccgParse.getLeaf(i).getCategory())
+    protected Parse getParse(final List<InputReader.InputWord> sentence, final SyntaxTreeNode ccgParse,
+                             DependencyGenerator dependencyGenerator) {
+        // TODO: get categories from syntax treenode
+        List<Category> categories = ccgParse.getLeaves().stream().map(SyntaxTreeNode::getCategory)
                 .collect(Collectors.toList());
-        Set<ResolvedDependency> dependencies = ccgParse.getDependencyParse().stream()
+        Set<UnlabelledDependency> unlabelledDeps = new HashSet<>();
+        dependencyGenerator.generateDependencies(ccgParse, unlabelledDeps);
+        Set<ResolvedDependency> dependencies = CCGBankEvaluation.convertDeps(sentence, unlabelledDeps).stream()
+                .filter(dep -> acceptDependency(sentence, dep))
+                .collect(Collectors.toSet());
+        return new Parse(categories, dependencies);
+    }
+
+    protected Parse getParse(final List<InputReader.InputWord> sentence, final SRLParser.CCGandSRLparse parse) {
+        // TODO: get categories from syntax treenode
+        List<Category> categories = parse.getCcgParse().getLeaves().stream().map(SyntaxTreeNode::getCategory)
+                .collect(Collectors.toList());
+        Set<ResolvedDependency> dependencies = parse.getDependencyParse().stream()
                 .filter(dep -> acceptDependency(sentence, dep))
                 .collect(Collectors.toSet());
         return new Parse(categories, dependencies);
@@ -79,25 +98,93 @@ public abstract class BaseCcgParser {
     public abstract List<Parse> parseNBest(List<InputReader.InputWord> sentence);
 
     public static class EasyCCGParser extends BaseCcgParser {
-        private SRLParser parser = null;
+        private DependencyGenerator dependencyGenerator;
+        private POSTagger posTagger;
+        private SRLParser srlParser;
+        private Parser ccgParser;
         private final double supertaggerBeam = 0.000001;
-        // TODO: adaptive chart-size based on nbest
-        private final int maxChartSize = 100000;
-        private final int maxLength = 70;
+        private final int maxChartSize = 20000;
+        private final int maxSentenceLength = 70;
 
         public EasyCCGParser(String modelFolderPath, int nBest)  {
             final File modelFolder = Util.getFile(modelFolderPath);
             if (!modelFolder.exists()) {
                 throw new InputMismatchException("Couldn't load model from from: " + modelFolder);
             }
-            final File pipelineFolder = new File(modelFolder, "/");
             System.err.println("====Starting loading model====");
-            final POSTagger posTagger = POSTagger.getStanfordTagger(new File(pipelineFolder, "posTagger"));
             try {
-                parser = new SRLParser.CcgParser(EasySRL.makeParser(pipelineFolder.getAbsolutePath(), supertaggerBeam,
-                                EasySRL.ParsingAlgorithm.ASTAR, maxChartSize, false /* joint */, Optional.empty(),
-                                nBest, maxLength), posTagger);
-            } catch (IOException e) {
+                Coindexation.parseMarkedUpFile(new File(modelFolder, "markedup"));
+                final File cutoffsFile = new File(modelFolder, "cutoffs");
+                final CutoffsDictionaryInterface cutoffs = cutoffsFile.exists() ? Util.deserialize(cutoffsFile) : null;
+                Model.ModelFactory modelFactory = new SupertagFactoredModel.SupertagFactoredModelFactory(
+                        Tagger.make(modelFolder, supertaggerBeam, 50, cutoffs), nBest > 1);
+                List<Category> rootCategories = new ArrayList<>();
+                String[] rootCats = { "S[dcl]", "S[wq]", "S[q]", "S[b]\\NP", "NP" };
+                for (String cat : rootCats) {
+                    rootCategories.add(Category.valueOf(cat));
+                }
+                ccgParser = new ParserAStar(modelFactory, maxSentenceLength, nBest, rootCategories, modelFolder,
+                        maxChartSize);
+                posTagger = POSTagger.getStanfordTagger(new File(modelFolder, "posTagger"));
+                srlParser = new SRLParser.CcgParser(
+                        EasySRL.makeParser(modelFolder.getAbsolutePath(), supertaggerBeam,
+                                EasySRL.ParsingAlgorithm.ASTAR,
+                                maxChartSize,
+                                false /* joint */,
+                                Optional.empty(),
+                                nBest, maxSentenceLength), posTagger);
+                dependencyGenerator = new DependencyGenerator(ccgParser.getUnaryRules());
+            } catch (Exception e) {
+                System.err.println("Parser initialization failed.");
+            }
+        }
+
+        @Override
+        public Parse parse(List<InputReader.InputWord> sentence) {
+            //List<SRLParser.CCGandSRLparse> parses = srlParser.parseTokens(sentence);
+            List<Util.Scored<SyntaxTreeNode>> parses = ccgParser.doParsing(
+                    new InputReader.InputToParser(sentence, null, null, false));
+            if (parses == null || parses.size() == 0) {
+                return null;
+            }
+            return getParse(sentence, parses.get(0).getObject(), dependencyGenerator);
+        }
+
+        @Override
+        public List<Parse> parseNBest(List<InputReader.InputWord> sentence) {
+             List<SRLParser.CCGandSRLparse> parses = srlParser.parseTokens(sentence);
+            /*List<Util.Scored<SyntaxTreeNode>> parses = ccgParser.doParsing(
+                    new InputReader.InputToParser(sentence, null, null, false)); */
+            if (parses == null || parses.size() == 0) {
+                return null;
+            }
+            return parses.stream().map(p -> getParse(sentence, p.getCcgParse(), dependencyGenerator))
+                    .collect(Collectors.toList());
+        }
+    }
+
+    public static class PipelineCCGParser extends BaseCcgParser {
+        private SRLParser parser;
+        private final double supertaggerBeam = 0.000001;
+        private final int maxChartSize = 20000;
+        private final int maxSentenceLength = 70;
+
+        public PipelineCCGParser(String modelFolderPath, int nBest)  {
+            final File modelFolder = Util.getFile(modelFolderPath);
+            if (!modelFolder.exists()) {
+                throw new InputMismatchException("Couldn't load model from from: " + modelFolder);
+            }
+            System.err.println("====Starting loading model====");
+            try {
+                final POSTagger posTagger = POSTagger.getStanfordTagger(new File(modelFolder, "posTagger"));
+                parser = new SRLParser.PipelineSRLParser(
+                        EasySRL.makeParser(modelFolder.getAbsolutePath(), supertaggerBeam,
+                                EasySRL.ParsingAlgorithm.ASTAR,
+                                maxChartSize,
+                                false /* joint */,
+                                Optional.empty(),
+                                nBest, maxSentenceLength), CCGBankEvaluation.dummyLabelClassifier, posTagger);
+            } catch (Exception e) {
                 System.err.println("Parser initialization failed.");
             }
         }
@@ -120,51 +207,6 @@ public abstract class BaseCcgParser {
             return parses.stream().map(p -> getParse(sentence, p)).collect(Collectors.toList());
         }
     }
-
-    /*
-    public static class EasySRLParser extends BaseCcgParser {
-        private SRLParser parser = null;
-        public EasySRLParser(String modelFolderPath, int nBest)  {
-            final File modelFolder = Util.getFile(modelFolderPath);
-            if (!modelFolder.exists()) {
-                throw new InputMismatchException("Couldn't load model from from: " + modelFolder);
-            }
-            final File pipelineFolder = new File(modelFolder, "/pipeline");
-            System.err.println("====Starting loading model====");
-            final POSTagger posTagger = POSTagger.getStanfordTagger(new File(pipelineFolder, "posTagger"));
-            try {
-                SRLParser pipelineParser = new SRLParser.PipelineSRLParser(
-                        EasySRL.makeParser(pipelineFolder.getAbsolutePath(), 0.0001,
-                                EasySRL.ParsingAlgorithm.ASTAR,
-                                200000, false , Optional.empty(), nBest),
-                        Util.deserialize(new File(pipelineFolder, "labelClassifier")), posTagger);
-                parser = new SRLParser.BackoffSRLParser(new SRLParser.JointSRLParser(
-                                ActiveLearningHelper.makeParser(modelFolderPath, 0.0001,
-                                        EasySRL.ParsingAlgorithm.ASTAR,
-                                        200000, true , Optional.empty(), nBest), posTagger), pipelineParser);
-            } catch (IOException e) {
-            }
-        }
-
-        @Override
-        public void parse(List<InputReader.InputWord> sentence, List<Category> categories,
-                          Set<ResolvedDependency> dependencies) {
-            if (parser == null) {
-                throw new RuntimeException("Parser uninitialized");
-            }
-            List<SRLParser.CCGandSRLparse> parses = parser.parseTokens(sentence);
-            if (parses == null || parses.size() == 0) {
-                return;
-            }
-            // 1-best here..
-            assert categories != null && dependencies != null;
-            for (int i = 0; i < sentence.size(); i++) {
-                categories.add(parses.get(0).getLeaf(i).getCategory());
-            }
-            dependencies.addAll(parses.get(0).getDependencyParse());
-        }
-    }
-*/
 
     public static class BharatParser extends BaseCcgParser {
         Map<String, Integer> sentences;
@@ -205,17 +247,6 @@ public abstract class BaseCcgParser {
                     // String[] stringsInfo = line.trim().split("[_\\d]+");
                     // Getting: _ 29 3 33 0
                     // String[] indicesInfo = line.trim().split("[^\\d]+");
-                    /*
-                     int predIdx = Integer.parseInt(indicesInfo[1]) - 1;
-                     Category category = Category.valueOf(stringsInfo[1].trim());
-                     int argNum = Integer.parseInt(indicesInfo[2]);
-                     int argIdx = Integer.parseInt(indicesInfo[indicesInfo.length - 2]) - 1;
-                     Preposition preposition = Preposition.NONE;
-                        if (category.getArgument(argNum).equals(Category.PP)) {
-                            preposition = Preposition.fromString(stringsInfo[2].trim());
-                        }
-                    */
-                   // System.out.print(line + "\t:\t");
                     // saw_2(S[dcl]\NP)/NP1
                     String chunk1 = line.trim().split("\\s+")[0];
                     String[] stringsInfo = chunk1.split("[_\\d]+");

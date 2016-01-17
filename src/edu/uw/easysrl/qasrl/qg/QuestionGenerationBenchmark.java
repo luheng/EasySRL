@@ -19,10 +19,13 @@ import java.util.*;
  * Now able to generate 3541 (76.20% of 4647 dependencies, 74.72% of 3979 aligned dependencies) questions.
  * 615 (17.37%) exact matches among all generated.
  *
- * Now able to generate 3895 (98.81% of 3942 dependencies, 85.45% of 3979 aligned dependencies) questions.
- * 657 (16.87%) exact matches among all generated.
+ * +++++++++ With Rebanking
+ * Now able to generate 3893 (98.81% of 3940 dependencies, 85.45% of 3979 aligned dependencies) questions.
+ * 662 (17.00%) exact matches among all generated.
  *
- *
+ * +++++++++ Without Rebanking
+ * Now able to generate 3083 (100.00% of 3083 dependencies, 82.13% of 2982 aligned dependencies) questions.
+ * 469 (15.21%) exact matches among all generated.
  *
  * Created by luheng on 12/8/15.
  */

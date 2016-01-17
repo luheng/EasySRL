@@ -31,7 +31,7 @@ public class ActiveLearningPrototype {
 
     public static void main(String[] args) {
         // TODO: timer
-        initialize(args, 5000);
+        initialize(args, 10);
         run();
     }
 
