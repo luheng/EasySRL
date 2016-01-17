@@ -81,11 +81,11 @@ public class CCGBankEvaluation {
 	public static void main(final String[] args) throws IOException {
 		final int maxLength = 70;// FIXME
 		// final String pipelineFolder = Util.getHomeFolder() + "/Downloads/cnn/models/model_ccgbank";
-		final String pipelineFolder = Util.getHomeFolder() + "/Downloads/cnn/models/model_tritrain_again";
+		final String pipelineFolder = "/Users/luheng/Workspace/EasySRL/model_tritrain_big/";
 		// final String pipelineFolder = Util.getHomeFolder() + "/Downloads/cnn/models/ensemble";
 		// final String modelFolder = "~/Documents/workspace/ccg_srl_models/model_tritrain/";
-		final String modelFolder = "~/Documents/workspace/ccg_srl_models/big_model/";
-		final List<Category> categories = TaggerEmbeddings.loadCategories(new File(pipelineFolder, "categories"));
+		// final String modelFolder = "~/Documents/workspace/ccg_srl_models/big_model/";
+		// final List<Category> categories = TaggerEmbeddings.loadCategories(new File(pipelineFolder, "categories"));
 		final POSTagger postagger = new POSTagger() {
 
 			@Override
@@ -152,7 +152,7 @@ public class CCGBankEvaluation {
 		final ErrorAnalysis errorAnalysisWithGoldCats = new ErrorAnalysis();
 
 		final DependencyGenerator dependencyGenerator = new DependencyGenerator(
-				Util.getFile("~/Downloads/cnn/models/model_ccgbank"));
+				Util.getFile("/Users/luheng/Workspace/EasySRL/model_tritrain_big/"));
 
 		final Multiset<String> validDeps = getValidDeps();
 

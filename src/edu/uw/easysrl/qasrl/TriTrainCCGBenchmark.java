@@ -169,8 +169,8 @@ public class TriTrainCCGBenchmark {
         sentences = new ArrayList<>();
         goldParses = new ArrayList<>();
         DataLoader.readDevPool(sentences, goldParses);
-        //parser = new BaseCcgParser.EasyCCGParser(commandLineOptions.getModel(), nBest);
-        parser = new BaseCcgParser.PipelineCCGParser(commandLineOptions.getModel(), nBest);
+        parser = new BaseCcgParser.EasyCCGParser(commandLineOptions.getModel(), nBest);
+        //parser = new BaseCcgParser.PipelineCCGParser(commandLineOptions.getModel(), nBest);
         System.out.println("Model loading time:\t" + TicToc.toc() + " seconds.");
     }
 

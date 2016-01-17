@@ -65,7 +65,7 @@ public abstract class BaseCcgParser {
         if (predIdx == argIdx) {
             return false;
         }
-        String depStr1 = dependency.getCategory() + "." + dependency.getArgument();
+        String depStr1 = dependency.getCategory() + "." + dependency.getArgNumber();
         return frequentDependenciesSet.contains(depStr1) &&
                 !badDependenciesSet.contains(sentence.get(predIdx).word + ":" + depStr1);
     }
@@ -85,7 +85,9 @@ public abstract class BaseCcgParser {
 
     protected Parse getParse(final List<InputReader.InputWord> sentence, final SRLParser.CCGandSRLparse parse) {
         // TODO: get categories from syntax treenode
-        List<Category> categories = parse.getCcgParse().getLeaves().stream().map(SyntaxTreeNode::getCategory)
+        System.err.println(parse.getDependencyParse().size());
+        List<Category> categories =
+                parse.getCcgParse().getLeaves().stream().map(SyntaxTreeNode::getCategory)
                 .collect(Collectors.toList());
         Set<ResolvedDependency> dependencies = parse.getDependencyParse().stream()
                 .filter(dep -> acceptDependency(sentence, dep))
@@ -100,8 +102,7 @@ public abstract class BaseCcgParser {
     public static class EasyCCGParser extends BaseCcgParser {
         private DependencyGenerator dependencyGenerator;
         private POSTagger posTagger;
-        private SRLParser srlParser;
-        private Parser ccgParser;
+        private Parser parser;
         private final double supertaggerBeam = 0.000001;
         private final int maxChartSize = 20000;
         private final int maxSentenceLength = 70;
@@ -123,17 +124,10 @@ public abstract class BaseCcgParser {
                 for (String cat : rootCats) {
                     rootCategories.add(Category.valueOf(cat));
                 }
-                ccgParser = new ParserAStar(modelFactory, maxSentenceLength, nBest, rootCategories, modelFolder,
+                parser = new ParserAStar(modelFactory, maxSentenceLength, nBest, rootCategories, modelFolder,
                         maxChartSize);
                 posTagger = POSTagger.getStanfordTagger(new File(modelFolder, "posTagger"));
-                srlParser = new SRLParser.CcgParser(
-                        EasySRL.makeParser(modelFolder.getAbsolutePath(), supertaggerBeam,
-                                EasySRL.ParsingAlgorithm.ASTAR,
-                                maxChartSize,
-                                false /* joint */,
-                                Optional.empty(),
-                                nBest, maxSentenceLength), posTagger);
-                dependencyGenerator = new DependencyGenerator(ccgParser.getUnaryRules());
+                dependencyGenerator = new DependencyGenerator(parser.getUnaryRules());
             } catch (Exception e) {
                 System.err.println("Parser initialization failed.");
             }
@@ -141,9 +135,8 @@ public abstract class BaseCcgParser {
 
         @Override
         public Parse parse(List<InputReader.InputWord> sentence) {
-            //List<SRLParser.CCGandSRLparse> parses = srlParser.parseTokens(sentence);
-            List<Util.Scored<SyntaxTreeNode>> parses = ccgParser.doParsing(
-                    new InputReader.InputToParser(sentence, null, null, false));
+            List<Util.Scored<SyntaxTreeNode>> parses = parser.doParsing(
+                    posTagger.tag(new InputReader.InputToParser(sentence, null, null, false)));
             if (parses == null || parses.size() == 0) {
                 return null;
             }
@@ -152,13 +145,12 @@ public abstract class BaseCcgParser {
 
         @Override
         public List<Parse> parseNBest(List<InputReader.InputWord> sentence) {
-             List<SRLParser.CCGandSRLparse> parses = srlParser.parseTokens(sentence);
-            /*List<Util.Scored<SyntaxTreeNode>> parses = ccgParser.doParsing(
-                    new InputReader.InputToParser(sentence, null, null, false)); */
+            List<Util.Scored<SyntaxTreeNode>> parses = parser.doParsing(
+                    posTagger.tag(new InputReader.InputToParser(sentence, null, null, false)));
             if (parses == null || parses.size() == 0) {
                 return null;
             }
-            return parses.stream().map(p -> getParse(sentence, p.getCcgParse(), dependencyGenerator))
+            return parses.stream().map(p -> getParse(sentence, p.getObject(), dependencyGenerator))
                     .collect(Collectors.toList());
         }
     }
