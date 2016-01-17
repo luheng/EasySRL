@@ -115,7 +115,7 @@ public abstract class BaseCcgParser {
         private DependencyGenerator dependencyGenerator;
         private Parser parser;
         private final double supertaggerBeam = 0.000001;
-        private final int maxChartSize = 100000;
+        private final int maxChartSize = 20000;
         private final int maxSentenceLength = 70;
 
         public EasyCCGParser(String modelFolderPath, List<Category> rootCategories, int nBest)  {
@@ -126,14 +126,10 @@ public abstract class BaseCcgParser {
             System.err.println("====Starting loading model====");
             try {
                 Coindexation.parseMarkedUpFile(new File(modelFolder, "markedup"));
-                final File cutoffsFile = new File(modelFolder, "cutoffs");
-                final CutoffsDictionaryInterface cutoffs = cutoffsFile.exists() ? Util.deserialize(cutoffsFile) : null;
-
                 Model.ModelFactory modelFactory = new SupertagFactoredModel.SupertagFactoredModelFactory(
-                        Tagger.make(modelFolder, supertaggerBeam, 50, cutoffs), nBest > 1);
+                        Tagger.make(modelFolder, supertaggerBeam, 50, null /* cutoffs */), nBest > 1);
                 parser = new ParserAStar(modelFactory, maxSentenceLength, nBest, rootCategories, modelFolder,
                         maxChartSize);
-                // posTagger = POSTagger.getStanfordTagger(new File(modelFolder, "posTagger"));
                 dependencyGenerator = new DependencyGenerator(parser.getUnaryRules());
             } catch (Exception e) {
                 System.err.println("Parser initialization failed.");

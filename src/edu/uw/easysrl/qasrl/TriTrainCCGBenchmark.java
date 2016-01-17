@@ -14,17 +14,12 @@ import java.util.stream.Collectors;
 
 /**
  * Single parser baseline on dev set.
- *
- * Model loading time: 78 seconds.
- *
- * 1-best results (on luheng's mac):
- *      Tagging accuracy = 0.9447142825167312
- *       Precision = 87.42
- *       Recall    = 86.62
- *       F1        = 87.02
- *
- *   Averaged parsing time (in sec):	0.0
- *   Averaged evaluation time (in sec):	0.0
+     Acc = 0.9486358854994292
+     Precision = 88.15
+     Recall    = 87.09
+     F1        = 87.61
+     Averaged parsing time (in sec):	0.0
+     Averaged evaluation time (in sec):	0.0
  *
  * Created by luheng on 1/13/16.
  */
@@ -91,6 +86,16 @@ Recall    = 92.71
 F1        = 93.04
 Avg. n-best:	93.53357817418677	 Avg. best-k:	12.396117523609654
 Averaged parsing time (in sec):	0.022035676810073453
+Averaged evaluation time (in sec):	0.0
+
+After merge:
+Acc = 0.9611836050874254
+Precision = 92.73
+Recall    = 91.77
+F1        = 92.25
+Avg. n-best:	92.03627504060638
+Avg. best-k:	13.10774228478614
+Averaged parsing time (in sec):	0.17217108825121819
 Averaged evaluation time (in sec):	0.0
 */
 
@@ -303,7 +308,7 @@ public class TriTrainCCGBenchmark {
     }
 
     public static void main(String[] args) {
-        run1BestExperiment(args);
-        //runNBestOracleExperiment(args, 10);
+        // run1BestExperiment(args);
+        runNBestOracleExperiment(args, 10);
     }
 }
