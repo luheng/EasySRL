@@ -7,6 +7,7 @@ import edu.uw.easysrl.syntax.evaluation.CCGBankEvaluation;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.Preposition;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
+import edu.uw.easysrl.syntax.model.CutoffsDictionary;
 import edu.uw.easysrl.syntax.model.CutoffsDictionaryInterface;
 import edu.uw.easysrl.syntax.model.Model;
 import edu.uw.easysrl.syntax.model.SupertagFactoredModel;
@@ -77,9 +78,20 @@ public abstract class BaseCcgParser {
                 .collect(Collectors.toList());
         Set<UnlabelledDependency> unlabelledDeps = new HashSet<>();
         dependencyGenerator.generateDependencies(ccgParse, unlabelledDeps);
-        Set<ResolvedDependency> dependencies = CCGBankEvaluation.convertDeps(sentence, unlabelledDeps).stream()
-                .filter(dep -> acceptDependency(sentence, dep))
-                .collect(Collectors.toSet());
+        Set<ResolvedDependency> dependencies = new HashSet<>();
+        unlabelledDeps.forEach(dep -> {
+            int predIdx = dep.getHead();
+            Category category = dep.getCategory();
+            int argNum = dep.getArgNumber();
+            String depStr = category + "." + dep.getArgNumber();
+            if (frequentDependenciesSet.contains(depStr) &&
+                    !badDependenciesSet.contains(sentence.get(predIdx).word + ":" + depStr)) {
+                dep.getArguments().stream()
+                        .filter(argIdx -> predIdx != argIdx)
+                        .forEach(argIdx2 -> dependencies.add(new ResolvedDependency(predIdx, category, argNum, argIdx2,
+                                SRLFrame.NONE, Preposition.NONE)));
+            }
+        });
         return new Parse(categories, dependencies);
     }
 
@@ -101,13 +113,12 @@ public abstract class BaseCcgParser {
 
     public static class EasyCCGParser extends BaseCcgParser {
         private DependencyGenerator dependencyGenerator;
-        private POSTagger posTagger;
         private Parser parser;
         private final double supertaggerBeam = 0.000001;
-        private final int maxChartSize = 20000;
+        private final int maxChartSize = 100000;
         private final int maxSentenceLength = 70;
 
-        public EasyCCGParser(String modelFolderPath, int nBest)  {
+        public EasyCCGParser(String modelFolderPath, List<Category> rootCategories, int nBest)  {
             final File modelFolder = Util.getFile(modelFolderPath);
             if (!modelFolder.exists()) {
                 throw new InputMismatchException("Couldn't load model from from: " + modelFolder);
@@ -117,26 +128,23 @@ public abstract class BaseCcgParser {
                 Coindexation.parseMarkedUpFile(new File(modelFolder, "markedup"));
                 final File cutoffsFile = new File(modelFolder, "cutoffs");
                 final CutoffsDictionaryInterface cutoffs = cutoffsFile.exists() ? Util.deserialize(cutoffsFile) : null;
+
                 Model.ModelFactory modelFactory = new SupertagFactoredModel.SupertagFactoredModelFactory(
                         Tagger.make(modelFolder, supertaggerBeam, 50, cutoffs), nBest > 1);
-                List<Category> rootCategories = new ArrayList<>();
-                String[] rootCats = { "S[dcl]", "S[wq]", "S[q]", "S[b]\\NP", "NP" };
-                for (String cat : rootCats) {
-                    rootCategories.add(Category.valueOf(cat));
-                }
                 parser = new ParserAStar(modelFactory, maxSentenceLength, nBest, rootCategories, modelFolder,
                         maxChartSize);
-                posTagger = POSTagger.getStanfordTagger(new File(modelFolder, "posTagger"));
+                // posTagger = POSTagger.getStanfordTagger(new File(modelFolder, "posTagger"));
                 dependencyGenerator = new DependencyGenerator(parser.getUnaryRules());
             } catch (Exception e) {
                 System.err.println("Parser initialization failed.");
+                e.printStackTrace();
             }
         }
 
         @Override
         public Parse parse(List<InputReader.InputWord> sentence) {
             List<Util.Scored<SyntaxTreeNode>> parses = parser.doParsing(
-                    posTagger.tag(new InputReader.InputToParser(sentence, null, null, false)));
+                    new InputReader.InputToParser(sentence, null, null, false));
             if (parses == null || parses.size() == 0) {
                 return null;
             }
@@ -146,7 +154,7 @@ public abstract class BaseCcgParser {
         @Override
         public List<Parse> parseNBest(List<InputReader.InputWord> sentence) {
             List<Util.Scored<SyntaxTreeNode>> parses = parser.doParsing(
-                    posTagger.tag(new InputReader.InputToParser(sentence, null, null, false)));
+                    new InputReader.InputToParser(sentence, null, null, false));
             if (parses == null || parses.size() == 0) {
                 return null;
             }

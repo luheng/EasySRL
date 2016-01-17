@@ -48,7 +48,8 @@ public class ActiveLearningPrototype {
         goldParses = new ArrayList<>();
         DataLoader.readDevPool(sentences, goldParses);
         // Initialize parser.
-        parser = new BaseCcgParser.EasyCCGParser(commandLineOptions.getModel(), nBest);
+        parser = new BaseCcgParser.EasyCCGParser(commandLineOptions.getModel(), commandLineOptions.getRootCategories(),
+                nBest);
         // Initialize the other modules.
         questionGenerator = new QuestionGenerator();
         responseSimulator = new ResponseSimulator(questionGenerator);

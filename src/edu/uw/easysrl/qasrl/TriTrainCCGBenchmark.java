@@ -38,6 +38,18 @@ import java.util.stream.Collectors;
  Avg. n-best:	9.823529411764707	 Avg. best-k:	1.41859243697479
  Averaged parsing time (in sec):	0.0
  Averaged evaluation time (in sec):	0.0
+
+ After merge ...
+ Acc = 0.9503988645818039
+Precision = 90.03
+Recall    = 89.12
+F1        = 89.57
+Avg. n-best:	9.763143331488655
+Avg. best-k:	1.5102379634753735
+Averaged parsing time (in sec):	0.0016602102933038186
+Averaged evaluation time (in sec):	0.0
+
+Process finished with exit code 0
 */
 
 /*
@@ -169,7 +181,8 @@ public class TriTrainCCGBenchmark {
         sentences = new ArrayList<>();
         goldParses = new ArrayList<>();
         DataLoader.readDevPool(sentences, goldParses);
-        parser = new BaseCcgParser.EasyCCGParser(commandLineOptions.getModel(), nBest);
+        parser = new BaseCcgParser.EasyCCGParser(commandLineOptions.getModel(), commandLineOptions.getRootCategories(),
+                nBest);
         //parser = new BaseCcgParser.PipelineCCGParser(commandLineOptions.getModel(), nBest);
         System.out.println("Model loading time:\t" + TicToc.toc() + " seconds.");
     }
@@ -291,6 +304,6 @@ public class TriTrainCCGBenchmark {
 
     public static void main(String[] args) {
         run1BestExperiment(args);
-        //runNBestOracleExperiment(args, 10000);
+        //runNBestOracleExperiment(args, 10);
     }
 }
