@@ -37,4 +37,12 @@ public class QueryFilter {
                 .filter(d -> d > 0)
                 .map(p -> p / sum * Math.log(p / sum)).sum();
     }
+
+    public static double getAnswerEntropy(final GroupedQuery query) {
+        final Collection<Set<Integer>> parseIds = query.answerToParses.values();
+        int sum = parseIds.stream().mapToInt(Collection::size).sum();
+        return -1.0 * parseIds.stream().mapToDouble(Collection::size)
+                .filter(d -> d > 0)
+                .map(p -> p / sum * Math.log(p / sum)).sum();
+    }
 }

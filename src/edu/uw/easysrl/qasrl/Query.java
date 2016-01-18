@@ -50,6 +50,16 @@ public class Query {
         }
     }
 
+    public String getQuestionString() {
+        return question.stream().collect(Collectors.joining(" "));
+    }
+
+    public Set<Integer> getAllParses() {
+        return answerToParses.keySet().stream().filter(a -> a >= 0)
+                .flatMap(a2 -> answerToParses.get(a2).stream())
+                .collect(Collectors.toSet());
+    }
+
     public void print(List<String> sentence) {
         System.out.println(questionScore + "\t" + question.stream().collect(Collectors.joining(" ")) + "?");
         answerToParses.keySet().stream().sorted().forEach(id -> {

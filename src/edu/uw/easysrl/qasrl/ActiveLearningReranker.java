@@ -1,6 +1,5 @@
 package edu.uw.easysrl.qasrl;
 
-import com.sun.tools.doclets.internal.toolkit.util.DocFinder;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.main.EasySRL;
 import edu.uw.easysrl.main.InputReader.InputWord;
@@ -31,9 +30,6 @@ public class ActiveLearningReranker {
     Map<String, Double> allResults;
 
     double minAnswerEntropy = 0.0;
-    boolean shuffleSentences = false;
-    int maxNumSentences = -1;
-    int randomSeed = 0;
 
     public static void main(String[] args) {
         EasySRL.CommandLineArguments commandLineOptions;
@@ -53,12 +49,8 @@ public class ActiveLearningReranker {
         ResponseSimulator responseSimulator = new ResponseSimulatorMultipleChoice();
 
         /************** manual parameter tuning ... ***********/
-        //final int[] nBestList = new int[] { 3, 5, 10, 20, 50, 100, 250, 500, 1000 };
-        final int[] nBestList = new int[] { 5 };
+        final int[] nBestList = new int[] { 3, 5, 10, 20, 50, 100 }; //,  250, 500, 1000 };
         final double minAnswerEntropy = 0.6;
-        final int maxNumSentences = 20;
-        final boolean shuffleSentences = true;
-        final int randomSeed = 12345;
 
         List<Map<String, Double>> allResults = new ArrayList<>();
         for (int nBest : nBestList) {
@@ -67,9 +59,6 @@ public class ActiveLearningReranker {
             ActiveLearningReranker learner = new ActiveLearningReranker(sentences, goldParses, parser,
                                                                         questionGenerator, responseSimulator, nBest);
             learner.minAnswerEntropy = minAnswerEntropy;
-            learner.shuffleSentences = shuffleSentences;
-            learner.maxNumSentences = maxNumSentences;
-            learner.randomSeed = randomSeed;
             learner.run(true /* verbose */);
             allResults.add(learner.allResults);
         }
@@ -117,15 +106,7 @@ public class ActiveLearningReranker {
         // Effect query: a query whose response boosts the score of a non-top parse but not the top one.
         int numQueries = 0, numEffectiveQueries = 0;
 
-        List<Integer> sentenceOrder = IntStream.range(0, sentences.size()).boxed().collect(Collectors.toList());
-        if (shuffleSentences) {
-            Collections.shuffle(sentenceOrder);
-        }
-        if (maxNumSentences > 0) {
-            sentenceOrder = sentenceOrder.subList(0, Math.min(maxNumSentences, sentences.size()));
-        }
-
-        for (int sentIdx : sentenceOrder) {
+        for (int sentIdx = 0; sentIdx < sentences.size(); sentIdx ++) {
             List<InputWord> sentence = sentences.get(sentIdx);
             List<String> words = sentence.stream().map(w->w.word).collect(Collectors.toList());
             Parse goldParse = goldParses.get(sentIdx);
@@ -141,8 +122,7 @@ public class ActiveLearningReranker {
             List<Query> queryList = generateQueries(words, parses);
 
             /******************* Response simulator ************/
-            // TODO: re-ranker; get simulated response and fix dependencies
-            // If the response gives N/A, shall we down vote all parses?
+            // TODO: If the response gives N/A, shall we down vote all parses?
             List<Response> responseList = queryList.stream()
                     .map(q -> responseSimulator.answerQuestion(q, words, goldParse))
                     .collect(Collectors.toList());
@@ -195,8 +175,10 @@ public class ActiveLearningReranker {
             }
         }
         System.out.println("\n1-best:\navg-k = 1.0\n" + oneBestAcc + "\n" + oneBest);
-        System.out.println("re-ranked:\navg-k = " + 1.0 * avgBestK / numSentencesParsed + "\n" + reRankedAcc + "\n" + reRanked);
-        System.out.println("oracle:\navg-k = " + 1.0 * avgOracleK / numSentencesParsed + "\n"+ oracleAcc + "\n" + oracle);
+        System.out.println("re-ranked:\navg-k = " + 1.0 * avgBestK / numSentencesParsed);
+        System.out.println(reRankedAcc + "\n" + reRanked);
+        System.out.println("oracle:\navg-k = " + 1.0 * avgOracleK / numSentencesParsed);
+        System.out.println(oracleAcc + "\n" + oracle);
         System.out.println("Number of queries = " + numQueries);
         System.out.println("Number of effective queries = " + numEffectiveQueries);
         System.out.println("Effective ratio = " + 1.0 * numEffectiveQueries / numQueries);
