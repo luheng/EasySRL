@@ -1,7 +1,5 @@
 package edu.uw.easysrl.qasrl;
 
-import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -43,7 +41,7 @@ public class ResponseSimulatorMultipleChoice extends ResponseSimulator {
             System.out.print(sentence.get(i) + ANSI_RESET);
         }
         System.out.println();
-        System.out.println(query.question.stream().collect(Collectors.joining(" ")) + "?");
+        System.out.println("Q: " + query.question.stream().collect(Collectors.joining(" ")) + "?");
         // TODO: highlight answer in sentence?
         List<Integer> answerCandidates = new ArrayList<>(query.answerToParses.keySet());
         int numAnswers = answerCandidates.size();

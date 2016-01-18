@@ -1,5 +1,6 @@
 package edu.uw.easysrl.qasrl;
 
+import com.sun.tools.doclets.internal.toolkit.util.DocFinder;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.main.EasySRL;
 import edu.uw.easysrl.main.InputReader.InputWord;
@@ -13,6 +14,7 @@ import edu.stanford.nlp.util.StringUtils;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 
 /**
@@ -29,6 +31,9 @@ public class ActiveLearningReranker {
     Map<String, Double> allResults;
 
     double minAnswerEntropy = 0.0;
+    boolean shuffleSentences = false;
+    int maxNumSentences = -1;
+    int randomSeed = 0;
 
     public static void main(String[] args) {
         EasySRL.CommandLineArguments commandLineOptions;
@@ -48,22 +53,26 @@ public class ActiveLearningReranker {
         ResponseSimulator responseSimulator = new ResponseSimulatorMultipleChoice();
 
         /************** manual parameter tuning ... ***********/
-        final int[] nBestList = new int[] { 3, 5, 10, 20, 50, 100, 250, 500, 1000 };
+        //final int[] nBestList = new int[] { 3, 5, 10, 20, 50, 100, 250, 500, 1000 };
+        final int[] nBestList = new int[] { 5 };
         final double minAnswerEntropy = 0.6;
         final int maxNumSentences = 20;
         final boolean shuffleSentences = true;
+        final int randomSeed = 12345;
 
         List<Map<String, Double>> allResults = new ArrayList<>();
         for (int nBest : nBestList) {
-            // TODO: shuffle and subsample sentences.
             BaseCcgParser parser = new BaseCcgParser.AStarParser(modelFolder, rootCategories, nBest);
+
             ActiveLearningReranker learner = new ActiveLearningReranker(sentences, goldParses, parser,
-                    questionGenerator, responseSimulator, nBest);
+                                                                        questionGenerator, responseSimulator, nBest);
             learner.minAnswerEntropy = minAnswerEntropy;
+            learner.shuffleSentences = shuffleSentences;
+            learner.maxNumSentences = maxNumSentences;
+            learner.randomSeed = randomSeed;
             learner.run(true /* verbose */);
             allResults.add(learner.allResults);
         }
-
         /*********** output results **********/
         List<String> resultKeys = new ArrayList<>(allResults.get(0).keySet());
         Collections.sort(resultKeys);
@@ -79,6 +88,7 @@ public class ActiveLearningReranker {
         });
         System.out.println();
     }
+
 
     public ActiveLearningReranker(List<List<InputWord>> sentences, List<Parse> goldParses, BaseCcgParser parser,
                                   QuestionGenerator questionGenerator, ResponseSimulator responseSimulator, int nBest) {
@@ -107,7 +117,15 @@ public class ActiveLearningReranker {
         // Effect query: a query whose response boosts the score of a non-top parse but not the top one.
         int numQueries = 0, numEffectiveQueries = 0;
 
-        for (int sentIdx = 0; sentIdx < sentences.size(); sentIdx++) {
+        List<Integer> sentenceOrder = IntStream.range(0, sentences.size()).boxed().collect(Collectors.toList());
+        if (shuffleSentences) {
+            Collections.shuffle(sentenceOrder);
+        }
+        if (maxNumSentences > 0) {
+            sentenceOrder = sentenceOrder.subList(0, Math.min(maxNumSentences, sentences.size()));
+        }
+
+        for (int sentIdx : sentenceOrder) {
             List<InputWord> sentence = sentences.get(sentIdx);
             List<String> words = sentence.stream().map(w->w.word).collect(Collectors.toList());
             Parse goldParse = goldParses.get(sentIdx);
@@ -172,7 +190,7 @@ public class ActiveLearningReranker {
             oracleAcc.add(CcgEvaluation.evaluateTags(parses.get(oracleK).categories, goldParse.categories));
 
             /*************** Print Debugging Info *************/
-            if (verbose) {
+            if (verbose && queryList.size() > 0) {
                 DebugPrinter.printQueryListInfo(sentIdx, words, parses, queryList, responseList);
             }
         }
