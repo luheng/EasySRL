@@ -50,14 +50,17 @@ public class ActiveLearningReranker {
         /************** manual parameter tuning ... ***********/
         final int[] nBestList = new int[] { 3, 5, 10, 20, 50, 100, 250, 500, 1000 };
         final double minAnswerEntropy = 0.6;
+        final int maxNumSentences = 20;
+        final boolean shuffleSentences = true;
 
         List<Map<String, Double>> allResults = new ArrayList<>();
         for (int nBest : nBestList) {
+            // TODO: shuffle and subsample sentences.
             BaseCcgParser parser = new BaseCcgParser.AStarParser(modelFolder, rootCategories, nBest);
             ActiveLearningReranker learner = new ActiveLearningReranker(sentences, goldParses, parser,
                     questionGenerator, responseSimulator, nBest);
             learner.minAnswerEntropy = minAnswerEntropy;
-            learner.run(false /* verbose */);
+            learner.run(true /* verbose */);
             allResults.add(learner.allResults);
         }
 
