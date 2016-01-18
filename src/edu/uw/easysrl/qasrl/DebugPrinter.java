@@ -17,7 +17,7 @@ public class DebugPrinter {
             Query query = queryList.get(i);
             Response response = responseList.get(i);
 
-            query.print(words);
+            query.print(words, response);
         }
     }
 }

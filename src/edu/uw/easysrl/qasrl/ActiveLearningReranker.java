@@ -5,57 +5,92 @@ import edu.uw.easysrl.main.EasySRL;
 import edu.uw.easysrl.main.InputReader.InputWord;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
+import edu.uw.easysrl.syntax.grammar.Category;
+
 import uk.co.flamingpenguin.jewel.cli.CliFactory;
 
 import edu.stanford.nlp.util.StringUtils;
 
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
+
 
 /**
  * Active Learning experiments (n-best reranking).
  * Created by luheng on 1/5/16.
  */
 public class ActiveLearningReranker {
-    static List<List<InputWord>> sentences;
-    static List<Parse> goldParses;
+    List<List<InputWord>> sentences;
+    List<Parse> goldParses;
+    BaseCcgParser parser;
+    QuestionGenerator questionGenerator;
+    ResponseSimulatorGold responseSimulator;
+    int nBest;
+    Map<String, Double> allResults;
 
-    static BaseCcgParser parser;
-    static QuestionGenerator questionGenerator;
-    static ResponseSimulator responseSimulator;
-
-    public static StringBuffer debugOutput;
+    double minAnswerEntropy = 0.0;
 
     public static void main(String[] args) {
-        initialize(args, 10);
-        run();
-    }
-
-    private static void initialize(String[] args, int nBest) {
-        // TODO: use ActiveLearning.CommandLineArguments
         EasySRL.CommandLineArguments commandLineOptions;
         try {
             commandLineOptions = CliFactory.parseArguments(EasySRL.CommandLineArguments.class, args);
         } catch (Exception e) {
             return;
         }
-        // Initialize corpora.
-        sentences = new ArrayList<>();
-        goldParses = new ArrayList<>();
+        List<List<InputWord>> sentences = new ArrayList<>();
+        List<Parse> goldParses = new ArrayList<>();
         DataLoader.readDevPool(sentences, goldParses);
-        // Initialize parser.
-        parser = new BaseCcgParser.AStarParser(commandLineOptions.getModel(), commandLineOptions.getRootCategories(),
-                nBest);
-        // Initialize the other modules.
-        questionGenerator = new QuestionGenerator();
-        responseSimulator = new ResponseSimulator(questionGenerator);
+
+        String modelFolder = commandLineOptions.getModel();
+        List<Category> rootCategories = commandLineOptions.getRootCategories();
+        QuestionGenerator questionGenerator = new QuestionGenerator();
+        ResponseSimulatorGold responseSimulator = new ResponseSimulatorGold(questionGenerator);
+
+        /************** manual parameter tuning ... ***********/
+        final int[] nBestList = new int[] { 3, 5, 10, 20, 50, 100, 250, 500, 1000 };
+        final double minAnswerEntropy = 0.0;
+
+        List<Map<String, Double>> allResults = new ArrayList<>();
+        for (int nBest : nBestList) {
+            BaseCcgParser parser = new BaseCcgParser.AStarParser(modelFolder, rootCategories, nBest);
+            ActiveLearningReranker learner = new ActiveLearningReranker(sentences, goldParses, parser,
+                    questionGenerator, responseSimulator, nBest);
+            learner.minAnswerEntropy = minAnswerEntropy;
+            learner.run(false /* verbose */);
+            allResults.add(learner.allResults);
+        }
+
+        /*********** output results **********/
+        List<String> resultKeys = new ArrayList<>(allResults.get(0).keySet());
+        Collections.sort(resultKeys);
+        System.out.print("\nnbest");
+        for (int i = 0; i < nBestList.length; i++) {
+            System.out.print("\t" + nBestList[i]);
+        }
+        resultKeys.forEach(rk -> {
+            System.out.print("\n" + rk);
+            for (int i = 0; i < nBestList.length; i++) {
+                System.out.print(String.format("\t%.3f",allResults.get(i).get(rk)));
+            }
+        });
+        System.out.println();
     }
 
-    private static void run() {
-        debugOutput = new StringBuffer();
+    public ActiveLearningReranker(List<List<InputWord>> sentences, List<Parse> goldParses, BaseCcgParser parser,
+                                  QuestionGenerator questionGenerator, ResponseSimulatorGold responseSimulator, int nBest) {
+        System.out.println(String.format("\n========== ReRanker Active Learning with %d-Best List ==========", nBest));
+        this.sentences = sentences;
+        this.goldParses = goldParses;
+        this.parser = parser;
+        this.questionGenerator = questionGenerator;
+        this.responseSimulator = responseSimulator;
+        this.nBest = nBest;
+    }
 
-        // TODO: shuffle input
+
+    public void run(boolean verbose) {
+        allResults = new HashMap<>();
+
         Results oneBest = new Results();
         Results reRanked = new Results();
         Results oracle = new Results();
@@ -133,7 +168,9 @@ public class ActiveLearningReranker {
             oracleAcc.add(CcgEvaluation.evaluateTags(parses.get(oracleK).categories, goldParse.categories));
 
             /*************** Print Debugging Info *************/
-            DebugPrinter.printQueryListInfo(sentIdx, words, parses, queryList, responseList);
+            if (verbose) {
+                DebugPrinter.printQueryListInfo(sentIdx, words, parses, queryList, responseList);
+            }
         }
         System.out.println("\n1-best:\navg-k = 1.0\n" + oneBestAcc + "\n" + oneBest);
         System.out.println("re-ranked:\navg-k = " + 1.0 * avgBestK / numSentencesParsed + "\n" + reRankedAcc + "\n" + reRanked);
@@ -141,35 +178,47 @@ public class ActiveLearningReranker {
         System.out.println("Number of queries = " + numQueries);
         System.out.println("Number of effective queries = " + numEffectiveQueries);
         System.out.println("Effective ratio = " + 1.0 * numEffectiveQueries / numQueries);
+
+        allResults.put("1-best-acc", oneBestAcc.getAccuracy() * 100);
+        allResults.put("1-best-f1", oneBest.getF1() * 100);
+        allResults.put("rerank-acc", reRankedAcc.getAccuracy() * 100);
+        allResults.put("rerank-f1", reRanked.getF1() * 100);
+        allResults.put("oracle-acc", oracleAcc.getAccuracy() * 100);
+        allResults.put("oracle-f1", oracle.getF1() * 100);
+        allResults.put("num-queries", (double) numQueries);
+        allResults.put("num-eff-queries", (double) numEffectiveQueries);
+        allResults.put("num-queries", (double) numQueries);
+        allResults.put("eff-ratio", 100.0 * numEffectiveQueries / numQueries);
     }
 
-    private static List<Query> generateQueries(List<String> words, List<Parse> parses) {
+    private List<Query> generateQueries(List<String> words, List<Parse> parses) {
         Map<String, Query> allQueries = new HashMap<>();
         int numParses = parses.size();
         for (int rankId = 0; rankId < numParses; rankId++) {
             Parse parse = parses.get(rankId);
             for (ResolvedDependency targetDependency : parse.dependencies) {
-                int argId = targetDependency.getArgument();
+                int predicateId = targetDependency.getHead();
+                int argumentId = targetDependency.getArgument();
                 List<String> question = questionGenerator.generateQuestion(targetDependency, words, parse.categories,
                                                                            parse.dependencies);
                 if (question == null || question.size() == 0) {
                     continue;
                 }
+                //String questionStr = StringUtils.join(question) + "\t" + predicateId;
                 String questionStr = StringUtils.join(question);
                 if (!allQueries.containsKey(questionStr)) {
-                    allQueries.put(questionStr, new Query(question, 1.0 /* question score */, numParses));
+                    allQueries.put(questionStr, new Query(question, predicateId, numParses));
                 }
-                allQueries.get(questionStr).addAnswer(argId, rankId, 1.0 /* answer score */);
+                allQueries.get(questionStr).addAnswer(argumentId, rankId, 1.0 /* answer score */);
                 // TODO: question scorer here.
                 // TODO: need to distinguish between multi-args and argument ambiguity from different parses.
             }
         }
         // Filter queries.
         List<Query> queryList = allQueries.values().stream()
-                .filter(query -> QueryFilter.isUseful(query, parses) /* && QueryFilter.isReasonable(query, parses) */)
-                .collect(Collectors.toList());
+                .filter(query -> QueryFilter.isUseful(query) && QueryFilter.getAnswerEntropy(query) > minAnswerEntropy)
+                        .collect(Collectors.toList());
         // TODO: sort with lambda
-        /*
         Collections.sort(queryList, new Comparator<Query>() {
             @Override
             public int compare(Query o1, Query o2) {
@@ -179,7 +228,6 @@ public class ActiveLearningReranker {
                 return o1.answerScores.size() == o2.answerScores.size() ? 0 : 1;
             }
         });
-        */
         return queryList;
     }
 }
