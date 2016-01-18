@@ -24,7 +24,7 @@ public class ActiveLearningReranker {
     List<Parse> goldParses;
     BaseCcgParser parser;
     QuestionGenerator questionGenerator;
-    ResponseSimulatorGold responseSimulator;
+    ResponseSimulator responseSimulator;
     int nBest;
     Map<String, Double> allResults;
 
@@ -44,11 +44,12 @@ public class ActiveLearningReranker {
         String modelFolder = commandLineOptions.getModel();
         List<Category> rootCategories = commandLineOptions.getRootCategories();
         QuestionGenerator questionGenerator = new QuestionGenerator();
-        ResponseSimulatorGold responseSimulator = new ResponseSimulatorGold(questionGenerator);
+        //ResponseSimulator responseSimulator = new ResponseSimulatorGold(questionGenerator);
+        ResponseSimulator responseSimulator = new ResponseSimulatorMultipleChoice();
 
         /************** manual parameter tuning ... ***********/
         final int[] nBestList = new int[] { 3, 5, 10, 20, 50, 100, 250, 500, 1000 };
-        final double minAnswerEntropy = 0.0;
+        final double minAnswerEntropy = 0.6;
 
         List<Map<String, Double>> allResults = new ArrayList<>();
         for (int nBest : nBestList) {
@@ -77,7 +78,7 @@ public class ActiveLearningReranker {
     }
 
     public ActiveLearningReranker(List<List<InputWord>> sentences, List<Parse> goldParses, BaseCcgParser parser,
-                                  QuestionGenerator questionGenerator, ResponseSimulatorGold responseSimulator, int nBest) {
+                                  QuestionGenerator questionGenerator, ResponseSimulator responseSimulator, int nBest) {
         System.out.println(String.format("\n========== ReRanker Active Learning with %d-Best List ==========", nBest));
         this.sentences = sentences;
         this.goldParses = goldParses;

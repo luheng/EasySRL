@@ -5,6 +5,7 @@ import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.Scanner;
 
 /**
  * Reads a choice from console.
@@ -21,6 +22,11 @@ public class ResponseSimulatorMultipleChoice extends ResponseSimulator {
     public static final String ANSI_CYAN = "\u001B[36m";
     public static final String ANSI_WHITE = "\u001B[37m";
 
+    private Scanner scanner;
+
+    public ResponseSimulatorMultipleChoice() {
+        scanner = new Scanner(System.in);
+    }
     /**
      *
      * @param query
@@ -47,11 +53,15 @@ public class ResponseSimulatorMultipleChoice extends ResponseSimulator {
             System.out.println(String.format("%d: %s", (i + 1), answerStr));
         }
         System.out.println(String.format("Please input a number between 1 to %d", numAnswers));
-        int choice = Integer.parseInt(System.console().readLine());
+        int choice = Integer.parseInt(scanner.nextLine());
         List<Integer> answerList = new ArrayList<>();
         if (0 < choice && choice <= numAnswers) {
-            answerList.add(answerCandidates.get(choice));
+            answerList.add(answerCandidates.get(choice - 1));
         }
         return new Response(answerList);
+    }
+
+    public static void main(String[] args) {
+
     }
 }
