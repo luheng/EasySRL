@@ -4,6 +4,7 @@ import gnu.trove.map.hash.TIntDoubleHashMap;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * Active Learning query
@@ -15,11 +16,17 @@ public class Query {
     HashMap<Integer, Set<Integer>> answerToParses;
     TIntDoubleHashMap answerScores;
 
-    public Query(List<String> question, double questionScore) {
+    public Query(List<String> question, double questionScore, int numParses) {
         this.question = question;
         this.questionScore = questionScore;
-        this.answerToParses = new HashMap<>();
-        this.answerScores = new TIntDoubleHashMap();
+        answerToParses = new HashMap<>();
+        answerScores = new TIntDoubleHashMap();
+        Set<Integer> allParses = new HashSet<>();
+        for (int i = 0; i < numParses; i++) {
+            allParses.add(i);
+        }
+        answerToParses.put(-1, allParses);
+        answerScores.put(-1, 1.0 * numParses);
     }
 
     public void addAnswer(int answerId, int parseId, double answerScore) {
@@ -28,12 +35,16 @@ public class Query {
         }
         answerToParses.get(answerId).add(parseId);
         answerScores.adjustOrPutValue(answerId, answerScore, answerScore);
+        if (answerToParses.get(-1).remove(parseId)) {
+            answerScores.adjustValue(-1, -1.0);
+        }
     }
 
     public void print(List<String> sentence) {
         System.out.println(questionScore + "\t" + question.stream().collect(Collectors.joining(" ")) + "?");
         answerToParses.keySet().stream().sorted().forEach(id -> {
-            System.out.print("\t" + answerScores.get(id) + "\t" + sentence.get(id));
+            String answerStr = (id < 0) ? "N/A" : sentence.get(id);
+            System.out.print("\t" + answerScores.get(id) + "\t" + answerStr);
             answerToParses.get(id).stream().sorted().forEach(parseId -> System.out.print("\t" + parseId));
             System.out.println();
         });

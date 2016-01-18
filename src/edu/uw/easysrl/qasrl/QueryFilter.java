@@ -23,6 +23,6 @@ public class QueryFilter {
 
     public static boolean isReasonable(final Query query, final List<Parse> parses) {
         // Not reasonable if not enough parses propose that question.
-        return query.answerToParses.values().stream().mapToInt(Collection::size).sum() >= 0.1 * parses.size();
+        return query.answerToParses.values().stream().mapToInt(Collection::size).sum() > 0.1 * parses.size();
     }
 }

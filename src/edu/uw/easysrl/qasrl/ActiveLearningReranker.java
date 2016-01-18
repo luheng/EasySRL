@@ -79,31 +79,9 @@ public class ActiveLearningReranker {
                 continue;
             }
             numSentencesParsed ++;
-            /****************** QueryGenerator ******************/
-            Map<String, Query> allQueries = new HashMap<>();
-            IntStream.range(0, parses.size()).forEach(k -> generateQueries(allQueries, words, parses.get(k), k));
-            /***************** QueryFilter **********************/
-            List<Query> queryList = allQueries.values().stream()
-                    .filter(query -> QueryFilter.isUseful(query, parses) && QueryFilter.isReasonable(query, parses))
-                    .collect(Collectors.toList());
-            // TODO: sort with lambda
-            /*
-            Collections.sort(queryList, new Comparator<Query>() {
-                @Override
-                public int compare(Query o1, Query o2) {
-                    if (o1.answerScores.size() < o2.answerScores.size()) {
-                        return -1;
-                    }
-                    return o1.answerScores.size() == o2.answerScores.size() ? 0 : 1;
-                }
-            });
-            */
-            // Debug: print queries.
-            // TODO: print gold response along with query info.
 
-            System.out.println("\n" + String.format("S[%d]:\t", sentIdx) +
-                    words.stream().collect(Collectors.joining(" ")));
-            queryList.forEach(query -> query.print(words));
+            /****************** Generate and Filter Queries ******************/
+            List<Query> queryList = generateQueries(words, parses);
 
             /******************* Response simulator ************/
             // TODO: re-ranker; get simulated response and fix dependencies
@@ -111,8 +89,9 @@ public class ActiveLearningReranker {
             List<Response> responseList = queryList.stream()
                     .map(q -> responseSimulator.answerQuestion(q, words, goldParse))
                     .collect(Collectors.toList());
-            double[] votes = parses.stream().mapToDouble(p->0.0).toArray();
+
             /******************* ReRanker ******************/
+            double[] votes = parses.stream().mapToDouble(p->0.0).toArray();
             for (int i = 0; i < queryList.size(); i++) {
                 Query query = queryList.get(i);
                 Response response = responseList.get(i);
@@ -132,6 +111,7 @@ public class ActiveLearningReranker {
                     ++ numEffectiveQueries;
                 }
             }
+
             /******************* Evaluate *******************/
             List<Results> results = CcgEvaluation.evaluate(parses, goldParse.dependencies);
             int bestK = 0, oracleK = 0;
@@ -151,6 +131,9 @@ public class ActiveLearningReranker {
             oneBestAcc.add(CcgEvaluation.evaluateTags(parses.get(0).categories, goldParse.categories));
             reRankedAcc.add(CcgEvaluation.evaluateTags(parses.get(bestK).categories, goldParse.categories));
             oracleAcc.add(CcgEvaluation.evaluateTags(parses.get(oracleK).categories, goldParse.categories));
+
+            /*************** Print Debugging Info *************/
+            DebugPrinter.printQueryListInfo(sentIdx, words, parses, queryList, responseList);
         }
         System.out.println("\n1-best:\navg-k = 1.0\n" + oneBestAcc + "\n" + oneBest);
         System.out.println("re-ranked:\navg-k = " + 1.0 * avgBestK / numSentencesParsed + "\n" + reRankedAcc + "\n" + reRanked);
@@ -160,23 +143,43 @@ public class ActiveLearningReranker {
         System.out.println("Effective ratio = " + 1.0 * numEffectiveQueries / numQueries);
     }
 
-    private static void generateQueries(Map<String, Query> queries, List<String> words, Parse parse, int rankId) {
-        assert queries != null;
-        // Map from question string to
-        for (ResolvedDependency targetDependency : parse.dependencies) {
-            int argId = targetDependency.getArgument();
-            List<String> question =
-                    questionGenerator.generateQuestion(targetDependency, words, parse.categories, parse.dependencies);
-            if (question == null || question.size() == 0) {
-                continue;
+    private static List<Query> generateQueries(List<String> words, List<Parse> parses) {
+        Map<String, Query> allQueries = new HashMap<>();
+        int numParses = parses.size();
+        for (int rankId = 0; rankId < numParses; rankId++) {
+            Parse parse = parses.get(rankId);
+            for (ResolvedDependency targetDependency : parse.dependencies) {
+                int argId = targetDependency.getArgument();
+                List<String> question = questionGenerator.generateQuestion(targetDependency, words, parse.categories,
+                                                                           parse.dependencies);
+                if (question == null || question.size() == 0) {
+                    continue;
+                }
+                String questionStr = StringUtils.join(question);
+                if (!allQueries.containsKey(questionStr)) {
+                    allQueries.put(questionStr, new Query(question, 1.0 /* question score */, numParses));
+                }
+                allQueries.get(questionStr).addAnswer(argId, rankId, 1.0 /* answer score */);
+                // TODO: question scorer here.
+                // TODO: need to distinguish between multi-args and argument ambiguity from different parses.
             }
-            String questionStr = StringUtils.join(question);
-            if (!queries.containsKey(questionStr)) {
-                queries.put(questionStr, new Query(question, 1.0 /* question score */));
-            }
-            queries.get(questionStr).addAnswer(argId, rankId, 1.0 /* answer score */);
-            // TODO: question scorer here.
-            // TODO: need to distinguish between multi-args and argument ambiguity from different parses.
         }
+        // Filter queries.
+        List<Query> queryList = allQueries.values().stream()
+                .filter(query -> QueryFilter.isUseful(query, parses) /* && QueryFilter.isReasonable(query, parses) */)
+                .collect(Collectors.toList());
+        // TODO: sort with lambda
+        /*
+        Collections.sort(queryList, new Comparator<Query>() {
+            @Override
+            public int compare(Query o1, Query o2) {
+                if (o1.answerScores.size() < o2.answerScores.size()) {
+                    return -1;
+                }
+                return o1.answerScores.size() == o2.answerScores.size() ? 0 : 1;
+            }
+        });
+        */
+        return queryList;
     }
 }
