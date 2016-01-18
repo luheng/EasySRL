@@ -7,14 +7,13 @@ import edu.uw.easysrl.syntax.evaluation.CCGBankEvaluation;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.Preposition;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
-import edu.uw.easysrl.syntax.model.CutoffsDictionary;
-import edu.uw.easysrl.syntax.model.CutoffsDictionaryInterface;
 import edu.uw.easysrl.syntax.model.Model;
 import edu.uw.easysrl.syntax.model.SupertagFactoredModel;
 import edu.uw.easysrl.syntax.parser.*;
 import edu.uw.easysrl.syntax.tagger.POSTagger;
 import edu.uw.easysrl.syntax.tagger.Tagger;
 import edu.uw.easysrl.util.Util;
+import edu.uw.easysrl.util.Util.Scored;
 
 import edu.stanford.nlp.util.StringUtils;
 
@@ -71,9 +70,10 @@ public abstract class BaseCcgParser {
                 !badDependenciesSet.contains(sentence.get(predIdx).word + ":" + depStr1);
     }
 
-    protected Parse getParse(final List<InputReader.InputWord> sentence, final SyntaxTreeNode ccgParse,
+    protected Parse getParse(final List<InputReader.InputWord> sentence, final Scored<SyntaxTreeNode> scoredParse,
                              DependencyGenerator dependencyGenerator) {
         // TODO: get categories from syntax treenode
+        SyntaxTreeNode ccgParse = scoredParse.getObject();
         List<Category> categories = ccgParse.getLeaves().stream().map(SyntaxTreeNode::getCategory)
                 .collect(Collectors.toList());
         Set<UnlabelledDependency> unlabelledDeps = new HashSet<>();
@@ -92,7 +92,7 @@ public abstract class BaseCcgParser {
                                 SRLFrame.NONE, Preposition.NONE)));
             }
         });
-        return new Parse(categories, dependencies);
+        return new Parse(categories, dependencies, scoredParse.getScore());
     }
 
     protected Parse getParse(final List<InputReader.InputWord> sentence, final SRLParser.CCGandSRLparse parse) {
@@ -111,14 +111,14 @@ public abstract class BaseCcgParser {
 
     public abstract List<Parse> parseNBest(List<InputReader.InputWord> sentence);
 
-    public static class EasyCCGParser extends BaseCcgParser {
+    public static class AStarParser extends BaseCcgParser {
         private DependencyGenerator dependencyGenerator;
         private Parser parser;
         private final double supertaggerBeam = 0.000001;
-        private final int maxChartSize = 20000;
+        private final int maxChartSize = 100000;
         private final int maxSentenceLength = 70;
 
-        public EasyCCGParser(String modelFolderPath, List<Category> rootCategories, int nBest)  {
+        public AStarParser(String modelFolderPath, List<Category> rootCategories, int nBest)  {
             final File modelFolder = Util.getFile(modelFolderPath);
             if (!modelFolder.exists()) {
                 throw new InputMismatchException("Couldn't load model from from: " + modelFolder);
@@ -139,23 +139,22 @@ public abstract class BaseCcgParser {
 
         @Override
         public Parse parse(List<InputReader.InputWord> sentence) {
-            List<Util.Scored<SyntaxTreeNode>> parses = parser.doParsing(
+            List<Scored<SyntaxTreeNode>> parses = parser.doParsing(
                     new InputReader.InputToParser(sentence, null, null, false));
             if (parses == null || parses.size() == 0) {
                 return null;
             }
-            return getParse(sentence, parses.get(0).getObject(), dependencyGenerator);
+            return getParse(sentence, parses.get(0), dependencyGenerator);
         }
 
         @Override
         public List<Parse> parseNBest(List<InputReader.InputWord> sentence) {
-            List<Util.Scored<SyntaxTreeNode>> parses = parser.doParsing(
+            List<Scored<SyntaxTreeNode>> parses = parser.doParsing(
                     new InputReader.InputToParser(sentence, null, null, false));
             if (parses == null || parses.size() == 0) {
                 return null;
             }
-            return parses.stream().map(p -> getParse(sentence, p.getObject(), dependencyGenerator))
-                    .collect(Collectors.toList());
+            return parses.stream().map(p -> getParse(sentence, p, dependencyGenerator)).collect(Collectors.toList());
         }
     }
 

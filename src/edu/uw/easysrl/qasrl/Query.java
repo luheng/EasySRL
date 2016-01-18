@@ -38,4 +38,9 @@ public class Query {
             System.out.println();
         });
     }
+
+    // TODO: compute query scores: expected intelligibility score and expected model change score
+    // A high quality question need to be:
+    // - derived from a confident lexicon.
+    // - derived from a parse with confident ``supporting dependencies'' (other than the target dependency)
 }
