@@ -95,6 +95,23 @@ public class Query {
         });
     }
 
+    public void print(List<String> sentence, Response response, Response goldResponse) {
+        double entropy = QueryGenerator.getAnswerEntropy(this);
+        System.out.println(entropy + "\t" + question.stream().collect(Collectors.joining(" ")) + "?");
+        answerToParses.keySet().stream().sorted().forEach(id -> {
+            String answerStr = (id < 0) ? "N/A" : sentence.get(id);
+            boolean match  = (id < 0 && response.answerIds.size() == 0) || response.answerIds.contains(id);
+            boolean matchGold = (id < 0 && goldResponse.answerIds.size() == 0) || goldResponse.answerIds.contains(id);
+            System.out.print("\t" + (match ? "*" : " ") +  (matchGold ? "g" : " ") +
+                    answerScores.get(id) + "\t" + answerStr);
+            List<int[]> idList = getShortList(new ArrayList<>(answerToParses.get(id)));
+            idList.stream().forEach(span -> System.out.print("\t" + (span[0] == span[1] ?
+                    span[0] : span[0] + "-" + span[1])));
+
+            System.out.println();
+        });
+    }
+
     /**
      * Summarize a list of ids into spans for better printing.
      * @param list: a list of ids, i.e. 1 2 3 5 8

@@ -11,13 +11,21 @@ public class DebugPrinter {
     // TODO TODO
     public static void printQueryListInfo(int sentIdx, List<String> words, List<Parse> parseList, List<Query> queryList,
                                           List<Response> responseList) {
-        System.out.println("\n" + String.format("S[%d]:\t", sentIdx) +
-                words.stream().collect(Collectors.joining(" ")));
+        System.out.println("\n" + String.format("S[%d]:\t", sentIdx) + words.stream().collect(Collectors.joining(" ")));
         for (int i = 0; i < queryList.size(); i++) {
             Query query = queryList.get(i);
             Response response = responseList.get(i);
 
             query.print(words, response);
+        }
+    }
+
+    public static void printQueryListInfo(int sentIdx, List<String> words, List<Parse> parseList, List<Query> queryList,
+                                          List<Response> responseList, List<Response> goldResponseList) {
+        System.out.println("\n" + String.format("S[%d]:\t", sentIdx) + words.stream().collect(Collectors.joining(" ")));
+        for (int i = 0; i < queryList.size(); i++) {
+            Query query = queryList.get(i);
+            query.print(words, responseList.get(i), goldResponseList.get(i));
         }
     }
 }

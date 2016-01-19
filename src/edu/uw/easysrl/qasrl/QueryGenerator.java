@@ -22,8 +22,8 @@ public class QueryGenerator {
      * @return a list of queries, filtered and sorted
      */
     public static List<Query> generateQueries(final List<String> words, final List<Parse> parses,
-                                               final QuestionGenerator questionGenerator,
-                                               final boolean collapseQueries, final double minAnswerEntropy) {
+                                              final QuestionGenerator questionGenerator,
+                                              final boolean collapseQueries, final double minAnswerEntropy) {
         Map<String, Query> allQueries = new HashMap<>();
         int numParses = parses.size();
         for (int rankId = 0; rankId < numParses; rankId++) {

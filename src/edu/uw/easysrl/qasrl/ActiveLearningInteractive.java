@@ -69,7 +69,7 @@ public class ActiveLearningInteractive {
             learner.minAnswerEntropy = minAnswerEntropy;
             learner.shuffleSentences = shuffleSentences;
             learner.maxNumSentences = maxNumSentences;
-            learner.collapseQueries = true;
+            learner.collapseQueries = collapseQueries;
             learner.randomSeed = randomSeed;
             learner.run(verbose);
             allResults.add(learner.allResults);
@@ -119,6 +119,9 @@ public class ActiveLearningInteractive {
         // Effect query: a query whose response boosts the score of a non-top parse but not the top one.
         int numQueries = 0, numEffectiveQueries = 0;
 
+        // For debugging.
+        ResponseSimulatorGold goldHuman = new ResponseSimulatorGold(questionGenerator);
+
         List<Integer> sentenceOrder = IntStream.range(0, sentences.size()).boxed().collect(Collectors.toList());
         if (shuffleSentences) {
             Collections.shuffle(sentenceOrder, new Random(randomSeed));
@@ -128,7 +131,8 @@ public class ActiveLearningInteractive {
         }
 
         // TODO: progress bar.
-        for (int sentIdx : sentenceOrder) {
+        for (int s = 0; s < sentenceOrder.size(); s++) {
+            int sentIdx = sentenceOrder.get(s);
             List<InputWord> sentence = sentences.get(sentIdx);
             List<String> words = sentence.stream().map(w->w.word).collect(Collectors.toList());
             Parse goldParse = goldParses.get(sentIdx);
@@ -146,6 +150,7 @@ public class ActiveLearningInteractive {
 
             /******************* Response simulator ************/
             // If the response gives N/A, shall we down vote all parses?
+            System.out.println(String.format("Sentence %d/%d", (s+1), sentenceOrder.size()));
             List<Response> responseList = queryList.stream()
                     .map(q -> responseSimulator.answerQuestion(q, words, goldParse))
                     .collect(Collectors.toList());
@@ -194,7 +199,10 @@ public class ActiveLearningInteractive {
 
             /*************** Print Debugging Info *************/
             if (verbose && queryList.size() > 0) {
-                DebugPrinter.printQueryListInfo(sentIdx, words, parses, queryList, responseList);
+                List<Response> goldResponseList = queryList.stream()
+                        .map(q -> goldHuman.answerQuestion(q, words, goldParse))
+                        .collect(Collectors.toList());
+                DebugPrinter.printQueryListInfo(sentIdx, words, parses, queryList, responseList, goldResponseList);
             }
         }
         System.out.println("\n1-best:\navg-k = 1.0\n" + oneBestAcc + "\n" + oneBest);
