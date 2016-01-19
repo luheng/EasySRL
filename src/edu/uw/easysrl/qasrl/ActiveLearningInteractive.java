@@ -126,11 +126,9 @@ public class ActiveLearningInteractive {
         if (shuffleSentences) {
             Collections.shuffle(sentenceOrder, new Random(randomSeed));
         }
-        if (maxNumSentences > 0) {
-            sentenceOrder = sentenceOrder.subList(0, Math.min(maxNumSentences, sentences.size()));
-        }
 
         // TODO: progress bar.
+        int numSentencesQueried = 0;
         for (int s = 0; s < sentenceOrder.size(); s++) {
             int sentIdx = sentenceOrder.get(s);
             List<InputWord> sentence = sentences.get(sentIdx);
@@ -150,7 +148,9 @@ public class ActiveLearningInteractive {
 
             /******************* Response simulator ************/
             // If the response gives N/A, shall we down vote all parses?
-            System.out.println(String.format("Sentence %d/%d", (s+1), sentenceOrder.size()));
+            if (queryList.size() > 0) {
+                System.out.println(String.format("Sentence %d/%d", (numSentencesQueried + 1), maxNumSentences));
+            }
             List<Response> responseList = queryList.stream()
                     .map(q -> responseSimulator.answerQuestion(q, words, goldParse))
                     .collect(Collectors.toList());
@@ -197,12 +197,21 @@ public class ActiveLearningInteractive {
             reRankedAcc.add(CcgEvaluation.evaluateTags(parses.get(bestK).categories, goldParse.categories));
             oracleAcc.add(CcgEvaluation.evaluateTags(parses.get(oracleK).categories, goldParse.categories));
 
+            if (queryList.size() > 0) {
+                numSentencesQueried ++;
+                if (maxNumSentences > -1 && numSentencesQueried >= maxNumSentences) {
+                    break;
+                }
+            }
+
             /*************** Print Debugging Info *************/
             if (verbose && queryList.size() > 0) {
+                System.out.println("===============");
                 List<Response> goldResponseList = queryList.stream()
                         .map(q -> goldHuman.answerQuestion(q, words, goldParse))
                         .collect(Collectors.toList());
                 DebugPrinter.printQueryListInfo(sentIdx, words, parses, queryList, responseList, goldResponseList);
+                System.out.println("===============");
             }
         }
         System.out.println("\n1-best:\navg-k = 1.0\n" + oneBestAcc + "\n" + oneBest);
