@@ -32,6 +32,7 @@ public class ActiveLearningInteractive {
     boolean shuffleSentences = false;
     int maxNumSentences = -1;
     int randomSeed = 0;
+    boolean collapseQueries = false;
 
     public static void main(String[] args) {
         EasySRL.CommandLineArguments commandLineOptions;
@@ -47,28 +48,30 @@ public class ActiveLearningInteractive {
         String modelFolder = commandLineOptions.getModel();
         List<Category> rootCategories = commandLineOptions.getRootCategories();
         QuestionGenerator questionGenerator = new QuestionGenerator();
-        //ResponseSimulator responseSimulator = new ResponseSimulatorGold(questionGenerator);
         ResponseSimulator responseSimulator = new ResponseSimulatorMultipleChoice();
 
         /************** manual parameter tuning ... ***********/
         //final int[] nBestList = new int[] { 3, 5, 10, 20, 50, 100, 250, 500, 1000 };
         final int[] nBestList = new int[] { 5 };
-        final double minAnswerEntropy = 0.6;
+        final double minAnswerEntropy = 0.0;
         final int maxNumSentences = 20;
         final boolean shuffleSentences = true;
+        final boolean collapseQueries = true;
+        final boolean verbose = true;
         final int randomSeed = 12345;
 
         List<Map<String, Double>> allResults = new ArrayList<>();
         for (int nBest : nBestList) {
             BaseCcgParser parser = new BaseCcgParser.AStarParser(modelFolder, rootCategories, nBest);
 
-            ActiveLearningReranker learner = new ActiveLearningReranker(sentences, goldParses, parser,
+            ActiveLearningInteractive learner = new ActiveLearningInteractive(sentences, goldParses, parser,
                     questionGenerator, responseSimulator, nBest);
             learner.minAnswerEntropy = minAnswerEntropy;
             learner.shuffleSentences = shuffleSentences;
             learner.maxNumSentences = maxNumSentences;
+            learner.collapseQueries = true;
             learner.randomSeed = randomSeed;
-            learner.run(true /* verbose */);
+            learner.run(verbose);
             allResults.add(learner.allResults);
         }
         /*********** output results **********/
@@ -138,7 +141,8 @@ public class ActiveLearningInteractive {
             numSentencesParsed ++;
 
             /****************** Generate and Filter Queries ******************/
-            List<Query> queryList = generateQueries(words, parses);
+            List<Query> queryList = QueryGenerator.generateQueries(words, parses, questionGenerator, collapseQueries,
+                    minAnswerEntropy);
 
             /******************* Response simulator ************/
             // If the response gives N/A, shall we down vote all parses?
@@ -189,11 +193,9 @@ public class ActiveLearningInteractive {
             oracleAcc.add(CcgEvaluation.evaluateTags(parses.get(oracleK).categories, goldParse.categories));
 
             /*************** Print Debugging Info *************/
-            /*
             if (verbose && queryList.size() > 0) {
                 DebugPrinter.printQueryListInfo(sentIdx, words, parses, queryList, responseList);
             }
-            */
         }
         System.out.println("\n1-best:\navg-k = 1.0\n" + oneBestAcc + "\n" + oneBest);
         System.out.println("re-ranked:\navg-k = " + 1.0 * avgBestK / numSentencesParsed + "\n" + reRankedAcc + "\n" + reRanked);
@@ -201,6 +203,10 @@ public class ActiveLearningInteractive {
         System.out.println("Number of queries = " + numQueries);
         System.out.println("Number of effective queries = " + numEffectiveQueries);
         System.out.println("Effective ratio = " + 1.0 * numEffectiveQueries / numQueries);
+        double baselineF1 = oneBest.getF1();
+        double rerankF1 = reRanked.getF1();
+        double avgGain = (rerankF1 - baselineF1) / numQueries;
+        System.out.println("Avg. F1 gain = " + avgGain);
 
         allResults.put("1-best-acc", oneBestAcc.getAccuracy() * 100);
         allResults.put("1-best-f1", oneBest.getF1() * 100);
@@ -212,45 +218,6 @@ public class ActiveLearningInteractive {
         allResults.put("num-eff-queries", (double) numEffectiveQueries);
         allResults.put("num-queries", (double) numQueries);
         allResults.put("eff-ratio", 100.0 * numEffectiveQueries / numQueries);
-    }
-
-    private List<Query> generateQueries(List<String> words, List<Parse> parses) {
-        Map<String, Query> allQueries = new HashMap<>();
-        int numParses = parses.size();
-        for (int rankId = 0; rankId < numParses; rankId++) {
-            Parse parse = parses.get(rankId);
-            for (ResolvedDependency targetDependency : parse.dependencies) {
-                int predicateId = targetDependency.getHead();
-                int argumentId = targetDependency.getArgument();
-                List<String> question = questionGenerator.generateQuestion(targetDependency, words, parse.categories,
-                        parse.dependencies);
-                if (question == null || question.size() == 0) {
-                    continue;
-                }
-                //String questionStr = StringUtils.join(question) + "\t" + predicateId;
-                String questionStr = StringUtils.join(question);
-                if (!allQueries.containsKey(questionStr)) {
-                    allQueries.put(questionStr, new Query(question, predicateId, numParses));
-                }
-                allQueries.get(questionStr).addAnswer(argumentId, rankId, 1.0 /* answer score */);
-                // TODO: question scorer here.
-                // TODO: need to distinguish between multi-args and argument ambiguity from different parses.
-            }
-        }
-        // Filter queries.
-        List<Query> queryList = allQueries.values().stream()
-                .filter(query -> QueryFilter.isUseful(query) && QueryFilter.getAnswerEntropy(query) > minAnswerEntropy)
-                .collect(Collectors.toList());
-        // TODO: sort with lambda
-        Collections.sort(queryList, new Comparator<Query>() {
-            @Override
-            public int compare(Query o1, Query o2) {
-                if (o1.answerScores.size() < o2.answerScores.size()) {
-                    return -1;
-                }
-                return o1.answerScores.size() == o2.answerScores.size() ? 0 : 1;
-            }
-        });
-        return queryList;
+        allResults.put("avg-gain", avgGain);
     }
 }

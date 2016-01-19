@@ -19,45 +19,57 @@ public class GroupedQuery {
     TObjectDoubleHashMap<String> questionScores;
     TIntDoubleHashMap answerScores;
 
-    /**
-     *
-     * @param queries: queries with same predicate index and same candidate answers to collapse.
-     */
-    public GroupedQuery(Set<Query> queries) {
-        Query anyQuery = queries.iterator().next();
-        predicateIndex = anyQuery.predicateIndex;
-        numTotalParses = anyQuery.numTotalParses;
-
+    public GroupedQuery(int predicateIndex, int numTotalParses, final Set<Integer> answerIds) {
+        this.predicateIndex = predicateIndex;
+        this.numTotalParses = numTotalParses;
         questionToParses = new HashMap<>();
         questionScores = new TObjectDoubleHashMap<>();
 
         answerToParses = new HashMap<>();
         answerScores = new TIntDoubleHashMap();
-        anyQuery.answerToParses.keySet().forEach(a -> answerToParses.put(a, new HashSet<>()));
+        answerIds.forEach(a -> answerToParses.put(a, new HashSet<>()));
 
-        queries.forEach(this::addQuery);
         Set<Integer> allParses = IntStream.range(0, numTotalParses).boxed().collect(Collectors.toSet());
-        answerToParses.values().forEach(allParses::removeAll);
         answerToParses.put(-1, allParses);
         answerScores.put(-1, 1.0 * allParses.size());
     }
 
-    private void addQuery(Query query) {
+    public void addQuery(Query query) {
         String qstr = query.getQuestionString();
+        double questionScore = query.getAllParses().size();
         if (!questionToParses.containsKey(qstr)) {
             questionToParses.put(qstr, new HashSet<>());
         }
         questionToParses.get(qstr).addAll(query.getAllParses());
-        questionScores.adjustOrPutValue(qstr, query.questionScore, query.questionScore);
+        questionScores.adjustOrPutValue(qstr, questionScore, questionScore);
         query.answerToParses.forEach((answerId, parseIds) -> {
             if (answerId >= 0) {
+                double answerScore = query.answerScores.get(answerId);
                 answerToParses.get(answerId).addAll(parseIds);
+                answerToParses.get(-1).removeAll(parseIds);
+                answerScores.adjustOrPutValue(answerId, answerScore, answerScore);
+                answerScores.put(-1, answerToParses.get(-1).size());
             }
         });
     }
 
+    public Query getQuery() {
+        // Pick the surface form with highest score.
+        String bestQuestion = "";
+        double bestScore = -1.0;
+        for (String qstr : questionScores.keySet()) {
+            double score = questionScores.get(qstr);
+            if (score > bestScore) {
+                bestScore = score;
+                bestQuestion = qstr;
+            }
+        }
+        return new Query(predicateIndex, numTotalParses, Arrays.asList(bestQuestion.split("\\s+")), bestScore,
+                         answerToParses, answerScores);
+    }
+
     public void print(List<String> sentence) {
-        double entropy = QueryFilter.getAnswerEntropy(this);
+        double entropy = QueryGenerator.getAnswerEntropy(this);
         questionToParses.keySet().stream().forEach(qstr -> {
             System.out.print(String.format("%.3f, %.3f\t%s", questionScores.get(qstr), entropy, qstr + "?"));
             List<int[]> idList = getShortList(new ArrayList<>(questionToParses.get(qstr)));
@@ -76,7 +88,7 @@ public class GroupedQuery {
     }
 
     public void print(List<String> sentence, Response response) {
-        double entropy = QueryFilter.getAnswerEntropy(this);
+        double entropy = QueryGenerator.getAnswerEntropy(this);
         questionToParses.keySet().stream().forEach(qstr -> {
             System.out.print(String.format("%.3f, %.3f\t%s", questionScores.get(qstr), entropy, qstr + "?"));
             List<int[]> idList = getShortList(new ArrayList<>(questionToParses.get(qstr)));

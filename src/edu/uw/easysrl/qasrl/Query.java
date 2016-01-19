@@ -14,7 +14,7 @@ public class Query {
     double questionScore;
     int predicateIndex;
     int numTotalParses;
-    HashMap<Integer, Set<Integer>> answerToParses;
+    Map<Integer, Set<Integer>> answerToParses;
     TIntDoubleHashMap answerScores;
 
     /**
@@ -37,6 +37,16 @@ public class Query {
         }
         answerToParses.put(-1, allParses);
         answerScores.put(-1, 1.0 * numTotalParses);
+    }
+
+    public Query(int predicateIndex, int numTotalParses, List<String> question, double questionScore,
+                 Map<Integer, Set<Integer>> answerToParses, TIntDoubleHashMap answerScores) {
+        this.predicateIndex = predicateIndex;
+        this.numTotalParses = numTotalParses;
+        this.question = question;
+        this.questionScore = questionScore;
+        this.answerToParses = answerToParses;
+        this.answerScores = answerScores;
     }
 
     public void addAnswer(int answerId, int parseId, double answerScore) {
@@ -71,7 +81,7 @@ public class Query {
     }
 
     public void print(List<String> sentence, Response response) {
-        double entropy = QueryFilter.getAnswerEntropy(this);
+        double entropy = QueryGenerator.getAnswerEntropy(this);
         System.out.println(entropy + "\t" + question.stream().collect(Collectors.joining(" ")) + "?");
         answerToParses.keySet().stream().sorted().forEach(id -> {
             String answerStr = (id < 0) ? "N/A" : sentence.get(id);

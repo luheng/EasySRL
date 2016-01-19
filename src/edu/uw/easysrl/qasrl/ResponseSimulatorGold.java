@@ -4,9 +4,11 @@ import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 
 import edu.stanford.nlp.util.StringUtils;
+import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Simulates user response in active learning. When presented with a question, the simulator answers with its knowledge
@@ -40,7 +42,15 @@ public class ResponseSimulatorGold extends ResponseSimulator {
                 continue;
             }
             if (questionStr.equalsIgnoreCase(StringUtils.join(goldQuestion))) {
-                answerIndices.add(dep.getArgumentIndex());
+                int argumentId = dep.getArgument();
+                Category answerCategory = dep.getCategory().getArgument(dep.getArgNumber());
+                if (answerCategory.equals(Category.PP) || sentence.get(argumentId).equals("to")) {
+                    goldParse.dependencies.stream()
+                            .filter(d -> d.getHead() == argumentId)
+                            .forEach(d2 -> answerIndices.add(d2.getArgument()));
+                } else {
+                    answerIndices.add(argumentId);
+                }
             }
         }
         if (answerIndices.size() == 0) {

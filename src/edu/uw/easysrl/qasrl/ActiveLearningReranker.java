@@ -13,7 +13,6 @@ import edu.stanford.nlp.util.StringUtils;
 
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 
 /**
@@ -30,6 +29,7 @@ public class ActiveLearningReranker {
     Map<String, Double> allResults;
 
     double minAnswerEntropy = 0.0;
+    boolean collapseQueries = false;
 
     public static void main(String[] args) {
         EasySRL.CommandLineArguments commandLineOptions;
@@ -45,12 +45,13 @@ public class ActiveLearningReranker {
         String modelFolder = commandLineOptions.getModel();
         List<Category> rootCategories = commandLineOptions.getRootCategories();
         QuestionGenerator questionGenerator = new QuestionGenerator();
-        //ResponseSimulator responseSimulator = new ResponseSimulatorGold(questionGenerator);
-        ResponseSimulator responseSimulator = new ResponseSimulatorMultipleChoice();
+        ResponseSimulator responseSimulator = new ResponseSimulatorGold(questionGenerator);
 
         /************** manual parameter tuning ... ***********/
-        final int[] nBestList = new int[] { 3, 5, 10, 20, 50, 100 }; //,  250, 500, 1000 };
+        final int[] nBestList = new int[] { 3, 5, 10, 20, 50, 100, 250, 500, 1000 };
         final double minAnswerEntropy = 0.6;
+        final boolean collapseQueries = true;
+        final boolean verbose = false;
 
         List<Map<String, Double>> allResults = new ArrayList<>();
         for (int nBest : nBestList) {
@@ -59,7 +60,8 @@ public class ActiveLearningReranker {
             ActiveLearningReranker learner = new ActiveLearningReranker(sentences, goldParses, parser,
                                                                         questionGenerator, responseSimulator, nBest);
             learner.minAnswerEntropy = minAnswerEntropy;
-            learner.run(true /* verbose */);
+            learner.collapseQueries = collapseQueries;
+            learner.run(verbose);
             allResults.add(learner.allResults);
         }
         /*********** output results **********/
@@ -72,7 +74,7 @@ public class ActiveLearningReranker {
         resultKeys.forEach(rk -> {
             System.out.print("\n" + rk);
             for (int i = 0; i < nBestList.length; i++) {
-                System.out.print(String.format("\t%.3f",allResults.get(i).get(rk)));
+                System.out.print(String.format("\t%.6f",allResults.get(i).get(rk)));
             }
         });
         System.out.println();
@@ -119,7 +121,8 @@ public class ActiveLearningReranker {
             numSentencesParsed ++;
 
             /****************** Generate and Filter Queries ******************/
-            List<Query> queryList = generateQueries(words, parses);
+            List<Query> queryList = QueryGenerator.generateQueries(words, parses, questionGenerator, collapseQueries,
+                    minAnswerEntropy);
 
             /******************* Response simulator ************/
             // TODO: If the response gives N/A, shall we down vote all parses?
@@ -175,13 +178,15 @@ public class ActiveLearningReranker {
             }
         }
         System.out.println("\n1-best:\navg-k = 1.0\n" + oneBestAcc + "\n" + oneBest);
-        System.out.println("re-ranked:\navg-k = " + 1.0 * avgBestK / numSentencesParsed);
-        System.out.println(reRankedAcc + "\n" + reRanked);
-        System.out.println("oracle:\navg-k = " + 1.0 * avgOracleK / numSentencesParsed);
-        System.out.println(oracleAcc + "\n" + oracle);
+        System.out.println("re-ranked:\navg-k = " + 1.0 * avgBestK / numSentencesParsed + "\n" + reRankedAcc + "\n" + reRanked);
+        System.out.println("oracle:\navg-k = " + 1.0 * avgOracleK / numSentencesParsed + "\n"+ oracleAcc + "\n" + oracle);
         System.out.println("Number of queries = " + numQueries);
         System.out.println("Number of effective queries = " + numEffectiveQueries);
         System.out.println("Effective ratio = " + 1.0 * numEffectiveQueries / numQueries);
+        double baselineF1 = oneBest.getF1();
+        double rerankF1 = reRanked.getF1();
+        double avgGain = (rerankF1 - baselineF1) / numQueries * 100;
+        System.out.println("Avg. F1 gain = " + avgGain);
 
         allResults.put("1-best-acc", oneBestAcc.getAccuracy() * 100);
         allResults.put("1-best-f1", oneBest.getF1() * 100);
@@ -193,45 +198,8 @@ public class ActiveLearningReranker {
         allResults.put("num-eff-queries", (double) numEffectiveQueries);
         allResults.put("num-queries", (double) numQueries);
         allResults.put("eff-ratio", 100.0 * numEffectiveQueries / numQueries);
+        allResults.put("avg-gain", avgGain);
     }
 
-    private List<Query> generateQueries(List<String> words, List<Parse> parses) {
-        Map<String, Query> allQueries = new HashMap<>();
-        int numParses = parses.size();
-        for (int rankId = 0; rankId < numParses; rankId++) {
-            Parse parse = parses.get(rankId);
-            for (ResolvedDependency targetDependency : parse.dependencies) {
-                int predicateId = targetDependency.getHead();
-                int argumentId = targetDependency.getArgument();
-                List<String> question = questionGenerator.generateQuestion(targetDependency, words, parse.categories,
-                                                                           parse.dependencies);
-                if (question == null || question.size() == 0) {
-                    continue;
-                }
-                //String questionStr = StringUtils.join(question) + "\t" + predicateId;
-                String questionStr = StringUtils.join(question);
-                if (!allQueries.containsKey(questionStr)) {
-                    allQueries.put(questionStr, new Query(question, predicateId, numParses));
-                }
-                allQueries.get(questionStr).addAnswer(argumentId, rankId, 1.0 /* answer score */);
-                // TODO: question scorer here.
-                // TODO: need to distinguish between multi-args and argument ambiguity from different parses.
-            }
-        }
-        // Filter queries.
-        List<Query> queryList = allQueries.values().stream()
-                .filter(query -> QueryFilter.isUseful(query) && QueryFilter.getAnswerEntropy(query) > minAnswerEntropy)
-                        .collect(Collectors.toList());
-        // TODO: sort with lambda
-        Collections.sort(queryList, new Comparator<Query>() {
-            @Override
-            public int compare(Query o1, Query o2) {
-                if (o1.answerScores.size() < o2.answerScores.size()) {
-                    return -1;
-                }
-                return o1.answerScores.size() == o2.answerScores.size() ? 0 : 1;
-            }
-        });
-        return queryList;
-    }
+
 }
