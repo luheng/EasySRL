@@ -11,6 +11,7 @@ import java.util.stream.IntStream;
  * Queries with multiple question strings.
  * Created by luheng on 1/18/16.
  */
+@Deprecated
 public class GroupedQueryOld {
     int predicateIndex;
     int numTotalParses;
@@ -72,7 +73,7 @@ public class GroupedQueryOld {
         double entropy = QueryGenerator.getAnswerEntropy(this);
         questionToParses.keySet().stream().forEach(qstr -> {
             System.out.print(String.format("%.3f, %.3f\t%s", questionScores.get(qstr), entropy, qstr + "?"));
-            List<int[]> idList = getShortList(new ArrayList<>(questionToParses.get(qstr)));
+            List<int[]> idList = DebugPrinter.getShortList(new ArrayList<>(questionToParses.get(qstr)));
             idList.stream().forEach(span -> System.out.print("\t" + (span[0] == span[1] ?
                     span[0] : span[0] + "-" + span[1])));
             System.out.println();
@@ -80,7 +81,7 @@ public class GroupedQueryOld {
         answerToParses.keySet().stream().sorted().forEach(id -> {
             String answerStr = (id < 0) ? "N/A" : sentence.get(id);
             System.out.print(String.format("\t%.3f\t%s", answerScores.get(id), answerStr));
-            List<int[]> idList = getShortList(new ArrayList<>(answerToParses.get(id)));
+            List<int[]> idList = DebugPrinter.getShortList(new ArrayList<>(answerToParses.get(id)));
             idList.stream().forEach(span -> System.out.print("\t" + (span[0] == span[1] ?
                     span[0] : span[0] + "-" + span[1])));
             System.out.println();
@@ -91,7 +92,7 @@ public class GroupedQueryOld {
         double entropy = QueryGenerator.getAnswerEntropy(this);
         questionToParses.keySet().stream().forEach(qstr -> {
             System.out.print(String.format("%.3f, %.3f\t%s", questionScores.get(qstr), entropy, qstr + "?"));
-            List<int[]> idList = getShortList(new ArrayList<>(questionToParses.get(qstr)));
+            List<int[]> idList = DebugPrinter.getShortList(new ArrayList<>(questionToParses.get(qstr)));
             idList.stream().forEach(span -> System.out.print("\t" + (span[0] == span[1] ?
                     span[0] : span[0] + "-" + span[1])));
             System.out.println();
@@ -100,29 +101,13 @@ public class GroupedQueryOld {
             String answerStr = (id < 0) ? "N/A" : sentence.get(id);
             boolean match = (id < 0 && response.answerIds.size() == 0) || response.answerIds.contains(id);
             System.out.print(String.format("\t%s%.3f\t%s", (match ? "*" : " "), answerScores.get(id), answerStr));
-            List<int[]> idList = getShortList(new ArrayList<>(answerToParses.get(id)));
+            List<int[]> idList = DebugPrinter.getShortList(new ArrayList<>(answerToParses.get(id)));
             idList.stream().forEach(span -> System.out.print("\t" + (span[0] == span[1] ?
                     span[0] : span[0] + "-" + span[1])));
             System.out.println();
         });
     }
 
-    /**
-     * Summarize a list of ids into spans for better printing.
-     * @param list: a list of ids, i.e. 1 2 3 5 8
-     * @return a summarized list of spans, i.e. 1-3, 5, 8
-     */
-    private static List<int[]> getShortList(List<Integer> list) {
-        Collections.sort(list);
-        List<int[]> shortList = new ArrayList<>();
-        for (int i = 0; i < list.size(); ) {
-            int j = i + 1;
-            for ( ; j < list.size() && list.get(j-1) + 1 == list.get(j); j++ ) ;
-            shortList.add(new int[] {list.get(i), list.get(j - 1)});
-            i = j;
-        }
-        return shortList;
-    }
     // TODO: compute query scores: expected intelligibility score and expected model change score
     // A high quality question need to be:
     // - derived from a confident lexicon.

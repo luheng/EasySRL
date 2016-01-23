@@ -1,6 +1,5 @@
 package edu.uw.easysrl.qasrl;
 
-import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.main.EasySRL;
 import edu.uw.easysrl.main.InputReader.InputWord;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
@@ -8,8 +7,6 @@ import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 import uk.co.flamingpenguin.jewel.cli.CliFactory;
-
-import edu.stanford.nlp.util.StringUtils;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -25,6 +22,7 @@ public class ActiveLearningInteractive {
     BaseCcgParser parser;
     QuestionGenerator questionGenerator;
     ResponseSimulator responseSimulator;
+    Reranker reranker;
     int nBest;
     Map<String, Double> allResults;
 
@@ -32,7 +30,6 @@ public class ActiveLearningInteractive {
     boolean shuffleSentences = false;
     int maxNumSentences = -1;
     int randomSeed = 0;
-    boolean collapseQueries = false;
 
     public static void main(String[] args) {
         EasySRL.CommandLineArguments commandLineOptions;
@@ -41,7 +38,7 @@ public class ActiveLearningInteractive {
         } catch (Exception e) {
             return;
         }
-        List<List<InputWord>> sentences = new ArrayList<>();
+        List<List<InputWord>  > sentences = new ArrayList<>();
         List<Parse> goldParses = new ArrayList<>();
         DataLoader.readDevPool(sentences, goldParses);
 
@@ -52,13 +49,12 @@ public class ActiveLearningInteractive {
 
         /************** manual parameter tuning ... ***********/
         //final int[] nBestList = new int[] { 3, 5, 10, 20, 50, 100, 250, 500, 1000 };
-        final int[] nBestList = new int[] { 5 };
+        final int[] nBestList = new int[] { 10 };
         final double minAnswerEntropy = 0.0;
         final int maxNumSentences = 20;
         final boolean shuffleSentences = true;
-        final boolean collapseQueries = true;
         final boolean verbose = true;
-        final int randomSeed = 12345;
+        final int randomSeed = 56789 ;
 
         List<Map<String, Double>> allResults = new ArrayList<>();
         for (int nBest : nBestList) {
@@ -69,7 +65,6 @@ public class ActiveLearningInteractive {
             learner.minAnswerEntropy = minAnswerEntropy;
             learner.shuffleSentences = shuffleSentences;
             learner.maxNumSentences = maxNumSentences;
-            learner.collapseQueries = collapseQueries;
             learner.randomSeed = randomSeed;
             learner.run(verbose);
             allResults.add(learner.allResults);
@@ -90,7 +85,6 @@ public class ActiveLearningInteractive {
         System.out.println();
     }
 
-
     public ActiveLearningInteractive(List<List<InputWord>> sentences, List<Parse> goldParses, BaseCcgParser parser,
                                      QuestionGenerator questionGenerator, ResponseSimulator responseSimulator,
                                      int nBest) {
@@ -100,6 +94,7 @@ public class ActiveLearningInteractive {
         this.parser = parser;
         this.questionGenerator = questionGenerator;
         this.responseSimulator = responseSimulator;
+        this.reranker = new Reranker();
         this.nBest = nBest;
     }
 
@@ -143,7 +138,7 @@ public class ActiveLearningInteractive {
             numSentencesParsed ++;
 
             /****************** Generate and Filter Queries ******************/
-            List<Query> queryList = QueryGenerator.generateQueries(words, parses, questionGenerator, collapseQueries,
+            List<GroupedQuery> queryList = QueryGenerator.generateQueries(words, parses, questionGenerator,
                     minAnswerEntropy);
 
             /******************* Response simulator ************/
@@ -151,39 +146,15 @@ public class ActiveLearningInteractive {
             if (queryList.size() > 0) {
                 System.out.println(String.format("Sentence %d/%d", (numSentencesQueried + 1), maxNumSentences));
             }
-            List<Response> responseList = queryList.stream()
+            List<Integer> responseList = queryList.stream()
                     .map(q -> responseSimulator.answerQuestion(q, words, goldParse))
                     .collect(Collectors.toList());
 
-            /******************* ReRanker ******************/
-            double[] votes = parses.stream().mapToDouble(p->0.0).toArray();
-            for (int i = 0; i < queryList.size(); i++) {
-                Query query = queryList.get(i);
-                Response response = responseList.get(i);
-                int minK = parses.size();
-                for (int answerId : response.answerIds) {
-                    if (query.answerToParses.containsKey(answerId)) {
-                        for (int k : query.answerToParses.get(answerId)) {
-                            votes[k] += 1.0;
-                            if (k < minK) {
-                                minK = k;
-                            }
-                        }
-                    }
-                }
-                ++ numQueries;
-                if (minK > 0 && minK < parses.size()) {
-                    ++ numEffectiveQueries;
-                }
-            }
-
-            /******************* Evaluate *******************/
+            /******************* Rerank and Oracle *******************/
+            int bestK = reranker.getRerankedBest(parses, queryList, responseList);
+            int oracleK = 0;
             List<Results> results = CcgEvaluation.evaluate(parses, goldParse.dependencies);
-            int bestK = 0, oracleK = 0;
             for (int k = 1; k < parses.size(); k++) {
-                if (votes[k] > votes[bestK]) {
-                    bestK = k;
-                }
                 if (results.get(k).getF1() > results.get(oracleK).getF1()) {
                     oracleK = k;
                 }
@@ -206,12 +177,22 @@ public class ActiveLearningInteractive {
 
             /*************** Print Debugging Info *************/
             if (verbose && queryList.size() > 0) {
-                System.out.println("===============");
-                List<Response> goldResponseList = queryList.stream()
+                System.out.print("\n===============");
+                List<Integer> goldResponseList = queryList.stream()
                         .map(q -> goldHuman.answerQuestion(q, words, goldParse))
                         .collect(Collectors.toList());
-                DebugPrinter.printQueryListInfo(sentIdx, words, parses, queryList, responseList, goldResponseList);
-                System.out.println("===============");
+                // TODO:
+                // DebugPrinter.printQueryListInfo(sentIdx, words, queryList, responseList, goldResponseList);
+
+                // print gold
+                Set<Integer> predicates = queryList.stream().map(q -> q.predicateIndex).collect(Collectors.toSet());
+                System.out.println("[gold]");
+                goldParse.dependencies.forEach(d -> {
+                    //if (predicates.contains(d.getHead())) {
+                        System.out.println(d.getCategory() + "." + d.getArgument() + "\t" + d.toString(words));
+                    //}
+                });
+                System.out.println("===============\n");
             }
         }
         System.out.println("\n1-best:\navg-k = 1.0\n" + oneBestAcc + "\n" + oneBest);

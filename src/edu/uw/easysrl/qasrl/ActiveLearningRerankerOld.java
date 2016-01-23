@@ -5,17 +5,21 @@ import edu.uw.easysrl.main.InputReader.InputWord;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
-
 import uk.co.flamingpenguin.jewel.cli.CliFactory;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
 
+/***
+ * BACKUP VERSION DONT CHANGE!!!!!
+ *
+ */
 /**
  * Active Learning experiments (n-best reranking).
  * Created by luheng on 1/5/16.
  */
+@Deprecated
 public class ActiveLearningRerankerOld {
     List<List<InputWord>> sentences;
     List<Parse> goldParses;

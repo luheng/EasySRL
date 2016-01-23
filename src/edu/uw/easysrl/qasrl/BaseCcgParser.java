@@ -92,7 +92,7 @@ public abstract class BaseCcgParser {
                                 SRLFrame.NONE, Preposition.NONE)));
             }
         });
-        return new Parse(categories, dependencies, scoredParse.getScore());
+        return new Parse(scoredParse.getObject(), categories, dependencies, scoredParse.getScore());
     }
 
     protected Parse getParse(final List<InputReader.InputWord> sentence, final SRLParser.CCGandSRLparse parse) {
@@ -104,7 +104,7 @@ public abstract class BaseCcgParser {
         Set<ResolvedDependency> dependencies = parse.getDependencyParse().stream()
                 .filter(dep -> acceptDependency(sentence, dep))
                 .collect(Collectors.toSet());
-        return new Parse(categories, dependencies);
+        return new Parse(parse.getCcgParse(), categories, dependencies);
     }
 
     public abstract Parse parse(List<InputReader.InputWord> sentence);
@@ -316,7 +316,7 @@ public abstract class BaseCcgParser {
                     categories.set(i, Category.valueOf("N"));
                 }
             }
-            return new Parse(categories, dependencies);
+            return new Parse(null, categories, dependencies);
         }
 
         @Override

@@ -146,6 +146,7 @@ public class QuestionGenerationBenchmark {
         writer.close();
     }
 
+    @SuppressWarnings("unused")
     private static void printPredicateInfo(BufferedWriter writer, Sentence sentence, CCGBankDependency ccgDep,
                                            QADependency qaDep) throws IOException {
         List<String> words = sentence.getWords();
@@ -192,6 +193,7 @@ public class QuestionGenerationBenchmark {
         }
     }
 
+    @SuppressWarnings("unused")
     private static void outputInfo(CCGBankDependency ccgDep,
                                    QADependency qaDep,
                                    List<String> words,
@@ -221,7 +223,6 @@ public class QuestionGenerationBenchmark {
     }
 
     public static void main(String[] args) {
-        // hacky: Initialize inflection dictionary ..
         questionGenerator = new QuestionGenerator();
         Map<Integer, List<AlignedDependency<CCGBankDependency, QADependency>>>
             mappedDependencies = PropBankAligner.getCcgAndQADependenciesTrain();

@@ -48,7 +48,7 @@ public class DataLoader {
                                     Preposition.NONE)
                     ).collect(Collectors.toSet());
             // TODO: convert gold with CCGBankEvaluation.
-            goldParses.add(new Parse(sentence.getLexicalCategories(), goldDependencies));
+            goldParses.add(new Parse(sentence.getCcgbankParse(), sentence.getLexicalCategories(), goldDependencies));
         }
         System.out.println(String.format("Read %d sentences to the training pool.", sentences.size()));
     }

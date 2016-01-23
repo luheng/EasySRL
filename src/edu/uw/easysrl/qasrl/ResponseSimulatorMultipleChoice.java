@@ -32,7 +32,7 @@ public class ResponseSimulatorMultipleChoice extends ResponseSimulator {
      * @param unusedSideInfo
      * @return
      */
-    public Response answerQuestion(Query query, List<String> sentence, Parse unusedSideInfo) {
+    public Response answerQuestion(QueryOld query, List<String> sentence, Parse unusedSideInfo) {
         int predicateIndex = query.predicateIndex;
         // print sentence
         for (int i = 0; i < sentence.size(); i++) {
@@ -57,6 +57,31 @@ public class ResponseSimulatorMultipleChoice extends ResponseSimulator {
             answerList.add(answerCandidates.get(choice - 1));
         }
         return new Response(answerList);
+    }
+
+    public int answerQuestion(GroupedQuery query, List<String> sentence, Parse goldParse) {
+        int predicateIndex = query.predicateIndex;
+        // print sentence
+        for (int i = 0; i < sentence.size(); i++) {
+            System.out.print(i > 0 ? " " : "");
+            System.out.print(i == predicateIndex ? ANSI_YELLOW : "");
+            System.out.print(sentence.get(i) + ANSI_RESET);
+        }
+        System.out.println();
+        System.out.println("Q: " + query.question + "?");
+        // TODO: highlight answer in sentence? print answer spans
+        int numAnswers = query.answerOptions.size();
+        for (int i = 0; i < numAnswers; i++) {
+            GroupedQuery.AnswerOption ao = query.answerOptions.get(i);
+            // debugging
+            String argIdsStr = ao.argumentIds.stream().map(String::valueOf).collect(Collectors.joining(","));
+            String argHeadsStr = (ao.argumentIds.size() == 0 || ao.argumentIds.get(0) == -1) ? "N/A" :
+                    ao.argumentIds.stream().map(sentence::get).collect(Collectors.joining(","));
+            System.out.println(String.format("%d: %s", (i + 1), ao.answer) + "\t" + argIdsStr + "\t" + argHeadsStr);
+        }
+        System.out.println(String.format("Please input a number between 1 to %d", numAnswers));
+        int choice = Integer.parseInt(scanner.nextLine());
+        return (0 < choice && choice <= numAnswers) ? choice - 1 : -1;
     }
 
     public static void main(String[] args) {

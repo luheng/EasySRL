@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
  * Active Learning query
  * Created by luheng on 1/14/16.
  */
+@Deprecated
 public class QueryOld {
     List<String> question;
     double questionScore;
