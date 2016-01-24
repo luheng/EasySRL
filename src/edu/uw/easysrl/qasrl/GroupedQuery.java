@@ -2,7 +2,6 @@ package edu.uw.easysrl.qasrl;
 
 import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.syntax.grammar.Category;
-import jdk.nashorn.internal.runtime.Debug;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -17,6 +16,7 @@ public class GroupedQuery {
         ImmutableList<Integer> argumentIds;
         String answer;
         Set<Integer> parseIds;
+        double probability;
 
         AnswerOption(ImmutableList<Integer> argumentIds, String answer, Set<Integer> parseIds) {
             this.argumentIds = argumentIds;
@@ -129,6 +129,10 @@ public class GroupedQuery {
             allParseIds.removeAll(parseIds);
         });
         answerOptions.add(new AnswerOption(ImmutableList.of(-1), "N/A", allParseIds));
+        // Compute probability of each answer option.
+        double sum = answerOptions.stream().mapToDouble(ao -> ao.parseIds.size()).sum();
+        answerOptions.forEach(ao -> ao.probability = 1.0 * ao.parseIds.size() / sum);
+
         collapsed = true;
     }
 
@@ -142,11 +146,11 @@ public class GroupedQuery {
             String match = (i == response ? "*" : "");
             String argIdsStr = ao.argumentIds.stream().map(String::valueOf).collect(Collectors.joining(","));
             // FIXME: why argumentIds can be size 0????
-            String argHeadsStr = (ao.argumentIds.size() == 0 || ao.argumentIds.get(0) == -1) ? "N/A" :
+            String argHeadsStr = ao.argumentIds.get(0) == -1 ? "N/A" :
                     ao.argumentIds.stream().map(words::get).collect(Collectors.joining(","));
             String parseIdsStr = DebugPrinter.getShortListString(ao.parseIds);
-            System.out.println(String.format("%s%d\t%s:%s(%s)\t%s", match, i, argIdsStr, argHeadsStr, ao.answer,
-                    parseIdsStr));
+            System.out.println(String.format("%.3f\t%s%d\t%s:%s(%s)\t%s", ao.probability, match, i, argIdsStr,
+                    argHeadsStr, ao.answer, parseIdsStr));
         }
         System.out.println();
     }

@@ -25,39 +25,6 @@ public class ResponseSimulatorMultipleChoice extends ResponseSimulator {
     public ResponseSimulatorMultipleChoice() {
         scanner = new Scanner(System.in);
     }
-    /**
-     *
-     * @param query
-     * @param sentence
-     * @param unusedSideInfo
-     * @return
-     */
-    public Response answerQuestion(QueryOld query, List<String> sentence, Parse unusedSideInfo) {
-        int predicateIndex = query.predicateIndex;
-        // print sentence
-        for (int i = 0; i < sentence.size(); i++) {
-            System.out.print(i > 0 ? " " : "");
-            System.out.print(i == predicateIndex ? ANSI_YELLOW : "");
-            System.out.print(sentence.get(i) + ANSI_RESET);
-        }
-        System.out.println();
-        System.out.println("Q: " + query.question.stream().collect(Collectors.joining(" ")) + "?");
-        // TODO: highlight answer in sentence?
-        List<Integer> answerCandidates = new ArrayList<>(query.answerToParses.keySet());
-        int numAnswers = answerCandidates.size();
-        for (int i = 0; i < numAnswers; i++) {
-            int answerPositionInSentence = answerCandidates.get(i);
-            String answerStr = answerPositionInSentence >= 0 ? sentence.get(answerPositionInSentence) : "N/A";
-            System.out.println(String.format("%d: %s", (i + 1), answerStr));
-        }
-        System.out.println(String.format("Please input a number between 1 to %d", numAnswers));
-        int choice = Integer.parseInt(scanner.nextLine());
-        List<Integer> answerList = new ArrayList<>();
-        if (0 < choice && choice <= numAnswers) {
-            answerList.add(answerCandidates.get(choice - 1));
-        }
-        return new Response(answerList);
-    }
 
     public int answerQuestion(GroupedQuery query, List<String> sentence, Parse goldParse) {
         int predicateIndex = query.predicateIndex;
@@ -65,7 +32,7 @@ public class ResponseSimulatorMultipleChoice extends ResponseSimulator {
         for (int i = 0; i < sentence.size(); i++) {
             System.out.print(i > 0 ? " " : "");
             System.out.print(i == predicateIndex ? ANSI_YELLOW : "");
-            System.out.print(sentence.get(i) + ANSI_RESET);
+            System.out.print(translateBrackets(sentence.get(i)) + ANSI_RESET);
         }
         System.out.println();
         System.out.println("Q: " + query.question + "?");
@@ -84,7 +51,20 @@ public class ResponseSimulatorMultipleChoice extends ResponseSimulator {
         return (0 < choice && choice <= numAnswers) ? choice - 1 : -1;
     }
 
-    public static void main(String[] args) {
-
+    private static String translateBrackets(String word) {
+        if (word.equalsIgnoreCase("-LRB-")) {
+            word = "(";
+        } else if (word.equalsIgnoreCase("-RRB-")) {
+            word = ")";
+        } else if (word.equalsIgnoreCase("-LCB-")) {
+            word = "{";
+        } else if (word.equalsIgnoreCase("-RCB-")) {
+            word = "}";
+        } else if (word.equalsIgnoreCase("-LSB-")) {
+            word = "[";
+        } else if (word.equalsIgnoreCase("-RSB-")) {
+            word = "]";
+        }
+        return word;
     }
 }

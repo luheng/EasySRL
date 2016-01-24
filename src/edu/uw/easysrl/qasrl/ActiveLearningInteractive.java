@@ -50,7 +50,7 @@ public class ActiveLearningInteractive {
         /************** manual parameter tuning ... ***********/
         //final int[] nBestList = new int[] { 3, 5, 10, 20, 50, 100, 250, 500, 1000 };
         final int[] nBestList = new int[] { 10 };
-        final double minAnswerEntropy = 0.0;
+        final double minAnswerEntropy = 0.3;
         final int maxNumSentences = 20;
         final boolean shuffleSentences = true;
         final boolean verbose = true;

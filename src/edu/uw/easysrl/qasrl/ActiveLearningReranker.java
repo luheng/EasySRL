@@ -27,7 +27,7 @@ public class ActiveLearningReranker {
     int nBest;
     Map<String, Double> allResults;
 
-    double minAnswerEntropy = 0.1;
+    double minAnswerEntropy = 0.0;
 
     public static void main(String[] args) {
         EasySRL.CommandLineArguments commandLineOptions;
@@ -48,8 +48,8 @@ public class ActiveLearningReranker {
 
         /************** manual parameter tuning ... ***********/
         //final int[] nBestList = new int[] { 3, 5, 10, 20, 50, 100, 250, 500, 1000 };
-        final int[] nBestList = new int[] { 100 };
-        final double minAnswerEntropy = 0.6;
+        final int[] nBestList = new int[] { 1000 };
+        final double minAnswerEntropy = 0.0;
         final boolean verbose = true;
 
         List<Map<String, Double>> allResults = new ArrayList<>();

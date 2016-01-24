@@ -11,27 +11,6 @@ import java.util.stream.Collectors;
  * Created by luheng on 1/17/16.
  */
 public class DebugPrinter {
-    // TODO TODO
-    public static void printQueryListInfo(int sentIdx, List<String> words, List<Parse> parseList,
-                                          List<QueryOld> queryList, List<Response> responseList) {
-        System.out.println("\n" + String.format("S[%d]:\t", sentIdx) + words.stream().collect(Collectors.joining(" ")));
-        for (int i = 0; i < queryList.size(); i++) {
-            QueryOld query = queryList.get(i);
-            Response response = responseList.get(i);
-
-            query.print(words, response);
-        }
-    }
-
-    public static void printQueryListInfo(int sentIdx, List<String> words, List<Parse> parseList,
-                                          List<QueryOld> queryList, List<Response> responseList,
-                                          List<Response> goldResponseList) {
-        System.out.println("\n" + String.format("S[%d]:\t", sentIdx) + words.stream().collect(Collectors.joining(" ")));
-        for (int i = 0; i < queryList.size(); i++) {
-            QueryOld query = queryList.get(i);
-            query.print(words, responseList.get(i), goldResponseList.get(i));
-        }
-    }
     public static void printQueryListInfo(int sentIdx, List<String> words, List<GroupedQuery> queryList,
                                           List<Integer> responseList) {
         System.out.println("\n" + String.format("S[%d]:\t", sentIdx) + words.stream().collect(Collectors.joining(" ")));

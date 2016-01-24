@@ -20,8 +20,12 @@ public class AnswerGenerator {
         Category answerCategory = dependency.getCategory().getArgument(dependency.getArgNumber());
         int argumentId = dependency.getArgument();
         if (answerCategory.equals(Category.PP) || words.get(argumentId).equals("to")) {
-            parse.dependencies.stream().filter(dep -> dep.getHead() == argumentId)
-                    .forEach(dep2 -> answers.add(dependency.getArgument()));
+            parse.dependencies.stream()
+                    .filter(d -> d.getHead() == argumentId)
+                    .forEach(d2 -> answers.add(d2.getArgument()));
+            if (answers.size() == 0) {
+                answers.add(argumentId);
+            }
         } else {
             answers.add(argumentId);
         }
@@ -36,13 +40,14 @@ public class AnswerGenerator {
         String result = "";
         int i = 0;
         for (final SyntaxTreeNodeLeaf child : argumentWords) {
-            if (i == 0 && depIsCore && child.getCategory().isFunctionInto(Category.PP) && argumentWords.size() > 1) {
-                // Simplify arguments by dropping initial prepositions, as in PropBank.
-            } else if (i == argumentWords.size() - 1 && child.getCategory().isPunctuation()) {
-                // Drop trailing punctuation.
-            } else {
-                result += " " + child.getWord();
+            boolean trim = (i == 0 || i == argumentWords.size() - 1);
+            boolean trimPP = (i == 0 && depIsCore && child.getCategory().isFunctionInto(Category.PP) && argumentWords.size() > 1);
+            boolean trimPos = (trim && child.getCategory().isPunctuation());
+            boolean trimOther = (trim && child.getWord().equals("\'s"));
+            if (trimPP || trimPos || trimOther) {
+                continue;
             }
+            result += " " + translateBrackets(child.getWord());
             i++;
         }
         return result.trim();
@@ -62,5 +67,22 @@ public class AnswerGenerator {
             }
         }
         return null;
+    }
+
+    private static String translateBrackets(String word) {
+        if (word.equalsIgnoreCase("-LRB-")) {
+            word = "(";
+        } else if (word.equalsIgnoreCase("-RRB-")) {
+            word = ")";
+        } else if (word.equalsIgnoreCase("-LCB-")) {
+            word = "{";
+        } else if (word.equalsIgnoreCase("-RCB-")) {
+            word = "}";
+        } else if (word.equalsIgnoreCase("-LSB-")) {
+            word = "[";
+        } else if (word.equalsIgnoreCase("-RSB-")) {
+            word = "]";
+        }
+        return word;
     }
 }
