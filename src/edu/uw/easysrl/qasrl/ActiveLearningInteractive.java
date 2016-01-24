@@ -27,6 +27,7 @@ public class ActiveLearningInteractive {
     Map<String, Double> allResults;
 
     double minAnswerEntropy = 0.0;
+    double maxAnswerMargin = 0.9;
     boolean shuffleSentences = false;
     int maxNumSentences = -1;
     int randomSeed = 0;
@@ -139,7 +140,7 @@ public class ActiveLearningInteractive {
 
             /****************** Generate and Filter Queries ******************/
             List<GroupedQuery> queryList = QueryGenerator.generateQueries(words, parses, questionGenerator,
-                    minAnswerEntropy);
+                    minAnswerEntropy, maxAnswerMargin);
 
             /******************* Response simulator ************/
             // If the response gives N/A, shall we down vote all parses?

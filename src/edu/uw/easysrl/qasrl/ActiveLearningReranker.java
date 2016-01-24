@@ -28,6 +28,7 @@ public class ActiveLearningReranker {
     Map<String, Double> allResults;
 
     double minAnswerEntropy = 0.0;
+    double maxAnswerMargin = 0.9;
 
     public static void main(String[] args) {
         EasySRL.CommandLineArguments commandLineOptions;
@@ -48,8 +49,7 @@ public class ActiveLearningReranker {
 
         /************** manual parameter tuning ... ***********/
         //final int[] nBestList = new int[] { 3, 5, 10, 20, 50, 100, 250, 500, 1000 };
-        final int[] nBestList = new int[] { 1000 };
-        final double minAnswerEntropy = 0.0;
+        final int[] nBestList = new int[] { 100 };
         final boolean verbose = true;
 
         List<Map<String, Double>> allResults = new ArrayList<>();
@@ -57,7 +57,6 @@ public class ActiveLearningReranker {
             BaseCcgParser parser = new BaseCcgParser.AStarParser(modelFolder, rootCategories, nBest);
             ActiveLearningReranker learner = new ActiveLearningReranker(sentences, goldParses, parser,
                                                                         questionGenerator, responseSimulator, nBest);
-            learner.minAnswerEntropy = minAnswerEntropy;
             learner.run(verbose);
             allResults.add(learner.allResults);
         }
@@ -118,7 +117,7 @@ public class ActiveLearningReranker {
 
             /****************** Generate and Filter Queries ******************/
             List<GroupedQuery> queryList = QueryGenerator.generateQueries(words, parses, questionGenerator,
-                    minAnswerEntropy);
+                    minAnswerEntropy, maxAnswerMargin);
 
             /******************* Response simulator ************/
             // TODO: If the response gives N/A, shall we down vote all parses?

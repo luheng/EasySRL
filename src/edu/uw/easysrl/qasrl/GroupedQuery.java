@@ -28,7 +28,6 @@ public class GroupedQuery {
     // should represent the latent role here.
     int totalNumParses;
     Set<Query> queries;
-    boolean collapsed;
 
     // Information specified only after collapsing;
     int predicateIndex;
@@ -41,7 +40,7 @@ public class GroupedQuery {
     public GroupedQuery(int numParses) {
         totalNumParses = numParses;
         queries = new HashSet<>();
-        collapsed = false;
+        answerOptions = null;
     }
 
     public GroupedQuery(Query query, int numParses) {
@@ -132,15 +131,24 @@ public class GroupedQuery {
         // Compute probability of each answer option.
         double sum = answerOptions.stream().mapToDouble(ao -> ao.parseIds.size()).sum();
         answerOptions.forEach(ao -> ao.probability = 1.0 * ao.parseIds.size() / sum);
+    }
 
-        collapsed = true;
+    public double computeEntropy() {
+        return -1.0 * answerOptions.stream()
+                .filter(ao -> ao.probability > 0)
+                .mapToDouble(ao -> ao.probability * Math.log(ao.probability) / Math.log(2.0)).sum();
+    }
+
+    public double computeMargin() {
+        List<Double> prob = answerOptions.stream().map(ao -> ao.probability).sorted().collect(Collectors.toList());
+        int len = prob.size();
+        return len < 2 ? 1.0 : prob.get(len - 1) - prob.get(len - 2);
     }
 
     public void print(List<String> words, int response) {
         System.out.println(String.format("%d:%s\t%s\t%d", predicateIndex, words.get(predicateIndex),
                 category, argumentNumber));
-        double entropy = QueryGenerator.getAnswerEntropy(this);
-        System.out.println(String.format("%.6f\t%s", entropy, question));
+        System.out.println(String.format("%.6f\t%.6f\t%s", computeEntropy(), computeMargin(), question));
         for (int i = 0; i < answerOptions.size(); i++) {
             AnswerOption ao = answerOptions.get(i);
             String match = (i == response ? "*" : "");
