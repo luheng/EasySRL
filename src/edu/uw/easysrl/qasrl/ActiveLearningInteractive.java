@@ -104,8 +104,6 @@ public class ActiveLearningInteractive {
 
         int numSentencesParsed = 0;
         int avgBestK = 0, avgOracleK = 0;
-        // Effect query: a query whose response boosts the score of a non-top parse but not the top one.
-        int numQueries = 0, numEffectiveQueries = 0;
 
         // For debugging.
         ResponseSimulatorGold goldHuman = new ResponseSimulatorGold(questionGenerator);
@@ -138,7 +136,7 @@ public class ActiveLearningInteractive {
             allQueries.addAll(QueryGenerator.generateQueries(sentIdx, words, parses, questionGenerator));
         }
         List<GroupedQuery> queryList = allQueries.stream()
-                .sorted((q1, q2) -> Double.compare(q1.computeMargin(), q2.computeMargin()))
+                .sorted((q1, q2) -> Double.compare(q1.answerMargin, q2.answerMargin))
                 .collect(Collectors.toList());
 
         /******************* Response simulator ************/
@@ -197,18 +195,17 @@ public class ActiveLearningInteractive {
             oneBestAcc.add(CcgEvaluation.evaluateTags(parses.get(0).categories, goldParse.categories));
             reRankedAcc.add(CcgEvaluation.evaluateTags(parses.get(bestK).categories, goldParse.categories));
             oracleAcc.add(CcgEvaluation.evaluateTags(parses.get(oracleK).categories, goldParse.categories));
-
         }
 
         System.out.println("\n1-best:\navg-k = 1.0\n" + oneBestAcc + "\n" + oneBest);
         System.out.println("re-ranked:\navg-k = " + 1.0 * avgBestK / numSentencesParsed + "\n" + reRankedAcc + "\n" + reRanked);
         System.out.println("oracle:\navg-k = " + 1.0 * avgOracleK / numSentencesParsed + "\n"+ oracleAcc + "\n" + oracle);
-        System.out.println("Number of queries = " + numQueries);
-        System.out.println("Number of effective queries = " + numEffectiveQueries);
-        System.out.println("Effective ratio = " + 1.0 * numEffectiveQueries / numQueries);
+        System.out.println("Number of queries = " + reranker.numQueries);
+        System.out.println("Number of effective queries = " + reranker.numEffectiveQueries);
+        System.out.println("Effective ratio = " + 1.0 * reranker.numEffectiveQueries / reranker.numQueries);
         double baselineF1 = oneBest.getF1();
         double rerankF1 = reRanked.getF1();
-        double avgGain = (rerankF1 - baselineF1) / numQueries;
+        double avgGain = (rerankF1 - baselineF1) / reranker.numQueries;
         System.out.println("Avg. F1 gain = " + avgGain);
 
         aggregatedResults.put("1-best-acc", oneBestAcc.getAccuracy() * 100);
@@ -217,10 +214,10 @@ public class ActiveLearningInteractive {
         aggregatedResults.put("rerank-f1", reRanked.getF1() * 100);
         aggregatedResults.put("oracle-acc", oracleAcc.getAccuracy() * 100);
         aggregatedResults.put("oracle-f1", oracle.getF1() * 100);
-        aggregatedResults.put("num-queries", (double) numQueries);
-        aggregatedResults.put("num-eff-queries", (double) numEffectiveQueries);
-        aggregatedResults.put("num-queries", (double) numQueries);
-        aggregatedResults.put("eff-ratio", 100.0 * numEffectiveQueries / numQueries);
+        aggregatedResults.put("num-queries", (double) reranker.numQueries);
+        aggregatedResults.put("num-eff-queries", (double) reranker.numEffectiveQueries);
+        aggregatedResults.put("num-queries", (double) reranker.numQueries);
+        aggregatedResults.put("eff-ratio", 100.0 * reranker.numEffectiveQueries / reranker.numQueries);
         aggregatedResults.put("avg-gain", avgGain);
     }
 }

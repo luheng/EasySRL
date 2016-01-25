@@ -26,11 +26,6 @@ public class ActiveLearningReranker {
     int nBest;
     Map<String, Double> aggregatedResults;
 
-    // Unused pruning metrics.
-    double minAnswerEntropy = 0.0;
-    double maxAnswerMargin = 0.5;
-    int maxNumQueries = 1000;
-
     public static void main(String[] args) {
         EasySRL.CommandLineArguments commandLineOptions;
         try {
@@ -50,7 +45,7 @@ public class ActiveLearningReranker {
 
         /************** manual parameter tuning ... ***********/
         //final int[] nBestList = new int[] { 3, 5, 10, 20, 50, 100, 250, 500, 1000 };
-        final int[] nBestList = new int[] { 1000 };
+        final int[] nBestList = new int[] { 500 };
         final boolean verbose = false;
 
         List<Map<String, Double>> allResults = new ArrayList<>();
@@ -99,7 +94,6 @@ public class ActiveLearningReranker {
             if (parses != null) {
                 allParses.put(sentIdx, parses);
                 allResults.put(sentIdx, CcgEvaluation.evaluate(parses, goldParses.get(sentIdx).dependencies));
-
                 if (allParses.size() % 100 == 0) {
                     System.out.println("Parsed:\t" + allParses.size() + " sentences ...");
                 }
@@ -112,9 +106,15 @@ public class ActiveLearningReranker {
             List<Parse> parses = allParses.get(sentIdx);
             allQueries.addAll(QueryGenerator.generateQueries(sentIdx, words, parses, questionGenerator));
         }
+        System.out.println("Total number of queries:\t" + allQueries.size());
+        // TODO: random order
         List<GroupedQuery> queryList = allQueries.stream()
-                .sorted((q1, q2) -> Double.compare(q1.computeMargin(), q2.computeMargin()))
+                //.filter(q -> q.answerMargin < 0.99)
+                //.sorted((q1, q2) -> Double.compare(q1.answerMargin, q2.answerMargin))
+                .sorted((q1, q2) -> Double.compare(-q1.answerEntropy, -q2.answerEntropy))
+                //.unordered()
                 .collect(Collectors.toList());
+
 
         /******************* Response simulator ************/
         // TODO: If the response gives N/A, shall we down vote all parses?

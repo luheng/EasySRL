@@ -4,6 +4,7 @@ import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 
+import java.io.Serializable;
 import java.util.List;
 import java.util.Set;
 
@@ -17,7 +18,8 @@ public class Parse {
     public Set<ResolvedDependency> dependencies;
     public double score;
 
-    public Parse(SyntaxTreeNode syntaxTree, List<Category> categories, Set<ResolvedDependency> dependencies, double score) {
+    public Parse(SyntaxTreeNode syntaxTree, List<Category> categories, Set<ResolvedDependency> dependencies,
+                 double score) {
         this.syntaxTree = syntaxTree;
         this.categories = categories;
         this.dependencies = dependencies;

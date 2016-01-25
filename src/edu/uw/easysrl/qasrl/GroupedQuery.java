@@ -35,6 +35,8 @@ public class GroupedQuery {
     String question;
     List<AnswerOption> answerOptions;
 
+    double answerMargin, answerEntropy;
+
     public GroupedQuery(int sentenceId, int numParses) {
         this.sentenceId = sentenceId;
         this.totalNumParses = numParses;
@@ -130,15 +132,17 @@ public class GroupedQuery {
         // Compute probability of each answer option.
         double sum = answerOptions.stream().mapToDouble(ao -> ao.parseIds.size()).sum();
         answerOptions.forEach(ao -> ao.probability = 1.0 * ao.parseIds.size() / sum);
+        answerMargin = computeMargin();
+        answerEntropy = computeEntropy();
     }
 
-    public double computeEntropy() {
+    private double computeEntropy() {
         return -1.0 * answerOptions.stream()
                 .filter(ao -> ao.probability > 0)
                 .mapToDouble(ao -> ao.probability * Math.log(ao.probability) / Math.log(2.0)).sum();
     }
 
-    public double computeMargin() {
+    private double computeMargin() {
         List<Double> prob = answerOptions.stream().map(ao -> ao.probability).sorted().collect(Collectors.toList());
         int len = prob.size();
         return len < 2 ? 1.0 : prob.get(len - 1) - prob.get(len - 2);
