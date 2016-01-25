@@ -1,13 +1,13 @@
 package edu.uw.easysrl.qasrl;
 
+import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeLeaf;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Print answer spans ..
@@ -30,6 +30,37 @@ public class AnswerGenerator {
             answers.add(argumentId);
         }
         return answers;
+    }
+
+    public static Map<ImmutableList<Integer>, String> generateAnswerSpans(int predicateIndex,
+            Map<ImmutableList<Integer>, Set<Integer>> answerToParses, List<String> words, List<Parse> parses) {
+        Map<ImmutableList<Integer>, String> answerToSpans = new HashMap<>();
+        Set<Integer> allIndices = new HashSet<>();
+        answerToParses.keySet().forEach(allIndices::addAll);
+        allIndices.add(predicateIndex);
+        for (ImmutableList<Integer> ids : answerToParses.keySet()) {
+            Set<Integer> parseIds = answerToParses.get(ids);
+            // use the highest ranked parse to get answer span.
+            int bestParseId = parseIds.stream().min(Integer::compare).get();
+            SyntaxTreeNode root = parses.get(bestParseId).syntaxTree;
+            if (ids.size() == 1) {
+                Set<Integer> excludeIndices = new HashSet<>(allIndices);
+                excludeIndices.remove(ids.get(0));
+                String span = getArgumentConstituent(words, root, ids.get(0), excludeIndices);
+                answerToSpans.put(ids, span);
+            } else {
+                List<String> spans = new ArrayList<>();
+                for (int id : ids) {
+                    Set<Integer> excludeIndices = new HashSet<>(allIndices);
+                    excludeIndices.remove(id);
+                    spans.add(getArgumentConstituent(words, root, ids.get(0), excludeIndices));
+                }
+                // TODO: handle appositive and conjunction here.
+                answerToSpans.put(ids, spans.stream().collect(Collectors.joining(" and ")));
+                answerToSpans.put(ids, spans.stream().collect(Collectors.joining(", ")));
+            }
+        }
+        return answerToSpans;
     }
 
     public static String getArgumentConstituent(final List<String> words, final SyntaxTreeNode node,

@@ -5,7 +5,7 @@ import edu.uw.easysrl.syntax.grammar.Category;
 import java.util.List;
 
 /**
- * New query structure ...
+ * A query is associated with a single Parse. It may have multiple answer heads in case of conjunctions and appositives.
  * Created by luheng on 1/20/16.
  */
 public class Query {
@@ -15,21 +15,16 @@ public class Query {
     int argumentNumber;
     List<Integer> argumentIds;
     int parseId;
-
     String question;
-    String answer;
 
-    public Query(int predicateIndex, final Category category, int argumentNumber,
-                 final List<Integer> argumentIds, int parseId, String question, String answer) {
+    public Query(int predicateIndex, final Category category, int argumentNumber, final List<Integer> argumentIds,
+                 int parseId, String question) {
         this.predicateIndex = predicateIndex;
         this.category = category;
         this.argumentNumber = argumentNumber;
         this.argumentIds = argumentIds;
         this.parseId = parseId;
         this.question = question;
-        this.answer = answer;
-        // Let's say for now: the number of answerOptions don't have to match number of argument ids. They are just the set of
-        // correct answerOptions that can be accepted regarding to this query. (still confusing?)
     }
 
 }

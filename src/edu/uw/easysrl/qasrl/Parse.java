@@ -9,7 +9,8 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Parse.
+ * Parsing results returned by the base CCG parser. Resolved dependencies and categories are extracted from syntaxTree.
+ * The score comes from the n-best parser.
  * Created by luheng on 1/12/16.
  */
 public class Parse {

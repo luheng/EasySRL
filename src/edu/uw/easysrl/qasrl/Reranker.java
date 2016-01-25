@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.IntStream;
 
 /**
  * Created by luheng on 1/21/16.
@@ -13,8 +14,9 @@ public class Reranker {
     int numEffectiveQueries;
     Map<Integer, List<Parse>> allParses;
     Map<Integer, double[]> allVotes;
+    boolean hasPriorVotes;
 
-    public Reranker(final Map<Integer, List<Parse>> allParses) {
+    public Reranker(final Map<Integer, List<Parse>> allParses, final List<GroupedQuery> allQueries) {
         numQueries = 0;
         numEffectiveQueries = 0;
         allVotes = new HashMap<>();
@@ -24,6 +26,15 @@ public class Reranker {
             allVotes.put(sentId, votes);
         });
         this.allParses = allParses;
+        if (allQueries == null) {
+            hasPriorVotes = false;
+            return;
+        }
+        allQueries.forEach(gq -> {
+            double[] votes = allVotes.get(gq.sentenceId);
+            gq.answerOptions.forEach(ao -> ao.parseIds.forEach(pid -> votes[pid] += ao.probability));
+        });
+        hasPriorVotes = true;
     }
 
     public void rerank(final GroupedQuery query, final int response) {
@@ -32,6 +43,11 @@ public class Reranker {
         int minK = allParses.get(sentenceId).size();
         double[] votes = allVotes.get(sentenceId);
         if (0 <= response && response < query.answerOptions.size()) {
+            // Subtract pre-computed votes;
+            if (hasPriorVotes) {
+                query.answerOptions.forEach(ao -> ao.parseIds.forEach(pid -> votes[pid] -= ao.probability));
+            }
+            // Add response votes.
             for (int k : query.answerOptions.get(response).parseIds) {
                 if (0 <= k && k < numParses) {
                     votes[k] += 1.0;
@@ -47,31 +63,6 @@ public class Reranker {
         }
     }
 
-    public void rerank(final List<GroupedQuery> queries, final List<Integer> responses) {
-        for (int i = 0; i < queries.size(); i++) {
-            GroupedQuery query = queries.get(i);
-            int response = responses.get(i);
-            int sentenceId = query.sentenceId;
-            int numParses = query.totalNumParses;
-            int minK = allParses.get(sentenceId).size();
-            double[] votes = allVotes.get(sentenceId);
-            if (0 <= response && response < query.answerOptions.size()) {
-                for (int k : query.answerOptions.get(response).parseIds) {
-                    if (0 <= k && k < numParses) {
-                        votes[k] += 1.0;
-                        if (k < minK) {
-                            minK = k;
-                        }
-                    }
-                }
-            }
-            ++ numQueries;
-            if (minK > 0 && minK < numParses) {
-                ++ numEffectiveQueries;
-            }
-        }
-    }
-
     public int getRerankedBest(final int sentenceId) {
         double[] votes = allVotes.get(sentenceId);
         int bestK = 0;
@@ -83,39 +74,15 @@ public class Reranker {
         return bestK;
     }
 
-    public int getRerankedBest(final List<Parse> parses, final List<GroupedQuery> queries,
-                               final List<Integer> responses) {
-        double[] votes = rerank(parses, queries, responses);
-        int bestK = 0;
-        for (int k = 1; k < parses.size(); k++) {
-            if (votes[k] > votes[bestK]) {
-                bestK = k;
+    public void printVotes() {
+        allVotes.keySet().stream().sorted().forEach(sentId -> {
+            double[] votes = allVotes.get(sentId);
+            System.out.println(sentId);
+            for (double v : votes) {
+                System.out.print(String.format("%3f\t", v));
             }
-        }
-        return bestK;
+            System.out.println();
+        });
     }
 
-    public double[] rerank(final List<Parse> parses, final List<GroupedQuery> queries, final List<Integer> responses) {
-        double[] votes = parses.stream().mapToDouble(p->0.0).toArray();
-        for (int i = 0; i < queries.size(); i++) {
-            GroupedQuery query = queries.get(i);
-            int response = responses.get(i);
-            int minK = parses.size();
-            if (0 <= response && response < query.answerOptions.size()) {
-                for (int k : query.answerOptions.get(response).parseIds) {
-                    if (0 <= k && k < parses.size()) {
-                        votes[k] += 1.0;
-                        if (k < minK) {
-                            minK = k;
-                        }
-                    }
-                }
-            }
-            ++ numQueries;
-            if (minK > 0 && minK < parses.size()) {
-                ++ numEffectiveQueries;
-            }
-        }
-        return votes;
-    }
 }

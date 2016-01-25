@@ -1,6 +1,7 @@
 package edu.uw.easysrl.qasrl;
 
 import com.google.common.collect.HashBasedTable;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Table;
 import com.google.common.collect.Table.Cell;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
@@ -8,6 +9,7 @@ import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 
 /**
@@ -54,6 +56,7 @@ public class QueryGenerator {
                 if (question == null || question.size() == 0) {
                     continue;
                 }
+                //String questionStr = (question == null || question.size() == 0) ? "-NOQ-" :
                 String questionStr = question.stream().collect(Collectors.joining(" "));
                 Set<Integer> answerIds = new HashSet<>();
                 dependencies.stream().forEach(dep -> {
@@ -62,17 +65,13 @@ public class QueryGenerator {
                 List<Integer> answerIdList = new ArrayList<>(answerIds);
                 Collections.sort(answerIdList);
 
-                List<String> answerSpans = new ArrayList<>();
                 answerIdList.forEach(id -> {
                     Set<Integer> excludeIndices = new HashSet<>(answerIdList);
                     excludeIndices.add(predicateId);
                     excludeIndices.remove(id);
-                    answerSpans.add(AnswerGenerator.getArgumentConstituent(words, parse.syntaxTree, id, excludeIndices));
                 });
-                // TODO: sort the answer spans.
-                String answerStr = answerSpans.stream().collect(Collectors.joining(" and "));
                 Query query = new Query(predicateId, dependency.getCategory(), argNum, answerIdList, rankId,
-                                questionStr, answerStr);
+                                        questionStr);
                 unmergedQueryList.add(query);
             }
         }
@@ -91,8 +90,50 @@ public class QueryGenerator {
                 groupedQueryList.add(new GroupedQuery(sentenceId, numParses, query));
             }
         }
-        groupedQueryList.forEach(GroupedQuery::collapse);
+        groupedQueryList.forEach(groupedQuery -> collapseQuery(groupedQuery, words, parses));
         return groupedQueryList;
+    }
+
+    private static void collapseQuery(GroupedQuery groupedQuery, List<String> words, List<Parse> parses) {
+        HashMap<String, Set<Integer>> questionToParses = new HashMap<>();
+        HashMap<ImmutableList<Integer>, Set<Integer>> answerToParses = new HashMap<>();
+
+        groupedQuery.queries.forEach(query -> {
+            ImmutableList<Integer> argList = ImmutableList.copyOf(query.argumentIds);
+            if (!questionToParses.containsKey(query.question)) {
+                questionToParses.put(query.question, new HashSet<>());
+            }
+            if (!answerToParses.containsKey(argList)) {
+                answerToParses.put(argList, new HashSet<>());
+            }
+            questionToParses.get(query.question).add(query.parseId);
+            answerToParses.get(argList).add(query.parseId);
+            // answerToSpan.put(argList, query.answer);
+        });
+
+        // merge answer options
+        // TODO: debug
+        double bestQuestionScore = -1.0;
+        String bestQuestion = "";
+        Query bestQuery = null;
+        for (String question : questionToParses.keySet()) {
+            double score = questionToParses.get(question).size();
+            if (score > bestQuestionScore) {
+                bestQuestionScore = score;
+                bestQuestion = question;
+            }
+        }
+        for (Query query : groupedQuery.queries) {
+            if (query.question.equals(bestQuestion)) {
+                bestQuery = query;
+                break;
+            }
+        }
+
+        Map<ImmutableList<Integer>, String> answerToSpans = AnswerGenerator.generateAnswerSpans(
+                bestQuery.predicateIndex, answerToParses, words, parses);
+        groupedQuery.collapse(bestQuery.predicateIndex, bestQuery.category, bestQuery.argumentNumber, bestQuestion,
+                              answerToParses, answerToSpans);
     }
 
 }

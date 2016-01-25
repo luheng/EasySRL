@@ -36,6 +36,9 @@ public class GroupedQuery {
     List<AnswerOption> answerOptions;
 
     double answerMargin, answerEntropy;
+    // TODO: move this to ActiveLearning ...
+    static final double rankDiscountFactor = 0.0;
+    static final boolean pruneAnswerOptions = false;
 
     public GroupedQuery(int sentenceId, int numParses) {
         this.sentenceId = sentenceId;
@@ -60,7 +63,7 @@ public class GroupedQuery {
 
     private static boolean canMerge(Query q1, Query q2) {
         if (q1.predicateIndex == q2.predicateIndex) {
-            if (q1.question.equals(q2.question)) {
+            if (q1.question.equals(q2.question) && !q1.question.equalsIgnoreCase("-NOQ-")) {
                 return true;
             }
             if (q1.category == q2.category && q1.argumentNumber == q2.argumentNumber) {
@@ -82,76 +85,53 @@ public class GroupedQuery {
         queries.add(query);
     }
 
-    public void collapse() {
-        HashMap<String, Set<Integer>> questionToParses = new HashMap<>();
-        HashMap<ImmutableList<Integer>, Set<Integer>> answerToParses = new HashMap<>();
-        HashMap<ImmutableList<Integer>, String> answerToSpan = new HashMap<>();
-        queries.forEach(query -> {
-            ImmutableList<Integer> argList = ImmutableList.copyOf(query.argumentIds);
-            if (!questionToParses.containsKey(query.question)) {
-                questionToParses.put(query.question, new HashSet<>());
-            }
-            if (!answerToParses.containsKey(argList)) {
-                answerToParses.put(argList, new HashSet<>());
-            }
-            questionToParses.get(query.question).add(query.parseId);
-            answerToParses.get(argList).add(query.parseId);
-            answerToSpan.put(argList, query.answer);
-        });
+    public void collapse(int predicateIndex, Category category, int argumentNumber, String question,
+                         Map<ImmutableList<Integer>, Set<Integer>> answerToParses,
+                         Map<ImmutableList<Integer>, String> answerToSpans) {
+        this.predicateIndex = predicateIndex;
+        this.category = category;
+        this.argumentNumber = argumentNumber;
+        this.question = question;
+        this.answerOptions = new ArrayList<>();
 
-        // merge answer options
-        // TODO: debug
-        double bestQuestionScore = -1.0;
-        String bestQuestion = "";
-        Query bestQuery = null;
-        for (String question : questionToParses.keySet()) {
-            double score = questionToParses.get(question).size();
-            if (score > bestQuestionScore) {
-                bestQuestionScore = score;
-                bestQuestion = question;
-            }
-        }
-        for (Query query : queries) {
-            if (query.question.equals(bestQuestion)) {
-                bestQuery = query;
-                break;
-            }
-        }
-        predicateIndex = bestQuery.predicateIndex;
-        category = bestQuery.category;
-        argumentNumber = bestQuery.argumentNumber;
-        question = bestQuestion;
-        answerOptions = new ArrayList<>();
         Set<Integer> allParseIds = IntStream.range(0, totalNumParses).boxed().collect(Collectors.toSet());
         answerToParses.keySet().forEach(argList -> {
             Set<Integer> parseIds = answerToParses.get(argList);
-            answerOptions.add(new AnswerOption(argList, answerToSpan.get(argList), parseIds));
+            answerOptions.add(new AnswerOption(argList, answerToSpans.get(argList), parseIds));
             allParseIds.removeAll(parseIds);
         });
         answerOptions.add(new AnswerOption(ImmutableList.of(-1), "N/A", allParseIds));
-        // Compute probability of each answer option.
-        double sum = answerOptions.stream().mapToDouble(ao -> ao.parseIds.size()).sum();
-        answerOptions.forEach(ao -> ao.probability = 1.0 * ao.parseIds.size() / sum);
-        answerMargin = computeMargin();
-        answerEntropy = computeEntropy();
+        // Compute p(a|q), entropy, margin, etc.
+        computeProbabilities();
+        if (pruneAnswerOptions) {
+            answerOptions = answerOptions.stream().filter(ao -> ao.probability > 0.05).collect(Collectors.toList());
+            computeProbabilities();
+        }
     }
 
-    private double computeEntropy() {
-        return -1.0 * answerOptions.stream()
-                .filter(ao -> ao.probability > 0)
-                .mapToDouble(ao -> ao.probability * Math.log(ao.probability) / Math.log(2.0)).sum();
-    }
+    private void computeProbabilities() {
+        // Normalize.
+        // Compute p(a|q). discounting by rank id.
+        answerOptions.forEach(ao -> ao.probability = ao.parseIds.stream()
+                        .mapToDouble(i -> Math.exp(-rankDiscountFactor * i / totalNumParses)).sum());
+        double sum = answerOptions.stream().mapToDouble(ao -> ao.probability).sum();
+        answerOptions.forEach(ao -> ao.probability /= sum);
 
-    private double computeMargin() {
+        // Margin.
         List<Double> prob = answerOptions.stream().map(ao -> ao.probability).sorted().collect(Collectors.toList());
         int len = prob.size();
-        return len < 2 ? 1.0 : prob.get(len - 1) - prob.get(len - 2);
+        answerMargin = len < 2 ? 1.0 : prob.get(len - 1) - prob.get(len - 2);
+
+        // Entropy.
+        answerEntropy = -1.0 * answerOptions.stream()
+                .filter(ao -> ao.probability > 0)
+                .mapToDouble(ao -> ao.probability * Math.log(ao.probability) / Math.log(2.0)).sum();
     }
 
     public void print(List<String> words, int response) {
         System.out.println(String.format("%d:%s\t%s\t%d", predicateIndex, words.get(predicateIndex),
                 category, argumentNumber));
-        System.out.println(String.format("%.6f\t%.6f\t%s", computeEntropy(), computeMargin(), question));
+        System.out.println(String.format("%.6f\t%.6f\t%s", answerEntropy, answerMargin, question));
         for (int i = 0; i < answerOptions.size(); i++) {
             AnswerOption ao = answerOptions.get(i);
             String match = (i == response ? "*" : "");

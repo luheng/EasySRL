@@ -22,7 +22,6 @@ public class ActiveLearningInteractive {
     BaseCcgParser parser;
     QuestionGenerator questionGenerator;
     ResponseSimulator responseSimulator;
-    Reranker reranker;
     int nBest;
     Map<String, Double> aggregatedResults;
 
@@ -140,7 +139,7 @@ public class ActiveLearningInteractive {
                 .collect(Collectors.toList());
 
         /******************* Response simulator ************/
-        Reranker reranker = new Reranker(allParses);
+        Reranker reranker = new Reranker(allParses, allQueries);
         List<GroupedQuery> asked = new ArrayList<>();
         List<Integer> responses = new ArrayList<>();
         for (int i = 0; i < queryList.size(); i++) {

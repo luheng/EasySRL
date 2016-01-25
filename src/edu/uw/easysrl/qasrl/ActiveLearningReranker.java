@@ -26,6 +26,9 @@ public class ActiveLearningReranker {
     int nBest;
     Map<String, Double> aggregatedResults;
 
+    final boolean usePriorRank = false;
+    final boolean verbose = true;
+
     public static void main(String[] args) {
         EasySRL.CommandLineArguments commandLineOptions;
         try {
@@ -45,15 +48,15 @@ public class ActiveLearningReranker {
 
         /************** manual parameter tuning ... ***********/
         //final int[] nBestList = new int[] { 3, 5, 10, 20, 50, 100, 250, 500, 1000 };
-        final int[] nBestList = new int[] { 500 };
-        final boolean verbose = false;
+        final int[] nBestList = new int[] { 50 };
+
 
         List<Map<String, Double>> allResults = new ArrayList<>();
         for (int nBest : nBestList) {
             BaseCcgParser parser = new BaseCcgParser.AStarParser(modelFolder, rootCategories, nBest);
             ActiveLearningReranker learner = new ActiveLearningReranker(sentences, goldParses, parser,
                                                                         questionGenerator, responseSimulator, nBest);
-            learner.run(verbose);
+            learner.run();
             allResults.add(learner.aggregatedResults);
         }
 
@@ -84,7 +87,7 @@ public class ActiveLearningReranker {
         this.nBest = nBest;
     }
 
-    public void run(boolean verbose) {
+    public void run() {
         /****************** Base n-best Parser ***************/
         Map<Integer, List<Parse>> allParses = new HashMap<>();
         Map<Integer, List<Results>> allResults = new HashMap<>();
@@ -115,7 +118,6 @@ public class ActiveLearningReranker {
                 //.unordered()
                 .collect(Collectors.toList());
 
-
         /******************* Response simulator ************/
         // TODO: If the response gives N/A, shall we down vote all parses?
         List<Integer> responseList = queryList.stream().map(q -> {
@@ -125,7 +127,8 @@ public class ActiveLearningReranker {
         }).collect(Collectors.toList());
 
         /***************** Reranking ****************/
-        Reranker reranker = new Reranker(allParses);
+        Reranker reranker = usePriorRank ? new Reranker(allParses, allQueries) : new Reranker(allParses, null);
+
         Map<Integer, Results> budgetCurve = new HashMap<>();
         for (int i = 0; i < queryList.size(); i++) {
             reranker.rerank(queryList.get(i), responseList.get(i));
@@ -138,6 +141,8 @@ public class ActiveLearningReranker {
                 budgetCurve.put(i, currentResult);
             }
         }
+
+        // reranker.printVotes();
 
         /*************** Evaluation ********************/
         aggregatedResults = new HashMap<>();
