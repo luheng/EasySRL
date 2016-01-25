@@ -21,9 +21,9 @@ public class QueryGenerator {
      * @param parses the nbest list
      * @return a list of queries, filtered and sorted
      */
-    public static List<GroupedQuery> generateQueries(final List<String> words, final List<Parse> parses,
-                                                     final QuestionGenerator questionGenerator,
-                                                     final double minAnswerEntropy, final double maxAnswerMargin) {
+    public static List<GroupedQuery> generateQueries(final int sentenceId, final List<String> words,
+                                                     final List<Parse> parses,
+                                                     final QuestionGenerator questionGenerator) {
         List<Query> unmergedQueryList = new ArrayList<>();
         List<GroupedQuery> groupedQueryList = new ArrayList<>();
 
@@ -88,15 +88,11 @@ public class QueryGenerator {
                 }
             }
             if (!merged) {
-                groupedQueryList.add(new GroupedQuery(query, numParses));
+                groupedQueryList.add(new GroupedQuery(sentenceId, numParses, query));
             }
         }
-        /********** Sort questions. Not very useful now ***********/
         groupedQueryList.forEach(GroupedQuery::collapse);
-        // TODO: sort with lambda
-        return groupedQueryList.stream()
-                .filter(query -> (query.computeEntropy() > minAnswerEntropy && query.computeMargin() < maxAnswerMargin))
-                .collect(Collectors.toList());
+        return groupedQueryList;
     }
 
 }

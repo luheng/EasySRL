@@ -25,26 +25,25 @@ public class GroupedQuery {
         }
     }
 
-    // should represent the latent role here.
-    int totalNumParses;
+    int sentenceId, totalNumParses;
     Set<Query> queries;
 
     // Information specified only after collapsing;
     int predicateIndex;
     Category category;
     int argumentNumber;
-
     String question;
     List<AnswerOption> answerOptions;
 
-    public GroupedQuery(int numParses) {
-        totalNumParses = numParses;
+    public GroupedQuery(int sentenceId, int numParses) {
+        this.sentenceId = sentenceId;
+        this.totalNumParses = numParses;
         queries = new HashSet<>();
         answerOptions = null;
     }
 
-    public GroupedQuery(Query query, int numParses) {
-        this(numParses);
+    public GroupedQuery(int sentenceId, int numParses, Query query) {
+        this(sentenceId, numParses);
         queries.add(query);
     }
 
