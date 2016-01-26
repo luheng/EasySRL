@@ -32,6 +32,7 @@ import java.util.*;
 public class QuestionGenerationBenchmark {
     private static QuestionGenerator questionGenerator;
 
+    // TODO what are "aligned" dependencies?
     /**
      * Go over all the sentences with aligned ccg-qa dependencies and generate questions. (we can as well generate
      * for unaligned dependencies, but we want to do evaluation with the annotated QAs.
@@ -76,7 +77,7 @@ public class QuestionGenerationBenchmark {
                 }
                 String word = words.get(ccgDep.getSentencePositionOfPredicate());
                 Category category = ccgDep.getCategory();
-                if (questionGenerator.filterPredicate(word, category)) {
+                if (!questionGenerator.askQuestionForPredicate(word, category)) {
                     continue;
                 }
                 numDependenciesProcessed ++;
@@ -85,9 +86,6 @@ public class QuestionGenerationBenchmark {
                         categories, ccgDeps);
                 if (template == null) {
                     uncoveredDeps.addString(ccgDep.getCategory().toString());
-                    /*if (category.getNumberOfArguments() > 3) {
-                        printPredicateInfo(null, sentence, ccgDep, qaDep);
-                    }*/
                     continue;
                 }
                 List<String> question = questionGenerator.generateQuestionFromTemplate(template,

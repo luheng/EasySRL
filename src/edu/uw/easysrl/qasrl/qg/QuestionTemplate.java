@@ -6,6 +6,10 @@ import edu.uw.easysrl.qasrl.qg.QuestionSlot.*;
 import java.util.*;
 
 /**
+ * A QuestionTemplate is primarily a list of QuestionSlots.
+ * The point of a QuestionTemplate is to abstract over all of the questions
+ * that could be asked about the various arguments to a predicate.
+ *
  * Philosophical arguments:
  *      A question template should be defined by and only by a given subset of ccg dependencies, which are the ones
  *      fanned out from the predicate to the set of arguments (slots).
@@ -40,9 +44,66 @@ public class QuestionTemplate {
         return slots.length - 1;
     }
 
-    // whMapper
-    // Examples:
-    // { "what", "for" }, {"what", "to do" }
+    /**
+     * Instantiate into a question about a particular argument.
+     * @param targetArgNum : the argument number under the predicate
+     *                       associated with what's being asked about in the question
+     * @param verbHelper
+     * @return a question asking for the argument in slot targetArgNum of template's predicate
+     */
+    public List<String> instantiateForArgument(int targetArgNum, VerbHelper verbHelper) {
+        int totalArgs = getNumArguments();
+        List<String> question = new ArrayList<>();
+        if (!argNumToSlotId.containsKey(targetArgNum)) {
+            return question;
+        }
+        String[] wh = getWhWordByArgNum(targetArgNum);
+        // Wh-word for the argument.
+        add(question, wh[0]);
+        // Add verb or aux-subject-verb.
+        if (targetArgNum == slots[0].argumentNumber) {
+            // If target argument is the subject (occupies the first slot).
+            // Not necessary Arg#1, for example, "xxxx", said she.
+            addAll(question, getActiveVerb(verbHelper));
+        } else {
+            String[] verb = getActiveSplitVerb(verbHelper);
+            // Add auxiliaries, as "did" in "What did someone build?".
+            add(question, verb[0]);
+            addAll(question, getPlaceHolderWordByArgNum(slots[0].argumentNumber));
+            add(question, verb[1]);
+        }
+        // Add other Arguments.
+        for (int slotId = 2; slotId < slots.length; slotId++) {
+            ArgumentSlot argSlot = (ArgumentSlot) slots[slotId];
+            if (targetArgNum == argSlot.argumentNumber || (totalArgs >= 3 && !argSlot.preposition.isEmpty())) {
+                continue;
+            }
+            addAll(question, getPlaceHolderWordByArgNum(argSlot.argumentNumber));
+        }
+        // Put preposition to the end.
+        add(question, wh[1]);
+        return question;
+    }
+
+    private static void add(List<String> question, String word) {
+        if (!word.isEmpty()) {
+            question.add(word);
+        }
+    }
+
+    private static void addAll(List<String> question, String[] words) {
+        for (String w : words) {
+            add(question, w);
+        }
+    }
+
+    /**
+     * Get the wh-word (and extra words to append to the question) associated with
+     * the expected answer to a question about argument argNum.
+     * extra words e.g. in "what did someone he do X for?" "what did someone want X to do?"
+     * @param argNum the argument number of the word we're abstracting away
+     * @return a 2-element array of { "wh-word", "extra words" } where extra words may be empty
+     */
     public String[] getWhWordByArgNum(int argNum) {
         int slotId = argNumToSlotId.get(argNum);
         ArgumentSlot slot = (ArgumentSlot) slots[slotId];
@@ -58,9 +119,13 @@ public class QuestionTemplate {
         return new String[] { "what", slot.preposition };
     }
 
-    // phMapper
-    // Examples:
-    // { "", "something" }, {"for", "something" }
+    /**
+     * Get placeholder words for arguments that aren't being asked about.
+     * For an object this would be e.g., { "", "something" };
+     * For an oblique argument this would be e.g., { "for", "something" }.
+     * @param argNum argument not in question
+     * @return a 2-element array of { "preposition", "placeholder" } where prep may be empty
+     */
     public String[] getPlaceHolderWordByArgNum(int argNum) {
         int slotId = argNumToSlotId.get(argNum);
         ArgumentSlot slot = (ArgumentSlot) slots[slotId];
@@ -89,8 +154,12 @@ public class QuestionTemplate {
         return new String[] { slot.preposition, phStr };
     }
 
-    // i.e. {"", "built"}, or {"might", "build"}
-    // if the verb was passive to start with, as in S[adj]\NP, or S[pss]\NP, we keep the voice unchanged.
+    /**
+     * Create the verb as it should be realized in a question, possibly with a modal.
+     * if the verb was passive to start with, as in S[adj]\NP, or S[pss]\NP, we keep the voice unchanged.
+     * @param verbHelper helps us figure out whether verb is inflected (proxy for veridicality)
+     * @return a 2-element array of { "modal", "verb" } where modal may be empty
+     */
     public String[] getActiveVerb(VerbHelper verbHelper) {
         List<Integer> auxiliaries = verbSlot.auxiliaries;
         String verbStr = words.get(verbSlot.indexInSentence);
@@ -122,7 +191,14 @@ public class QuestionTemplate {
         return new String[] { "", verbStr };
     }
 
-    // If the verb is a single inflected one, we need to change it: "built" -> {"did", "build"}
+    /**
+     * If the argument in question is not the subject,
+     * we will need to split the verb from its auxiliary,
+     * e.g., "built" -> {"did", "build"}
+     * TODO is the below description correct?
+     * @param verbHelper
+     * @return a 2-element array of { "aux", "verb" } where verb is uninflected
+     */
     public String[] getActiveSplitVerb(VerbHelper verbHelper) {
         String[] result;
         if (verbSlot.auxiliaries.size() == 0 ) {
@@ -164,10 +240,5 @@ public class QuestionTemplate {
         }
         return str.trim();
     }
-
-    // i.e. {"was", "built"}, {"have been", "built"}
-    /*public List<String> getPassiveVerb() {
-        return null;
-    }*/
 
 }
