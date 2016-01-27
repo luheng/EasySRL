@@ -32,7 +32,6 @@ import java.util.*;
 public class QuestionGenerationBenchmark {
     private static QuestionGenerator questionGenerator;
 
-    // TODO what are "aligned" dependencies?
     /**
      * Go over all the sentences with aligned ccg-qa dependencies and generate questions. (we can as well generate
      * for unaligned dependencies, but we want to do evaluation with the annotated QAs.
@@ -43,7 +42,11 @@ public class QuestionGenerationBenchmark {
         CountDictionary coveredDeps = new CountDictionary();
         CountDictionary uncoveredDeps = new CountDictionary();
         CountDictionary alignedDeps = new CountDictionary();
+
+        Set<Sentence> allSentences = new HashSet<Sentence>();
+        int numDependenciesTotal = 0;
         int numDependenciesProcessed = 0;
+        int numQuestionTemplatesGenerated = 0;
         int numQuestionsGenerated = 0;
         int numGeneratedAligned = 0;
         int numQuestionExactMatch = 0;
@@ -62,6 +65,7 @@ public class QuestionGenerationBenchmark {
                 continue;
             }
             Sentence sentence = deps.get(0).sentence;
+            allSentences.add(sentence);
             List<String> words = sentence.getWords();
             List<Category> categories = sentence.getLexicalCategories();
             Collection<CCGBankDependency> ccgDeps = sentence.getCCGBankDependencyParse().getDependencies();
@@ -71,8 +75,9 @@ public class QuestionGenerationBenchmark {
                 if (ccgDep == null) {
                     continue;
                 }
+                numDependenciesTotal++;
                 if (qaDep != null) {
-                    numAligned ++;
+                    numAligned++;
                     alignedDeps.addString(ccgDep.getCategory().toString());
                 }
                 String word = words.get(ccgDep.getSentencePositionOfPredicate());
@@ -80,7 +85,7 @@ public class QuestionGenerationBenchmark {
                 if (!questionGenerator.askQuestionForPredicate(word, category)) {
                     continue;
                 }
-                numDependenciesProcessed ++;
+                numDependenciesProcessed++;
                 int predicateIndex = ccgDep.getSentencePositionOfPredicate();
                 QuestionTemplate template = questionGenerator.getTemplateFromCCGBank(predicateIndex, words,
                         categories, ccgDeps);
@@ -88,14 +93,15 @@ public class QuestionGenerationBenchmark {
                     uncoveredDeps.addString(ccgDep.getCategory().toString());
                     continue;
                 }
+                numQuestionTemplatesGenerated++;
                 List<String> question = questionGenerator.generateQuestionFromTemplate(template,
                         ccgDep.getArgNumber());
                 if (question.size() == 0) {
                     continue;
                 }
-                numQuestionsGenerated ++;
+                numQuestionsGenerated++;
                 if (qaDep != null) {
-                    numGeneratedAligned ++;
+                    numGeneratedAligned++;
                 }
                 coveredDeps.addString(ccgDep.getCategory().toString());
 
@@ -133,14 +139,26 @@ public class QuestionGenerationBenchmark {
             }
         }
         System.out.println("\n++++++++++++++++++++++++++++++++++++++++++");
-        System.out.println(String.format("Now able to generate %d " +
-                        "(%.2f%% of %d dependencies, %.2f%% of %d aligned dependencies) questions. " +
-                        "%d (%.2f%%) exact matches among all generated.",
-                numQuestionsGenerated,
-                100.0 * numQuestionsGenerated / numDependenciesProcessed, numDependenciesProcessed,
-                100.0 * numGeneratedAligned / numAligned, numAligned,
-                numQuestionExactMatch, 100.0 * numQuestionExactMatch / numQuestionsGenerated));
-        // uncoveredDeps.prettyPrint();
+        System.out.println(String.format("Sentences: %d", allSentences.size()));
+        System.out.println(String.format("Dependencies: %d (%.2f per sentence)",
+                                         numDependenciesTotal, 1.0 * numDependenciesTotal / allSentences.size()));
+        System.out.println(String.format("Aligned dependencies: %d (%.2f%% of deps, %.2f per sentence)",
+                                         numAligned, 100.0 * numAligned / numDependenciesTotal,
+                                         1.0 * numAligned / allSentences.size()));
+        System.out.println(String.format("Dependencies processed: %d (%.2f%%, of deps, %.2f per sentence)",
+                                         numDependenciesProcessed, 100.0 * numDependenciesProcessed / numDependenciesTotal,
+                                         1.0 * numDependenciesProcessed / allSentences.size()));
+        System.out.println(String.format("Question templates: %d (%.2f%%)",
+                                         numQuestionTemplatesGenerated, 100.0 * numQuestionTemplatesGenerated / numDependenciesProcessed));
+        System.out.println(String.format("Questions: %d (%.2f%% of deps, %.2f per sentence)",
+                                         numQuestionsGenerated, 100.0 * numQuestionsGenerated / numQuestionTemplatesGenerated,
+                                         1.0 * numQuestionsGenerated / allSentences.size));
+        System.out.println(String.format("Questions for aligned dependencies: %d (%.2f%% of aligned deps before processing)",
+                                         numGeneratedAligned, 100.0 * numGeneratedAligned / numAligned));
+        System.out.println(String.format("Exact matches among questions: %d (%.2f%% of all questions, %.2f%% of aligned questions)",
+                                         numQuestionExactMatch,
+                                         100.0 * numQuestionExactMatch / numQuestionsGenerated,
+                                         100.0 * numQuestionExactMatch / numGeneratedAligned));
         writer.close();
     }
 

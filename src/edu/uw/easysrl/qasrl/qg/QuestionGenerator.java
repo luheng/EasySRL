@@ -88,13 +88,14 @@ public class QuestionGenerator {
     }
 
     /**
-     * Generates a question given a SRL-parsed sentence and a particular dependency to ask about.
+     * Generates a question given a supertagged sentence, a dependency in question,
+     * and all of the dependencies sharing their predicate with that dependency.
      * First constructs a QuestionTemplate by locating the target dep's arguments in the sentence.
      * Then passes to generateQuestionFromTemplate.
      * @param targetDependency    : the dependency to ask about
      * @param words               : the sentence
      * @param categories          : supertags for the sentence
-     * @param ccgDeps             : deps from the SRL parse
+     * @param deps                : dependencies sharing their predicate with the target
      * @return the question as a list of non-empty strings
      */
     public List<String> generateQuestion(ResolvedDependency targetDependency,
