@@ -9,7 +9,6 @@ import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 
 /**
@@ -53,11 +52,13 @@ public class QueryGenerator {
                 // FIXME: modify question generator to accept less info.
                 List<String> question = questionGenerator.generateQuestion(dependency, words, parse.categories,
                         parse.dependencies);
+                /*
                 if (question == null || question.size() == 0) {
                     continue;
-                }
-                //String questionStr = (question == null || question.size() == 0) ? "-NOQ-" :
-                String questionStr = question.stream().collect(Collectors.joining(" "));
+                }*/
+                String questionStr = (question == null || question.size() == 0) ? "-NOQ-" :
+                        question.stream().collect(Collectors.joining(" "));
+                // String questionStr = question.stream().collect(Collectors.joining(" "));
                 Set<Integer> answerIds = new HashSet<>();
                 dependencies.stream().forEach(dep -> {
                     answerIds.addAll(AnswerGenerator.getArgumentIds(words, parse, dep));
@@ -87,7 +88,7 @@ public class QueryGenerator {
                 }
             }
             if (!merged) {
-                groupedQueryList.add(new GroupedQuery(sentenceId, numParses, query));
+                groupedQueryList.add(new GroupedQuery(sentenceId, parses, query));
             }
         }
         groupedQueryList.forEach(groupedQuery -> collapseQuery(groupedQuery, words, parses));

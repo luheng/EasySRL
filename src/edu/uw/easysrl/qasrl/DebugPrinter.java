@@ -22,8 +22,14 @@ public class DebugPrinter {
         }
     }
 
-    public static void printQueryListInfo(List<String> words, GroupedQuery query, int response, int goldResponse) {
-        System.out.println("\n" + String.format("S[%d]:\t", query.sentenceId) + words.stream()
+    public static void printQueryInfo(List<String> words, GroupedQuery query, int response) {
+        System.out.println(String.format("S[%d]:\t", query.sentenceId) + words.stream()
+                .collect(Collectors.joining(" ")));
+        query.print(words, response);
+    }
+
+    public static void printQueryInfo(List<String> words, GroupedQuery query, int response, int goldResponse) {
+        System.out.println(String.format("S[%d]:\t", query.sentenceId) + words.stream()
                 .collect(Collectors.joining(" ")));
         query.print(words, response);
         System.out.println("[gold]");

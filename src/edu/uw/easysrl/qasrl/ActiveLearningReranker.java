@@ -26,8 +26,14 @@ public class ActiveLearningReranker {
     int nBest;
     Map<String, Double> aggregatedResults;
 
+    // Pre-compute expected vote scores for parses using the p(a|q). But this makes the learning curve much worse.
     final boolean usePriorRank = false;
+    // Print debugging info or not.
     final boolean verbose = true;
+    // Plot learning curve (F1 vs. number of queries).
+    final boolean plotCurve = true;
+    // Maximum number of queries per sentence.
+    final int maxNumQueriesPerSentence = 100;
 
     public static void main(String[] args) {
         EasySRL.CommandLineArguments commandLineOptions;
@@ -116,10 +122,12 @@ public class ActiveLearningReranker {
                 //.sorted((q1, q2) -> Double.compare(q1.answerMargin, q2.answerMargin))
                 .sorted((q1, q2) -> Double.compare(-q1.answerEntropy, -q2.answerEntropy))
                 //.unordered()
+                .limit(maxNumQueriesPerSentence * sentences.size())
                 .collect(Collectors.toList());
 
+        System.out.println("Pruned number of queries:\t" + queryList.size());
+
         /******************* Response simulator ************/
-        // TODO: If the response gives N/A, shall we down vote all parses?
         List<Integer> responseList = queryList.stream().map(q -> {
             int sentId = q.sentenceId;
             List<String> words = sentences.get(sentId).stream().map(w -> w.word).collect(Collectors.toList());
@@ -132,7 +140,7 @@ public class ActiveLearningReranker {
         Map<Integer, Results> budgetCurve = new HashMap<>();
         for (int i = 0; i < queryList.size(); i++) {
             reranker.rerank(queryList.get(i), responseList.get(i));
-            if (i % 200 == 0) {
+            if (plotCurve && i % 200 == 0) {
                 Results currentResult = new Results();
                 allParses.keySet().forEach(sentIdx -> {
                     int bestK = reranker.getRerankedBest(sentIdx);
@@ -141,8 +149,6 @@ public class ActiveLearningReranker {
                 budgetCurve.put(i, currentResult);
             }
         }
-
-        // reranker.printVotes();
 
         /*************** Evaluation ********************/
         aggregatedResults = new HashMap<>();
@@ -153,6 +159,10 @@ public class ActiveLearningReranker {
         Accuracy reRankedAcc = new Accuracy();
         Accuracy oracleAcc = new Accuracy();
         int avgBestK = 0, avgOracleK = 0;
+
+        int numMultiHeadQueries = 0;
+        int numMultiHeadQueriesGold = 0;
+
         for (int sentIdx : allParses.keySet()) {
             List<Parse> parses = allParses.get(sentIdx);
             List<Results> results = allResults.get(sentIdx);
@@ -173,17 +183,40 @@ public class ActiveLearningReranker {
             reRankedAcc.add(CcgEvaluation.evaluateTags(parses.get(bestK).categories, goldParse.categories));
             oracleAcc.add(CcgEvaluation.evaluateTags(parses.get(oracleK).categories, goldParse.categories));
             if (verbose) {
-                List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
-                DebugPrinter.printQueryListInfo(sentIdx, words, queryList, responseList);
+                for (int i = 0; i < queryList.size(); i++) {
+                    GroupedQuery query = queryList.get(i);
+                    int response = responseList.get(i);
+                    if (query.sentenceId != sentIdx || response == -1) {
+                        continue;
+                    }
+                    if (query.answerOptions.get(response).argumentIds.size() > 1) {
+                        numMultiHeadQueriesGold ++;
+                    }
+                    if (query.answerOptions.stream().anyMatch(ao -> ao.argumentIds.size() > 1)) {
+                        numMultiHeadQueries ++;
+                    }
+                    if (query.answerOptions.size() > 0 && query.answerEntropy > 0.5) {
+                        List<String> words = sentences.get(sentIdx).stream().map(w -> w.word)
+                                .collect(Collectors.toList());
+                        DebugPrinter.printQueryInfo(words, query, response);
+                    }
+                }
             }
         }
+        System.out.println(numMultiHeadQueriesGold + "\t" + queryList.size() + "\t" +
+                100.0 * numMultiHeadQueriesGold / queryList.size());
+        System.out.println(numMultiHeadQueries + "\t" + queryList.size() + "\t" +
+                100.0 * numMultiHeadQueries / queryList.size());
+
         // Effect query: a query whose response boosts the score of a non-top parse but not the top one.
         int numSentencesParsed = allParses.size();
         int numQueries = reranker.numQueries;
         int numEffectiveQueries = reranker.numEffectiveQueries;
         System.out.println("\n1-best:\navg-k = 1.0\n" + oneBestAcc + "\n" + oneBest);
-        System.out.println("re-ranked:\navg-k = " + 1.0 * avgBestK / numSentencesParsed + "\n" + reRankedAcc + "\n" + reRanked);
-        System.out.println("oracle:\navg-k = " + 1.0 * avgOracleK / numSentencesParsed + "\n"+ oracleAcc + "\n" + oracle);
+        System.out.println("re-ranked:\navg-k = " + 1.0 * avgBestK / numSentencesParsed + "\n" + reRankedAcc + "\n" +
+                reRanked);
+        System.out.println("oracle:\navg-k = " + 1.0 * avgOracleK / numSentencesParsed + "\n"+ oracleAcc + "\n" +
+                oracle);
         System.out.println("Number of queries = " + numQueries);
         System.out.println("Number of effective queries = " + numEffectiveQueries);
         System.out.println("Effective ratio = " + 1.0 * numEffectiveQueries / numQueries);
@@ -204,10 +237,12 @@ public class ActiveLearningReranker {
         aggregatedResults.put("eff-ratio", 100.0 * numEffectiveQueries / numQueries);
         aggregatedResults.put("avg-gain", avgGain);
 
-        budgetCurve.keySet().stream().sorted().forEach(i -> System.out.print("\t" + i));
-        System.out.println();
-        budgetCurve.keySet().stream().sorted().forEach(i -> System.out.print("\t" +
-                String.format("%.3f", budgetCurve.get(i).getF1() * 100.0)));
-        System.out.println();
+        if (plotCurve) {
+            budgetCurve.keySet().stream().sorted().forEach(i -> System.out.print("\t" + i));
+            System.out.println();
+            budgetCurve.keySet().stream().sorted().forEach(i -> System.out.print("\t" +
+                    String.format("%.3f", budgetCurve.get(i).getF1() * 100.0)));
+            System.out.println();
+        }
     }
 }

@@ -26,6 +26,7 @@ public class GroupedQuery {
     }
 
     int sentenceId, totalNumParses;
+    final List<Parse> parses;
     Set<Query> queries;
 
     // Information specified only after collapsing;
@@ -38,17 +39,19 @@ public class GroupedQuery {
     double answerMargin, answerEntropy;
     // TODO: move this to ActiveLearning ...
     static final double rankDiscountFactor = 0.0;
-    static final boolean pruneAnswerOptions = false;
+    static final double minAnswerProbability = 0.00; //true;
+    static final boolean estimateWithParseScores = true;
 
-    public GroupedQuery(int sentenceId, int numParses) {
+    public GroupedQuery(int sentenceId, final List<Parse> parses) {
         this.sentenceId = sentenceId;
-        this.totalNumParses = numParses;
+        this.parses = parses;
+        this.totalNumParses = parses.size();
         queries = new HashSet<>();
         answerOptions = null;
     }
 
-    public GroupedQuery(int sentenceId, int numParses, Query query) {
-        this(sentenceId, numParses);
+    public GroupedQuery(int sentenceId, List<Parse> parses, Query query) {
+        this(sentenceId, parses);
         queries.add(query);
     }
 
@@ -86,8 +89,8 @@ public class GroupedQuery {
     }
 
     public void collapse(int predicateIndex, Category category, int argumentNumber, String question,
-                         Map<ImmutableList<Integer>, Set<Integer>> answerToParses,
-                         Map<ImmutableList<Integer>, String> answerToSpans) {
+                         final Map<ImmutableList<Integer>, Set<Integer>> answerToParses,
+                         final Map<ImmutableList<Integer>, String> answerToSpans) {
         this.predicateIndex = predicateIndex;
         this.category = category;
         this.argumentNumber = argumentNumber;
@@ -103,17 +106,19 @@ public class GroupedQuery {
         answerOptions.add(new AnswerOption(ImmutableList.of(-1), "N/A", allParseIds));
         // Compute p(a|q), entropy, margin, etc.
         computeProbabilities();
-        if (pruneAnswerOptions) {
-            answerOptions = answerOptions.stream().filter(ao -> ao.probability > 0.05).collect(Collectors.toList());
-            computeProbabilities();
-        }
+        answerOptions = answerOptions.stream().filter(ao -> ao.probability > minAnswerProbability)
+                .collect(Collectors.toList());
     }
 
     private void computeProbabilities() {
-        // Normalize.
-        // Compute p(a|q). discounting by rank id.
-        answerOptions.forEach(ao -> ao.probability = ao.parseIds.stream()
-                        .mapToDouble(i -> Math.exp(-rankDiscountFactor * i / totalNumParses)).sum());
+        // Compute p(a|q).
+        if (estimateWithParseScores) {
+            answerOptions.forEach(ao -> ao.probability = ao.parseIds.stream()
+                    .mapToDouble(i -> parses.get(i).score).sum());
+        } else {
+            answerOptions.forEach(ao -> ao.probability = ao.parseIds.stream()
+                    .mapToDouble(i -> Math.exp(-rankDiscountFactor * i / totalNumParses)).sum());
+        }
         double sum = answerOptions.stream().mapToDouble(ao -> ao.probability).sum();
         answerOptions.forEach(ao -> ao.probability /= sum);
 
@@ -122,21 +127,21 @@ public class GroupedQuery {
         int len = prob.size();
         answerMargin = len < 2 ? 1.0 : prob.get(len - 1) - prob.get(len - 2);
 
-        // Entropy.
+        // Entropy divided by log(number of options) to stay in range [0,1].
+        double K = Math.log(answerOptions.size());
         answerEntropy = -1.0 * answerOptions.stream()
                 .filter(ao -> ao.probability > 0)
-                .mapToDouble(ao -> ao.probability * Math.log(ao.probability) / Math.log(2.0)).sum();
+                .mapToDouble(ao -> ao.probability * Math.log(ao.probability) / K).sum();
     }
 
     public void print(List<String> words, int response) {
-        System.out.println(String.format("%d:%s\t%s\t%d", predicateIndex, words.get(predicateIndex),
-                category, argumentNumber));
+        System.out.println(String.format("%d:%s\t%s\t%d", predicateIndex, words.get(predicateIndex), category,
+                argumentNumber));
         System.out.println(String.format("%.6f\t%.6f\t%s", answerEntropy, answerMargin, question));
         for (int i = 0; i < answerOptions.size(); i++) {
             AnswerOption ao = answerOptions.get(i);
             String match = (i == response ? "*" : "");
             String argIdsStr = ao.argumentIds.stream().map(String::valueOf).collect(Collectors.joining(","));
-            // FIXME: why argumentIds can be size 0????
             String argHeadsStr = ao.argumentIds.get(0) == -1 ? "N/A" :
                     ao.argumentIds.stream().map(words::get).collect(Collectors.joining(","));
             String parseIdsStr = DebugPrinter.getShortListString(ao.parseIds);

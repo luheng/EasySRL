@@ -38,26 +38,26 @@ public class AnswerGenerator {
         Set<Integer> allIndices = new HashSet<>();
         answerToParses.keySet().forEach(allIndices::addAll);
         allIndices.add(predicateIndex);
-        for (ImmutableList<Integer> ids : answerToParses.keySet()) {
-            Set<Integer> parseIds = answerToParses.get(ids);
+        for (ImmutableList<Integer> argumentIds : answerToParses.keySet()) {
+            Set<Integer> parseIds = answerToParses.get(argumentIds);
             // use the highest ranked parse to get answer span.
             int bestParseId = parseIds.stream().min(Integer::compare).get();
             SyntaxTreeNode root = parses.get(bestParseId).syntaxTree;
-            if (ids.size() == 1) {
+            if (argumentIds.size() == 1) {
                 Set<Integer> excludeIndices = new HashSet<>(allIndices);
-                excludeIndices.remove(ids.get(0));
-                String span = getArgumentConstituent(words, root, ids.get(0), excludeIndices);
-                answerToSpans.put(ids, span);
+                excludeIndices.remove(argumentIds.get(0));
+                String span = getArgumentConstituent(words, root, argumentIds.get(0), excludeIndices);
+                answerToSpans.put(argumentIds, span);
             } else {
                 List<String> spans = new ArrayList<>();
-                for (int id : ids) {
+                for (int argId : argumentIds) {
                     Set<Integer> excludeIndices = new HashSet<>(allIndices);
-                    excludeIndices.remove(id);
-                    spans.add(getArgumentConstituent(words, root, ids.get(0), excludeIndices));
+                    excludeIndices.remove(argId);
+                    spans.add(getArgumentConstituent(words, root, argId, excludeIndices));
                 }
                 // TODO: handle appositive and conjunction here.
-                answerToSpans.put(ids, spans.stream().collect(Collectors.joining(" and ")));
-                answerToSpans.put(ids, spans.stream().collect(Collectors.joining(", ")));
+                answerToSpans.put(argumentIds, spans.stream().collect(Collectors.joining(" and ")));
+                answerToSpans.put(argumentIds, spans.stream().collect(Collectors.joining(", ")));
             }
         }
         return answerToSpans;

@@ -29,7 +29,7 @@ public class ActiveLearningInteractive {
     double maxAnswerMargin = 0.9;
     boolean shuffleSentences = false;
     int maxNumSentences = -1;
-    int maxNumQueries = 20;
+    int maxNumQueries = 50;
     int randomSeed = 0;
 
     public static void main(String[] args) {
@@ -50,7 +50,7 @@ public class ActiveLearningInteractive {
 
         /************** manual parameter tuning ... ***********/
         //final int[] nBestList = new int[] { 3, 5, 10, 20, 50, 100, 250, 500, 1000 };
-        final int[] nBestList = new int[] { 10 };
+        final int[] nBestList = new int[] { 50 };
         boolean verbose = true;
 
         List<Map<String, Double>> allResults = new ArrayList<>();
@@ -135,7 +135,7 @@ public class ActiveLearningInteractive {
             allQueries.addAll(QueryGenerator.generateQueries(sentIdx, words, parses, questionGenerator));
         }
         List<GroupedQuery> queryList = allQueries.stream()
-                .sorted((q1, q2) -> Double.compare(q1.answerMargin, q2.answerMargin))
+                .sorted((q1, q2) -> Double.compare(-q1.answerEntropy, -q2.answerEntropy))
                 .collect(Collectors.toList());
 
         /******************* Response simulator ************/
@@ -155,7 +155,7 @@ public class ActiveLearningInteractive {
             if (verbose) {
                 System.out.print("\n===============");
                 int goldResponse = goldHuman.answerQuestion(query, words, goldParses.get(sentIdx));
-                DebugPrinter.printQueryListInfo(words, query, response, goldResponse);
+                DebugPrinter.printQueryInfo(words, query, response, goldResponse);
                 // print gold
                 /*
                 Set<Integer> predicates = queryList.stream().map(q -> q.predicateIndex).collect(Collectors.toSet());

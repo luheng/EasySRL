@@ -8,6 +8,7 @@ import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -20,6 +21,7 @@ public class ResponseSimulatorGold extends ResponseSimulator {
     private QuestionGenerator questionGenerator;
 
     // TODO: simulate noise level.
+    // TODO: partial reward for parses that got part of the answer heads right ..
     public ResponseSimulatorGold(QuestionGenerator questionGenerator) {
         this.questionGenerator = questionGenerator;
     }
@@ -35,21 +37,22 @@ public class ResponseSimulatorGold extends ResponseSimulator {
      public int answerQuestion(GroupedQuery query, List<String> sentence, Parse goldParse) {
         List<Integer> answerIndices = new ArrayList<>();
         for (ResolvedDependency dep : goldParse.dependencies) {
+            if (dep.getHead() != query.predicateIndex) {
+                continue;
+            }
             List<String> goldQuestion = questionGenerator.generateQuestion(dep, sentence, goldParse.categories,
                     goldParse.dependencies);
+            /*
             if (goldQuestion == null || goldQuestion.size() == 0) {
                 continue;
             }
-            // TODO: use answer generator.
-            if (query.question.equalsIgnoreCase(StringUtils.join(goldQuestion))) {
-                int argumentId = dep.getArgument();
-                Category answerCategory = dep.getCategory().getArgument(dep.getArgNumber());
-                if (answerCategory.equals(Category.PP) || sentence.get(argumentId).equals("to")) {
-                    goldParse.dependencies.stream()
-                            .filter(d -> d.getHead() == argumentId)
-                            .forEach(d2 -> answerIndices.add(d2.getArgument()));
-                } else {
-                    answerIndices.add(argumentId);
+            */
+            String goldQuestionStr = (goldQuestion == null || goldQuestion.size() == 0) ? "-NOQ-" :
+                    goldQuestion.stream().collect(Collectors.joining(" "));
+            if (query.question.equalsIgnoreCase(goldQuestionStr)) {
+                if (!goldQuestionStr.equals("-NOQ-") ||
+                        (dep.getCategory() == query.category && dep.getArgNumber() == query.argumentNumber)) {
+                    answerIndices.addAll(AnswerGenerator.getArgumentIds(sentence, goldParse, dep));
                 }
             }
         }
