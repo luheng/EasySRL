@@ -152,7 +152,7 @@ public class QuestionGenerationBenchmark {
                                          numQuestionTemplatesGenerated, 100.0 * numQuestionTemplatesGenerated / numDependenciesProcessed));
         System.out.println(String.format("Questions: %d (%.2f%% of deps, %.2f per sentence)",
                                          numQuestionsGenerated, 100.0 * numQuestionsGenerated / numQuestionTemplatesGenerated,
-                                         1.0 * numQuestionsGenerated / allSentences.size));
+                                         1.0 * numQuestionsGenerated / allSentences.size()));
         System.out.println(String.format("Questions for aligned dependencies: %d (%.2f%% of aligned deps before processing)",
                                          numGeneratedAligned, 100.0 * numGeneratedAligned / numAligned));
         System.out.println(String.format("Exact matches among questions: %d (%.2f%% of all questions, %.2f%% of aligned questions)",

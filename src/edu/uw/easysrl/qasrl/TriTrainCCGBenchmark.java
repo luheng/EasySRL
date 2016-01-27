@@ -169,6 +169,7 @@ public class TriTrainCCGBenchmark {
         try {
             commandLineOptions = CliFactory.parseArguments(EasySRL.CommandLineArguments.class, args);
         } catch (Exception e) {
+            System.out.println("Exception occurred while parsing command line arguments.");
             return;
         }
         // Initialize corpora.
@@ -202,8 +203,7 @@ public class TriTrainCCGBenchmark {
             numParsed ++;
             avgParsingTime += TicToc.toc();
             TicToc.tic();
-            Set<ResolvedDependency> dependencies = predict.dependencies;
-            Results sentenceF1 = CcgEvaluation.evaluate(dependencies, gold.dependencies);
+            Results sentenceF1 = CcgEvaluation.evaluate(predict.dependencies, gold.dependencies);
             Accuracy sentenceAcc = CcgEvaluation.evaluateTags(predict.categories, gold.categories);
             parsingAcc.add(sentenceF1);
             taggingAcc.add(sentenceAcc);
@@ -211,12 +211,21 @@ public class TriTrainCCGBenchmark {
             // Verbose output.
             if (verbose) {
                 System.out.println(String.format("\n[S%d]:\t", sentIdx) + StringUtils.join(words));
-                System.out.println(words.size() + "\t" + dependencies.size());
-                for (ResolvedDependency dep : dependencies) {
-                    System.out.println(
-                            String.format("%d:%s\t%s.%d\t%d:%s", dep.getHead(), words.get(dep.getHead()),
-                                    dep.getCategory(), dep.getArgNumber(),
-                                    dep.getArgument(), words.get(dep.getArgument())));
+                System.out.println(String.format("Words: %d\tPredicted deps: %d\t Gold deps: %d",
+                                                 words.size(), predict.dependencies.size(), gold.dependencies.size()));
+                Set<ResolvedDependency> precisionMistakes = CcgEvaluation.difference(predict.dependencies, gold.dependencies);
+                Set<ResolvedDependency> recallMistakes = CcgEvaluation.difference(gold.dependencies, predict.dependencies);
+                System.out.println("False positive dependencies:");
+                for (ResolvedDependency dep : precisionMistakes) {
+                    System.out.println(String.format("\t%d:%s\t%s.%d\t%d:%s", dep.getHead(), words.get(dep.getHead()),
+                                                     dep.getCategory(), dep.getArgNumber(),
+                                                     dep.getArgument(), words.get(dep.getArgument())));
+                }
+                System.out.println("False negative (missed) dependencies:");
+                for (ResolvedDependency dep : recallMistakes) {
+                    System.out.println(String.format("\t%d:%s\t%s.%d\t%d:%s", dep.getHead(), words.get(dep.getHead()),
+                                                     dep.getCategory(), dep.getArgNumber(),
+                                                     dep.getArgument(), words.get(dep.getArgument())));
                 }
                 System.out.println(sentenceAcc + "\n" + sentenceF1);
                 System.out.println("Averaged parsing time (in sec):\t" + 1.0 * avgParsingTime / numParsed);
@@ -297,7 +306,7 @@ public class TriTrainCCGBenchmark {
     }
 
     public static void main(String[] args) {
-        // run1BestExperiment(args);
-        runNBestOracleExperiment(args, 100);
+        run1BestExperiment(args);
+        // runNBestOracleExperiment(args, 100);
     }
 }
