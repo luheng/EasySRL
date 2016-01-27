@@ -64,7 +64,7 @@ public class ResponseSimulatorGold extends ResponseSimulator {
                 return i;
             }
         }
-        System.out.println("[gold]:\t" + answerIndices.stream().map(String::valueOf).collect(Collectors.joining(",")));
+        // System.out.println("[gold]:\t" + answerIndices.stream().map(String::valueOf).collect(Collectors.joining(",")));
         return -1;
     }
 }

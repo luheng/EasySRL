@@ -24,11 +24,13 @@ public class ActiveLearningInteractive {
     ResponseSimulator responseSimulator;
     Reranker reranker;
     int nBest;
-    Map<String, Double> allResults;
+    Map<String, Double> aggregatedResults;
 
     double minAnswerEntropy = 0.0;
+    double maxAnswerMargin = 0.9;
     boolean shuffleSentences = false;
     int maxNumSentences = -1;
+    int maxNumQueries = 20;
     int randomSeed = 0;
 
     public static void main(String[] args) {
@@ -50,11 +52,7 @@ public class ActiveLearningInteractive {
         /************** manual parameter tuning ... ***********/
         //final int[] nBestList = new int[] { 3, 5, 10, 20, 50, 100, 250, 500, 1000 };
         final int[] nBestList = new int[] { 10 };
-        final double minAnswerEntropy = 0.3;
-        final int maxNumSentences = 20;
-        final boolean shuffleSentences = true;
-        final boolean verbose = true;
-        final int randomSeed = 56789 ;
+        boolean verbose = true;
 
         List<Map<String, Double>> allResults = new ArrayList<>();
         for (int nBest : nBestList) {
@@ -62,12 +60,8 @@ public class ActiveLearningInteractive {
 
             ActiveLearningInteractive learner = new ActiveLearningInteractive(sentences, goldParses, parser,
                     questionGenerator, responseSimulator, nBest);
-            learner.minAnswerEntropy = minAnswerEntropy;
-            learner.shuffleSentences = shuffleSentences;
-            learner.maxNumSentences = maxNumSentences;
-            learner.randomSeed = randomSeed;
             learner.run(verbose);
-            allResults.add(learner.allResults);
+            allResults.add(learner.aggregatedResults);
         }
         /*********** output results **********/
         List<String> resultKeys = new ArrayList<>(allResults.get(0).keySet());
@@ -94,13 +88,12 @@ public class ActiveLearningInteractive {
         this.parser = parser;
         this.questionGenerator = questionGenerator;
         this.responseSimulator = responseSimulator;
-        this.reranker = new Reranker();
         this.nBest = nBest;
     }
 
 
     public void run(boolean verbose) {
-        allResults = new HashMap<>();
+        aggregatedResults = new HashMap<>();
 
         Results oneBest = new Results();
         Results reRanked = new Results();
@@ -111,8 +104,6 @@ public class ActiveLearningInteractive {
 
         int numSentencesParsed = 0;
         int avgBestK = 0, avgOracleK = 0;
-        // Effect query: a query whose response boosts the score of a non-top parse but not the top one.
-        int numQueries = 0, numEffectiveQueries = 0;
 
         // For debugging.
         ResponseSimulatorGold goldHuman = new ResponseSimulatorGold(questionGenerator);
@@ -122,38 +113,75 @@ public class ActiveLearningInteractive {
             Collections.shuffle(sentenceOrder, new Random(randomSeed));
         }
 
-        // TODO: progress bar.
-        int numSentencesQueried = 0;
-        for (int s = 0; s < sentenceOrder.size(); s++) {
-            int sentIdx = sentenceOrder.get(s);
-            List<InputWord> sentence = sentences.get(sentIdx);
-            List<String> words = sentence.stream().map(w->w.word).collect(Collectors.toList());
-            Parse goldParse = goldParses.get(sentIdx);
+        /****************** Base n-best Parser ***************/
+        Map<Integer, List<Parse>> allParses = new HashMap<>();
+        Map<Integer, List<Results>> allResults = new HashMap<>();
+        for (int sentIdx = 0; sentIdx < sentences.size(); sentIdx ++) {
             // TODO: get parse scores.
-            /****************** Base n-best Parser ***************/
             List<Parse> parses = parser.parseNBest(sentences.get(sentIdx));
-            if (parses == null) {
-                continue;
+            if (parses != null) {
+                allParses.put(sentIdx, parses);
+                allResults.put(sentIdx, CcgEvaluation.evaluate(parses, goldParses.get(sentIdx).dependencies));
+
+                if (allParses.size() % 100 == 0) {
+                    System.out.println("Parsed:\t" + allParses.size() + " sentences ...");
+                }
             }
-            numSentencesParsed ++;
+        }
+        /****************** Generate Queries ******************/
+        List<GroupedQuery> allQueries = new ArrayList<>();
+        for (int sentIdx : allParses.keySet()) {
+            List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
+            List<Parse> parses = allParses.get(sentIdx);
+            allQueries.addAll(QueryGenerator.generateQueries(sentIdx, words, parses, questionGenerator));
+        }
+        List<GroupedQuery> queryList = allQueries.stream()
+                .sorted((q1, q2) -> Double.compare(q1.answerMargin, q2.answerMargin))
+                .collect(Collectors.toList());
 
-            /****************** Generate and Filter Queries ******************/
-            List<GroupedQuery> queryList = QueryGenerator.generateQueries(words, parses, questionGenerator,
-                    minAnswerEntropy);
+        /******************* Response simulator ************/
+        Reranker reranker = new Reranker(allParses);
+        List<GroupedQuery> asked = new ArrayList<>();
+        List<Integer> responses = new ArrayList<>();
+        for (int i = 0; i < queryList.size(); i++) {
+            GroupedQuery query = queryList.get(i);
+            int sentIdx = query.sentenceId;
+            List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
+            int response = responseSimulator.answerQuestion(query, words, goldParses.get(sentIdx));
+            asked.add(query);
+            responses.add(response);
+            reranker.rerank(query, response);
 
-            /******************* Response simulator ************/
-            // If the response gives N/A, shall we down vote all parses?
-            if (queryList.size() > 0) {
-                System.out.println(String.format("Sentence %d/%d", (numSentencesQueried + 1), maxNumSentences));
+            /*************** Print Debugging Info *************/
+            if (verbose) {
+                System.out.print("\n===============");
+                int goldResponse = goldHuman.answerQuestion(query, words, goldParses.get(sentIdx));
+                DebugPrinter.printQueryListInfo(words, query, response, goldResponse);
+                // print gold
+                /*
+                Set<Integer> predicates = queryList.stream().map(q -> q.predicateIndex).collect(Collectors.toSet());
+                System.out.println("[gold]");
+                goldParse.dependencies.forEach(d -> {
+                    //if (predicates.contains(d.getHead())) {
+                    System.out.println(d.getCategory() + "." + d.getArgument() + "\t" + d.toString(words));
+                    //}
+                });
+                */
+                System.out.println("===============\n");
             }
-            List<Integer> responseList = queryList.stream()
-                    .map(q -> responseSimulator.answerQuestion(q, words, goldParse))
-                    .collect(Collectors.toList());
 
-            /******************* Rerank and Oracle *******************/
-            int bestK = reranker.getRerankedBest(parses, queryList, responseList);
+            if (asked.size() >= maxNumQueries) {
+                break;
+            }
+        }
+
+        /**************** Rerank ***********************/
+        for (int sentIdx : allParses.keySet()) {
+            List<Parse> parses = allParses.get(sentIdx);
+            List<Results> results = allResults.get(sentIdx);
+            Parse goldParse = goldParses.get(sentIdx);
+            int bestK = reranker.getRerankedBest(sentIdx);
             int oracleK = 0;
-            List<Results> results = CcgEvaluation.evaluate(parses, goldParse.dependencies);
             for (int k = 1; k < parses.size(); k++) {
                 if (results.get(k).getF1() > results.get(oracleK).getF1()) {
                     oracleK = k;
@@ -167,55 +195,29 @@ public class ActiveLearningInteractive {
             oneBestAcc.add(CcgEvaluation.evaluateTags(parses.get(0).categories, goldParse.categories));
             reRankedAcc.add(CcgEvaluation.evaluateTags(parses.get(bestK).categories, goldParse.categories));
             oracleAcc.add(CcgEvaluation.evaluateTags(parses.get(oracleK).categories, goldParse.categories));
-
-            if (queryList.size() > 0) {
-                numSentencesQueried ++;
-                if (maxNumSentences > -1 && numSentencesQueried >= maxNumSentences) {
-                    break;
-                }
-            }
-
-            /*************** Print Debugging Info *************/
-            if (verbose && queryList.size() > 0) {
-                System.out.print("\n===============");
-                List<Integer> goldResponseList = queryList.stream()
-                        .map(q -> goldHuman.answerQuestion(q, words, goldParse))
-                        .collect(Collectors.toList());
-                // TODO:
-                // DebugPrinter.printQueryListInfo(sentIdx, words, queryList, responseList, goldResponseList);
-
-                // print gold
-                Set<Integer> predicates = queryList.stream().map(q -> q.predicateIndex).collect(Collectors.toSet());
-                System.out.println("[gold]");
-                goldParse.dependencies.forEach(d -> {
-                    //if (predicates.contains(d.getHead())) {
-                        System.out.println(d.getCategory() + "." + d.getArgument() + "\t" + d.toString(words));
-                    //}
-                });
-                System.out.println("===============\n");
-            }
         }
+
         System.out.println("\n1-best:\navg-k = 1.0\n" + oneBestAcc + "\n" + oneBest);
         System.out.println("re-ranked:\navg-k = " + 1.0 * avgBestK / numSentencesParsed + "\n" + reRankedAcc + "\n" + reRanked);
         System.out.println("oracle:\navg-k = " + 1.0 * avgOracleK / numSentencesParsed + "\n"+ oracleAcc + "\n" + oracle);
-        System.out.println("Number of queries = " + numQueries);
-        System.out.println("Number of effective queries = " + numEffectiveQueries);
-        System.out.println("Effective ratio = " + 1.0 * numEffectiveQueries / numQueries);
+        System.out.println("Number of queries = " + reranker.numQueries);
+        System.out.println("Number of effective queries = " + reranker.numEffectiveQueries);
+        System.out.println("Effective ratio = " + 1.0 * reranker.numEffectiveQueries / reranker.numQueries);
         double baselineF1 = oneBest.getF1();
         double rerankF1 = reRanked.getF1();
-        double avgGain = (rerankF1 - baselineF1) / numQueries;
+        double avgGain = (rerankF1 - baselineF1) / reranker.numQueries;
         System.out.println("Avg. F1 gain = " + avgGain);
 
-        allResults.put("1-best-acc", oneBestAcc.getAccuracy() * 100);
-        allResults.put("1-best-f1", oneBest.getF1() * 100);
-        allResults.put("rerank-acc", reRankedAcc.getAccuracy() * 100);
-        allResults.put("rerank-f1", reRanked.getF1() * 100);
-        allResults.put("oracle-acc", oracleAcc.getAccuracy() * 100);
-        allResults.put("oracle-f1", oracle.getF1() * 100);
-        allResults.put("num-queries", (double) numQueries);
-        allResults.put("num-eff-queries", (double) numEffectiveQueries);
-        allResults.put("num-queries", (double) numQueries);
-        allResults.put("eff-ratio", 100.0 * numEffectiveQueries / numQueries);
-        allResults.put("avg-gain", avgGain);
+        aggregatedResults.put("1-best-acc", oneBestAcc.getAccuracy() * 100);
+        aggregatedResults.put("1-best-f1", oneBest.getF1() * 100);
+        aggregatedResults.put("rerank-acc", reRankedAcc.getAccuracy() * 100);
+        aggregatedResults.put("rerank-f1", reRanked.getF1() * 100);
+        aggregatedResults.put("oracle-acc", oracleAcc.getAccuracy() * 100);
+        aggregatedResults.put("oracle-f1", oracle.getF1() * 100);
+        aggregatedResults.put("num-queries", (double) reranker.numQueries);
+        aggregatedResults.put("num-eff-queries", (double) reranker.numEffectiveQueries);
+        aggregatedResults.put("num-queries", (double) reranker.numQueries);
+        aggregatedResults.put("eff-ratio", 100.0 * reranker.numEffectiveQueries / reranker.numQueries);
+        aggregatedResults.put("avg-gain", avgGain);
     }
 }

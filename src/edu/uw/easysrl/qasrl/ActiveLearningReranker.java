@@ -22,12 +22,9 @@ public class ActiveLearningReranker {
     BaseCcgParser parser;
     QuestionGenerator questionGenerator;
     ResponseSimulator responseSimulator;
-    Reranker reranker;
 
     int nBest;
-    Map<String, Double> allResults;
-
-    double minAnswerEntropy = 0.0;
+    Map<String, Double> aggregatedResults;
 
     public static void main(String[] args) {
         EasySRL.CommandLineArguments commandLineOptions;
@@ -48,18 +45,16 @@ public class ActiveLearningReranker {
 
         /************** manual parameter tuning ... ***********/
         //final int[] nBestList = new int[] { 3, 5, 10, 20, 50, 100, 250, 500, 1000 };
-        final int[] nBestList = new int[] { 1000 };
-        final double minAnswerEntropy = 0.0;
-        final boolean verbose = true;
+        final int[] nBestList = new int[] { 500 };
+        final boolean verbose = false;
 
         List<Map<String, Double>> allResults = new ArrayList<>();
         for (int nBest : nBestList) {
             BaseCcgParser parser = new BaseCcgParser.AStarParser(modelFolder, rootCategories, nBest);
             ActiveLearningReranker learner = new ActiveLearningReranker(sentences, goldParses, parser,
                                                                         questionGenerator, responseSimulator, nBest);
-            learner.minAnswerEntropy = minAnswerEntropy;
             learner.run(verbose);
-            allResults.add(learner.allResults);
+            allResults.add(learner.aggregatedResults);
         }
 
         /*********** output results **********/
@@ -86,49 +81,78 @@ public class ActiveLearningReranker {
         this.parser = parser;
         this.questionGenerator = questionGenerator;
         this.responseSimulator = responseSimulator;
-        this.reranker = new Reranker();
         this.nBest = nBest;
     }
 
     public void run(boolean verbose) {
-        allResults = new HashMap<>();
+        /****************** Base n-best Parser ***************/
+        Map<Integer, List<Parse>> allParses = new HashMap<>();
+        Map<Integer, List<Results>> allResults = new HashMap<>();
+        for (int sentIdx = 0; sentIdx < sentences.size(); sentIdx ++) {
+            // TODO: get parse scores.
+            List<Parse> parses = parser.parseNBest(sentences.get(sentIdx));
+            if (parses != null) {
+                allParses.put(sentIdx, parses);
+                allResults.put(sentIdx, CcgEvaluation.evaluate(parses, goldParses.get(sentIdx).dependencies));
+                if (allParses.size() % 100 == 0) {
+                    System.out.println("Parsed:\t" + allParses.size() + " sentences ...");
+                }
+            }
+        }
+        /****************** Generate Queries ******************/
+        List<GroupedQuery> allQueries = new ArrayList<>();
+        for (int sentIdx : allParses.keySet()) {
+            List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
+            List<Parse> parses = allParses.get(sentIdx);
+            allQueries.addAll(QueryGenerator.generateQueries(sentIdx, words, parses, questionGenerator));
+        }
+        System.out.println("Total number of queries:\t" + allQueries.size());
+        // TODO: random order
+        List<GroupedQuery> queryList = allQueries.stream()
+                //.filter(q -> q.answerMargin < 0.99)
+                //.sorted((q1, q2) -> Double.compare(q1.answerMargin, q2.answerMargin))
+                .sorted((q1, q2) -> Double.compare(-q1.answerEntropy, -q2.answerEntropy))
+                //.unordered()
+                .collect(Collectors.toList());
 
+
+        /******************* Response simulator ************/
+        // TODO: If the response gives N/A, shall we down vote all parses?
+        List<Integer> responseList = queryList.stream().map(q -> {
+            int sentId = q.sentenceId;
+            List<String> words = sentences.get(sentId).stream().map(w -> w.word).collect(Collectors.toList());
+            return responseSimulator.answerQuestion(q, words, goldParses.get(sentId));
+        }).collect(Collectors.toList());
+
+        /***************** Reranking ****************/
+        Reranker reranker = new Reranker(allParses);
+        Map<Integer, Results> budgetCurve = new HashMap<>();
+        for (int i = 0; i < queryList.size(); i++) {
+            reranker.rerank(queryList.get(i), responseList.get(i));
+            if (i % 200 == 0) {
+                Results currentResult = new Results();
+                allParses.keySet().forEach(sentIdx -> {
+                    int bestK = reranker.getRerankedBest(sentIdx);
+                    currentResult.add(allResults.get(sentIdx).get(bestK));
+                });
+                budgetCurve.put(i, currentResult);
+            }
+        }
+
+        /*************** Evaluation ********************/
+        aggregatedResults = new HashMap<>();
         Results oneBest = new Results();
         Results reRanked = new Results();
         Results oracle = new Results();
         Accuracy oneBestAcc = new Accuracy();
         Accuracy reRankedAcc = new Accuracy();
         Accuracy oracleAcc = new Accuracy();
-
-        int numSentencesParsed = 0;
         int avgBestK = 0, avgOracleK = 0;
-
-        for (int sentIdx = 0; sentIdx < sentences.size(); sentIdx ++) {
-            List<InputWord> sentence = sentences.get(sentIdx);
-            List<String> words = sentence.stream().map(w->w.word).collect(Collectors.toList());
+        for (int sentIdx : allParses.keySet()) {
+            List<Parse> parses = allParses.get(sentIdx);
+            List<Results> results = allResults.get(sentIdx);
             Parse goldParse = goldParses.get(sentIdx);
-
-            // TODO: get parse scores.
-            /****************** Base n-best Parser ***************/
-            List<Parse> parses = parser.parseNBest(sentences.get(sentIdx));
-            if (parses == null) {
-                continue;
-            }
-            numSentencesParsed ++;
-
-            /****************** Generate and Filter Queries ******************/
-            List<GroupedQuery> queryList = QueryGenerator.generateQueries(words, parses, questionGenerator,
-                    minAnswerEntropy);
-
-            /******************* Response simulator ************/
-            // TODO: If the response gives N/A, shall we down vote all parses?
-            List<Integer> responseList = queryList.stream()
-                    .map(q -> responseSimulator.answerQuestion(q, words, goldParse))
-                    .collect(Collectors.toList());
-
-            /******************* ReRanker and Oracle ******************/
-            int bestK = reranker.getRerankedBest(parses, queryList, responseList);
-            List<Results> results = CcgEvaluation.evaluate(parses, goldParse.dependencies);
+            int bestK = reranker.getRerankedBest(sentIdx);
             int oracleK = 0;
             for (int k = 1; k < parses.size(); k++) {
                 if (results.get(k).getF1() > results.get(oracleK).getF1()) {
@@ -143,16 +167,15 @@ public class ActiveLearningReranker {
             oneBestAcc.add(CcgEvaluation.evaluateTags(parses.get(0).categories, goldParse.categories));
             reRankedAcc.add(CcgEvaluation.evaluateTags(parses.get(bestK).categories, goldParse.categories));
             oracleAcc.add(CcgEvaluation.evaluateTags(parses.get(oracleK).categories, goldParse.categories));
-
-            /*************** Print Debugging Info *************/
-            if (verbose && queryList.size() > 0) {
+            if (verbose) {
+                List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
                 DebugPrinter.printQueryListInfo(sentIdx, words, queryList, responseList);
             }
         }
         // Effect query: a query whose response boosts the score of a non-top parse but not the top one.
+        int numSentencesParsed = allParses.size();
         int numQueries = reranker.numQueries;
         int numEffectiveQueries = reranker.numEffectiveQueries;
-
         System.out.println("\n1-best:\navg-k = 1.0\n" + oneBestAcc + "\n" + oneBest);
         System.out.println("re-ranked:\navg-k = " + 1.0 * avgBestK / numSentencesParsed + "\n" + reRankedAcc + "\n" + reRanked);
         System.out.println("oracle:\navg-k = " + 1.0 * avgOracleK / numSentencesParsed + "\n"+ oracleAcc + "\n" + oracle);
@@ -164,16 +187,22 @@ public class ActiveLearningReranker {
         double avgGain = (rerankF1 - baselineF1) / numQueries * 100;
         System.out.println("Avg. F1 gain = " + avgGain);
 
-        allResults.put("1-best-acc", oneBestAcc.getAccuracy() * 100);
-        allResults.put("1-best-f1", oneBest.getF1() * 100);
-        allResults.put("rerank-acc", reRankedAcc.getAccuracy() * 100);
-        allResults.put("rerank-f1", reRanked.getF1() * 100);
-        allResults.put("oracle-acc", oracleAcc.getAccuracy() * 100);
-        allResults.put("oracle-f1", oracle.getF1() * 100);
-        allResults.put("num-queries", (double) numQueries);
-        allResults.put("num-eff-queries", (double) numEffectiveQueries);
-        allResults.put("num-queries", (double) numQueries);
-        allResults.put("eff-ratio", 100.0 * numEffectiveQueries / numQueries);
-        allResults.put("avg-gain", avgGain);
+        aggregatedResults.put("1-best-acc", oneBestAcc.getAccuracy() * 100);
+        aggregatedResults.put("1-best-f1", oneBest.getF1() * 100);
+        aggregatedResults.put("rerank-acc", reRankedAcc.getAccuracy() * 100);
+        aggregatedResults.put("rerank-f1", reRanked.getF1() * 100);
+        aggregatedResults.put("oracle-acc", oracleAcc.getAccuracy() * 100);
+        aggregatedResults.put("oracle-f1", oracle.getF1() * 100);
+        aggregatedResults.put("num-queries", (double) numQueries);
+        aggregatedResults.put("num-eff-queries", (double) numEffectiveQueries);
+        aggregatedResults.put("num-queries", (double) numQueries);
+        aggregatedResults.put("eff-ratio", 100.0 * numEffectiveQueries / numQueries);
+        aggregatedResults.put("avg-gain", avgGain);
+
+        budgetCurve.keySet().stream().sorted().forEach(i -> System.out.print("\t" + i));
+        System.out.println();
+        budgetCurve.keySet().stream().sorted().forEach(i -> System.out.print("\t" +
+                String.format("%.3f", budgetCurve.get(i).getF1() * 100.0)));
+        System.out.println();
     }
 }

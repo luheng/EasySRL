@@ -15,28 +15,26 @@ public class DebugPrinter {
                                           List<Integer> responseList) {
         System.out.println("\n" + String.format("S[%d]:\t", sentIdx) + words.stream().collect(Collectors.joining(" ")));
         for (int i = 0; i < queryList.size(); i++) {
-            queryList.get(i).print(words, responseList.get(i));
+            GroupedQuery query = queryList.get(i);
+            if (query.sentenceId == sentIdx) {
+                queryList.get(i).print(words, responseList.get(i));
+            }
         }
     }
 
+    public static void printQueryListInfo(List<String> words, GroupedQuery query, int response, int goldResponse) {
+        System.out.println("\n" + String.format("S[%d]:\t", query.sentenceId) + words.stream()
+                .collect(Collectors.joining(" ")));
+        query.print(words, response);
+        System.out.println("[gold]");
+        query.print(words, goldResponse);
+    }
 
     /**
      * Summarize a list of ids into spans for better printing.
-     * @param list: a list of ids, i.e. 1 2 3 5 8
+     * @param inputList: a list of ids, i.e. 1 2 3 5 8
      * @return a summarized list of spans, i.e. 1-3, 5, 8
      */
-    public static List<int[]> getShortList(List<Integer> list) {
-        Collections.sort(list);
-        List<int[]> shortList = new ArrayList<>();
-        for (int i = 0; i < list.size(); ) {
-            int j = i + 1;
-            for ( ; j < list.size() && list.get(j-1) + 1 == list.get(j); j++ ) ;
-            shortList.add(new int[] {list.get(i), list.get(j - 1)});
-            i = j;
-        }
-        return shortList;
-    }
-
     public static String getShortListString(final Collection<Integer> inputList) {
         List<Integer> list = new ArrayList<>(inputList);
         Collections.sort(list);

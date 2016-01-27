@@ -3,10 +3,8 @@ package edu.uw.easysrl.qasrl;
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Table;
 import com.google.common.collect.Table.Cell;
-import edu.stanford.nlp.util.StringUtils;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
-import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -19,14 +17,13 @@ import java.util.stream.Collectors;
 public class QueryGenerator {
 
     /**
-     *
      * @param words the sentence
      * @param parses the nbest list
      * @return a list of queries, filtered and sorted
      */
-    public static List<GroupedQuery> generateQueries(final List<String> words, final List<Parse> parses,
-                                                     final QuestionGenerator questionGenerator,
-                                                     final double minAnswerEntropy) {
+    public static List<GroupedQuery> generateQueries(final int sentenceId, final List<String> words,
+                                                     final List<Parse> parses,
+                                                     final QuestionGenerator questionGenerator) {
         List<Query> unmergedQueryList = new ArrayList<>();
         List<GroupedQuery> groupedQueryList = new ArrayList<>();
 
@@ -91,20 +88,11 @@ public class QueryGenerator {
                 }
             }
             if (!merged) {
-                groupedQueryList.add(new GroupedQuery(query, numParses));
+                groupedQueryList.add(new GroupedQuery(sentenceId, numParses, query));
             }
         }
-        /********** Sort questions. Not very useful now ***********/
         groupedQueryList.forEach(GroupedQuery::collapse);
-        // TODO: sort with lambda
-        return groupedQueryList.stream()
-                .filter(query -> getAnswerEntropy(query) > minAnswerEntropy)
-                .collect(Collectors.toList());
+        return groupedQueryList;
     }
 
-    public static double getAnswerEntropy(final GroupedQuery query) {
-        return -1.0 * query.answerOptions.stream()
-                .filter(ao -> ao.probability > 0)
-                .mapToDouble(ao -> ao.probability * Math.log(ao.probability) / Math.log(2.0)).sum();
-    }
 }

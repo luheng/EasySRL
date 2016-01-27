@@ -84,7 +84,6 @@ public class CountDictionary {
 		}
 		return -1;
 	}
-	
 
 	public int addString(String str, int count) {
 		if (str2index.contains(str)) {
@@ -101,8 +100,7 @@ public class CountDictionary {
 	}
 	
 	public int addString(String str, String unseenMarker) {
-		return str2index.contains(str) ? addString(str) :
-				addString(unseenMarker);
+		return str2index.contains(str) ? addString(str) : addString(unseenMarker);
 	}
 	
 	public boolean contains(String str) {
@@ -158,8 +156,7 @@ public class CountDictionary {
 	
 	public void prettyPrint() {
 		for (int i = 0; i < size(); i++) {
-			System.out.println(String.format("%d\t%s\t%d", i, index2str.get(i),
-											index2count.get(i)));
+			System.out.println(String.format("%d\t%s\t%d", i, index2str.get(i), index2count.get(i)));
 		}
 	}
 
