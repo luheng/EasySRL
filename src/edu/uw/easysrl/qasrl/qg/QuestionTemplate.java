@@ -114,7 +114,7 @@ public class QuestionTemplate {
             return new String[] { "what", "doing" };
         }
         if (slotId == 0 && getNumArguments() > 1) {
-            return new String[] { "who", "" };
+            return new String[] { "who/what", "" };
         }
         return new String[] { "what", slot.preposition };
     }
@@ -131,7 +131,7 @@ public class QuestionTemplate {
         ArgumentSlot slot = (ArgumentSlot) slots[slotId];
         int argumentIndex = slot.indexInSentence;
         if (UnrealizedArgumentSlot.class.isInstance(slot)) {
-            return new String [] { slot.preposition, argNum == 1 && getNumArguments() > 1 ? "someone" : "something" };
+            return new String [] { slot.preposition, argNum == 1 && getNumArguments() > 1 ? "someone/something" : "something" };
         }
         if (slot.category.isFunctionInto(Category.valueOf("S[to]\\NP"))) {
             return new String[] { "to do", "something" };
@@ -149,7 +149,7 @@ public class QuestionTemplate {
         } else if (argumentIndex > 1 && categories.get(argumentIndex - 1).isFunctionInto(Category.valueOf("NP|N"))) {
             phStr =  words.get(argumentIndex - 1) + " " + words.get(argumentIndex);
         } else {
-            phStr = (slotId == 0 && getNumArguments() > 1 ? "someone" : "something");
+            phStr = (slotId == 0 && getNumArguments() > 1 ? "someone/something" : "something");
         }
         return new String[] { slot.preposition, phStr };
     }
@@ -183,10 +183,10 @@ public class QuestionTemplate {
         if (predicateCategory.isFunctionInto(Category.valueOf("S[adj]\\NP")) ||
             predicateCategory.isFunctionInto(Category.valueOf("S[pss]\\NP")) ||
             predicateCategory.isFunctionInto(Category.valueOf("S[ng]\\NP"))) {
-            return new String[] { "might be", verbStr };
+            return new String[] { "would be", verbStr };
         }
         if (verbHelper.isUninflected(words, categories, verbSlot.indexInSentence)) {
-            return new String[] { "might", verbStr };
+            return new String[] { "would ", verbStr };
         }
         return new String[] { "", verbStr };
     }

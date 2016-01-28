@@ -12,6 +12,7 @@ import uk.co.flamingpenguin.jewel.cli.CliFactory;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import edu.stanford.nlp.util.StringUtils;
 
 /**
  * New - Active Learning experiments (n-best reranking).
@@ -169,30 +170,46 @@ public class ActiveLearningReranker {
             reRankedAcc.add(CcgEvaluation.evaluateTags(parses.get(bestK).categories, goldParse.categories));
             oracleAcc.add(CcgEvaluation.evaluateTags(parses.get(oracleK).categories, goldParse.categories));
             if (verbose) {
-                List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
-                DebugPrinter.printQueryListInfo(sentIdx, words, queryList, responseList);
-                Map<String, Parse> parsesForStats = new TreeMap<String, Parse>();
-                // print false positives and negatives for:
-                parsesForStats.put("1) original best", parses.get(0));
-                parsesForStats.put("2) reranked best", parses.get(bestK));
-                parsesForStats.put("3) oracle   best", parses.get(oracleK));
-                parsesForStats.forEach((label, parse) -> {
-                        Set<ResolvedDependency> precisionMistakes = CcgEvaluation.difference(parse.dependencies, goldParse.dependencies);
-                        Set<ResolvedDependency> recallMistakes = CcgEvaluation.difference(goldParse.dependencies, parse.dependencies);
-                        System.out.println(label);
-                        System.out.println("False positive dependencies:");
-                        for (ResolvedDependency dep : precisionMistakes) {
-                            System.out.println(String.format("\t%d:%s\t%s.%d\t%d:%s", dep.getHead(), words.get(dep.getHead()),
-                                                             dep.getCategory(), dep.getArgNumber(),
-                                                             dep.getArgument(), words.get(dep.getArgument())));
-                        }
-                        System.out.println("False negative (missed) dependencies:");
-                        for (ResolvedDependency dep : recallMistakes) {
-                            System.out.println(String.format("\t%d:%s\t%s.%d\t%d:%s", dep.getHead(), words.get(dep.getHead()),
-                                                             dep.getCategory(), dep.getArgNumber(),
-                                                             dep.getArgument(), words.get(dep.getArgument())));
-                        }
-                });
+                Parse oracleParse = parses.get(oracleK);
+                Set<ResolvedDependency> oraclePrecisionMistakes =
+                    CcgEvaluation.difference(oracleParse.dependencies, goldParse.dependencies);
+                Set<ResolvedDependency> oracleRecallMistakes =
+                    CcgEvaluation.difference(goldParse.dependencies, oracleParse.dependencies);
+                // only print the extra info for ones where we could do better
+                // also, only print the mistakes that were corrected by the oracle
+                if(oracleK != bestK) {
+                    List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
+                    // what if the reranker gave us something worse?
+                    if(results.get(0).getF1() > results.get(bestK).getF1()) {
+                        System.out.println("====== Reranker produced worse result! ======");
+                        DebugPrinter.printQueryListInfo(sentIdx, words, queryList, responseList);
+                    }
+                    Map<String, Parse> parsesForStats = new TreeMap<String, Parse>();
+                    // print false positives and negatives for:
+                    parsesForStats.put("==== original best ====", parses.get(0));
+                    parsesForStats.put("==== reranked best ====", parses.get(bestK));
+                    parsesForStats.forEach((label, parse) -> {
+                            Set<ResolvedDependency> precisionMistakes =
+                                CcgEvaluation.difference(parse.dependencies, goldParse.dependencies);
+                            precisionMistakes.removeAll(oraclePrecisionMistakes);
+                            Set<ResolvedDependency> recallMistakes =
+                                CcgEvaluation.difference(goldParse.dependencies, parse.dependencies);
+                            recallMistakes.removeAll(oracleRecallMistakes);
+                            System.out.println(label);
+                            System.out.println("False positive dependencies:");
+                            for (ResolvedDependency dep : precisionMistakes) {
+                                System.out.println(String.format("\t%d:%s\t%s.%d\t%d:%s", dep.getHead(), words.get(dep.getHead()),
+                                                                 dep.getCategory(), dep.getArgNumber(),
+                                                                 dep.getArgument(), words.get(dep.getArgument())));
+                            }
+                            System.out.println("False negative (missed) dependencies:");
+                            for (ResolvedDependency dep : recallMistakes) {
+                                System.out.println(String.format("\t%d:%s\t%s.%d\t%d:%s", dep.getHead(), words.get(dep.getHead()),
+                                                                 dep.getCategory(), dep.getArgNumber(),
+                                                                 dep.getArgument(), words.get(dep.getArgument())));
+                            }
+                        });
+                }
             }
         }
         // Effect query: a query whose response boosts the score of a non-top parse but not the top one.
