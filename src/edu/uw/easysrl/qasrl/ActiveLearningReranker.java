@@ -5,6 +5,7 @@ import edu.uw.easysrl.main.InputReader.InputWord;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.dependencies.ResolvedDependency;
 
 import uk.co.flamingpenguin.jewel.cli.CliFactory;
 
@@ -45,8 +46,8 @@ public class ActiveLearningReranker {
 
         /************** manual parameter tuning ... ***********/
         //final int[] nBestList = new int[] { 3, 5, 10, 20, 50, 100, 250, 500, 1000 };
-        final int[] nBestList = new int[] { 500 };
-        final boolean verbose = false;
+        final int[] nBestList = new int[] { 20 };
+        final boolean verbose = true;
 
         List<Map<String, Double>> allResults = new ArrayList<>();
         for (int nBest : nBestList) {
@@ -170,6 +171,28 @@ public class ActiveLearningReranker {
             if (verbose) {
                 List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
                 DebugPrinter.printQueryListInfo(sentIdx, words, queryList, responseList);
+                Map<String, Parse> parsesForStats = new TreeMap<String, Parse>();
+                // print false positives and negatives for:
+                parsesForStats.put("1) original best", parses.get(0));
+                parsesForStats.put("2) reranked best", parses.get(bestK));
+                parsesForStats.put("3) oracle   best", parses.get(oracleK));
+                parsesForStats.forEach((label, parse) -> {
+                        Set<ResolvedDependency> precisionMistakes = CcgEvaluation.difference(parse.dependencies, goldParse.dependencies);
+                        Set<ResolvedDependency> recallMistakes = CcgEvaluation.difference(goldParse.dependencies, parse.dependencies);
+                        System.out.println(label);
+                        System.out.println("False positive dependencies:");
+                        for (ResolvedDependency dep : precisionMistakes) {
+                            System.out.println(String.format("\t%d:%s\t%s.%d\t%d:%s", dep.getHead(), words.get(dep.getHead()),
+                                                             dep.getCategory(), dep.getArgNumber(),
+                                                             dep.getArgument(), words.get(dep.getArgument())));
+                        }
+                        System.out.println("False negative (missed) dependencies:");
+                        for (ResolvedDependency dep : recallMistakes) {
+                            System.out.println(String.format("\t%d:%s\t%s.%d\t%d:%s", dep.getHead(), words.get(dep.getHead()),
+                                                             dep.getCategory(), dep.getArgNumber(),
+                                                             dep.getArgument(), words.get(dep.getArgument())));
+                        }
+                });
             }
         }
         // Effect query: a query whose response boosts the score of a non-top parse but not the top one.
