@@ -3,12 +3,8 @@ package edu.uw.easysrl.qasrl;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 
-import edu.stanford.nlp.util.StringUtils;
-import edu.uw.easysrl.syntax.grammar.Category;
-
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -42,17 +38,12 @@ public class ResponseSimulatorGold extends ResponseSimulator {
             }
             List<String> goldQuestion = questionGenerator.generateQuestion(dep, sentence, goldParse.categories,
                     goldParse.dependencies);
-            /*
-            if (goldQuestion == null || goldQuestion.size() == 0) {
-                continue;
-            }
-            */
             String goldQuestionStr = (goldQuestion == null || goldQuestion.size() == 0) ? "-NOQ-" :
                     goldQuestion.stream().collect(Collectors.joining(" "));
             if (query.question.equalsIgnoreCase(goldQuestionStr)) {
                 if (!goldQuestionStr.equals("-NOQ-") ||
                         (dep.getCategory() == query.category && dep.getArgNumber() == query.argumentNumber)) {
-                    answerIndices.addAll(AnswerGenerator.getArgumentIds(sentence, goldParse, dep));
+                    answerIndices.addAll(AnswerGenerator.getArgumentIdsForDependency(sentence, goldParse, dep));
                 }
             }
         }

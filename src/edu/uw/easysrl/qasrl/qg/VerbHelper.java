@@ -177,18 +177,18 @@ public class VerbHelper {
                     List<Integer> aux = getAuxiliaryChain(words, categories, i);
                     aux.add(i);
                     for (int j = 0; j < words.size(); j++) {
-                        System.out.print((j == 0 ? "" : " ") + (j == i ? "*" : "") + words.get(j));
+                        System.out.printWithGoldDependency((j == 0 ? "" : " ") + (j == i ? "*" : "") + words.get(j));
                     }
                     System.out.println();
-                    aux.forEach(id -> System.out.print(words.get(id) + " "));
+                    aux.forEach(id -> System.out.printWithGoldDependency(words.get(id) + " "));
                     System.out.println();
-                    aux.forEach(id -> System.out.print(categories.get(id) + " "));
+                    aux.forEach(id -> System.out.printWithGoldDependency(categories.get(id) + " "));
                     System.out.println("\n");
                 }
                 if (isAuxiliaryVerb(sentence.getWords(), sentence.getLexicalCategories(), i)) {
                     System.out.println();
                     for (int j = 0; j < words.size(); j++) {
-                        System.out.print((j == 0 ? "" : " ") + (j == i ? "*" : "") + words.get(j));
+                        System.out.printWithGoldDependency((j == 0 ? "" : " ") + (j == i ? "*" : "") + words.get(j));
                     }
                     System.out.println();
                     System.out.println(sentence.getWords().get(i) + "\t" + sentence.getLexicalCategories().get(i));

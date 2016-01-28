@@ -23,6 +23,10 @@ public class GroupedQuery {
             this.answer = answer;
             this.parseIds = parseIds;
         }
+
+        public boolean isNAOption() {
+            return argumentIds.get(0) == -1;
+        }
     }
 
     int sentenceId, totalNumParses;
@@ -134,10 +138,10 @@ public class GroupedQuery {
                 .mapToDouble(ao -> ao.probability * Math.log(ao.probability) / K).sum();
     }
 
-    public void print(List<String> words, int response) {
+    public void print(final List<String> words, int response) {
         System.out.println(String.format("%d:%s\t%s\t%d", predicateIndex, words.get(predicateIndex), category,
                 argumentNumber));
-        System.out.println(String.format("%.6f\t%.6f\t%s", answerEntropy, answerMargin, question));
+        System.out.println(String.format("%.2f\t%.2f\t%s", answerEntropy, answerMargin, question));
         for (int i = 0; i < answerOptions.size(); i++) {
             AnswerOption ao = answerOptions.get(i);
             String match = (i == response ? "*" : "");
@@ -145,8 +149,36 @@ public class GroupedQuery {
             String argHeadsStr = ao.argumentIds.get(0) == -1 ? "N/A" :
                     ao.argumentIds.stream().map(words::get).collect(Collectors.joining(","));
             String parseIdsStr = DebugPrinter.getShortListString(ao.parseIds);
-            System.out.println(String.format("%.3f\t%s%d\t%s:%s(%s)\t%s", ao.probability, match, i, argIdsStr,
+            System.out.println(String.format("%.2f\t%s%d\t%s:%s\t%s\t%s", ao.probability, match, i, argIdsStr,
                     argHeadsStr, ao.answer, parseIdsStr));
+        }
+        System.out.println();
+    }
+
+    public void printWithGoldDependency(final List<String> words, int response, Parse goldParse) {
+        System.out.print(String.format("\t%d:%s\t%s.%d",
+                predicateIndex,
+                words.get(predicateIndex),
+                category,
+                argumentNumber));
+        AnswerGenerator.getArgumentIds(words, goldParse, predicateIndex, category, argumentNumber).stream().sorted()
+                .forEach(argId -> System.out.print(String.format("\t%d:%s", argId, words.get(argId))));
+        System.out.println();
+        System.out.println(String.format("%.2f\t \t%s", answerEntropy, question));
+        for (int i = 0; i < answerOptions.size(); i++) {
+            AnswerOption ao = answerOptions.get(i);
+            String match = (i == response ? "*" : "");
+            String argIdsStr = ao.argumentIds.stream().map(String::valueOf).collect(Collectors.joining(","));
+            String argHeadsStr = ao.argumentIds.get(0) == -1 ? "N/A" :
+                    ao.argumentIds.stream().map(words::get).collect(Collectors.joining(","));
+            String parseIdsStr = DebugPrinter.getShortListString(ao.parseIds);
+            System.out.println(String.format("%.2f\t%s[%d]\t%s\t%s:%s\t%s",
+                    ao.probability,
+                    match, i,
+                    ao.answer,
+                    argIdsStr,
+                    argHeadsStr,
+                    parseIdsStr));
         }
         System.out.println();
     }

@@ -124,7 +124,7 @@ public class OracleDependenciesModel extends Model {
 			totalTags += gold.getWords().size();
 			if (tagAcc < gold.getWords().size()) {
 				System.out.println(tagAcc + "/" + gold.getWords().size());
-				// System.out.println(ParsePrinter.SUPERTAG_PRINTER.print(parses.get(0).getObject(), 0));
+				// System.out.println(ParsePrinter.SUPERTAG_PRINTER.printWithGoldDependency(parses.get(0).getObject(), 0));
 				for (int i = 0; i < gold.getWords().size(); i++) {
 					System.out.print(gold.getWords().get(i).word);
 					if (parse.getLeaves().get(i).getCategory() != gold.getLeaves().get(i).getCategory()) {

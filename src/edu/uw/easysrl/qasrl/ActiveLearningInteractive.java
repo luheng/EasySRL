@@ -132,7 +132,8 @@ public class ActiveLearningInteractive {
         for (int sentIdx : allParses.keySet()) {
             List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
             List<Parse> parses = allParses.get(sentIdx);
-            allQueries.addAll(QueryGenerator.generateQueries(sentIdx, words, parses, questionGenerator));
+            allQueries.addAll(QueryGenerator.generateQueries(sentIdx, words, parses, questionGenerator,
+                    false /* generatePseudoQuestions */));
         }
         List<GroupedQuery> queryList = allQueries.stream()
                 .sorted((q1, q2) -> Double.compare(-q1.answerEntropy, -q2.answerEntropy))
@@ -156,7 +157,7 @@ public class ActiveLearningInteractive {
                 System.out.print("\n===============");
                 int goldResponse = goldHuman.answerQuestion(query, words, goldParses.get(sentIdx));
                 DebugPrinter.printQueryInfo(words, query, response, goldResponse);
-                // print gold
+                // printWithGoldDependency gold
                 /*
                 Set<Integer> predicates = queryList.stream().map(q -> q.predicateIndex).collect(Collectors.toSet());
                 System.out.println("[gold]");

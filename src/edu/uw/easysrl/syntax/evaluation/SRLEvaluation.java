@@ -153,7 +153,7 @@ public class SRLEvaluation {
 		}
 
 		// for (final SyntaxTreeNodeLeaf leaf : parse.getCcgParse().getLeaves()) {
-		// System.err.print(leaf.getWord() + "|" + leaf.getCategory() + " ");
+		// System.err.printWithGoldDependency(leaf.getWord() + "|" + leaf.getCategory() + " ");
 		// }
 		// System.err.println();
 

@@ -17,13 +17,13 @@ import java.util.stream.Collectors;
  * Created by luheng on 1/5/16.
  */
 public class ActiveLearningReranker {
-    List<List<InputWord>> sentences;
-    List<Parse> goldParses;
-    BaseCcgParser parser;
-    QuestionGenerator questionGenerator;
-    ResponseSimulator responseSimulator;
+    final List<List<InputWord>> sentences;
+    final List<Parse> goldParses;
+    final BaseCcgParser parser;
+    final QuestionGenerator questionGenerator;
+    final ResponseSimulator responseSimulator;
 
-    int nBest;
+    final int nBest;
     Map<String, Double> aggregatedResults;
 
     // Pre-compute expected vote scores for parses using the p(a|q). But this makes the learning curve much worse.
@@ -34,6 +34,9 @@ public class ActiveLearningReranker {
     final boolean plotCurve = true;
     // Maximum number of queries per sentence.
     final int maxNumQueriesPerSentence = 100;
+    // Incorporate -NOQ- queries (dependencies we can't generate questions for) in reranking to see potential
+    // improvements.
+    boolean generatePseudoQuestions = true;
 
     public static void main(String[] args) {
         EasySRL.CommandLineArguments commandLineOptions;
@@ -97,15 +100,26 @@ public class ActiveLearningReranker {
         /****************** Base n-best Parser ***************/
         Map<Integer, List<Parse>> allParses = new HashMap<>();
         Map<Integer, List<Results>> allResults = new HashMap<>();
+        Map<Integer, Integer> oracleParseIds = new HashMap<>();
         for (int sentIdx = 0; sentIdx < sentences.size(); sentIdx ++) {
-            // TODO: get parse scores.
             List<Parse> parses = parser.parseNBest(sentences.get(sentIdx));
-            if (parses != null) {
-                allParses.put(sentIdx, parses);
-                allResults.put(sentIdx, CcgEvaluation.evaluate(parses, goldParses.get(sentIdx).dependencies));
-                if (allParses.size() % 100 == 0) {
-                    System.out.println("Parsed:\t" + allParses.size() + " sentences ...");
+            if (parses == null) {
+                continue;
+            }
+            // Get results for every parse in the n-best list.
+            List<Results> results = CcgEvaluation.evaluate(parses, goldParses.get(sentIdx).dependencies);
+            // Get oracle parse id.
+            int oracleK = 0;
+            for (int k = 1; k < parses.size(); k++) {
+                if (results.get(k).getF1() > results.get(oracleK).getF1()) {
+                    oracleK = k;
                 }
+            }
+            allParses.put(sentIdx, parses);
+            allResults.put(sentIdx, results);
+            oracleParseIds.put(sentIdx, oracleK);
+            if (allParses.size() % 100 == 0) {
+                System.out.println("Parsed:\t" + allParses.size() + " sentences ...");
             }
         }
         /****************** Generate Queries ******************/
@@ -113,7 +127,8 @@ public class ActiveLearningReranker {
         for (int sentIdx : allParses.keySet()) {
             List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
             List<Parse> parses = allParses.get(sentIdx);
-            allQueries.addAll(QueryGenerator.generateQueries(sentIdx, words, parses, questionGenerator));
+            allQueries.addAll(QueryGenerator.generateQueries(sentIdx, words, parses, questionGenerator,
+                                                             generatePseudoQuestions));
         }
         System.out.println("Total number of queries:\t" + allQueries.size());
         // TODO: random order
@@ -162,18 +177,15 @@ public class ActiveLearningReranker {
 
         int numMultiHeadQueries = 0;
         int numMultiHeadQueriesGold = 0;
+        int numTrulyEffectiveQueries = 0;
 
         for (int sentIdx : allParses.keySet()) {
             List<Parse> parses = allParses.get(sentIdx);
             List<Results> results = allResults.get(sentIdx);
             Parse goldParse = goldParses.get(sentIdx);
             int bestK = reranker.getRerankedBest(sentIdx);
-            int oracleK = 0;
-            for (int k = 1; k < parses.size(); k++) {
-                if (results.get(k).getF1() > results.get(oracleK).getF1()) {
-                    oracleK = k;
-                }
-            }
+            int oracleK = oracleParseIds.get(sentIdx);
+
             avgBestK += bestK;
             avgOracleK += oracleK;
             oneBest.add(results.get(0));
@@ -189,16 +201,21 @@ public class ActiveLearningReranker {
                     if (query.sentenceId != sentIdx || response == -1) {
                         continue;
                     }
+
                     if (query.answerOptions.get(response).argumentIds.size() > 1) {
                         numMultiHeadQueriesGold ++;
                     }
                     if (query.answerOptions.stream().anyMatch(ao -> ao.argumentIds.size() > 1)) {
                         numMultiHeadQueries ++;
                     }
-                    if (query.answerOptions.size() > 0 && query.answerEntropy > 0.5) {
+                    // Look at all the queries that voted for the oracle parse but not the 1-best.
+                    Set<Integer> voted = query.answerOptions.get(response).parseIds;
+                    if (!query.answerOptions.get(response).isNAOption() &&
+                            voted.contains(oracleK) && !voted.contains(0)) {
                         List<String> words = sentences.get(sentIdx).stream().map(w -> w.word)
                                 .collect(Collectors.toList());
-                        DebugPrinter.printQueryInfo(words, query, response);
+                        DebugPrinter.printQueryInfo(words, query, response, goldParse);
+                        numTrulyEffectiveQueries ++;
                     }
                 }
             }
@@ -207,6 +224,7 @@ public class ActiveLearningReranker {
                 100.0 * numMultiHeadQueriesGold / queryList.size());
         System.out.println(numMultiHeadQueries + "\t" + queryList.size() + "\t" +
                 100.0 * numMultiHeadQueries / queryList.size());
+        System.out.println("Number of truly effective queries:\t" + numTrulyEffectiveQueries);
 
         // Effect query: a query whose response boosts the score of a non-top parse but not the top one.
         int numSentencesParsed = allParses.size();

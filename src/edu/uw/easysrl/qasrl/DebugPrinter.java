@@ -11,21 +11,10 @@ import java.util.stream.Collectors;
  * Created by luheng on 1/17/16.
  */
 public class DebugPrinter {
-    public static void printQueryListInfo(int sentIdx, List<String> words, List<GroupedQuery> queryList,
-                                          List<Integer> responseList) {
-        System.out.println("\n" + String.format("S[%d]:\t", sentIdx) + words.stream().collect(Collectors.joining(" ")));
-        for (int i = 0; i < queryList.size(); i++) {
-            GroupedQuery query = queryList.get(i);
-            if (query.sentenceId == sentIdx) {
-                queryList.get(i).print(words, responseList.get(i));
-            }
-        }
-    }
-
-    public static void printQueryInfo(List<String> words, GroupedQuery query, int response) {
+    public static void printQueryInfo(List<String> words, GroupedQuery query, int response, final Parse goldParse) {
         System.out.println(String.format("S[%d]:\t", query.sentenceId) + words.stream()
                 .collect(Collectors.joining(" ")));
-        query.print(words, response);
+        query.printWithGoldDependency(words, response, goldParse);
     }
 
     public static void printQueryInfo(List<String> words, GroupedQuery query, int response, int goldResponse) {

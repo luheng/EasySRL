@@ -20,11 +20,15 @@ public class QueryGenerator {
     /**
      * @param words the sentence
      * @param parses the nbest list
+     * @param questionGenerator to generate wh-question from a resolved dependency
+     * @param generatePseudoQuestions generate -NOQ- questions if set to true, for error analysis and brainstorming
+     *                                about new question templates.
      * @return a list of queries, filtered and sorted
      */
     public static List<GroupedQuery> generateQueries(final int sentenceId, final List<String> words,
                                                      final List<Parse> parses,
-                                                     final QuestionGenerator questionGenerator) {
+                                                     final QuestionGenerator questionGenerator,
+                                                     boolean generatePseudoQuestions) {
         List<Query> unmergedQueryList = new ArrayList<>();
         List<GroupedQuery> groupedQueryList = new ArrayList<>();
 
@@ -52,16 +56,14 @@ public class QueryGenerator {
                 // FIXME: modify question generator to accept less info.
                 List<String> question = questionGenerator.generateQuestion(dependency, words, parse.categories,
                         parse.dependencies);
-                /*
-                if (question == null || question.size() == 0) {
+                if (!generatePseudoQuestions && (question == null || question.size() == 0)) {
                     continue;
-                }*/
+                }
                 String questionStr = (question == null || question.size() == 0) ? "-NOQ-" :
                         question.stream().collect(Collectors.joining(" "));
-                // String questionStr = question.stream().collect(Collectors.joining(" "));
                 Set<Integer> answerIds = new HashSet<>();
                 dependencies.stream().forEach(dep -> {
-                    answerIds.addAll(AnswerGenerator.getArgumentIds(words, parse, dep));
+                    answerIds.addAll(AnswerGenerator.getArgumentIdsForDependency(words, parse, dep));
                 });
                 List<Integer> answerIdList = new ArrayList<>(answerIds);
                 Collections.sort(answerIdList);

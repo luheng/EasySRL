@@ -28,7 +28,7 @@ public class ResponseSimulatorMultipleChoice extends ResponseSimulator {
 
     public int answerQuestion(GroupedQuery query, List<String> sentence, Parse goldParse) {
         int predicateIndex = query.predicateIndex;
-        // print sentence
+        // printWithGoldDependency sentence
         for (int i = 0; i < sentence.size(); i++) {
             System.out.print(i > 0 ? " " : "");
             System.out.print(i == predicateIndex ? ANSI_YELLOW : "");
@@ -36,7 +36,7 @@ public class ResponseSimulatorMultipleChoice extends ResponseSimulator {
         }
         System.out.println();
         System.out.println("Q: " + query.question + "?");
-        // TODO: highlight answer in sentence? print answer spans
+        // TODO: highlight answer in sentence? printWithGoldDependency answer spans
         int numAnswers = query.answerOptions.size();
         for (int i = 0; i < numAnswers; i++) {
             GroupedQuery.AnswerOption ao = query.answerOptions.get(i);

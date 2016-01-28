@@ -210,7 +210,7 @@ public class CCGBankEvaluation {
 
 						unlabelled.add(evaluate(unlabel(forParse), unlabel(goldDeps), errorAnalysisUnlabelled, words));
 
-						// System.out.print(Util.twoDP(100.0 * resultsForParse.getF1()) + " ");
+						// System.out.printWithGoldDependency(Util.twoDP(100.0 * resultsForParse.getF1()) + " ");
 						if (r == null || resultsForParse.getF1() > r.getF1()) {
 							r = resultsForParse;
 							bestParse = parse.getCcgParse();

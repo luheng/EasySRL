@@ -15,7 +15,8 @@ import java.util.stream.Collectors;
  */
 public class AnswerGenerator {
 
-    public static Set<Integer> getArgumentIds(final List<String> words, Parse parse, ResolvedDependency dependency) {
+    public static Set<Integer> getArgumentIdsForDependency(final List<String> words, Parse parse,
+                                                           ResolvedDependency dependency) {
         Set<Integer> answers = new HashSet<>();
         Category answerCategory = dependency.getCategory().getArgument(dependency.getArgNumber());
         int argumentId = dependency.getArgument();
@@ -30,6 +31,18 @@ public class AnswerGenerator {
             answers.add(argumentId);
         }
         return answers;
+    }
+
+    public static Set<Integer> getArgumentIds(final List<String> words, final Parse parse, int predicateIndex,
+                                              Category category, int argumentNumber) {
+        Set<Integer> argumentIds = new HashSet<>();
+        parse.dependencies.forEach(dependency -> {
+            if (dependency.getHead() == predicateIndex && dependency.getCategory() == category &&
+                    dependency.getArgNumber() == argumentNumber) {
+                argumentIds.addAll(getArgumentIdsForDependency(words, parse, dependency));
+            }
+        });
+        return argumentIds;
     }
 
     public static Map<ImmutableList<Integer>, String> generateAnswerSpans(int predicateIndex,
