@@ -4,6 +4,7 @@ import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.Category.Slash;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.qasrl.qg.QuestionSlot.*;
+import edu.uw.easysrl.qasrl.AnswerGenerator;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -115,9 +116,8 @@ public class QuestionTemplate {
     public List<Category> categories;
     public SyntaxTreeNode tree;
 
-    // the first element of `slots` is understood to be the subject
-    public ArgumentSlot[] slots;
     public PredicateSlot predSlot;
+    public ArgumentSlot[] slots;
     public Map<Integer, Integer> argNumToSlotId;
 
     public VerbHelper verbHelper;
@@ -133,7 +133,7 @@ public class QuestionTemplate {
         this.categories = categories;
         this.verbHelper = verbHelper;
         this.argNumToSlotId = new HashMap<>();
-        for (int slotId = 0; slotId < slots.length; slotId++) {
+        for (int slotId = 1; slotId < slots.length; slotId++) {
             argNumToSlotId.put(slots[slotId].argumentNumber, slotId);
         }
 
@@ -191,14 +191,14 @@ public class QuestionTemplate {
     public List<String> instantiateForArgument(int targetArgNum) {
         int totalArgs = predicateCategory.getNumberOfArguments();
         List<String> question = new ArrayList<>();
-        if (!argNumToSlotId.containsKey(targetArgNum) || type == QuestionType.INVALID) {
+        if (type == QuestionType.INVALID ||
+            !argNumToSlotId.containsKey(targetArgNum) ||
+            words.get(predSlot.indexInSentence).equals("of") || // "of" is just a doozy
+            slots[argNumToSlotId.get(targetArgNum)].category.matches(Category.valueOf("PR")) // we don't ask for a particle
+            ) {
             return question;
         }
-        // "of" is just a doozy
-        if (words.get(predSlot.indexInSentence).equals("of")) {
-            return question;
-        }
-        // new approach: add arguments on either side until done, according to CCG category.
+        // add arguments on either side until done, according to CCG category.
         // split the PRED if the target was not the last argument added to the left.
         List<String> left = new ArrayList<>();
         List<String> right = new ArrayList<>();
@@ -235,7 +235,7 @@ public class QuestionTemplate {
             currentArgNum--;
         }
 
-        String wh = getWhWordByArgNum(targetArgNum)[0];
+        String wh = getWhWordByArgNum(targetArgNum);
         question.add(wh);
 
         // split the predicate or don't, depending:
@@ -253,35 +253,6 @@ public class QuestionTemplate {
         return question.stream()
             .filter(s -> !s.isEmpty()) // to mitigate oversights. harmless anyway
             .collect(Collectors.toList());
-
-        /*
-        // Wh-word for the argument.
-        add(question, wh[0]);
-        // Add verb or aux-subject-verb.
-        if (targetArgNum == slots[0].argumentNumber) {
-            // If target argument is the subject (occupies the first slot).
-            // This is not necessary arg1, for example: "xxxx", said she.
-            addAll(question, getUnsplitPred());
-        } else {
-            String[] pred = getSplitPred();
-            // Add auxiliaries, as "did" in "What did someone build?"
-            // or "what was something among?"
-            add(question, pred[0]);
-            addAll(question, getPlaceholderWordsByArgNum(slots[0].argumentNumber));
-            add(question, pred[1]);
-        }
-        // Add other arguments.
-        for (int slotId = 2; slotId < slots.length; slotId++) {
-            ArgumentSlot argSlot = slots[slotId];
-            if (targetArgNum == argSlot.argumentNumber || (totalArgs >= 3 && !argSlot.preposition.isEmpty())) {
-                continue;
-            }
-            addAll(question, getPlaceholderWordsByArgNum(argSlot.argumentNumber));
-        }
-        // Put preposition at the end.
-        add(question, wh[1]);
-        return question;
-        */
     }
 
     /**
@@ -291,26 +262,27 @@ public class QuestionTemplate {
      * @param argNum the argument number of the word we're abstracting away
      * @return a 2-element array of { "wh-word", "extra words" } where extra words may be empty
      */
-    public String[] getWhWordByArgNum(int argNum) {
-        int slotId = argNumToSlotId.get(argNum);
-        ArgumentSlot slot = (ArgumentSlot) slots[slotId];
-        if (slot.category.isFunctionInto(Category.valueOf("S[to]\\NP"))) {
-            return new String[] { "what", "to do" };
-        }
-        if (slot.category.isFunctionInto(Category.valueOf("S[ng]\\NP"))) {
-            return new String[] { "what", "doing" };
-        }
-        if (slotId == 0) {
-            return new String[] { "what", "" };
-        }
-        return new String[] { "what", slot.preposition };
+    public String getWhWordByArgNum(int argNum) {
+        return "what";
     }
 
     public List<String> getTargetPlaceholderWords(int argNum) {
+        ArrayList<String> result = new ArrayList<>();
         if(type == QuestionType.NOUN_ADJUNCT) {
-            return new ArrayList<String>();
+            return result;
         }
-        return new ArrayList<String>();
+        int slotId = argNumToSlotId.get(argNum);
+        ArgumentSlot slot = (ArgumentSlot) slots[slotId];
+        if (slot.category.isFunctionInto(Category.valueOf("S[to]\\NP"))) {
+            result.add("to do");
+            return result;
+        }
+        if (slot.category.isFunctionInto(Category.valueOf("S[ng]\\NP"))) {
+            result.add("doing");
+            return result;
+        }
+        result.add(slot.preposition);
+        return result;
     }
 
     /**
@@ -326,58 +298,16 @@ public class QuestionTemplate {
         ArgumentSlot slot = slots[slotId];
         int argumentIndex = slot.indexInSentence;
         if (UnrealizedArgumentSlot.class.isInstance(slot)) {
-            return Arrays.asList(new String [] { slot.preposition, "something" });
-        }
-
-        // return Arrays.asList(new String[] { words.get(argumentIndex) });
-
-        // what we ACTUALLY want is the smallest containing tree of the arg head
-        // that has the same category as we take as an argument.
-        SyntaxTreeNode argNode = tree.getLeaves().get(argumentIndex);
-        Category argNodeCat = argNode.getCategory();
-        while(!argNodeCat.matches(slot.category)) {
-            argNode = TreeWalker.getParent(argNode, tree).get();
-            argNodeCat = argNode.getCategory();
-        }
-        return Arrays.asList(new String [] { argNode.getWord() });
-
-        /*
-        // what we really want is the bigged constituent headed by the argument that doesn't contain the pred.
-        Optional<SyntaxTreeNode> currentConstituent = Optional.of(tree);
-        while(currentConstituent.isPresent() && currentConstituent.get().getDependencyStructure().getArbitraryHead() != argumentIndex) {
-            currentConstituent = currentConstituent.get().getChildren().stream().filter(child -> {
-                    int minIndex = child.getStartIndex();
-                    int maxIndex = child.getEndIndex();
-                    // this should happen exactly once
-                    boolean argInConstituent = minIndex <= argumentIndex && maxIndex >= argumentIndex;
-                    boolean predInConstituent = minIndex <= predSlot.indexInSentence && maxIndex >= predSlot.indexInSentence;
-                    return argInConstituent && !predInConstituent;
-                }).findFirst();
-        }
-        return Arrays.asList(new String [] { currentConstituent.map(node -> node.getWord()).orElse("OHNOES") });
-        */
-
-        /*
-        if (slot.category.isFunctionInto(Category.valueOf("S[to]\\NP"))) {
-            return Arrays.asList(new String[] { "to do", "something" });
-        }
-        if (slot.category.isFunctionInto(Category.valueOf("S[ng]\\NP"))) {
-            return Arrays.asList(new String[] { "doing", "something" });
-        }
-        // i.e. say something, says that ...
-        if (slot.category.isFunctionInto(Category.valueOf("S"))) {
-            return Arrays.asList(new String[] { "", "something" });
-        }
-        String phStr;
-        if (categories.get(argumentIndex).equals(Category.NP)) {
-            phStr =  words.get(argumentIndex);
-        } else if (argumentIndex > 1 && categories.get(argumentIndex - 1).isFunctionInto(Category.valueOf("NP|N"))) {
-            phStr =  words.get(argumentIndex - 1) + " " + words.get(argumentIndex);
+            result.add(slot.preposition);
+            result.add("something");
+            return result;
         } else {
-            phStr = (slotId == 0 ? "someone" : "something");
+            SyntaxTreeNode argNode = AnswerGenerator
+                .getLowestAncestorWithCategory(tree.getLeaves().get(argumentIndex), slot.category, tree)
+                .get();
+            result.add(argNode.getWord());
+            return result;
         }
-        return Arrays.asList(new String[] { slot.preposition, phStr });
-        */
     }
 
     /**
@@ -388,9 +318,6 @@ public class QuestionTemplate {
     public List<String> getUnsplitPred() {
         List<Integer> auxiliaries = predSlot.auxiliaries;
         String predStr = words.get(predSlot.indexInSentence);
-        if (predSlot.hasParticle) {
-            predStr += " " + words.get(predSlot.particleIndex);
-        }
         if(type == QuestionType.VERB) {
             // If we have the infinitive such as "to allow", change it to would allow.
             //if (predicateCategory.isFunctionInto(Category.valueOf("S[b]\\NP"))) {
@@ -439,9 +366,6 @@ public class QuestionTemplate {
                     return Arrays.asList(new String[] { "was", words.get(predSlot.indexInSentence) });
                 }
                 result = verbHelper.getAuxiliaryAndVerbStrings(words, categories, predSlot.indexInSentence);
-                if (predSlot.hasParticle) {
-                    result[1] += " " + words.get(predSlot.particleIndex);
-                }
             } else {
                 String[] r = (String[]) getUnsplitPred().toArray();
                 String[] rw = (r[0] + " " + r[1]).split("\\s+");

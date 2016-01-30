@@ -23,8 +23,8 @@ public class QuestionGenerator {
     /**
      * Generates a question given a supertagged sentence, a dependency in question,
      * and all of the dependencies sharing their predicate with that dependency.
-     * First constructs a QuestionTemplate by locating the target dep's arguments in the sentence.
-     * Then passes to generateQuestionFromTemplate.
+     * Constructs a QuestionTemplate by locating the target dep's arguments in the sentence,
+     * then instantiates it for the appropriate argument.
      * @param targetDependency    : the dependency to ask about
      * @param words               : the sentence
      * @param categories          : supertags for the sentence
@@ -99,18 +99,10 @@ public class QuestionGenerator {
         if (numArguments == 0) {
             return null;
         }
-        // a question template should roughly match up with the supertag of the predicate.
         // Create the pred slot.
         List<Integer> auxChain = verbHelper.getAuxiliaryChain(words, categories, predicateIndex);
-        PredicateSlot pred;
-        // If last argument is PR, as in "sweep out"
-        if (predicateCategory.getArgument(numArguments).equals(Category.PR)) {
-            int particleIndex = argNumToPosition[numArguments];
-            pred = new PredicateSlot(predicateIndex, particleIndex, auxChain, predicateCategory);
-        } else {
-            pred = new PredicateSlot(predicateIndex, auxChain, predicateCategory);
-        }
-        // Generate slots. Skipping PR argument.
+        PredicateSlot pred = new PredicateSlot(predicateIndex, auxChain, predicateCategory);
+        // Generate slots.
         ArgumentSlot[] arguments = new ArgumentSlot[numArguments + 1];
         for (int argNum = 1; argNum <= numArguments; argNum++) {
             int argIdx = argNumToPosition[argNum];
@@ -118,8 +110,6 @@ public class QuestionGenerator {
             ArgumentSlot slot;
             if (argIdx < 0) {
                 slot = new UnrealizedArgumentSlot(argNum, argumentCategory);
-            } else if (argumentCategory.equals(Category.PR)) {
-                slot = null;
             } else {
                 // TODO: maybe we should use the identified PP? Add later.
                 String ppStr = argumentCategory.isFunctionInto(Category.PP) ?
@@ -128,26 +118,15 @@ public class QuestionGenerator {
             }
             arguments[argNum] = slot;
         }
+        /* I'll burn this bridge when I get to it
         // Special case: T1, T2 said, or T2, said T1
         if (numArguments == 2 && predicateCategory.getArgument(1).equals(Category.Sdcl)) {
             ArgumentSlot[] slots = new ArgumentSlot[] { arguments[2], arguments[1] };
             return new QuestionTemplate(pred, slots, tree, words, categories, verbHelper);
         }
-        // Otherwise it follows this order: T1 verb Tn Tn-1 ... T2
-        // The first argument is always the subject. Why is this always true in English?
-        List<ArgumentSlot> slots = new ArrayList<>();
-        slots.add(arguments[1]);
-        for (int i = numArguments; i > 1; i--) {
-            if (arguments[i] != null) {
-                slots.add(arguments[i]);
-            }
-        }
-        ArgumentSlot[] slotList = slots.toArray(new ArgumentSlot[slots.size()]);
-        return new QuestionTemplate(pred, slotList, tree, words, categories, verbHelper);
+        */
+        return new QuestionTemplate(pred, arguments, tree, words, categories, verbHelper);
     }
 
-    public List<String> generateQuestionFromTemplate(QuestionTemplate template, int targetArgNum) {
-        return template.instantiateForArgument(targetArgNum);
-    }
 }
 

@@ -15,32 +15,17 @@ public class QuestionSlot {
         public Category category;
         public int indexInSentence;
         public List<Integer> auxiliaries;
-        public boolean hasParticle;
-        public int particleIndex;
 
         public PredicateSlot(int indexInSentence, List<Integer> auxiliaries, Category category) {
             this.indexInSentence = indexInSentence;
             this.category = category;
             this.auxiliaries = auxiliaries;
-            hasParticle = false;
-            particleIndex = -1;
-        }
-
-        public PredicateSlot(int indexInSentence, int particleIndex, List<Integer> auxiliaries, Category category) {
-            this.indexInSentence = indexInSentence;
-            this.category = category;
-            this.auxiliaries = auxiliaries;
-            this.hasParticle = true;
-            this.particleIndex = particleIndex;
         }
 
         public String toString(List<String> sentenceWords) {
             List<String> res = new ArrayList<>();
             auxiliaries.forEach(aux -> res.add(sentenceWords.get(aux)));
             res.add(sentenceWords.get(indexInSentence));
-            if (hasParticle) {
-                res.add(sentenceWords.get(particleIndex));
-            }
             return String.format("%s:%s", category, StringUtils.join(res));
         }
     }
@@ -49,9 +34,7 @@ public class QuestionSlot {
         public Category category;
         public int indexInSentence;
         public int argumentNumber;
-
         public String preposition;
-        public boolean isVerb;
 
         public ArgumentSlot(int indexInSentence, int argumentNumber, Category argumentCategory, String preposition) {
             this.indexInSentence = indexInSentence;
@@ -59,7 +42,6 @@ public class QuestionSlot {
             this.category = argumentCategory;
             //hasPreposition = argumentCategory.isFunctionInto(Category.PP);
             this.preposition = preposition;
-            isVerb = argumentCategory.isFunctionInto(Category.valueOf("S\\NP"));
         }
 
         public String toString(List<String> sentenceWords) {

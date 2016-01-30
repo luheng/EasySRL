@@ -7,6 +7,7 @@ import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeLeaf;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -84,5 +85,40 @@ public class AnswerGenerator {
             word = "]";
         }
         return word;
+    }
+
+    /**
+     * Tries to get the parent of a node in a tree.
+     * Assumes the given node is in the given tree. If not, it will probably return empty, maybe... but maybe not.
+     * Returns empty if the node is just the whole tree.
+     */
+    public static Optional<SyntaxTreeNode> getParent(SyntaxTreeNode node, SyntaxTreeNode wholeTree) {
+        int nodeStart = node.getStartIndex();
+        int nodeEnd = node.getEndIndex();
+        Optional<SyntaxTreeNode> curCandidate = Optional.of(wholeTree);
+        Optional<SyntaxTreeNode> lastCandidate = Optional.empty();
+        while(curCandidate.isPresent() && curCandidate.get() != node) {
+            lastCandidate = curCandidate;
+            curCandidate = curCandidate.get().getChildren().stream().filter(child -> {
+                    int childStart = child.getStartIndex();
+                    int childEnd = child.getEndIndex();
+                    return (childStart <= nodeStart) && (childEnd >= nodeEnd);
+                }).findFirst();
+        }
+        return lastCandidate;
+    }
+
+    public static Optional<SyntaxTreeNode> getLowestAncestorWithCategory(SyntaxTreeNode node, Category category, SyntaxTreeNode wholeTree) {
+        Category curCat = node.getCategory();
+        Optional<SyntaxTreeNode> curNode = Optional.of(node);
+        while(curNode.isPresent() && !curCat.matches(category)) {
+            curNode = AnswerGenerator.getParent(curNode.get(), wholeTree);
+            curCat = curNode.get().getCategory();
+        }
+        if(!curCat.matches(category)) {
+            return Optional.empty();
+        } else {
+            return curNode;
+        }
     }
 }

@@ -90,8 +90,7 @@ public class QuestionGenerationBenchmark {
                     uncoveredDeps.addString(ccgDep.getCategory().toString());
                     continue;
                 }
-                List<String> question = questionGenerator.generateQuestionFromTemplate(template,
-                        ccgDep.getArgNumber());
+                List<String> question = template.instantiateForArgument(ccgDep.getArgNumber());
                 if (question.size() == 0) {
                     continue;
                 }
