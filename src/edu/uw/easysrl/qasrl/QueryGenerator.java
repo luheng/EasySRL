@@ -6,6 +6,7 @@ import com.google.common.collect.Table;
 import com.google.common.collect.Table.Cell;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
+import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -23,12 +24,14 @@ public class QueryGenerator {
      * @param questionGenerator to generate wh-question from a resolved dependency
      * @param generatePseudoQuestions generate -NOQ- questions if set to true, for error analysis and brainstorming
      *                                about new question templates.
+     * @param groupSameLabelDependencies set to true to consider multi-head dependencies (conjunctions and appositives)
      * @return a list of queries, filtered and sorted
      */
     public static List<GroupedQuery> generateQueries(final int sentenceId, final List<String> words,
                                                      final List<Parse> parses,
                                                      final QuestionGenerator questionGenerator,
-                                                     boolean generatePseudoQuestions) {
+                                                     boolean generatePseudoQuestions,
+                                                     boolean groupSameLabelDependencies) {
         List<Query> unmergedQueryList = new ArrayList<>();
         List<GroupedQuery> groupedQueryList = new ArrayList<>();
 
@@ -52,33 +55,35 @@ public class QueryGenerator {
                 int predicateId = entry.getRowKey();
                 int argNum = entry.getColumnKey();
                 Set<ResolvedDependency> dependencies = entry.getValue();
-                ResolvedDependency dependency = dependencies.iterator().next();
-                // FIXME: modify question generator to accept less info.
-                List<String> question = questionGenerator.generateQuestion(dependency, words, parse.categories,
+                ResolvedDependency anyDependency = dependencies.iterator().next();
+                Category category = anyDependency.getCategory();
+
+                List<String> question = questionGenerator.generateQuestion(anyDependency, words, parse.categories,
                         parse.dependencies);
                 if (!generatePseudoQuestions && (question == null || question.size() == 0)) {
                     continue;
                 }
                 String questionStr = (question == null || question.size() == 0) ? "-NOQ-" :
                         question.stream().collect(Collectors.joining(" "));
-                Set<Integer> answerIds = new HashSet<>();
-                dependencies.stream().forEach(dep -> {
-                    answerIds.addAll(AnswerGenerator.getArgumentIdsForDependency(words, parse, dep));
-                });
-                List<Integer> answerIdList = new ArrayList<>(answerIds);
-                Collections.sort(answerIdList);
-
-                answerIdList.forEach(id -> {
-                    Set<Integer> excludeIndices = new HashSet<>(answerIdList);
-                    excludeIndices.add(predicateId);
-                    excludeIndices.remove(id);
-                });
-                Query query = new Query(predicateId, dependency.getCategory(), argNum, answerIdList, rankId,
-                                        questionStr);
-                unmergedQueryList.add(query);
+                if (groupSameLabelDependencies) {
+                    Set<Integer> answerIds = new HashSet<>();
+                    dependencies.stream().forEach(dep -> {
+                        answerIds.addAll(AnswerGenerator.getArgumentIdsForDependency(words, parse, dep));
+                    });
+                    List<Integer> answerIdList = new ArrayList<>(answerIds);
+                    Collections.sort(answerIdList);
+                    Query query = new Query(predicateId, category, argNum, answerIdList, rankId, questionStr);
+                    unmergedQueryList.add(query);
+                } else {
+                    for (ResolvedDependency dep : dependencies) {
+                        List<Integer> answerIds = AnswerGenerator.getArgumentIdsForDependency(words, parse, dep)
+                                .stream().sorted().collect(Collectors.toList());
+                        Query query = new Query(predicateId, category, argNum, answerIds, rankId, questionStr);
+                        unmergedQueryList.add(query);
+                    }
+                }
             }
         }
-
         /************ Collapse queries **************/
         for (Query query : unmergedQueryList) {
             boolean merged = false;
@@ -114,7 +119,7 @@ public class QueryGenerator {
             // answerToSpan.put(argList, query.answer);
         });
 
-        // merge answer options
+        // merge answer chosenOptions
         // TODO: debug
         double bestQuestionScore = -1.0;
         String bestQuestion = "";

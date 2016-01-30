@@ -245,7 +245,7 @@ public class TriTrainCCGBenchmark {
             }
             avgParsingTime += TicToc.toc();
             TicToc.tic();
-            List<Results> results = CcgEvaluation.evaluate(parses, gold.dependencies);
+            List<Results> results = CcgEvaluation.evaluateNBest(parses, gold.dependencies);
             Results bestF1 = new Results();
             int bestK = 0;
             for (int k = 0; k < results.size(); k++) {

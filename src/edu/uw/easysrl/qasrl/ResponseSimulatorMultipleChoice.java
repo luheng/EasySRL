@@ -26,7 +26,7 @@ public class ResponseSimulatorMultipleChoice extends ResponseSimulator {
         scanner = new Scanner(System.in);
     }
 
-    public int answerQuestion(GroupedQuery query, List<String> sentence, Parse goldParse) {
+    public Response answerQuestion(GroupedQuery query, List<String> sentence, Parse goldParse) {
         int predicateIndex = query.predicateIndex;
         // printWithGoldDependency sentence
         for (int i = 0; i < sentence.size(); i++) {
@@ -47,8 +47,13 @@ public class ResponseSimulatorMultipleChoice extends ResponseSimulator {
             System.out.println(String.format("%d: %s", (i + 1), ao.answer) + "\t" + argIdsStr + "\t" + argHeadsStr);
         }
         System.out.println(String.format("Please input a number between 1 to %d", numAnswers));
-        int choice = Integer.parseInt(scanner.nextLine());
-        return (0 < choice && choice <= numAnswers) ? choice - 1 : -1;
+        // TODO: accept multiple answers
+        Response response = new Response();
+        int choice = Integer.parseInt(scanner.nextLine()) - 1;
+        if (0 <= choice && choice < numAnswers) {
+            response.add(choice);
+        }
+        return response;
     }
 
     private static String translateBrackets(String word) {

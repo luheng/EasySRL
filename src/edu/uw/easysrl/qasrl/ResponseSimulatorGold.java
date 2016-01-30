@@ -13,7 +13,6 @@ import java.util.stream.Collectors;
  * Created by luheng on 1/5/16.
  */
 public class ResponseSimulatorGold extends ResponseSimulator {
-
     private QuestionGenerator questionGenerator;
 
     // TODO: simulate noise level.
@@ -30,7 +29,7 @@ public class ResponseSimulatorGold extends ResponseSimulator {
      * @return Answer is represented a list of indices in the sentence.
      *          A single -1 in the list means ``unintelligible/unanswerable question.
      */
-     public int answerQuestion(GroupedQuery query, List<String> sentence, Parse goldParse) {
+     public Response answerQuestion(GroupedQuery query, List<String> sentence, Parse goldParse) {
         List<Integer> answerIndices = new ArrayList<>();
         for (ResolvedDependency dep : goldParse.dependencies) {
             if (dep.getHead() != query.predicateIndex) {
@@ -47,18 +46,17 @@ public class ResponseSimulatorGold extends ResponseSimulator {
                 }
             }
         }
+        Response response = new Response();
         for (int i = 0; i < query.answerOptions.size(); i++) {
             GroupedQuery.AnswerOption option = query.answerOptions.get(i);
             // If gold choose N/A option.
             if (answerIndices.size() == 0 && option.argumentIds.get(0) == -1) {
-                return i;
-            }
-            // If argument set matches exactly.
-            if (option.argumentIds.containsAll(answerIndices) && answerIndices.containsAll(option.argumentIds)) {
-                return i;
+                response.add(i);
+            } else if (option.argumentIds.containsAll(answerIndices) && answerIndices.containsAll(option.argumentIds)) {
+                response.add(i);
             }
         }
         // System.out.println("[gold]:\t" + answerIndices.stream().map(String::valueOf).collect(Collectors.joining(",")));
-        return -1;
+        return response;
     }
 }

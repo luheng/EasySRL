@@ -14,7 +14,7 @@ public abstract class ResponseSimulator {
      * @param sentence the raw sentence
      * @param goldParse gold ccg parse of the sentence, for simulating correct response
      * @return a single number from 0-(n-1), denoting the option in the query.
-     *          return -1 if none of the options are chosen.
+     *          return -1 if none of the chosenOptions are chosen.
      */
-    public abstract int answerQuestion(GroupedQuery query, List<String> sentence, Parse goldParse);
+    public abstract Response answerQuestion(GroupedQuery query, List<String> sentence, Parse goldParse);
 }

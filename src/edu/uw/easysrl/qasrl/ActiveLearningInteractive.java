@@ -32,6 +32,8 @@ public class ActiveLearningInteractive {
     int maxNumQueries = 50;
     int randomSeed = 0;
 
+    boolean groupSameLabelDependencies = true;
+
     public static void main(String[] args) {
         EasySRL.CommandLineArguments commandLineOptions;
         try {
@@ -120,7 +122,7 @@ public class ActiveLearningInteractive {
             List<Parse> parses = parser.parseNBest(sentences.get(sentIdx));
             if (parses != null) {
                 allParses.put(sentIdx, parses);
-                allResults.put(sentIdx, CcgEvaluation.evaluate(parses, goldParses.get(sentIdx).dependencies));
+                allResults.put(sentIdx, CcgEvaluation.evaluateNBest(parses, goldParses.get(sentIdx).dependencies));
 
                 if (allParses.size() % 100 == 0) {
                     System.out.println("Parsed:\t" + allParses.size() + " sentences ...");
@@ -133,21 +135,21 @@ public class ActiveLearningInteractive {
             List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
             List<Parse> parses = allParses.get(sentIdx);
             allQueries.addAll(QueryGenerator.generateQueries(sentIdx, words, parses, questionGenerator,
-                    false /* generatePseudoQuestions */));
+                    false /* generatePseudoQuestions */, groupSameLabelDependencies));
         }
         List<GroupedQuery> queryList = allQueries.stream()
                 .sorted((q1, q2) -> Double.compare(-q1.answerEntropy, -q2.answerEntropy))
                 .collect(Collectors.toList());
 
         /******************* Response simulator ************/
-        Reranker reranker = new Reranker(allParses, allQueries);
+        RerankerSimple reranker = new RerankerSimple(allParses, allQueries);
         List<GroupedQuery> asked = new ArrayList<>();
-        List<Integer> responses = new ArrayList<>();
+        List<Response> responses = new ArrayList<>();
         for (int i = 0; i < queryList.size(); i++) {
             GroupedQuery query = queryList.get(i);
             int sentIdx = query.sentenceId;
             List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
-            int response = responseSimulator.answerQuestion(query, words, goldParses.get(sentIdx));
+            Response response = responseSimulator.answerQuestion(query, words, goldParses.get(sentIdx));
             asked.add(query);
             responses.add(response);
             reranker.rerank(query, response);
@@ -155,8 +157,9 @@ public class ActiveLearningInteractive {
             /*************** Print Debugging Info *************/
             if (verbose) {
                 System.out.print("\n===============");
-                int goldResponse = goldHuman.answerQuestion(query, words, goldParses.get(sentIdx));
-                DebugPrinter.printQueryInfo(words, query, response, goldResponse);
+                Response goldResponse = goldHuman.answerQuestion(query, words, goldParses.get(sentIdx));
+                // FIXME
+                // DebugPrinter.printQueryInfo(words, query, response, goldResponse);
                 // printWithGoldDependency gold
                 /*
                 Set<Integer> predicates = queryList.stream().map(q -> q.predicateIndex).collect(Collectors.toSet());

@@ -40,7 +40,7 @@ public class GroupedQuery {
     String question;
     List<AnswerOption> answerOptions;
 
-    double answerMargin, answerEntropy;
+    double answerMargin, answerEntropy, utility;
     // TODO: move this to ActiveLearning ...
     static final double rankDiscountFactor = 0.0;
     static final double minAnswerProbability = 0.00; //true;
@@ -92,6 +92,10 @@ public class GroupedQuery {
         queries.add(query);
     }
 
+    public void setUtility(double utility) {
+        this.utility = utility;
+    }
+
     public void collapse(int predicateIndex, Category category, int argumentNumber, String question,
                          final Map<ImmutableList<Integer>, Set<Integer>> answerToParses,
                          final Map<ImmutableList<Integer>, String> answerToSpans) {
@@ -131,7 +135,7 @@ public class GroupedQuery {
         int len = prob.size();
         answerMargin = len < 2 ? 1.0 : prob.get(len - 1) - prob.get(len - 2);
 
-        // Entropy divided by log(number of options) to stay in range [0,1].
+        // Entropy divided by log(number of chosenOptions) to stay in range [0,1].
         double K = Math.log(answerOptions.size());
         answerEntropy = -1.0 * answerOptions.stream()
                 .filter(ao -> ao.probability > 0)
