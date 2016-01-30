@@ -8,6 +8,7 @@ import edu.uw.easysrl.qasrl.corpora.AlignedDependency;
 import edu.uw.easysrl.qasrl.corpora.PropBankAligner;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.qasrl.CountDictionary;
+import edu.uw.easysrl.qasrl.qg.QuestionSlot.*;
 
 import java.io.*;
 import java.util.*;
@@ -82,18 +83,13 @@ public class QuestionGenerationBenchmark {
                 }
                 String word = words.get(ccgDep.getSentencePositionOfPredicate());
                 Category category = ccgDep.getCategory();
-                if (!questionGenerator.askQuestionForPredicate(word, category)) {
-                    continue;
-                }
-                numDependenciesProcessed++;
                 int predicateIndex = ccgDep.getSentencePositionOfPredicate();
-                QuestionTemplate template = questionGenerator.getTemplateFromCCGBank(predicateIndex, words,
-                        categories, ccgDeps);
+                QuestionTemplate template = questionGenerator
+                    .getTemplateFromCCGBank(predicateIndex, dep.sentence.getCcgbankParse(), words, categories, ccgDeps);
                 if (template == null) {
                     uncoveredDeps.addString(ccgDep.getCategory().toString());
                     continue;
                 }
-                numQuestionTemplatesGenerated++;
                 List<String> question = questionGenerator.generateQuestionFromTemplate(template,
                         ccgDep.getArgNumber());
                 if (question.size() == 0) {
@@ -118,7 +114,7 @@ public class QuestionGenerationBenchmark {
                 System.out.println("\n" + StringUtils.join(words) + "\n" + ccgInfo);
                 writer.write("\n" + StringUtils.join(words) + "\n" + ccgInfo + "\n");
 
-                for (QuestionSlot slot : template.slots) {
+                for (ArgumentSlot slot : template.slots) {
                     String slotStr = (slot.argumentNumber == ccgDep.getArgNumber() ?
                             String.format("{%s}", slot.toString(words)) : slot.toString(words));
                     System.out.print(slotStr + "\t");
@@ -145,13 +141,8 @@ public class QuestionGenerationBenchmark {
         System.out.println(String.format("Aligned dependencies: %d (%.2f%% of deps, %.2f per sentence)",
                                          numAligned, 100.0 * numAligned / numDependenciesTotal,
                                          1.0 * numAligned / allSentences.size()));
-        System.out.println(String.format("Dependencies processed: %d (%.2f%%, of deps, %.2f per sentence)",
-                                         numDependenciesProcessed, 100.0 * numDependenciesProcessed / numDependenciesTotal,
-                                         1.0 * numDependenciesProcessed / allSentences.size()));
-        System.out.println(String.format("Question templates: %d (%.2f%%)",
-                                         numQuestionTemplatesGenerated, 100.0 * numQuestionTemplatesGenerated / numDependenciesProcessed));
         System.out.println(String.format("Questions: %d (%.2f%% of deps, %.2f per sentence)",
-                                         numQuestionsGenerated, 100.0 * numQuestionsGenerated / numQuestionTemplatesGenerated,
+                                         numQuestionsGenerated, 100.0 * numQuestionsGenerated / numDependenciesTotal,
                                          1.0 * numQuestionsGenerated / allSentences.size()));
         System.out.println(String.format("Questions for aligned dependencies: %d (%.2f%% of aligned deps before processing)",
                                          numGeneratedAligned, 100.0 * numGeneratedAligned / numAligned));

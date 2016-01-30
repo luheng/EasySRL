@@ -124,7 +124,7 @@ public class VerbHelper {
         String verbStr = words.get(index).toLowerCase();
         String[] infl = inflectionDictionary.getBestInflections(verbStr.toLowerCase());
         if (infl == null) {
-            System.err.println("Can't find inflections for: " + words.get(index));
+            System.err.println("Can't find inflections for: " + words.get(index) + " " + categories.get(index));
             return new String[] {"", verbStr};
         }
         // build

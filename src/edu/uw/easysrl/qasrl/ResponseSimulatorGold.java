@@ -35,8 +35,8 @@ public class ResponseSimulatorGold extends ResponseSimulator {
      public int answerQuestion(GroupedQuery query, List<String> sentence, Parse goldParse) {
         List<Integer> answerIndices = new ArrayList<>();
         for (ResolvedDependency dep : goldParse.dependencies) {
-            List<String> goldQuestion = questionGenerator.generateQuestion(dep, sentence, goldParse.categories,
-                    goldParse.dependencies);
+            List<String> goldQuestion = questionGenerator
+                .generateQuestion(dep, goldParse.syntaxTree, sentence, goldParse.categories, goldParse.dependencies);
             if (goldQuestion == null || goldQuestion.size() == 0) {
                 continue;
             }

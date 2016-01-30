@@ -150,6 +150,7 @@ public class ActiveLearningReranker {
         Accuracy reRankedAcc = new Accuracy();
         Accuracy oracleAcc = new Accuracy();
         int avgBestK = 0, avgOracleK = 0;
+        CountDictionary missedCategories = new CountDictionary();
         for (int sentIdx : allParses.keySet()) {
             List<Parse> parses = allParses.get(sentIdx);
             List<Results> results = allResults.get(sentIdx);
@@ -177,12 +178,12 @@ public class ActiveLearningReranker {
                     CcgEvaluation.difference(goldParse.dependencies, oracleParse.dependencies);
                 // only print the extra info for ones where we could do better
                 // also, only print the mistakes that were corrected by the oracle
-                if(oracleK != bestK) {
-                    List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
+                List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
+                DebugPrinter.printQueryListInfo(sentIdx, words, queryList, responseList);
+                // if(oracleK != bestK) {
                     // what if the reranker gave us something worse?
                     if(results.get(0).getF1() > results.get(bestK).getF1()) {
                         System.out.println("====== Reranker produced worse result! ======");
-                        DebugPrinter.printQueryListInfo(sentIdx, words, queryList, responseList);
                     }
                     Map<String, Parse> parsesForStats = new TreeMap<String, Parse>();
                     // print false positives and negatives for:
@@ -201,16 +202,30 @@ public class ActiveLearningReranker {
                                 System.out.println(String.format("\t%d:%s\t%s.%d\t%d:%s", dep.getHead(), words.get(dep.getHead()),
                                                                  dep.getCategory(), dep.getArgNumber(),
                                                                  dep.getArgument(), words.get(dep.getArgument())));
+                                if(label.contains("reranked")) {
+                                    missedCategories.addString(dep.getCategory().toString());
+                                }
                             }
                             System.out.println("False negative (missed) dependencies:");
                             for (ResolvedDependency dep : recallMistakes) {
                                 System.out.println(String.format("\t%d:%s\t%s.%d\t%d:%s", dep.getHead(), words.get(dep.getHead()),
                                                                  dep.getCategory(), dep.getArgNumber(),
                                                                  dep.getArgument(), words.get(dep.getArgument())));
+                                if(label.contains("reranked")) {
+                                    missedCategories.addString(dep.getCategory().toString());
+                                }
                             }
                         });
-                }
             }
+        }
+        System.out.println("Categories of the heads of mistakes:");
+        List<String> missedCats = missedCategories.getStrings()
+            .stream()
+            .sorted((c1, c2) -> Integer.compare(missedCategories.getCount(c1), missedCategories.getCount(c2)))
+            .collect(Collectors.toList());
+        for (String cat : missedCats) {
+            int catCount = missedCategories.getCount(cat);
+            System.out.println(cat + ":\t" + catCount);
         }
         // Effect query: a query whose response boosts the score of a non-top parse but not the top one.
         int numSentencesParsed = allParses.size();
@@ -244,5 +259,5 @@ public class ActiveLearningReranker {
         budgetCurve.keySet().stream().sorted().forEach(i -> System.out.print("\t" +
                 String.format("%.3f", budgetCurve.get(i).getF1() * 100.0)));
         System.out.println();
-    }
+        }
 }
