@@ -6,6 +6,8 @@ import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
 
+import gnu.trove.map.hash.TIntIntHashMap;
+import gnu.trove.map.hash.TObjectIntHashMap;
 import uk.co.flamingpenguin.jewel.cli.CliFactory;
 
 import java.util.*;
@@ -38,6 +40,12 @@ public class ActiveLearningReranker {
     // improvements.
     boolean generatePseudoQuestions = false;
     boolean groupSameLabelDependencies = true;
+    // For reranker
+    double rerankerStepSize = 1.0;
+
+    final static String preparsedFile = "parses.10best.out";
+
+    // TODO: if a parse already has low probability, it should provide very little weight when computing answer entropy.
 
     public static void main(String[] args) {
         EasySRL.CommandLineArguments commandLineOptions;
@@ -58,11 +66,14 @@ public class ActiveLearningReranker {
 
         /************** manual parameter tuning ... ***********/
         //final int[] nBestList = new int[] { 3, 5, 10, 20, 50, 100, 250, 500, 1000 };
-        final int[] nBestList = new int[] { 50 };
+        final int[] nBestList = new int[] { 10 };
 
         List<Map<String, Double>> allResults = new ArrayList<>();
         for (int nBest : nBestList) {
-            BaseCcgParser parser = new BaseCcgParser.AStarParser(modelFolder, rootCategories, nBest);
+            BaseCcgParser parser =
+                    preparsedFile.isEmpty() ?
+                            new BaseCcgParser.AStarParser(modelFolder, rootCategories, nBest) :
+                            new BaseCcgParser.MockParser(preparsedFile, nBest);
             ActiveLearningReranker learner = new ActiveLearningReranker(sentences, goldParses, parser,
                                                                         questionGenerator, responseSimulator, nBest);
             learner.run();
@@ -101,8 +112,9 @@ public class ActiveLearningReranker {
         Map<Integer, List<Parse>> allParses = new HashMap<>();
         Map<Integer, List<Results>> allResults = new HashMap<>();
         Map<Integer, Integer> oracleParseIds = new HashMap<>();
+
         for (int sentIdx = 0; sentIdx < sentences.size(); sentIdx ++) {
-            List<Parse> parses = parser.parseNBest(sentences.get(sentIdx));
+            List<Parse> parses = parser.parseNBest(sentIdx, sentences.get(sentIdx));
             if (parses == null) {
                 continue;
             }
@@ -141,29 +153,28 @@ public class ActiveLearningReranker {
 
         System.out.println("Pruned number of queries:\t" + queryList.size());
 
-        /******************* Response simulator ************/
-        List<Response> responseList = queryList.stream().map(q -> {
-            int sentId = q.sentenceId;
-            List<String> words = sentences.get(sentId).stream().map(w -> w.word).collect(Collectors.toList());
-            return responseSimulator.answerQuestion(q, words, goldParses.get(sentId));
-        }).collect(Collectors.toList());
-
         /***************** Reranking ****************/
-        /*
-        Reranker reranker = usePriorRank ? new RerankerSimple(allParses, allQueries) :
-                new RerankerSimple(allParses, null);
-                */
-        Reranker reranker = new RerankerExponentiated(allParses);
-
+        /* Reranker reranker = usePriorRank ? new RerankerSimple(allParses, allQueries) :new RerankerSimple(allParses, null);
+        */
+        Reranker reranker = new RerankerExponentiated(allParses, rerankerStepSize);
+        TIntIntHashMap numQueriesPerSentence = new TIntIntHashMap();
+        allParses.keySet().forEach(sid -> numQueriesPerSentence.put(sid, 0));
         Map<Integer, Results> budgetCurve = new HashMap<>();
+
         for (int i = 0; i < queryList.size(); i++) {
-            reranker.rerank(queryList.get(i), responseList.get(i));
+            GroupedQuery query = queryList.get(i);
+            int sentId = query.sentenceId;
+            List<String> words = sentences.get(sentId).stream().map(w -> w.word).collect(Collectors.toList());
+            Response response = responseSimulator.answerQuestion(query, words, goldParses.get(sentId));
+            reranker.rerank(query, response);
+            numQueriesPerSentence.adjustValue(sentId, 1);
+            int bestK = reranker.getRerankedBest(sentId);
+            int oracleK = oracleParseIds.get(sentId);
+            System.out.println(i + "\t" + sentId + "\t" + numQueriesPerSentence.get(sentId) + "\t" + bestK + "\t" + oracleK);
             if (plotCurve && i % 200 == 0) {
                 Results currentResult = new Results();
-                allParses.keySet().forEach(sentIdx -> {
-                    int bestK = reranker.getRerankedBest(sentIdx);
-                    currentResult.add(allResults.get(sentIdx).get(bestK));
-                });
+                allParses.keySet().forEach(sid ->
+                        currentResult.add(allResults.get(sid).get(reranker.getRerankedBest(sid))));
                 budgetCurve.put(i, currentResult);
             }
         }
@@ -182,12 +193,19 @@ public class ActiveLearningReranker {
         int numMultiHeadQueriesGold = 0;
         int numTrulyEffectiveQueries = 0;
 
+        TObjectIntHashMap<String> analysis = new TObjectIntHashMap<>();
+
         for (int sentIdx : allParses.keySet()) {
             List<Parse> parses = allParses.get(sentIdx);
             List<Results> results = allResults.get(sentIdx);
             Parse goldParse = goldParses.get(sentIdx);
             int bestK = reranker.getRerankedBest(sentIdx);
             int oracleK = oracleParseIds.get(sentIdx);
+
+            boolean bestIsOracle = (bestK == oracleK);
+            boolean oracleIsTop = (oracleK == 0);
+
+            analysis.adjustOrPutValue(String.format("BestIsOracle=%b, OracleIsTop=%b", bestIsOracle, oracleIsTop), 1, 1);
 
             avgBestK += bestK;
             avgOracleK += oracleK;
@@ -197,6 +215,7 @@ public class ActiveLearningReranker {
             oneBestAcc.add(CcgEvaluation.evaluateTags(parses.get(0).categories, goldParse.categories));
             reRankedAcc.add(CcgEvaluation.evaluateTags(parses.get(bestK).categories, goldParse.categories));
             oracleAcc.add(CcgEvaluation.evaluateTags(parses.get(oracleK).categories, goldParse.categories));
+            /*
             if (verbose) {
                 for (int i = 0; i < queryList.size(); i++) {
                     GroupedQuery query = queryList.get(i);
@@ -224,6 +243,11 @@ public class ActiveLearningReranker {
                     }
                 }
             }
+            */
+        }
+
+        for (String s : analysis.keySet()) {
+            System.out.println(s + "\t" + analysis.get(s));
         }
         System.out.println(numMultiHeadQueriesGold + "\t" + queryList.size() + "\t" +
                 100.0 * numMultiHeadQueriesGold / queryList.size());

@@ -11,9 +11,9 @@ import java.util.Map;
 public class RerankerExponentiated extends Reranker {
     Map<Integer, List<Parse>> allParses;
     Map<Integer, double[]> allScores;
-    private static final double stepSize = 0.5;
+    double stepSize = 0.5;
 
-    public RerankerExponentiated(final Map<Integer, List<Parse>> allParses) {
+    public RerankerExponentiated(final Map<Integer, List<Parse>> allParses, double stepSize) {
         numQueries = 0;
         numEffectiveQueries = 0;
         allScores = new HashMap<>();
@@ -24,6 +24,7 @@ public class RerankerExponentiated extends Reranker {
             allScores.put(sentId, votes);
         });
         this.allParses = allParses;
+        this.stepSize = stepSize;
     }
 
     public void rerank(final GroupedQuery query, final Response response) {

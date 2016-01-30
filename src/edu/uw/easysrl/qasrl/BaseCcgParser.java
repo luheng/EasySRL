@@ -17,10 +17,7 @@ import edu.uw.easysrl.util.Util.Scored;
 
 import edu.stanford.nlp.util.StringUtils;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -109,7 +106,15 @@ public abstract class BaseCcgParser {
 
     public abstract Parse parse(List<InputReader.InputWord> sentence);
 
+    public Parse parse(int sentenceId, List<InputReader.InputWord> sentence) {
+        return parse(sentence);
+    }
+
     public abstract List<Parse> parseNBest(List<InputReader.InputWord> sentence);
+
+    public List<Parse> parseNBest(int sentenceId, List<InputReader.InputWord> sentence) {
+        return parseNBest(sentence);
+    }
 
     public static class AStarParser extends BaseCcgParser {
         private DependencyGenerator dependencyGenerator;
@@ -158,6 +163,51 @@ public abstract class BaseCcgParser {
         }
     }
 
+    /**
+     * Reads pre-parsed n-best list from file.
+     */
+    public static class MockParser extends BaseCcgParser {
+        private Map<Integer, List<Parse>> allParses;
+
+        public MockParser(String parsesFilePath, int nBest)  {
+            allParses = new HashMap<>();
+            Map<Integer, List<Parse>> readParses;
+            try {
+                ObjectInputStream inputStream = new ObjectInputStream(new BufferedInputStream(
+                        new FileInputStream(parsesFilePath)));
+                readParses = (Map<Integer, List<Parse>>) inputStream.readObject();
+            }  catch(Exception e){
+                e.printStackTrace();
+                return;
+            }
+            readParses.forEach((sentIdx, parses) ->
+                    allParses.put(sentIdx, (parses.size() <= nBest) ? parses : parses.subList(0, nBest)));
+        }
+
+        @Override
+        public Parse parse(List<InputReader.InputWord> sentence) {
+            return null;
+        }
+
+        @Override
+        public List<Parse> parseNBest(List<InputReader.InputWord> sentence) {
+            return null;
+        }
+
+        @Override
+        public Parse parse(int sentenceId, List<InputReader.InputWord> sentence) {
+            return allParses.containsKey(sentenceId) ? allParses.get(sentenceId).get(0) : null;
+        }
+
+        @Override
+        public List<Parse> parseNBest(int sentenceId, List<InputReader.InputWord> sentence) {
+            return allParses.containsKey(sentenceId) ? allParses.get(sentenceId) : null;
+        }
+    }
+
+    /**
+     * Not used.
+     */
     public static class PipelineCCGParser extends BaseCcgParser {
         private SRLParser parser;
         private final double supertaggerBeam = 0.000001;
