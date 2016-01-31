@@ -108,12 +108,25 @@ public class AnswerGenerator {
         return lastCandidate;
     }
 
-    public static Optional<SyntaxTreeNode> getLowestAncestorWithCategory(SyntaxTreeNode node, Category category, SyntaxTreeNode wholeTree) {
+    public static Optional<SyntaxTreeNode> getLowestAncestorInstantiatingCategory(SyntaxTreeNode node, Category category, SyntaxTreeNode wholeTree) {
         Optional<SyntaxTreeNode> curNode = Optional.of(node);
         Optional<Category> curCat = curNode.map(n -> n.getCategory());
-        while(curNode.isPresent() && !curCat.get().matches(category)) {
+        // it's important here that we do category.matches(...) because we're looking for the first thing
+        // that *is an instance* of the (more general) parameter category, i.e.,
+        // it might have features not specified in the parameter.
+        while(curNode.isPresent() && !category.matches(curCat.get())) {
             curNode = AnswerGenerator.getParent(curNode.get(), wholeTree);
             curCat = curNode.map(n -> n.getCategory());
+        }
+        return curNode;
+    }
+
+    public static Optional<SyntaxTreeNode> getLowestAncestorFunctionIntoCategory(SyntaxTreeNode node, Category category, SyntaxTreeNode wholeTree) {
+        Optional<SyntaxTreeNode> curNode = Optional.of(node);
+        Optional<Category> curCat = curNode.map(n -> n.getCategory());
+        while(curNode.isPresent() && !curCat.get().isFunctionInto(category)) {
+            curNode = AnswerGenerator.getParent(curNode.get(), wholeTree);
+            curCat = curNode.map(SyntaxTreeNode::getCategory);
         }
         return curNode;
     }

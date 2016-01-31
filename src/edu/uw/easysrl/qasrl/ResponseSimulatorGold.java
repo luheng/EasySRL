@@ -36,7 +36,7 @@ public class ResponseSimulatorGold extends ResponseSimulator {
         List<Integer> answerIndices = new ArrayList<>();
         for (ResolvedDependency dep : goldParse.dependencies) {
             List<String> goldQuestion = questionGenerator
-                .generateQuestion(dep, goldParse.syntaxTree, sentence, goldParse.categories, goldParse.dependencies);
+                .generateQuestion(dep, sentence, goldParse);
             if (goldQuestion == null || goldQuestion.size() == 0) {
                 continue;
             }

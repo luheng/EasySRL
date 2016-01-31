@@ -84,8 +84,10 @@ public class QuestionGenerationBenchmark {
                 String word = words.get(ccgDep.getSentencePositionOfPredicate());
                 Category category = ccgDep.getCategory();
                 int predicateIndex = ccgDep.getSentencePositionOfPredicate();
-                QuestionTemplate template = questionGenerator
-                    .getTemplateFromCCGBank(predicateIndex, dep.sentence.getCcgbankParse(), words, categories, ccgDeps);
+                // XXX unsupported right now because not using this benchmark.
+                QuestionTemplate template = null;
+                    // questionGenerator
+                    //   .getTemplateFromCCGBank(predicateIndex, dep.sentence.getCcgbankParse(), words, categories, ccgDeps);
                 if (template == null) {
                     uncoveredDeps.addString(ccgDep.getCategory().toString());
                     continue;
