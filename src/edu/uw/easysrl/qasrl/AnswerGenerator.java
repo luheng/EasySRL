@@ -109,16 +109,12 @@ public class AnswerGenerator {
     }
 
     public static Optional<SyntaxTreeNode> getLowestAncestorWithCategory(SyntaxTreeNode node, Category category, SyntaxTreeNode wholeTree) {
-        Category curCat = node.getCategory();
         Optional<SyntaxTreeNode> curNode = Optional.of(node);
-        while(curNode.isPresent() && !curCat.matches(category)) {
+        Optional<Category> curCat = curNode.map(n -> n.getCategory());
+        while(curNode.isPresent() && !curCat.get().matches(category)) {
             curNode = AnswerGenerator.getParent(curNode.get(), wholeTree);
-            curCat = curNode.get().getCategory();
+            curCat = curNode.map(n -> n.getCategory());
         }
-        if(!curCat.matches(category)) {
-            return Optional.empty();
-        } else {
-            return curNode;
-        }
+        return curNode;
     }
 }
