@@ -13,7 +13,6 @@ import uk.co.flamingpenguin.jewel.cli.CliFactory;
 import java.util.*;
 import java.util.stream.Collectors;
 
-
 /**
  * New - Active Learning experiments (n-best reranking).
  * Created by luheng on 1/5/16.
@@ -28,8 +27,6 @@ public class ActiveLearningReranker {
     final int nBest;
     Map<String, Double> aggregatedResults;
 
-    // Pre-compute expected vote scores for parses using the p(a|q). But this makes the learning curve much worse.
-    final boolean usePriorRank = false;
     // Print debugging info or not.
     final boolean verbose = true;
     // Plot learning curve (F1 vs. number of queries).
@@ -40,10 +37,13 @@ public class ActiveLearningReranker {
     // improvements.
     boolean generatePseudoQuestions = false;
     boolean groupSameLabelDependencies = true;
-    // For reranker
-    double rerankerStepSize = 1.0;
-
+    // The change inflicted on distribution of parses after each query update.
+    double rerankerStepSize = 0.5;
+    // The file contains the pre-parsed n-best list (of CCGBank dev). Leave file name is empty, if we wish to parse
+    // sentences in the experiment.
     final static String preparsedFile = "parses.10best.out";
+    // After a batch of queries, update query entropy and reorder them based on updated probabilities of parses.
+    final static int reorderQueriesEvery = 100;
 
     // TODO: if a parse already has low probability, it should provide very little weight when computing answer entropy.
 
@@ -134,49 +134,64 @@ public class ActiveLearningReranker {
                 System.out.println("Parsed:\t" + allParses.size() + " sentences ...");
             }
         }
+
+        /***************** Reranking ****************/
+        RerankerExponentiated reranker = new RerankerExponentiated(allParses, rerankerStepSize);
+
         /****************** Generate Queries ******************/
-        List<GroupedQuery> allQueries = new ArrayList<>();
+        Comparator<GroupedQuery> queryComparator = new Comparator<GroupedQuery>() {
+            public int compare(GroupedQuery q1, GroupedQuery q2) {
+                return Double.compare(-q1.answerEntropy, -q2.answerEntropy);
+            }
+        };
+        PriorityQueue<GroupedQuery> queryList = new PriorityQueue<>(queryComparator);
         for (int sentIdx : allParses.keySet()) {
             List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
             List<Parse> parses = allParses.get(sentIdx);
-            allQueries.addAll(QueryGenerator.generateQueries(sentIdx, words, parses, questionGenerator,
-                    generatePseudoQuestions, groupSameLabelDependencies));
+            List<GroupedQuery> queries = QueryGenerator.generateQueries(sentIdx, words, parses, questionGenerator,
+                    generatePseudoQuestions, groupSameLabelDependencies);
+            queries.forEach(query -> query.computeProbabilities(reranker.expScores.get(query.sentenceId)));
+            queryList.addAll(queries);
         }
-        System.out.println("Total number of queries:\t" + allQueries.size());
-        List<GroupedQuery> queryList = allQueries.stream()
-                //.filter(q -> q.answerMargin < 0.99)
-                //.sorted((q1, q2) -> Double.compare(q1.answerMargin, q2.answerMargin))
-                .sorted((q1, q2) -> Double.compare(-q1.answerEntropy, -q2.answerEntropy))
-                //.unordered()
-                .limit(maxNumQueriesPerSentence * sentences.size())
-                .collect(Collectors.toList());
+        System.out.println("Total number of queries:\t" + queryList.size());;
 
-        System.out.println("Pruned number of queries:\t" + queryList.size());
-
-        /***************** Reranking ****************/
-        /* Reranker reranker = usePriorRank ? new RerankerSimple(allParses, allQueries) :new RerankerSimple(allParses, null);
-        */
-        Reranker reranker = new RerankerExponentiated(allParses, rerankerStepSize);
         TIntIntHashMap numQueriesPerSentence = new TIntIntHashMap();
         allParses.keySet().forEach(sid -> numQueriesPerSentence.put(sid, 0));
         Map<Integer, Results> budgetCurve = new HashMap<>();
 
-        for (int i = 0; i < queryList.size(); i++) {
-            GroupedQuery query = queryList.get(i);
+        int queryCounter = 0;
+        while (!queryList.isEmpty()) {
+            if (plotCurve && queryCounter % 200 == 0) {
+                Results currentResult = new Results();
+                allParses.keySet().forEach(sid ->
+                        currentResult.add(allResults.get(sid).get(reranker.getRerankedBest(sid))));
+                budgetCurve.put(queryCounter, currentResult);
+
+                // Refresh queue
+                System.out.println(queryList.size());
+            }
+            if (queryCounter > 0 && queryCounter % reorderQueriesEvery == 0) {
+                Collection<GroupedQuery> queryBuffer = new ArrayList<>(queryList);
+                queryBuffer.forEach(query -> query.computeProbabilities(reranker.expScores.get(query.sentenceId)));
+                queryList.clear();
+                queryList.addAll(queryBuffer);
+            }
+
+            queryCounter ++;
+            GroupedQuery query = queryList.poll();
             int sentId = query.sentenceId;
             List<String> words = sentences.get(sentId).stream().map(w -> w.word).collect(Collectors.toList());
             Response response = responseSimulator.answerQuestion(query, words, goldParses.get(sentId));
+
+            double entropy = reranker.computeParsesEntropy(sentId);
             reranker.rerank(query, response);
             numQueriesPerSentence.adjustValue(sentId, 1);
             int bestK = reranker.getRerankedBest(sentId);
             int oracleK = oracleParseIds.get(sentId);
-            System.out.println(i + "\t" + sentId + "\t" + numQueriesPerSentence.get(sentId) + "\t" + bestK + "\t" + oracleK);
-            if (plotCurve && i % 200 == 0) {
-                Results currentResult = new Results();
-                allParses.keySet().forEach(sid ->
-                        currentResult.add(allResults.get(sid).get(reranker.getRerankedBest(sid))));
-                budgetCurve.put(i, currentResult);
-            }
+            /*
+            System.out.println(numQueriesPerSentence.get(sentId) + "\t" + sentId + "\t" +
+                    numQueriesPerSentence.get(sentId) + "\t" + bestK + "\t" + oracleK + "\t" + entropy + "\t" +
+                    reranker.computeParsesEntropy(sentId)); */
         }
 
         /*************** Evaluation ********************/

@@ -40,10 +40,9 @@ public class GroupedQuery {
     String question;
     List<AnswerOption> answerOptions;
 
-    double answerMargin, answerEntropy, utility;
+    double answerMargin, answerEntropy;
     // TODO: move this to ActiveLearning ...
     static final double rankDiscountFactor = 0.0;
-    static final double minAnswerProbability = 0.00; //true;
     static final boolean estimateWithParseScores = true;
 
     public GroupedQuery(int sentenceId, final List<Parse> parses) {
@@ -92,8 +91,9 @@ public class GroupedQuery {
         queries.add(query);
     }
 
+    @Deprecated
     public void setUtility(double utility) {
-        this.utility = utility;
+        // do nothing.
     }
 
     public void collapse(int predicateIndex, Category category, int argumentNumber, String question,
@@ -112,17 +112,13 @@ public class GroupedQuery {
             allParseIds.removeAll(parseIds);
         });
         answerOptions.add(new AnswerOption(ImmutableList.of(-1), "N/A", allParseIds));
-        // Compute p(a|q), entropy, margin, etc.
-        computeProbabilities();
-        answerOptions = answerOptions.stream().filter(ao -> ao.probability > minAnswerProbability)
-                .collect(Collectors.toList());
     }
 
-    private void computeProbabilities() {
+    public void computeProbabilities(double[] parseDist) {
         // Compute p(a|q).
         if (estimateWithParseScores) {
             answerOptions.forEach(ao -> ao.probability = ao.parseIds.stream()
-                    .mapToDouble(i -> parses.get(i).score).sum());
+                    .mapToDouble(i -> parseDist[i]).sum());
         } else {
             answerOptions.forEach(ao -> ao.probability = ao.parseIds.stream()
                     .mapToDouble(i -> Math.exp(-rankDiscountFactor * i / totalNumParses)).sum());
@@ -139,7 +135,8 @@ public class GroupedQuery {
         double K = Math.log(answerOptions.size());
         answerEntropy = -1.0 * answerOptions.stream()
                 .filter(ao -> ao.probability > 0)
-                .mapToDouble(ao -> ao.probability * Math.log(ao.probability) / K).sum();
+                .mapToDouble(ao -> ao.probability * Math.log(ao.probability)).sum();
+                //.mapToDouble(ao -> ao.probability * Math.log(ao.probability) / K).sum();
     }
 
     public void print(final List<String> words, int response) {

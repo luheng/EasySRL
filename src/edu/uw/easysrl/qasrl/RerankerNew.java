@@ -2,10 +2,7 @@ package edu.uw.easysrl.qasrl;
 
 import java.util.*;
 
-/**
- * New reranker with multiplicative weight update :)
- * Created by luheng on 1/28/16.
- */
+@Deprecated
 public class RerankerNew {
     Map<Integer, List<Parse>> allParses;
     Map<Integer, double[]> allScores; // all scores, in exponential.

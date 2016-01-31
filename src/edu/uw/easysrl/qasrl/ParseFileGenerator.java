@@ -17,7 +17,7 @@ import java.util.*;
  */
 public class ParseFileGenerator {
 
-    static final int nBest = 100;
+    static final int nBest = 50;
 
     public static void main(String[] args) {
         EasySRL.CommandLineArguments commandLineOptions;

@@ -12,11 +12,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 
-/**
- * Experimental.
- * Dynamically sample questions. I'll explain later.
- * Created by luheng on 1/5/16.
- */
+@Deprecated
 public class ActiveLearningDynamicReranking {
     final List<List<InputWord>> sentences;
     final List<Parse> goldParses;
@@ -147,7 +143,7 @@ public class ActiveLearningDynamicReranking {
             double avgUtil = .0;
             for (GroupedQuery query : queries) {
                 reranker.computeUtility(query, null /* p(a|q) */);
-                avgUtil += query.utility;
+                avgUtil += query.answerEntropy;
             }
             sentenceUtility.put(sentIdx, avgUtil / queries.size());
         });
@@ -159,7 +155,7 @@ public class ActiveLearningDynamicReranking {
         Comparator<GroupedQuery> queryComparator = new Comparator<GroupedQuery>() {
             @Override
             public int compare(GroupedQuery q1, GroupedQuery q2) {
-                return Double.compare(-q1.utility, -q2.utility);
+                return Double.compare(-q1.answerEntropy, -q2.answerEntropy);
             }
         };
         int numQueries = 0;
@@ -180,7 +176,7 @@ public class ActiveLearningDynamicReranking {
                     budgetCurve.put(numQueries, currentResult);
                 }
                 GroupedQuery query = queryList.get(0);
-                if (query.utility < 0.3) {
+                if (query.answerEntropy < 0.3) {
                     break;
                 }
                 int sentId = query.sentenceId;
@@ -192,7 +188,7 @@ public class ActiveLearningDynamicReranking {
                 queryList.forEach(q -> reranker.computeUtility(q, null));
                 Collections.sort(queryList, queryComparator);
 
-                System.out.println("\t" + query.utility + "\t" + query.answerOptions.size() + "\t" +
+                System.out.println("\t" + query.answerEntropy + "\t" + query.answerOptions.size() + "\t" +
                         reranker.getRerankedBest(sentenceIdx) + "\t" + oracleParseIds.get(sentenceIdx));
                 //query.print(words, response);
 

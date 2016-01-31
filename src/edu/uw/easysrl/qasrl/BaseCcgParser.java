@@ -69,13 +69,13 @@ public abstract class BaseCcgParser {
 
     protected Parse getParse(final List<InputReader.InputWord> sentence, final Scored<SyntaxTreeNode> scoredParse,
                              DependencyGenerator dependencyGenerator) {
-        // TODO: get categories from syntax treenode
         SyntaxTreeNode ccgParse = scoredParse.getObject();
         List<Category> categories = ccgParse.getLeaves().stream().map(SyntaxTreeNode::getCategory)
                 .collect(Collectors.toList());
         Set<UnlabelledDependency> unlabelledDeps = new HashSet<>();
         dependencyGenerator.generateDependencies(ccgParse, unlabelledDeps);
         Set<ResolvedDependency> dependencies = new HashSet<>();
+        // Convert and filter dependencies for evaluation.
         unlabelledDeps.forEach(dep -> {
             int predIdx = dep.getHead();
             Category category = dep.getCategory();
@@ -85,15 +85,14 @@ public abstract class BaseCcgParser {
                     !badDependenciesSet.contains(sentence.get(predIdx).word + ":" + depStr)) {
                 dep.getArguments().stream()
                         .filter(argIdx -> predIdx != argIdx)
-                        .forEach(argIdx2 -> dependencies.add(new ResolvedDependency(predIdx, category, argNum, argIdx2,
-                                SRLFrame.NONE, Preposition.NONE)));
+                        .forEach(argIdx2 -> dependencies.add(new ResolvedDependency(
+                                    predIdx, category, argNum, argIdx2, SRLFrame.NONE, Preposition.NONE)));
             }
         });
         return new Parse(scoredParse.getObject(), categories, dependencies, scoredParse.getScore());
     }
 
     protected Parse getParse(final List<InputReader.InputWord> sentence, final SRLParser.CCGandSRLparse parse) {
-        // TODO: get categories from syntax treenode
         System.err.println(parse.getDependencyParse().size());
         List<Category> categories =
                 parse.getCcgParse().getLeaves().stream().map(SyntaxTreeNode::getCategory)
