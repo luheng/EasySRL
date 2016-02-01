@@ -11,6 +11,7 @@ import java.util.List;
  */
 public class Response {
     List<Integer> chosenOptions;
+    String debugginInfo;
 
     public Response() {
         chosenOptions = new ArrayList<>();

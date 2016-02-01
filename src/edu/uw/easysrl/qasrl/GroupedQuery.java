@@ -139,13 +139,13 @@ public class GroupedQuery {
                 //.mapToDouble(ao -> ao.probability * Math.log(ao.probability) / K).sum();
     }
 
-    public void print(final List<String> words, int response) {
+    public void print(final List<String> words, Response response) {
         System.out.println(String.format("%d:%s\t%s\t%d", predicateIndex, words.get(predicateIndex), category,
                 argumentNumber));
         System.out.println(String.format("%.2f\t%.2f\t%s", answerEntropy, answerMargin, question));
         for (int i = 0; i < answerOptions.size(); i++) {
             AnswerOption ao = answerOptions.get(i);
-            String match = (i == response ? "*" : "");
+            String match = (response.chosenOptions.contains(i) ? "*" : "");
             String argIdsStr = ao.argumentIds.stream().map(String::valueOf).collect(Collectors.joining(","));
             String argHeadsStr = ao.argumentIds.get(0) == -1 ? "N/A" :
                     ao.argumentIds.stream().map(words::get).collect(Collectors.joining(","));
@@ -182,5 +182,10 @@ public class GroupedQuery {
                     parseIdsStr));
         }
         System.out.println();
+    }
+
+    public List<AnswerOption> getTopAnswerOptions(final int numOptions) {
+        return answerOptions.stream().sorted((ao1, ao2) -> Double.compare(-ao1.probability, -ao2.probability))
+                .limit(numOptions).collect(Collectors.toList());
     }
 }

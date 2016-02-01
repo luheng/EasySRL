@@ -8,23 +8,28 @@ import edu.uw.easysrl.syntax.grammar.Category;
 
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
 import uk.co.flamingpenguin.jewel.cli.CliFactory;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * New - Active Learning experiments (n-best reranking).
  * Created by luheng on 1/5/16.
  */
-public class ActiveLearningReranker {
+public class MTurkDataWriter {
     final List<List<InputWord>> sentences;
     final List<Parse> goldParses;
     final BaseCcgParser parser;
     final QuestionGenerator questionGenerator;
     final ResponseSimulator responseSimulator;
 
-    final int nBest;
     Map<String, Double> aggregatedResults;
 
     // Print debugging info or not.
@@ -42,8 +47,16 @@ public class ActiveLearningReranker {
     // The file contains the pre-parsed n-best list (of CCGBank dev). Leave file name is empty, if we wish to parse
     // sentences in the experiment.
     final static String preparsedFile = "parses.50best.out";
+
+    final static int nBest = 50;
+
     // After a batch of queries, update query entropy and reorder them based on updated probabilities of parses.
     final static int reorderQueriesEvery = 100;
+    // Maximum number of answer options per query.
+    final static int maxAnswerOptionsPerQuery = 4;
+
+    private static String[] csvHeader = {"query_id", "sent_id", "sentence", "pred_id", "pred_head",
+                                         "question", "answer1", "answer2", "answer3", "answer4"};
 
     // TODO: if a parse already has low probability, it should provide very little weight when computing answer entropy.
 
@@ -64,50 +77,28 @@ public class ActiveLearningReranker {
         QuestionGenerator questionGenerator = new QuestionGenerator();
         ResponseSimulator responseSimulator = new ResponseSimulatorGold(questionGenerator);
 
-        /************** manual parameter tuning ... ***********/
-        //final int[] nBestList = new int[] { 3, 5, 10, 20, 50, 100, 250, 500, 1000 };
-        final int[] nBestList = new int[] { 50 };
-
-        List<Map<String, Double>> allResults = new ArrayList<>();
-        for (int nBest : nBestList) {
-            BaseCcgParser parser =
-                    preparsedFile.isEmpty() ?
-                            new BaseCcgParser.AStarParser(modelFolder, rootCategories, nBest) :
-                            new BaseCcgParser.MockParser(preparsedFile, nBest);
-            ActiveLearningReranker learner = new ActiveLearningReranker(sentences, goldParses, parser,
-                                                                        questionGenerator, responseSimulator, nBest);
+        BaseCcgParser parser = preparsedFile.isEmpty() ?
+                        new BaseCcgParser.AStarParser(modelFolder, rootCategories, nBest) :
+                        new BaseCcgParser.MockParser(preparsedFile, nBest);
+        MTurkDataWriter learner = new MTurkDataWriter(sentences, goldParses, parser, questionGenerator, responseSimulator);
+        try {
             learner.run();
-            allResults.add(learner.aggregatedResults);
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-
-        /*********** output results **********/
-        List<String> resultKeys = new ArrayList<>(allResults.get(0).keySet());
-        Collections.sort(resultKeys);
-        System.out.print("\nnbest");
-        for (int i = 0; i < nBestList.length; i++) {
-            System.out.print("\t" + nBestList[i]);
-        }
-        resultKeys.forEach(rk -> {
-            System.out.print("\n" + rk);
-            for (int i = 0; i < nBestList.length; i++) {
-                System.out.print(String.format("\t%.6f",allResults.get(i).get(rk)));
-            }
-        });
-        System.out.println();
     }
 
-    public ActiveLearningReranker(List<List<InputWord>> sentences, List<Parse> goldParses, BaseCcgParser parser,
-                                  QuestionGenerator questionGenerator, ResponseSimulator responseSimulator, int nBest) {
+    public MTurkDataWriter(List<List<InputWord>> sentences, List<Parse> goldParses, BaseCcgParser parser,
+                           QuestionGenerator questionGenerator, ResponseSimulator responseSimulator) {
         System.out.println(String.format("\n========== ReRanker Active Learning with %d-Best List ==========", nBest));
         this.sentences = sentences;
         this.goldParses = goldParses;
         this.parser = parser;
         this.questionGenerator = questionGenerator;
         this.responseSimulator = responseSimulator;
-        this.nBest = nBest;
     }
 
-    public void run() {
+    public void run() throws IOException {
         /****************** Base n-best Parser ***************/
         Map<Integer, List<Parse>> allParses = new HashMap<>();
         Map<Integer, List<Results>> allResults = new HashMap<>();
@@ -159,6 +150,16 @@ public class ActiveLearningReranker {
         allParses.keySet().forEach(sid -> numQueriesPerSentence.put(sid, 0));
         Map<Integer, Results> budgetCurve = new HashMap<>();
 
+        CSVPrinter csvPrinter;
+        try {
+            csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter("test.csv")), CSVFormat.EXCEL
+                    .withRecordSeparator("\n"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return;
+        }
+
+        csvPrinter.printRecord((Object[]) csvHeader);
         int queryCounter = 0;
         while (!queryList.isEmpty()) {
             if (plotCurve && queryCounter % 200 == 0) {
@@ -191,23 +192,34 @@ public class ActiveLearningReranker {
             System.out.println(numQueriesPerSentence.get(sentId) + "\t" + sentId + "\t" +
                     numQueriesPerSentence.get(sentId) + "\t" + bestK + "\t" + oracleK + "\t" + entropy + "\t" +
                     reranker.computeParsesEntropy(sentId));
-            /*
-            if (oracleK == 0 && bestK != oracleK) {
-                System.out.println("\n" + words.stream().collect(Collectors.joining(" ")));
-                System.out.println(numQueriesPerSentence.get(sentId) + "\t" + sentId + "\t" +
-                        numQueriesPerSentence.get(sentId) + "\t" + bestK + "\t" + oracleK + "\t" + entropy + "\t" +
-                        reranker.computeParsesEntropy(sentId));
-                query.print(words, response);
-                System.out.println("[k-best]:\t" + allResults.get(sentId).get(bestK));
-                System.out.println("[oracle]:\t" + allResults.get(sentId).get(oracleK) + "\n");
-                System.out.println("--on qg covered deps--");
-                System.out.println("[k-best]:\t" + AnalysisHelper.evaluateQuestionCoveredDependencies(
-                        allParses.get(sentId).get(bestK), goldParses.get(sentId), words, questionGenerator));
-                System.out.println("[oracle]:\t" + AnalysisHelper.evaluateQuestionCoveredDependencies(
-                        allParses.get(sentId).get(oracleK), goldParses.get(sentId), words, questionGenerator));
+
+
+            //TODO: write query to csv
+            // "query_id", "sent_id", "sentence", "pred_id", "pred_head","question",
+            // "answer1", "answer2", "answer3", "answer4";
+            List<String> csvRow = new ArrayList<>();
+            csvRow.add(String.valueOf(queryCounter));
+            csvRow.add(String.valueOf(sentId));
+            // get highlighted sentence
+            String sentenceStr = IntStream.range(0, words.size())
+                    .mapToObj(i -> i == query.predicateIndex ? "<mark>" + words.get(i) + "</mark>" : words.get(i))
+                    .collect(Collectors.joining(" "));
+            csvRow.add(String.valueOf(sentenceStr));
+            csvRow.add(String.valueOf(query.predicateIndex));
+            csvRow.add(words.get(query.predicateIndex));
+            csvRow.add(query.question);
+            List<GroupedQuery.AnswerOption> options = query.getTopAnswerOptions(4 /* max number of answer options */);
+            for (int i = 0; i < 4; i++) {
+                if (i < options.size()) {
+                    csvRow.add(options.get(i).answer);
+                } else {
+                    csvRow.add("");
+                }
             }
-            */
+            csvPrinter.printRecord(csvRow);
         }
+
+        csvPrinter.close();
 
         /*************** Evaluation ********************/
         aggregatedResults = new HashMap<>();
@@ -245,35 +257,6 @@ public class ActiveLearningReranker {
             oneBestAcc.add(CcgEvaluation.evaluateTags(parses.get(0).categories, goldParse.categories));
             reRankedAcc.add(CcgEvaluation.evaluateTags(parses.get(bestK).categories, goldParse.categories));
             oracleAcc.add(CcgEvaluation.evaluateTags(parses.get(oracleK).categories, goldParse.categories));
-            /*
-            if (verbose) {
-                for (int i = 0; i < queryList.size(); i++) {
-                    GroupedQuery query = queryList.get(i);
-                    Response response = responseList.get(i);
-                    if (query.sentenceId != sentIdx) {
-                        continue;
-                    }
-                    // FIXME
-                    for (int r : response.chosenOptions) {
-                        if (query.answerOptions.get(r).argumentIds.size() > 1) {
-                            numMultiHeadQueriesGold ++;
-                        }
-                        if (query.answerOptions.stream().anyMatch(ao -> ao.argumentIds.size() > 1)) {
-                            numMultiHeadQueries ++;
-                        }
-                        // Look at all the queries that voted for the oracle parse but not the 1-best.
-                        Set<Integer> voted = query.answerOptions.get(r).parseIds;
-                        if (!query.answerOptions.get(r).isNAOption() &&
-                                voted.contains(oracleK) && !voted.contains(0)) {
-                            List<String> words = sentences.get(sentIdx).stream().map(w -> w.word)
-                                    .collect(Collectors.toList());
-                            DebugPrinter.printQueryInfo(words, query, r, goldParse);
-                            numTrulyEffectiveQueries++;
-                        }
-                    }
-                }
-            }
-            */
         }
 
         for (String s : analysis.keySet()) {

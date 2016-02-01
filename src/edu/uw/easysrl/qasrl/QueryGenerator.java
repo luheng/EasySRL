@@ -125,7 +125,7 @@ public class QueryGenerator {
         String bestQuestion = "";
         Query bestQuery = null;
         for (String question : questionToParses.keySet()) {
-            double score = questionToParses.get(question).size();
+            double score = questionToParses.get(question).stream().mapToDouble(pid -> parses.get(pid).score).sum();
             if (score > bestQuestionScore) {
                 bestQuestionScore = score;
                 bestQuestion = question;

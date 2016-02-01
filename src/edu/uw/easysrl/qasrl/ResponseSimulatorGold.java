@@ -39,9 +39,10 @@ public class ResponseSimulatorGold extends ResponseSimulator {
                     goldParse.dependencies);
             String goldQuestionStr = (goldQuestion == null || goldQuestion.size() == 0) ? "-NOQ-" :
                     goldQuestion.stream().collect(Collectors.joining(" "));
-            if (query.question.equalsIgnoreCase(goldQuestionStr)) {
-                if (!goldQuestionStr.equals("-NOQ-") ||
-                        (dep.getCategory() == query.category && dep.getArgNumber() == query.argumentNumber)) {
+            boolean questionMatch = query.question.equalsIgnoreCase(goldQuestionStr);
+            boolean labelMatch = (dep.getCategory() == query.category && dep.getArgNumber() == query.argumentNumber);
+            if (questionMatch || labelMatch) {
+                if (!goldQuestionStr.equals("-NOQ-") || labelMatch) {
                     answerIndices.addAll(AnswerGenerator.getArgumentIdsForDependency(sentence, goldParse, dep));
                 }
             }
