@@ -11,9 +11,10 @@ import java.util.*;
  */
 public class VerbHelper {
     private static final String[] enAuxiliaryVerbs = {
+            "am",
+            "ai", // as in ai n't
             "be",
             "being",
-            "am",
             "\'m",
             "is",
             "\'s",

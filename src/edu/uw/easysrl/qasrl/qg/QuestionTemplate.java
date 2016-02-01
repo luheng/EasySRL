@@ -72,7 +72,6 @@ public class QuestionTemplate {
     // What is something according to? What something down from?
 
     // Categories to skip ..
-    private static final Category prepositions = Category.valueOf("((S\\NP)\\(S\\NP))/NP");
     // private static final Category auxiliaries = Category.valueOf("(S[dcl]\\NP)/(S[b]\\NP)");
     //private static final Category controlParticles = Category.valueOf("(S[to]\\NP)/(S[b]\\NP)");
     private static final Category controlParticles = Category.valueOf("(S\\NP)/(S[b]\\NP)");
@@ -173,8 +172,11 @@ public class QuestionTemplate {
             } else {
                 type = QuestionType.VERB_ADJUNCT;
             }
-        } else if(Category.valueOf("(S[dcl]\\NP)/NP").matches(predicateCategory)) {
+        } else if(Category.valueOf("(S\\NP)/NP").matches(predicateCategory)) {
             type = QuestionType.VERB;
+        } else if(Category.valueOf("(NP\\NP)/(S[dcl]\\NP)").matches(predicateCategory)) {
+            type = QuestionType.INVALID;
+            // type = QuestionType.RELATIVIZER;
         }
 
         /*
@@ -210,7 +212,10 @@ public class QuestionTemplate {
     }
 
     public enum QuestionType {
-        VERB, ADJECTIVE_ADJUNCT, NOUN_ADJUNCT, VERB_ADJUNCT, INVALID
+        VERB,
+        ADJECTIVE_ADJUNCT, NOUN_ADJUNCT, VERB_ADJUNCT,
+        RELATIVIZER,
+        INVALID
     }
 
     private boolean cantAskQuestion(int targetArgNum) {
@@ -228,8 +233,8 @@ public class QuestionTemplate {
              targetArgNum == 2) || // "full of promise" -> "something was _ of promise; what's _?" --- can't really ask it.
             categories.get(argIndex.get()).matches(Category.valueOf("PR")) // don't ask about a particle
             ;
-        return type != QuestionType.VERB;
-        // return cantAsk;
+        // return type != QuestionType.VERB;
+        return cantAsk;
     }
 
     /**
