@@ -51,8 +51,9 @@ public class VerbHelper {
     };
 
     private static final String[] enCopulaVerbs = {
-            "be", "being", "am", "\'m", "is",
-            "\'s", "are", "\'re", "was", "were", "been", "being"
+        "be", "being", "am", "\'m", "is",
+        "ai", // as in "ai n't"
+        "\'re", "\'s", "are", "\'re", "was", "were", "been", "being"
     };
 
     private static final Set<String> enAuxiliaryVerbSet;
@@ -120,31 +121,31 @@ public class VerbHelper {
     /**
      * approved -> List { did, approve }
      */
-    public String[] getAuxiliaryAndVerbStrings(List<String> words, List<Category> categories, int index) {
+    public Optional<String[]> getAuxiliaryAndVerbStrings(List<String> words, List<Category> categories, int index) {
         String verbStr = words.get(index).toLowerCase();
         String[] infl = inflectionDictionary.getBestInflections(verbStr.toLowerCase());
         if (infl == null) {
-            System.err.println("Can't find inflections for: " + words.get(index) + " " + categories.get(index));
-            return new String[] {"", verbStr};
+            // System.err.println("Can't find inflections for: " + words.get(index) + " " + categories.get(index));
+            return Optional.empty();
         }
         // build
         if (verbStr.equals(infl[0])) {
-            return new String[] {"would", infl[0]};
+            return Optional.of(new String[] {"would", infl[0]});
         }
         // builds
         if (verbStr.equals(infl[1])) {
-            return new String[] {"does", infl[0]};
+            return Optional.of(new String[] {"does", infl[0]});
         }
         // building
         if (verbStr.equals(infl[2])) {
-            return new String[] {"would", "be " + infl[2]};
+            return Optional.of(new String[] {"would", "be " + infl[2]});
         }
         // built
         if (verbStr.equals(infl[3])) {
-            return new String[] {"did", infl[0]};
+            return Optional.of(new String[] {"did", infl[0]});
         }
         // built (pt)
-        return new String[] {"have", infl[4]};
+        return Optional.of(new String[] {"have", infl[4]});
     }
 
     public boolean hasInflectedForms(String word) {

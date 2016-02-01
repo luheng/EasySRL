@@ -4,7 +4,6 @@ import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.Category.Slash;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
-import edu.uw.easysrl.qasrl.qg.QuestionSlot.*;
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.AnswerGenerator;
 import java.util.stream.Collectors;
@@ -13,7 +12,6 @@ import java.util.stream.Stream;
 import java.util.*;
 
 /**
- * A QuestionTemplate is primarily a list of QuestionSlots.
  * The point of a QuestionTemplate is to abstract over all of the questions
  * that could be asked about the various arguments to a predicate.
  *
@@ -75,7 +73,7 @@ public class QuestionTemplate {
 
     // Categories to skip ..
     private static final Category prepositions = Category.valueOf("((S\\NP)\\(S\\NP))/NP");
-    private static final Category auxiliaries = Category.valueOf("(S[dcl]\\NP)/(S[b]\\NP)");
+    // private static final Category auxiliaries = Category.valueOf("(S[dcl]\\NP)/(S[b]\\NP)");
     //private static final Category controlParticles = Category.valueOf("(S[to]\\NP)/(S[b]\\NP)");
     private static final Category controlParticles = Category.valueOf("(S\\NP)/(S[b]\\NP)");
     private static final Category pastParticiples = Category.valueOf("(S[dcl]\\NP)/(S[pt]\\NP)");
@@ -113,15 +111,17 @@ public class QuestionTemplate {
     }
 
 
-    public List<String> words;
     public Parse parse;
+    public List<String> words;
     public List<Category> categories;
     public SyntaxTreeNode tree;
 
-    public PredicateSlot predSlot;
+    public List<Integer> auxiliaries;
+    public int predicateIndex;
     public Category predicateCategory;
-    public ArgumentSlot[] slots;
-    public Map<Integer, Integer> argNumToSlotId;
+
+    public Map<Integer, Integer> argIndices;
+    public Map<Integer, Category> argCategories;
 
     public VerbHelper verbHelper;
 
@@ -129,36 +129,31 @@ public class QuestionTemplate {
 
     public QuestionTemplate(int predicateIndex, List<String> words, Parse parse, VerbHelper verbHelper) {
         this.categories = parse.categories;
-        Category predicateCategory = categories.get(predicateIndex);
-        int[] argNumToPosition = new int[predicateCategory.getNumberOfArguments() + 1];
-        Arrays.fill(argNumToPosition, -1);
+        this.predicateIndex = predicateIndex;
+        this.predicateCategory = categories.get(predicateIndex);
+        this.auxiliaries = verbHelper.getAuxiliaryChain(words, categories, predicateIndex);
+        this.parse = parse;
+        this.tree = parse.syntaxTree;
+        this.verbHelper = verbHelper;
+        this.words = words;
+        this.argIndices = new HashMap<Integer, Integer>();
         for (ResolvedDependency dep : parse.dependencies) {
             if (dep.getHead() == predicateIndex && dep.getArgument() != dep.getHead()) {
-                argNumToPosition[dep.getArgNumber()] = dep.getArgument();
+                argIndices.put(dep.getArgNumber(), dep.getArgument());
             }
         }
-        // PredicateSlot predSlot, ArgumentSlot[] slots, SyntaxTreeNode tree,
-        // List<String> words, List<Category> categories, VerbHelper verbHelper
         int numArguments = predicateCategory.getNumberOfArguments();
-        // Create the pred slot.
-        List<Integer> auxChain = verbHelper.getAuxiliaryChain(words, categories, predicateIndex);
-        PredicateSlot predSlot = new PredicateSlot(predicateIndex, auxChain, predicateCategory);
-        // Generate slots.
-        ArgumentSlot[] arguments = new ArgumentSlot[numArguments + 1];
-        for (int argNum = 1; argNum <= numArguments; argNum++) {
-            int argIdx = argNumToPosition[argNum];
-            Category argumentCategory = predicateCategory.getArgument(argNum);
-            ArgumentSlot slot;
-            if (argIdx < 0) {
-                slot = new UnrealizedArgumentSlot(argNum, argumentCategory);
-            } else {
-                // TODO: maybe we should use the identified PP? Add later.
-                String ppStr = argumentCategory.isFunctionInto(Category.PP) ?
-                        PrepositionHelper.getPreposition(words, categories, argIdx) : "";
-                slot = new ArgumentSlot(argIdx, argNum, argumentCategory, ppStr);
-            }
-            arguments[argNum] = slot;
+        this.argCategories = new HashMap<Integer, Category>();
+        for (int i = 1; i <= numArguments; i++) {
+            if(!argIndices.containsKey(i)) argIndices.put(i, -1);
+            argCategories.put(i, predicateCategory.getArgument(i));
         }
+        /*
+        // TODO: maybe we should use the identified PP? Add later.
+        String ppStr = argumentCategory.isFunctionInto(Category.PP) ?
+            PrepositionHelper.getPreposition(words, categories, argIdx) : "";
+        */
+
         /* I'll burn this bridge when I get to it
         // Special case: T1, T2 said, or T2, said T1
         if (numArguments == 2 && predicateCategory.getArgument(1).equals(Category.Sdcl)) {
@@ -166,20 +161,8 @@ public class QuestionTemplate {
             return new QuestionTemplate(pred, slots, tree, words, categories, verbHelper);
         }
         */
-        this.parse = parse;
-        this.predSlot = predSlot;
-        this.predicateCategory = predSlot.category;
-        this.slots = arguments;
-        this.tree = parse.syntaxTree;
-        this.verbHelper = verbHelper;
-        this.words = words;
-        this.argNumToSlotId = new HashMap<>();
-        for (int slotId = 1; slotId < slots.length; slotId++) {
-            argNumToSlotId.put(slots[slotId].argumentNumber, slotId);
-        }
 
-        type = QuestionType.INVALID;
-        // only allow the following categories of words to ask questions about
+        this.type = QuestionType.INVALID;
         if (numArguments == 0) {
             type = QuestionType.INVALID;
         } else if(Category.valueOf("(NP\\NP)/NP").matches(predicateCategory)) {
@@ -190,11 +173,13 @@ public class QuestionTemplate {
             } else {
                 type = QuestionType.VERB_ADJUNCT;
             }
+        } else if(Category.valueOf("(S[dcl]\\NP)/NP").matches(predicateCategory)) {
+            type = QuestionType.VERB;
         }
 
         /*
         // here is the logic that used to be in filterPredicate
-        String word = words.get(predSlot.indexInSentence);
+        String word = words.get(predicateIndex);
         // adjuncts first: because last applied arg of an adjunct is really just an arg of its arg
         // for example, (S\NP)\(S\NP) reads as a verb because it's a function into (S\NP)
         if (belongsTo(predicateCategory, nounAdjuncts)) {
@@ -229,30 +214,31 @@ public class QuestionTemplate {
     }
 
     private boolean cantAskQuestion(int targetArgNum) {
-        ArgumentSlot slot = slots[argNumToSlotId.get(targetArgNum)];
-        return type == QuestionType.INVALID ||
-            !argNumToSlotId.containsKey(targetArgNum) ||
-            slot.indexInSentence == -1 || // don't ask about an unrealized arg
+        Optional<Integer> argIndex = Optional.of(argIndices.get(targetArgNum));
+        boolean cantAsk = type == QuestionType.INVALID ||
+            !argIndex.isPresent() ||
+            argIndex.get() == -1 || // don't ask about an unrealized arg
             (type == QuestionType.NOUN_ADJUNCT &&
-             words.get(predSlot.indexInSentence).equals("of")) || // "of" is just a doozy
+             words.get(predicateIndex).equals("of")) || // "of" is just a doozy
             (type == QuestionType.VERB_ADJUNCT &&
-             Arrays.asList(slots).stream()
-             .filter(arg -> arg != null && arg.indexInSentence > -1)
-             .anyMatch(arg -> verbHelper.isCopulaVerb(words.get(arg.indexInSentence)))) || // adjuncts to copular constructs are wonky
+             argIndices.values().stream()
+             .filter(index -> index >= 0)
+             .anyMatch(index -> verbHelper.isCopulaVerb(words.get(index)))) || // adverbs of copulas are wonky and not helpful
             (type == QuestionType.ADJECTIVE_ADJUNCT &&
-             targetArgNum == 2) || // "full of promise" -> "something was _ of promise; what's _?"---kinda no options
-            slot.category.matches(Category.valueOf("PR")) // don't ask about a particle
+             targetArgNum == 2) || // "full of promise" -> "something was _ of promise; what's _?" --- can't really ask it.
+            categories.get(argIndex.get()).matches(Category.valueOf("PR")) // don't ask about a particle
             ;
+        return type != QuestionType.VERB;
+        // return cantAsk;
     }
 
     /**
      * Instantiate into a question about a particular argument.
      * @param targetArgNum : the argument number under the predicate
      *                       associated with what's being asked about in the question
-     * @return a question asking for the argument in slot targetArgNum of template's predicate
+     * @return a question asking for the targetArgNum'th argument of template's predicate
      */
     public List<String> instantiateForArgument(int targetArgNum) {
-        int totalArgs = predicateCategory.getNumberOfArguments();
         List<String> question = new ArrayList<>();
         if (cantAskQuestion(targetArgNum)) {
             return question;
@@ -262,27 +248,28 @@ public class QuestionTemplate {
         List<String> left = new ArrayList<>();
         List<String> right = new ArrayList<>();
         boolean isTargetLastAddedToLeft = false;
-        int currentArgNum = totalArgs;
         Category currentCategory = predicateCategory;
-        while(currentArgNum > 0) {
+        for(int currentArgNum = predicateCategory.getNumberOfArguments(); currentArgNum > 0; currentArgNum--) {
             // get the surface form of the argument in question
             List<String> argWords;
             boolean addingTarget = currentArgNum == targetArgNum;
             if(addingTarget) {
                 argWords = getTargetPlaceholderWords(currentArgNum);
             } else {
-                ArgumentSlot slot = slots[argNumToSlotId.get(currentArgNum)];
-                argWords = getRepresentativePhrase(slot.indexInSentence, slot.category);
+                int argIndex = argIndices.get(currentArgNum);
+                Category argCategory = argCategories.get(currentArgNum);
+                argWords = getRepresentativePhrase(argIndex, argCategory);
             }
 
             // add the argument on the left or right side, depending on the slash
             Slash slash = currentCategory.getSlash();
             switch(slash) {
             case FWD:
-                right = Stream.concat(right.stream(), argWords.stream()).collect(Collectors.toList());
+                right.addAll(argWords);
                 break;
             case BWD:
-                left = Stream.concat(argWords.stream(), left.stream()).collect(Collectors.toList());
+                argWords.addAll(left);
+                left = argWords;
                 isTargetLastAddedToLeft = addingTarget;
                 break;
             case EITHER:
@@ -292,7 +279,6 @@ public class QuestionTemplate {
 
             // proceed to the next argument
             currentCategory = currentCategory.getLeft();
-            currentArgNum--;
         }
 
         String wh = getWhWordByArgNum(targetArgNum);
@@ -311,7 +297,7 @@ public class QuestionTemplate {
 
         question.addAll(right);
         return question.stream()
-            .filter(s -> !s.isEmpty()) // to mitigate oversights. harmless anyway
+            .filter(s -> s != null && !s.isEmpty()) // to mitigate oversights. harmless anyway
             .collect(Collectors.toList());
     }
 
@@ -331,18 +317,18 @@ public class QuestionTemplate {
         if(type == QuestionType.NOUN_ADJUNCT) {
             return result;
         }
-        int slotId = argNumToSlotId.get(argNum);
-        ArgumentSlot slot = (ArgumentSlot) slots[slotId];
-        if (slot.category.isFunctionInto(Category.valueOf("S[to]\\NP"))) {
+        int argIndex = argIndices.get(argNum);
+        Category argCategory = argCategories.get(argNum);
+        if (argCategory.isFunctionInto(Category.valueOf("S[to]\\NP"))) {
             result.add("to do");
-        } else if (slot.category.isFunctionInto(Category.valueOf("S[ng]\\NP"))) {
+        } else if (argCategory.isFunctionInto(Category.valueOf("S[ng]\\NP"))) {
             result.add("doing");
-        } else if (slot.category.isFunctionInto(Category.valueOf("S[dcl]\\NP"))) {
+        } else if (argCategory.isFunctionInto(Category.valueOf("S[dcl]\\NP"))) {
             result.add("do");
-        } else if (slot.category.isFunctionInto(Category.valueOf("S\\NP"))) { // catch-all
+        } else if (argCategory.isFunctionInto(Category.valueOf("S\\NP"))) { // catch-all for verbs
             result.add("do");
         }
-        // result.add(slot.preposition);
+        // TODO maybe add preposition
         return result;
     }
 
@@ -363,7 +349,7 @@ public class QuestionTemplate {
         Optional<SyntaxTreeNode> nodeOpt = AnswerGenerator
             .getLowestAncestorFunctionIntoCategory(headLeaf, neededCategory, tree);
         if(!nodeOpt.isPresent()) {
-            // fall back to just the original leaf.
+            // fall back to just the original leaf. this failure case is very rare.
             List<String> result = new ArrayList<>();
             result.add(headLeaf.getWord());
             return result;
@@ -381,8 +367,9 @@ public class QuestionTemplate {
 
         // add arguments on either side until done, according to CCG category.
         Category currentCategory = node.getCategory();
-        int currentArgNum = currentCategory.getNumberOfArguments();
-        while(currentArgNum > neededCategory.getNumberOfArguments()) {
+        for(int currentArgNum = currentCategory.getNumberOfArguments();
+            currentArgNum > neededCategory.getNumberOfArguments();
+            currentArgNum--) {
             Category argCat = currentCategory.getRight();
             // recover arg index using the fact that we know the head leaf and the arg num.
             Set<ResolvedDependency> deps = parse.dependencies;
@@ -407,7 +394,6 @@ public class QuestionTemplate {
             }
             // proceed to the next argument
             currentCategory = currentCategory.getLeft();
-            currentArgNum--;
         }
 
         List<String> result = new ArrayList<>();
@@ -423,11 +409,11 @@ public class QuestionTemplate {
      * @return a 2-element array of { "modal", "verb" } where modal may be empty
      */
     public List<String> getUnsplitPred() {
-        List<Integer> auxiliaries = predSlot.auxiliaries;
-        String predStr = words.get(predSlot.indexInSentence);
+        String predStr = words.get(predicateIndex);
         if(type == QuestionType.VERB) {
             // If we have the infinitive such as "to allow", change it to would allow.
             //if (predicateCategory.isFunctionInto(Category.valueOf("S[b]\\NP"))) {
+            // TODO more robust might be to do it based on clause type S[to]
             if (auxiliaries.size() > 0 && words.get(auxiliaries.get(0)).equalsIgnoreCase("to")) {
                 return Arrays.asList(new String[]{ "would", predStr });
             }
@@ -445,7 +431,7 @@ public class QuestionTemplate {
                 predicateCategory.isFunctionInto(Category.valueOf("S[ng]\\NP"))) {
                 return Arrays.asList(new String[] { "would be", predStr });
             }
-            if (verbHelper.isUninflected(words, categories, predSlot.indexInSentence)) {
+            if (verbHelper.isUninflected(words, categories, predicateIndex)) {
                 return Arrays.asList(new String[] { "would", predStr });
             }
         } else if (type == QuestionType.NOUN_ADJUNCT) {
@@ -467,16 +453,19 @@ public class QuestionTemplate {
      * @return a 2-element array of { "aux", "pred" }
      */
     public List<String> getSplitPred() {
-        String predStr = words.get(predSlot.indexInSentence);
+        String predStr = words.get(predicateIndex);
         String[] result = new String[2];
         if (type == QuestionType.VERB) {
-            if (predSlot.auxiliaries.size() == 0 ) {
+            if (auxiliaries.size() == 0 ) {
                 if (predicateCategory.isFunctionInto(Category.valueOf("S[adj]\\NP")) || // predicative adjectives
                     predicateCategory.isFunctionInto(Category.valueOf("S[pss]\\NP")) || // passive verbs
                     predicateCategory.isFunctionInto(Category.valueOf("S[ng]\\NP"))) { // progressive verbs
                     return Arrays.asList(new String[] { "was", predStr });
+                } else if (verbHelper.isCopulaVerb(words.get(predicateIndex))) {
+                    return Arrays.asList(new String[] { predStr, "" });
+                } else {
+                    result = verbHelper.getAuxiliaryAndVerbStrings(words, categories, predicateIndex).orElse(new String [] { "", predStr });
                 }
-                result = verbHelper.getAuxiliaryAndVerbStrings(words, categories, predSlot.indexInSentence);
             } else {
                 String[] r = (String[]) getUnsplitPred().toArray();
                 String[] rw = (r[0] + " " + r[1]).split("\\s+");
@@ -496,6 +485,7 @@ public class QuestionTemplate {
                     }
                 }
             }
+            // TODO: get information about the clause to use in other cases
         } else if (type == QuestionType.NOUN_ADJUNCT) {
             return Arrays.asList(new String[] { "was", predStr });
         } else if (type == QuestionType.VERB_ADJUNCT) {
@@ -508,10 +498,13 @@ public class QuestionTemplate {
 
     public String toString() {
         String str = "";
+        /*
         str += predSlot.toString(words) + ":\t";
         for (ArgumentSlot slot : slots) {
             str += slot.toString(words) + "\t";
         }
+        */
+        str += "herp";
         return str.trim();
     }
 

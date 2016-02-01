@@ -8,7 +8,6 @@ import edu.uw.easysrl.qasrl.corpora.AlignedDependency;
 import edu.uw.easysrl.qasrl.corpora.PropBankAligner;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.qasrl.CountDictionary;
-import edu.uw.easysrl.qasrl.qg.QuestionSlot.*;
 
 import java.io.*;
 import java.util.*;
@@ -115,12 +114,6 @@ public class QuestionGenerationBenchmark {
                 System.out.println("\n" + StringUtils.join(words) + "\n" + ccgInfo);
                 writer.write("\n" + StringUtils.join(words) + "\n" + ccgInfo + "\n");
 
-                for (ArgumentSlot slot : template.slots) {
-                    String slotStr = (slot.argumentNumber == ccgDep.getArgNumber() ?
-                            String.format("{%s}", slot.toString(words)) : slot.toString(words));
-                    System.out.print(slotStr + "\t");
-                    writer.write(slotStr + "\t");
-                }
                 System.out.println("\n" + questionString + "\t" + words.get(ccgDep.getSentencePositionOfArgument()));
                 writer.write("\n" + questionString + "\t" + words.get(ccgDep.getSentencePositionOfArgument()) + "\n");
                 if (qaDep == null) {
