@@ -30,6 +30,7 @@ public class GroupedQuery {
     }
 
     int sentenceId, totalNumParses;
+    final List<String> sentence;
     final List<Parse> parses;
     Set<Query> queries;
 
@@ -45,16 +46,17 @@ public class GroupedQuery {
     static final double rankDiscountFactor = 0.0;
     static final boolean estimateWithParseScores = true;
 
-    public GroupedQuery(int sentenceId, final List<Parse> parses) {
+    public GroupedQuery(int sentenceId, final List<String> sentence, final List<Parse> parses) {
         this.sentenceId = sentenceId;
+        this.sentence = sentence;
         this.parses = parses;
         this.totalNumParses = parses.size();
         queries = new HashSet<>();
         answerOptions = null;
     }
 
-    public GroupedQuery(int sentenceId, List<Parse> parses, Query query) {
-        this(sentenceId, parses);
+    public GroupedQuery(int sentenceId, final List<String> sentence, List<Parse> parses, Query query) {
+        this(sentenceId, sentence, parses);
         queries.add(query);
     }
 

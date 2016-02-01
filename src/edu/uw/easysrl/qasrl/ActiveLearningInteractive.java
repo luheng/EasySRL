@@ -107,7 +107,7 @@ public class ActiveLearningInteractive {
         int avgBestK = 0, avgOracleK = 0;
 
         // For debugging.
-        ResponseSimulatorGold goldHuman = new ResponseSimulatorGold(questionGenerator);
+        ResponseSimulatorGold goldHuman = new ResponseSimulatorGold(goldParses, questionGenerator);
 
         List<Integer> sentenceOrder = IntStream.range(0, sentences.size()).boxed().collect(Collectors.toList());
         if (shuffleSentences) {
@@ -149,7 +149,7 @@ public class ActiveLearningInteractive {
             GroupedQuery query = queryList.get(i);
             int sentIdx = query.sentenceId;
             List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
-            Response response = responseSimulator.answerQuestion(query, words, goldParses.get(sentIdx));
+            Response response = responseSimulator.answerQuestion(query);
             asked.add(query);
             responses.add(response);
             reranker.rerank(query, response);
@@ -157,7 +157,7 @@ public class ActiveLearningInteractive {
             /*************** Print Debugging Info *************/
             if (verbose) {
                 System.out.print("\n===============");
-                Response goldResponse = goldHuman.answerQuestion(query, words, goldParses.get(sentIdx));
+                Response goldResponse = goldHuman.answerQuestion(query);
                 // FIXME
                 // DebugPrinter.printQueryInfo(words, query, response, goldResponse);
                 // printWithGoldDependency gold

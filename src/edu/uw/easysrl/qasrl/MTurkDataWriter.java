@@ -36,8 +36,6 @@ public class MTurkDataWriter {
     final boolean verbose = true;
     // Plot learning curve (F1 vs. number of queries).
     final boolean plotCurve = true;
-    // Maximum number of queries per sentence.
-    final int maxNumQueriesPerSentence = 100;
     // Incorporate -NOQ- queries (dependencies we can't generate questions for) in reranking to see potential
     // improvements.
     boolean generatePseudoQuestions = false;
@@ -54,6 +52,8 @@ public class MTurkDataWriter {
     final static int reorderQueriesEvery = 100;
     // Maximum number of answer options per query.
     final static int maxAnswerOptionsPerQuery = 4;
+    // Maximum number of queries
+    final static int maxNumQueries = 1000;
 
     private static String[] csvHeader = {"query_id", "sent_id", "sentence", "pred_id", "pred_head",
                                          "question", "answer1", "answer2", "answer3", "answer4"};
@@ -75,7 +75,7 @@ public class MTurkDataWriter {
         String modelFolder = commandLineOptions.getModel();
         List<Category> rootCategories = commandLineOptions.getRootCategories();
         QuestionGenerator questionGenerator = new QuestionGenerator();
-        ResponseSimulator responseSimulator = new ResponseSimulatorGold(questionGenerator);
+        ResponseSimulator responseSimulator = new ResponseSimulatorGold(goldParses, questionGenerator);
 
         BaseCcgParser parser = preparsedFile.isEmpty() ?
                         new BaseCcgParser.AStarParser(modelFolder, rootCategories, nBest) :
@@ -150,16 +150,10 @@ public class MTurkDataWriter {
         allParses.keySet().forEach(sid -> numQueriesPerSentence.put(sid, 0));
         Map<Integer, Results> budgetCurve = new HashMap<>();
 
-        CSVPrinter csvPrinter;
-        try {
-            csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter("test.csv")), CSVFormat.EXCEL
+        CSVPrinter csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter("test.csv")), CSVFormat.EXCEL
                     .withRecordSeparator("\n"));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return;
-        }
-
         csvPrinter.printRecord((Object[]) csvHeader);
+
         int queryCounter = 0;
         while (!queryList.isEmpty()) {
             if (plotCurve && queryCounter % 200 == 0) {
@@ -170,6 +164,9 @@ public class MTurkDataWriter {
 
                 // Refresh queue
                 System.out.println(queryList.size());
+            }
+            if (queryCounter >= maxNumQueries) {
+                break;
             }
             if (queryCounter > 0 && queryCounter % reorderQueriesEvery == 0) {
                 Collection<GroupedQuery> queryBuffer = new ArrayList<>(queryList);
@@ -182,7 +179,7 @@ public class MTurkDataWriter {
             GroupedQuery query = queryList.poll();
             int sentId = query.sentenceId;
             List<String> words = sentences.get(sentId).stream().map(w -> w.word).collect(Collectors.toList());
-            Response response = responseSimulator.answerQuestion(query, words, goldParses.get(sentId));
+            Response response = responseSimulator.answerQuestion(query);
 
             double entropy = reranker.computeParsesEntropy(sentId);
             reranker.rerank(query, response);
@@ -208,8 +205,8 @@ public class MTurkDataWriter {
             csvRow.add(String.valueOf(query.predicateIndex));
             csvRow.add(words.get(query.predicateIndex));
             csvRow.add(query.question);
-            List<GroupedQuery.AnswerOption> options = query.getTopAnswerOptions(4 /* max number of answer options */);
-            for (int i = 0; i < 4; i++) {
+            List<GroupedQuery.AnswerOption> options = query.getTopAnswerOptions(maxAnswerOptionsPerQuery);
+            for (int i = 0; i < maxAnswerOptionsPerQuery; i++) {
                 if (i < options.size()) {
                     csvRow.add(options.get(i).answer);
                 } else {

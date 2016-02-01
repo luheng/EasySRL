@@ -62,7 +62,7 @@ public class ActiveLearningReranker {
         String modelFolder = commandLineOptions.getModel();
         List<Category> rootCategories = commandLineOptions.getRootCategories();
         QuestionGenerator questionGenerator = new QuestionGenerator();
-        ResponseSimulator responseSimulator = new ResponseSimulatorGold(questionGenerator);
+        ResponseSimulator responseSimulator = new ResponseSimulatorGold(goldParses, questionGenerator);
 
         /************** manual parameter tuning ... ***********/
         //final int[] nBestList = new int[] { 3, 5, 10, 20, 50, 100, 250, 500, 1000 };
@@ -179,10 +179,9 @@ public class ActiveLearningReranker {
 
             queryCounter ++;
             GroupedQuery query = queryList.poll();
-            int sentId = query.sentenceId;
-            List<String> words = sentences.get(sentId).stream().map(w -> w.word).collect(Collectors.toList());
-            Response response = responseSimulator.answerQuestion(query, words, goldParses.get(sentId));
+            Response response = responseSimulator.answerQuestion(query);
 
+            int sentId = query.sentenceId;
             double entropy = reranker.computeParsesEntropy(sentId);
             reranker.rerank(query, response);
             numQueriesPerSentence.adjustValue(sentId, 1);

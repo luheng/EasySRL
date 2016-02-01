@@ -95,7 +95,7 @@ public class QueryGenerator {
                 }
             }
             if (!merged) {
-                groupedQueryList.add(new GroupedQuery(sentenceId, parses, query));
+                groupedQueryList.add(new GroupedQuery(sentenceId, words, parses, query));
             }
         }
         groupedQueryList.forEach(groupedQuery -> collapseQuery(groupedQuery, words, parses));
