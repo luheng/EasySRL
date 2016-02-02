@@ -17,7 +17,7 @@ public class DebugPrinter {
         query.printWithGoldDependency(words, response, goldParse);
     }
 
-    public static void printQueryInfo(List<String> words, GroupedQuery query, int response, int goldResponse) {
+    public static void printQueryInfo(List<String> words, GroupedQuery query, Response response, Response goldResponse) {
         System.out.println(String.format("S[%d]:\t", query.sentenceId) + words.stream()
                 .collect(Collectors.joining(" ")));
         query.print(words, response);

@@ -89,6 +89,4 @@ public class RerankerExponentiated extends Reranker {
     private double computeDelta(final GroupedQuery query, GroupedQuery.AnswerOption option, int parseId) {
         return option.parseIds.contains(parseId) ? stepSize : -stepSize;
     }
-
-
 }
