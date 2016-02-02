@@ -5,12 +5,14 @@ import edu.uw.easysrl.main.InputReader.InputWord;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.dependencies.ResolvedDependency;
 
 import uk.co.flamingpenguin.jewel.cli.CliFactory;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
+import edu.stanford.nlp.util.StringUtils;
 
 /**
  * New - Active Learning experiments (n-best reranking).
@@ -45,8 +47,8 @@ public class ActiveLearningReranker {
 
         /************** manual parameter tuning ... ***********/
         //final int[] nBestList = new int[] { 3, 5, 10, 20, 50, 100, 250, 500, 1000 };
-        final int[] nBestList = new int[] { 500 };
-        final boolean verbose = false;
+        final int[] nBestList = new int[] { 20 };
+        final boolean verbose = true;
 
         List<Map<String, Double>> allResults = new ArrayList<>();
         for (int nBest : nBestList) {
@@ -148,6 +150,7 @@ public class ActiveLearningReranker {
         Accuracy reRankedAcc = new Accuracy();
         Accuracy oracleAcc = new Accuracy();
         int avgBestK = 0, avgOracleK = 0;
+        CountDictionary missedCategories = new CountDictionary();
         for (int sentIdx : allParses.keySet()) {
             List<Parse> parses = allParses.get(sentIdx);
             List<Results> results = allResults.get(sentIdx);
@@ -168,9 +171,61 @@ public class ActiveLearningReranker {
             reRankedAcc.add(CcgEvaluation.evaluateTags(parses.get(bestK).categories, goldParse.categories));
             oracleAcc.add(CcgEvaluation.evaluateTags(parses.get(oracleK).categories, goldParse.categories));
             if (verbose) {
+                Parse oracleParse = parses.get(oracleK);
+                Set<ResolvedDependency> oraclePrecisionMistakes =
+                    CcgEvaluation.difference(oracleParse.dependencies, goldParse.dependencies);
+                Set<ResolvedDependency> oracleRecallMistakes =
+                    CcgEvaluation.difference(goldParse.dependencies, oracleParse.dependencies);
+                // only print the extra info for ones where we could do better
+                // also, only print the mistakes that were corrected by the oracle
                 List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
                 DebugPrinter.printQueryListInfo(sentIdx, words, queryList, responseList);
+                // if(oracleK != bestK) {
+                    // what if the reranker gave us something worse?
+                    if(results.get(0).getF1() > results.get(bestK).getF1()) {
+                        System.out.println("====== Reranker produced worse result! ======");
+                    }
+                    Map<String, Parse> parsesForStats = new TreeMap<String, Parse>();
+                    // print false positives and negatives for:
+                    parsesForStats.put("==== original best ====", parses.get(0));
+                    parsesForStats.put("==== reranked best ====", parses.get(bestK));
+                    parsesForStats.forEach((label, parse) -> {
+                            Set<ResolvedDependency> precisionMistakes =
+                                CcgEvaluation.difference(parse.dependencies, goldParse.dependencies);
+                            precisionMistakes.removeAll(oraclePrecisionMistakes);
+                            Set<ResolvedDependency> recallMistakes =
+                                CcgEvaluation.difference(goldParse.dependencies, parse.dependencies);
+                            recallMistakes.removeAll(oracleRecallMistakes);
+                            System.out.println(label);
+                            System.out.println("False positive dependencies:");
+                            for (ResolvedDependency dep : precisionMistakes) {
+                                System.out.println(String.format("\t%d:%s\t%s.%d\t%d:%s", dep.getHead(), words.get(dep.getHead()),
+                                                                 dep.getCategory(), dep.getArgNumber(),
+                                                                 dep.getArgument(), words.get(dep.getArgument())));
+                                if(label.contains("reranked")) {
+                                    missedCategories.addString(dep.getCategory().toString());
+                                }
+                            }
+                            System.out.println("False negative (missed) dependencies:");
+                            for (ResolvedDependency dep : recallMistakes) {
+                                System.out.println(String.format("\t%d:%s\t%s.%d\t%d:%s", dep.getHead(), words.get(dep.getHead()),
+                                                                 dep.getCategory(), dep.getArgNumber(),
+                                                                 dep.getArgument(), words.get(dep.getArgument())));
+                                if(label.contains("reranked")) {
+                                    missedCategories.addString(dep.getCategory().toString());
+                                }
+                            }
+                        });
             }
+        }
+        System.out.println("Categories of the heads of mistakes:");
+        List<String> missedCats = missedCategories.getStrings()
+            .stream()
+            .sorted((c1, c2) -> Integer.compare(missedCategories.getCount(c1), missedCategories.getCount(c2)))
+            .collect(Collectors.toList());
+        for (String cat : missedCats) {
+            int catCount = missedCategories.getCount(cat);
+            System.out.println(cat + ":\t" + catCount);
         }
         // Effect query: a query whose response boosts the score of a non-top parse but not the top one.
         int numSentencesParsed = allParses.size();
@@ -204,5 +259,5 @@ public class ActiveLearningReranker {
         budgetCurve.keySet().stream().sorted().forEach(i -> System.out.print("\t" +
                 String.format("%.3f", budgetCurve.get(i).getF1() * 100.0)));
         System.out.println();
-    }
+        }
 }

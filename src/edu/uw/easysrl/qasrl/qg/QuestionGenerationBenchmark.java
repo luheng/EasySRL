@@ -42,7 +42,11 @@ public class QuestionGenerationBenchmark {
         CountDictionary coveredDeps = new CountDictionary();
         CountDictionary uncoveredDeps = new CountDictionary();
         CountDictionary alignedDeps = new CountDictionary();
+
+        Set<Sentence> allSentences = new HashSet<Sentence>();
+        int numDependenciesTotal = 0;
         int numDependenciesProcessed = 0;
+        int numQuestionTemplatesGenerated = 0;
         int numQuestionsGenerated = 0;
         int numGeneratedAligned = 0;
         int numQuestionExactMatch = 0;
@@ -61,6 +65,7 @@ public class QuestionGenerationBenchmark {
                 continue;
             }
             Sentence sentence = deps.get(0).sentence;
+            allSentences.add(sentence);
             List<String> words = sentence.getWords();
             List<Category> categories = sentence.getLexicalCategories();
             Collection<CCGBankDependency> ccgDeps = sentence.getCCGBankDependencyParse().getDependencies();
@@ -70,34 +75,30 @@ public class QuestionGenerationBenchmark {
                 if (ccgDep == null) {
                     continue;
                 }
+                numDependenciesTotal++;
                 if (qaDep != null) {
-                    numAligned ++;
+                    numAligned++;
                     alignedDeps.addString(ccgDep.getCategory().toString());
                 }
                 String word = words.get(ccgDep.getSentencePositionOfPredicate());
                 Category category = ccgDep.getCategory();
-                if (questionGenerator.filterPredicate(word, category)) {
-                    continue;
-                }
-                numDependenciesProcessed ++;
                 int predicateIndex = ccgDep.getSentencePositionOfPredicate();
-                QuestionTemplate template = questionGenerator.getTemplateFromCCGBank(predicateIndex, words,
-                        categories, ccgDeps);
+                // XXX unsupported right now because not using this benchmark.
+                QuestionTemplate template = null;
+                    // questionGenerator
+                    //   .getTemplateFromCCGBank(predicateIndex, dep.sentence.getCcgbankParse(), words, categories, ccgDeps);
                 if (template == null) {
                     uncoveredDeps.addString(ccgDep.getCategory().toString());
-                    /*if (category.getNumberOfArguments() > 3) {
-                        printPredicateInfo(null, sentence, ccgDep, qaDep);
-                    }*/
                     continue;
                 }
-                List<String> question = questionGenerator.generateQuestionFromTemplate(template,
-                        ccgDep.getArgNumber());
+                QuestionAnswerPair qaPair = template.instantiateForArgument(ccgDep.getArgNumber());
+                List<String> question = qaPair.questionWords;
                 if (question.size() == 0) {
                     continue;
                 }
-                numQuestionsGenerated ++;
+                numQuestionsGenerated++;
                 if (qaDep != null) {
-                    numGeneratedAligned ++;
+                    numGeneratedAligned++;
                 }
                 coveredDeps.addString(ccgDep.getCategory().toString());
 
@@ -114,12 +115,6 @@ public class QuestionGenerationBenchmark {
                 System.out.println("\n" + StringUtils.join(words) + "\n" + ccgInfo);
                 writer.write("\n" + StringUtils.join(words) + "\n" + ccgInfo + "\n");
 
-                for (QuestionSlot slot : template.slots) {
-                    String slotStr = (slot.argumentNumber == ccgDep.getArgNumber() ?
-                            String.format("{%s}", slot.toString(words)) : slot.toString(words));
-                    System.out.print(slotStr + "\t");
-                    writer.write(slotStr + "\t");
-                }
                 System.out.println("\n" + questionString + "\t" + words.get(ccgDep.getSentencePositionOfArgument()));
                 writer.write("\n" + questionString + "\t" + words.get(ccgDep.getSentencePositionOfArgument()) + "\n");
                 if (qaDep == null) {
@@ -135,14 +130,21 @@ public class QuestionGenerationBenchmark {
             }
         }
         System.out.println("\n++++++++++++++++++++++++++++++++++++++++++");
-        System.out.println(String.format("Now able to generate %d " +
-                        "(%.2f%% of %d dependencies, %.2f%% of %d aligned dependencies) questions. " +
-                        "%d (%.2f%%) exact matches among all generated.",
-                numQuestionsGenerated,
-                100.0 * numQuestionsGenerated / numDependenciesProcessed, numDependenciesProcessed,
-                100.0 * numGeneratedAligned / numAligned, numAligned,
-                numQuestionExactMatch, 100.0 * numQuestionExactMatch / numQuestionsGenerated));
-        // uncoveredDeps.prettyPrint();
+        System.out.println(String.format("Sentences: %d", allSentences.size()));
+        System.out.println(String.format("Dependencies: %d (%.2f per sentence)",
+                                         numDependenciesTotal, 1.0 * numDependenciesTotal / allSentences.size()));
+        System.out.println(String.format("Aligned dependencies: %d (%.2f%% of deps, %.2f per sentence)",
+                                         numAligned, 100.0 * numAligned / numDependenciesTotal,
+                                         1.0 * numAligned / allSentences.size()));
+        System.out.println(String.format("Questions: %d (%.2f%% of deps, %.2f per sentence)",
+                                         numQuestionsGenerated, 100.0 * numQuestionsGenerated / numDependenciesTotal,
+                                         1.0 * numQuestionsGenerated / allSentences.size()));
+        System.out.println(String.format("Questions for aligned dependencies: %d (%.2f%% of aligned deps before processing)",
+                                         numGeneratedAligned, 100.0 * numGeneratedAligned / numAligned));
+        System.out.println(String.format("Exact matches among questions: %d (%.2f%% of all questions, %.2f%% of aligned questions)",
+                                         numQuestionExactMatch,
+                                         100.0 * numQuestionExactMatch / numQuestionsGenerated,
+                                         100.0 * numQuestionExactMatch / numGeneratedAligned));
         writer.close();
     }
 

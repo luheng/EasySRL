@@ -49,8 +49,8 @@ public class QueryGenerator {
                 Set<ResolvedDependency> dependencies = entry.getValue();
                 ResolvedDependency dependency = dependencies.iterator().next();
                 // FIXME: modify question generator to accept less info.
-                List<String> question = questionGenerator.generateQuestion(dependency, words, parse.categories,
-                        parse.dependencies);
+                List<String> question = questionGenerator
+                    .generateQuestion(dependency, words, parse);
                 if (question == null || question.size() == 0) {
                     continue;
                 }

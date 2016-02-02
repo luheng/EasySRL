@@ -21,6 +21,18 @@ public class CcgEvaluation {
         return new Results(predicted.size(), numMatches, gold.size());
     }
 
+    /**
+     * Get the dependencies present in one but not the other.
+     * Interpretable as either the "false positives" that hurt precision of `one`
+     * or the "false negatives" that hurt the recall of `two`.
+     */
+    public static Set<ResolvedDependency> difference(final Set<ResolvedDependency> one, final Set<ResolvedDependency> two) {
+        Set<String> twoSet = two.stream().map(CcgEvaluation::dependencyToString).collect(Collectors.toSet());
+        Set<ResolvedDependency> extrasInOne =
+            one.stream().filter(dep -> !twoSet.contains(dependencyToString(dep))).collect(Collectors.toSet());
+        return extrasInOne;
+    }
+
     public static List<Results> evaluate(final List<Parse> parses, final Set<ResolvedDependency> gold) {
         Set<String> goldSet = gold.stream().map(CcgEvaluation::dependencyToString).collect(Collectors.toSet());
         return parses.stream().map(parse -> {
