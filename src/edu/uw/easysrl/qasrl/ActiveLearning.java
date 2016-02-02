@@ -21,7 +21,9 @@ public class ActiveLearning {
     // Reranker needs to be initialized after we parse all the sentences .. maybe not?
     RerankerExponentiated reranker;
 
-    private PriorityQueue<GroupedQuery> queryList;
+    // All queries.
+    private List<GroupedQuery> queryPool;
+    private PriorityQueue<GroupedQuery> queryQueue;
     private Map<Integer, List<Parse>> allParses;
     private Map<Integer, List<Results>> allResults;
     private Map<Integer, Integer> oracleParseIds;
@@ -51,14 +53,12 @@ public class ActiveLearning {
     int nBest = 50;
 
     // After a batch of queries, update query entropy and reorder them based on updated probabilities of parses.
-    final static int reorderQueriesEvery = -1   ;
+    final static int reorderQueriesEvery = 10;
 
     final static String modelFolder = "/Users/luheng/Workspace/EasySRL/model_tritrain_big/";
     final static List<Category> rootCategories =  Arrays.asList(
             Category.valueOf("S[dcl]"), Category.valueOf("S[wq]"), Category.valueOf("S[q]"),
             Category.valueOf("S[b]\\NP"), Category.valueOf("NP"));
-
-
 
     public static void main(String[] args) {
         ActiveLearning learner = new ActiveLearning();
@@ -67,9 +67,9 @@ public class ActiveLearning {
 
         int queryCounter = 0;
         while (learner.getNumberOfRemainingQueries() > 0) {
-            GroupedQuery query = learner.getNextQuery();
+            GroupedQuery query = learner.getNextQueryInQueue();
             Response response = responseSimulator.answerQuestion(query);
-            learner.responseToQuery(query, response);
+            learner.respondToQuery(query, response);
             if (queryCounter % 200 == 0) {
                 budgetCurve.put(queryCounter, learner.getRerankedF1());
             }
@@ -142,40 +142,52 @@ public class ActiveLearning {
 
         /****************** Initialize Query List ******************/
         reranker = new RerankerExponentiated(allParses, rerankerStepSize);
-        queryList = new PriorityQueue<>(queryComparator);
+        queryPool = new ArrayList<>();
+        queryQueue = new PriorityQueue<>(queryComparator);
         for (int sentIdx : allParses.keySet()) {
             List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
             List<Parse> parses = allParses.get(sentIdx);
             List<GroupedQuery> queries = QueryGenerator.generateQueries(sentIdx, words, parses, questionGenerator,
                     generatePseudoQuestions, groupSameLabelDependencies);
-            queries.forEach(query -> query.computeProbabilities(reranker.expScores.get(query.sentenceId)));
-            queryList.addAll(queries);
+            queries.forEach(query -> {
+                query.computeProbabilities(reranker.expScores.get(query.sentenceId));
+                query.setQueryId(queryPool.size());
+                queryPool.add(query);
+            });
         }
-        System.out.println("Total number of queries:\t" + queryList.size());;
+        queryQueue.addAll(queryPool);
+        System.out.println("Total number of queries:\t" + queryQueue.size());;
     }
 
-    public List<String> getSentence(int sentenceId) {
+    public List<String> getSentenceById(int sentenceId) {
         return sentences.get(sentenceId).stream().map(w -> w.word).collect(Collectors.toList());
     }
 
-    public GroupedQuery getNextQuery() {
-        return queryList.poll();
+    public GroupedQuery getQueryById(int queryId) {
+        if (queryId >= 0 && queryId < queryPool.size()) {
+            return queryPool.get(queryId);
+        }
+        return null;
     }
 
-    public void responseToQuery(GroupedQuery query, Response response) {
+    public GroupedQuery getNextQueryInQueue() {
+        return queryQueue.poll();
+    }
+
+    public void respondToQuery(GroupedQuery query, Response response) {
         reranker.rerank(query, response);
     }
 
     public void refreshQueryList() {
-        Collection<GroupedQuery> queryBuffer = new ArrayList<>(queryList);
+        Collection<GroupedQuery> queryBuffer = new ArrayList<>(queryQueue);
         queryBuffer.forEach(query -> query.computeProbabilities(reranker.expScores.get(query.sentenceId)));
-        queryList.clear();
-        queryList.addAll(queryBuffer);
-        System.out.println("Remaining number of queries:\t" + queryList.size());
+        queryQueue.clear();
+        queryQueue.addAll(queryBuffer);
+        System.out.println("Remaining number of queries:\t" + queryQueue.size());
     }
 
     public int getNumberOfRemainingQueries() {
-        return queryList.size();
+        return queryQueue.size();
     }
 
     public Results getRerankedF1() {

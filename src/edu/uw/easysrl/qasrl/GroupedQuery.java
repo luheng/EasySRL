@@ -12,7 +12,7 @@ import java.util.stream.IntStream;
  * Created by luheng on 1/21/16.
  */
 public class GroupedQuery {
-    class AnswerOption {
+    public class AnswerOption {
         ImmutableList<Integer> argumentIds;
         String answer;
         Set<Integer> parseIds;
@@ -24,12 +24,13 @@ public class GroupedQuery {
             this.parseIds = parseIds;
         }
 
+        public String getAnswer() { return answer; }
         public boolean isNAOption() {
             return argumentIds.get(0) == -1;
         }
     }
 
-    int sentenceId, totalNumParses;
+    int sentenceId, totalNumParses, queryId;
     final List<String> sentence;
     final List<Parse> parses;
     Set<Query> queries;
@@ -93,11 +94,6 @@ public class GroupedQuery {
         queries.add(query);
     }
 
-    @Deprecated
-    public void setUtility(double utility) {
-        // do nothing.
-    }
-
     public void collapse(int predicateIndex, Category category, int argumentNumber, String question,
                          final Map<ImmutableList<Integer>, Set<Integer>> answerToParses,
                          final Map<ImmutableList<Integer>, String> answerToSpans) {
@@ -115,6 +111,24 @@ public class GroupedQuery {
         });
         answerOptions.add(new AnswerOption(ImmutableList.of(-1), "N/A", allParseIds));
     }
+
+    public void setQueryId(int id) {
+        this.queryId = id;
+    }
+
+    public int getQueryId() {
+        return queryId;
+    }
+
+    public List<String> getSentence() {
+        return sentence;
+    }
+
+    public int getPredicateIndex() { return predicateIndex; }
+
+    public String getQuestion() { return question; }
+
+    public List<AnswerOption> getAnswerOptions() { return answerOptions; }
 
     public void computeProbabilities(double[] parseDist) {
         // Compute p(a|q).
@@ -190,4 +204,5 @@ public class GroupedQuery {
         return answerOptions.stream().sorted((ao1, ao2) -> Double.compare(-ao1.probability, -ao2.probability))
                 .limit(numOptions).collect(Collectors.toList());
     }
+
 }
