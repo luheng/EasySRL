@@ -95,7 +95,6 @@ public class ActiveLearningInteractive {
 
     public void run(boolean verbose) {
         aggregatedResults = new HashMap<>();
-
         Results oneBest = new Results();
         Results reRanked = new Results();
         Results oracle = new Results();
@@ -108,7 +107,6 @@ public class ActiveLearningInteractive {
 
         // For debugging.
         ResponseSimulatorGold goldHuman = new ResponseSimulatorGold(goldParses, questionGenerator);
-
         List<Integer> sentenceOrder = IntStream.range(0, sentences.size()).boxed().collect(Collectors.toList());
         if (shuffleSentences) {
             Collections.shuffle(sentenceOrder, new Random(randomSeed));

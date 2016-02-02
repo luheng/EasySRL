@@ -55,11 +55,12 @@ public class QueryGenerator {
                 int predicateId = entry.getRowKey();
                 int argNum = entry.getColumnKey();
                 Set<ResolvedDependency> dependencies = entry.getValue();
+
                 ResolvedDependency anyDependency = dependencies.iterator().next();
                 Category category = anyDependency.getCategory();
 
-                List<String> question = questionGenerator.generateQuestion(anyDependency, words, parse.categories,
-                        parse.dependencies);
+                ResolvedDependency dependency = dependencies.iterator().next();
+                List<String> question = questionGenerator.generateQuestion(dependency, words, parse);
                 if (!generatePseudoQuestions && (question == null || question.size() == 0)) {
                     continue;
                 }

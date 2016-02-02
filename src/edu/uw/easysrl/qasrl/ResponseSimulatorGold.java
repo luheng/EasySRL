@@ -37,8 +37,7 @@ public class ResponseSimulatorGold extends ResponseSimulator {
             if (dep.getHead() != query.predicateIndex) {
                 continue;
             }
-            List<String> goldQuestion = questionGenerator.generateQuestion(dep, sentence, goldParse.categories,
-                    goldParse.dependencies);
+            List<String> goldQuestion = questionGenerator.generateQuestion(dep, sentence, goldParse);
             String goldQuestionStr = (goldQuestion == null || goldQuestion.size() == 0) ? "-NOQ-" :
                     goldQuestion.stream().collect(Collectors.joining(" "));
             boolean questionMatch = query.question.equalsIgnoreCase(goldQuestionStr);

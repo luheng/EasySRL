@@ -3,11 +3,14 @@ package edu.uw.easysrl.qasrl;
 import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.syntax.grammar.Category.Slash;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeLeaf;
 
+
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.*;
 
 /**
  * Print answer spans ..
@@ -157,32 +160,15 @@ public class AnswerGenerator {
         while(curCandidate.isPresent() && curCandidate.get() != node) {
             lastCandidate = curCandidate;
             curCandidate = curCandidate.get().getChildren().stream().filter(child -> {
-                int childStart = child.getStartIndex();
-                int childEnd = child.getEndIndex();
-                return (childStart <= nodeStart) && (childEnd >= nodeEnd);
-            }).findFirst();
+                    int childStart = child.getStartIndex();
+                    int childEnd = child.getEndIndex();
+                    return (childStart <= nodeStart) && (childEnd >= nodeEnd);
+                }).findFirst();
         }
         return lastCandidate;
     }
 
-    public static Optional<SyntaxTreeNode> getLowestAncestorInstantiatingCategory(SyntaxTreeNode node,
-                                                                                  Category category,
-                                                                                  SyntaxTreeNode wholeTree) {
-        Optional<SyntaxTreeNode> curNode = Optional.of(node);
-        Optional<Category> curCat = curNode.map(n -> n.getCategory());
-        // it's important here that we do category.matches(...) because we're looking for the first thing
-        // that *is an instance* of the (more general) parameter category, i.e.,
-        // it might have features not specified in the parameter.
-        while(curNode.isPresent() && !category.matches(curCat.get())) {
-            curNode = AnswerGenerator.getParent(curNode.get(), wholeTree);
-            curCat = curNode.map(n -> n.getCategory());
-        }
-        return curNode;
-    }
-
-    public static Optional<SyntaxTreeNode> getLowestAncestorFunctionIntoCategory(SyntaxTreeNode node,
-                                                                                 Category category,
-                                                                                 SyntaxTreeNode wholeTree) {
+    public static Optional<SyntaxTreeNode> getLowestAncestorFunctionIntoCategory(SyntaxTreeNode node, Category category, SyntaxTreeNode wholeTree) {
         Optional<SyntaxTreeNode> curNode = Optional.of(node);
         Optional<Category> curCat = curNode.map(n -> n.getCategory());
         while(curNode.isPresent() && !curCat.get().isFunctionInto(category)) {
@@ -190,5 +176,106 @@ public class AnswerGenerator {
             curCat = curNode.map(SyntaxTreeNode::getCategory);
         }
         return curNode;
+    }
+
+    // Could be improved for PPs and such if necessary.
+    public static List<String> getRepresentativePhraseForUnrealized(Category category) {
+        List<String> result = new ArrayList<>();
+        result.add("something");
+        return result;
+    }
+
+    public static List<String> getRepresentativePhrase(int headIndex, Category neededCategory, Parse parse) {
+        return getRepresentativePhrase(headIndex, neededCategory, parse, Optional.empty());
+    }
+
+    public static List<String> getRepresentativePhrase(int headIndex, Category neededCategory, Parse parse, String replacementWord) {
+        return getRepresentativePhrase(headIndex, neededCategory, parse, Optional.of(replacementWord));
+    }
+
+    /**
+     * Constructs a phrase with the desired head and category label.
+     * takes an optional (by overloading---see above) argument asking for the head word to be replaced by something else.
+     *   the optional argument is used when stripping verbs of their tense. (maybe there's a less hacky way to deal with that...)
+     * TODO: does not handle coordination; we might want to include both args in the case of coordination.
+     * In particular this would be for the phrases inside questions: consider "What did something do between April 1991?"
+     */
+    public static List<String> getRepresentativePhrase(int headIndex, Category neededCategory, Parse parse, Optional<String> replacementWord) {
+        SyntaxTreeNode tree = parse.syntaxTree;
+        if(headIndex == -1) {
+            return getRepresentativePhraseForUnrealized(neededCategory);
+        }
+        SyntaxTreeNode headLeaf = tree.getLeaves().get(headIndex);
+        Optional<SyntaxTreeNode> nodeOpt = AnswerGenerator
+            .getLowestAncestorFunctionIntoCategory(headLeaf, neededCategory, tree);
+        if(!nodeOpt.isPresent()) {
+            // fall back to just the original leaf. this failure case is very rare.
+            List<String> result = new ArrayList<>();
+            result.addAll(getNodeWords(headLeaf));
+            return result;
+        }
+        // here we don't necessarily have the whole phrase. `node` is a function into the phrase.
+        // especially common is the case where we get a transitive verb and it doesn't bother including the object.
+        // so we need to populate the remaining spots by accessing the arguments of THIS guy,
+        // until he exactly matches the category we're looking for.
+        // using this method will capture and appropriately rearrange extracted arguments and such.
+
+        SyntaxTreeNode node = nodeOpt.get();
+        List<String> center = getNodeWords(node);
+        if(replacementWord.isPresent()) {
+            int indexInCenter = headIndex - node.getStartIndex();
+            center.set(indexInCenter, replacementWord.get());
+        }
+        List<String> left = new ArrayList<>();
+        List<String> right = new ArrayList<>();
+
+        // add arguments on either side until done, according to CCG category.
+        Category currentCategory = node.getCategory();
+        for(int currentArgNum = currentCategory.getNumberOfArguments();
+            currentArgNum > neededCategory.getNumberOfArguments();
+            currentArgNum--) {
+            Category argCat = currentCategory.getRight();
+            // recover arg index using the fact that we know the head leaf and the arg num.
+            Set<ResolvedDependency> deps = parse.dependencies;
+            int curArg = currentArgNum; // just so we can use it in the lambda below
+            Optional<ResolvedDependency> depOpt = deps.stream().filter(dep -> {
+                    return dep.getHead() == headIndex && dep.getArgNumber() == curArg;
+                }).findFirst();
+            int argIndex = depOpt.map(dep -> dep.getArgument()).orElse(-1);
+            List<String> argPhrase = getRepresentativePhrase(argIndex, argCat, parse);
+            // add the argument on the left or right side, depending on the slash
+            Slash slash = currentCategory.getSlash();
+            switch(slash) {
+            case FWD:
+                right = Stream.concat(right.stream(), argPhrase.stream()).collect(Collectors.toList());
+                break;
+            case BWD:
+                left = Stream.concat(argPhrase.stream(), left.stream()).collect(Collectors.toList());
+                break;
+            case EITHER:
+                System.err.println("Undirected slash appeared in supertagged data :(");
+                break;
+            }
+            // proceed to the next argument
+            currentCategory = currentCategory.getLeft();
+        }
+
+        List<String> result = new ArrayList<>();
+        result.addAll(left);
+        result.addAll(center);
+        result.addAll(right);
+        return result;
+    }
+
+    // helper method to make sure we decapitalize the first letter of the sentence
+    private static List<String> getNodeWords(SyntaxTreeNode node) {
+        List<String> words = node.getLeaves()
+            .stream()
+            .map(leaf -> leaf.getWord())
+            .collect(Collectors.toList());
+        if(node.getStartIndex() == 0) {
+            words.set(0, Character.toLowerCase(words.get(0).charAt(0)) + words.get(0).substring(1));
+        }
+        return words;
     }
 }

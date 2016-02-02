@@ -46,7 +46,6 @@ public class ActiveLearningReranker {
     final static int reorderQueriesEvery = 100;
 
     // TODO: if a parse already has low probability, it should provide very little weight when computing answer entropy.
-
     public static void main(String[] args) {
         EasySRL.CommandLineArguments commandLineOptions;
         try {
@@ -217,12 +216,12 @@ public class ActiveLearningReranker {
         Accuracy reRankedAcc = new Accuracy();
         Accuracy oracleAcc = new Accuracy();
         int avgBestK = 0, avgOracleK = 0;
-
         int numMultiHeadQueries = 0;
         int numMultiHeadQueriesGold = 0;
         int numTrulyEffectiveQueries = 0;
 
         TObjectIntHashMap<String> analysis = new TObjectIntHashMap<>();
+        CountDictionary missedCategories = new CountDictionary();
 
         for (int sentIdx : allParses.keySet()) {
             List<Parse> parses = allParses.get(sentIdx);
@@ -230,11 +229,8 @@ public class ActiveLearningReranker {
             Parse goldParse = goldParses.get(sentIdx);
             int bestK = reranker.getRerankedBest(sentIdx);
             int oracleK = oracleParseIds.get(sentIdx);
-
-            boolean bestIsOracle = (bestK == oracleK);
-            boolean oracleIsTop = (oracleK == 0);
-
-            analysis.adjustOrPutValue(String.format("BestIsOracle=%b, OracleIsTop=%b", bestIsOracle, oracleIsTop), 1, 1);
+            analysis.adjustOrPutValue(String.format("BestIsOracle=%b, OracleIsTop=%b", (bestK == oracleK),
+                    (oracleK == 0)), 1, 1);
 
             avgBestK += bestK;
             avgOracleK += oracleK;
@@ -246,31 +242,51 @@ public class ActiveLearningReranker {
             oracleAcc.add(CcgEvaluation.evaluateTags(parses.get(oracleK).categories, goldParse.categories));
             /*
             if (verbose) {
-                for (int i = 0; i < queryList.size(); i++) {
-                    GroupedQuery query = queryList.get(i);
-                    Response response = responseList.get(i);
-                    if (query.sentenceId != sentIdx) {
-                        continue;
+                Parse oracleParse = parses.get(oracleK);
+                Set<ResolvedDependency> oraclePrecisionMistakes =
+                    CcgEvaluation.difference(oracleParse.dependencies, goldParse.dependencies);
+                Set<ResolvedDependency> oracleRecallMistakes =
+                    CcgEvaluation.difference(goldParse.dependencies, oracleParse.dependencies);
+                // only print the extra info for ones where we could do better
+                // also, only print the mistakes that were corrected by the oracle
+                List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
+                DebugPrinter.printQueryListInfo(sentIdx, words, queryList, responseList);
+                // if(oracleK != bestK) {
+                    // what if the reranker gave us something worse?
+                    if(results.get(0).getF1() > results.get(bestK).getF1()) {
+                        System.out.println("====== Reranker produced worse result! ======");
                     }
-                    // FIXME
-                    for (int r : response.chosenOptions) {
-                        if (query.answerOptions.get(r).argumentIds.size() > 1) {
-                            numMultiHeadQueriesGold ++;
-                        }
-                        if (query.answerOptions.stream().anyMatch(ao -> ao.argumentIds.size() > 1)) {
-                            numMultiHeadQueries ++;
-                        }
-                        // Look at all the queries that voted for the oracle parse but not the 1-best.
-                        Set<Integer> voted = query.answerOptions.get(r).parseIds;
-                        if (!query.answerOptions.get(r).isNAOption() &&
-                                voted.contains(oracleK) && !voted.contains(0)) {
-                            List<String> words = sentences.get(sentIdx).stream().map(w -> w.word)
-                                    .collect(Collectors.toList());
-                            DebugPrinter.printQueryInfo(words, query, r, goldParse);
-                            numTrulyEffectiveQueries++;
-                        }
-                    }
-                }
+                    Map<String, Parse> parsesForStats = new TreeMap<String, Parse>();
+                    // print false positives and negatives for:
+                    parsesForStats.put("==== original best ====", parses.get(0));
+                    parsesForStats.put("==== reranked best ====", parses.get(bestK));
+                    parsesForStats.forEach((label, parse) -> {
+                            Set<ResolvedDependency> precisionMistakes =
+                                CcgEvaluation.difference(parse.dependencies, goldParse.dependencies);
+                            precisionMistakes.removeAll(oraclePrecisionMistakes);
+                            Set<ResolvedDependency> recallMistakes =
+                                CcgEvaluation.difference(goldParse.dependencies, parse.dependencies);
+                            recallMistakes.removeAll(oracleRecallMistakes);
+                            System.out.println(label);
+                            System.out.println("False positive dependencies:");
+                            for (ResolvedDependency dep : precisionMistakes) {
+                                System.out.println(String.format("\t%d:%s\t%s.%d\t%d:%s", dep.getHead(), words.get(dep.getHead()),
+                                                                 dep.getCategory(), dep.getArgNumber(),
+                                                                 dep.getArgument(), words.get(dep.getArgument())));
+                                if(label.contains("reranked")) {
+                                    missedCategories.addString(dep.getCategory().toString());
+                                }
+                            }
+                            System.out.println("False negative (missed) dependencies:");
+                            for (ResolvedDependency dep : recallMistakes) {
+                                System.out.println(String.format("\t%d:%s\t%s.%d\t%d:%s", dep.getHead(), words.get(dep.getHead()),
+                                                                 dep.getCategory(), dep.getArgNumber(),
+                                                                 dep.getArgument(), words.get(dep.getArgument())));
+                                if(label.contains("reranked")) {
+                                    missedCategories.addString(dep.getCategory().toString());
+                                }
+                            }
+                        });
             }
             */
         }
@@ -283,6 +299,15 @@ public class ActiveLearningReranker {
         System.out.println(numMultiHeadQueries + "\t" + queryList.size() + "\t" +
                 100.0 * numMultiHeadQueries / queryList.size());
         System.out.println("Number of truly effective queries:\t" + numTrulyEffectiveQueries);
+
+        System.out.println("Categories of the heads of mistakes:");
+        List<String> missedCats = missedCategories.getStrings()
+            .stream()
+            .sorted((c1, c2) -> Integer.compare(missedCategories.getCount(c1), missedCategories.getCount(c2)))
+            .collect(Collectors.toList());
+        for (String cat : missedCats) {
+            int catCount = missedCategories.getCount(cat);
+        }
 
         // Effect query: a query whose response boosts the score of a non-top parse but not the top one.
         int numSentencesParsed = allParses.size();
