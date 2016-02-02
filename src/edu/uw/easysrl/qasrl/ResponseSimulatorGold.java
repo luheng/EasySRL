@@ -53,8 +53,10 @@ public class ResponseSimulatorGold extends ResponseSimulator {
         for (int i = 0; i < query.answerOptions.size(); i++) {
             GroupedQuery.AnswerOption option = query.answerOptions.get(i);
             // If gold choose N/A option.
-            if (answerIndices.size() == 0 && option.argumentIds.get(0) == -1) {
-                response.add(i);
+            if (GroupedQuery.BadQuestionOption.class.isInstance(option)) {
+                if (answerIndices.size() == 0) {
+                    response.add(i);
+                }
             } else if (option.argumentIds.containsAll(answerIndices) && answerIndices.containsAll(option.argumentIds)) {
                 response.add(i);
             }

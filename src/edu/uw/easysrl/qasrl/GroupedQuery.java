@@ -13,10 +13,14 @@ import java.util.stream.IntStream;
  */
 public class GroupedQuery {
     public class AnswerOption {
-        ImmutableList<Integer> argumentIds;
-        String answer;
+        protected ImmutableList<Integer> argumentIds;
+        protected String answer;
         Set<Integer> parseIds;
         double probability;
+
+        AnswerOption(Set<Integer> parseIds) {
+            this.parseIds = parseIds;
+        }
 
         AnswerOption(ImmutableList<Integer> argumentIds, String answer, Set<Integer> parseIds) {
             this.argumentIds = argumentIds;
@@ -25,10 +29,37 @@ public class GroupedQuery {
         }
 
         public String getAnswer() { return answer; }
+
+        public ImmutableList<Integer> getArgumentIds() { return argumentIds; }
+
         public boolean isNAOption() {
-            return argumentIds.get(0) == -1;
+            return BadQuestionOption.class.isInstance(this) || NoAnswerOption.class.isInstance(this);
         }
     }
+
+    public class BadQuestionOption extends AnswerOption {
+        BadQuestionOption(Set<Integer> parseIds) {
+            super(parseIds);
+        }
+
+        public ImmutableList<Integer> getArgumentIds() { return null; }
+        public String getAnswer() { return "Question is not understandable."; }
+        public boolean isNAOption() {
+            return true;
+        }
+    }
+
+    public class NoAnswerOption extends AnswerOption {
+        NoAnswerOption(Set<Integer> parseIds) {
+            super(parseIds);
+        }
+        public ImmutableList<Integer> getArgumentIds() { return null; }
+        public String getAnswer() { return "Answer is not listed."; }
+        public boolean isNAOption() {
+            return true;
+        }
+    }
+
 
     int sentenceId, totalNumParses, queryId;
     final List<String> sentence;
@@ -109,7 +140,8 @@ public class GroupedQuery {
             answerOptions.add(new AnswerOption(argList, answerToSpans.get(argList), parseIds));
             allParseIds.removeAll(parseIds);
         });
-        answerOptions.add(new AnswerOption(ImmutableList.of(-1), "N/A", allParseIds));
+        answerOptions.add(new BadQuestionOption(allParseIds));
+        //answerOptions.add(new AnswerOption(ImmutableList.of(-1), "N/A", allParseIds));
     }
 
     public void setQueryId(int id) {
@@ -162,8 +194,9 @@ public class GroupedQuery {
         for (int i = 0; i < answerOptions.size(); i++) {
             AnswerOption ao = answerOptions.get(i);
             String match = (response.chosenOptions.contains(i) ? "*" : "");
-            String argIdsStr = ao.argumentIds.stream().map(String::valueOf).collect(Collectors.joining(","));
-            String argHeadsStr = ao.argumentIds.get(0) == -1 ? "N/A" :
+            String argIdsStr = ao.isNAOption() ? "_" :
+                    ao.argumentIds.stream().map(String::valueOf).collect(Collectors.joining(","));
+            String argHeadsStr = ao.isNAOption() ? "N/A" :
                     ao.argumentIds.stream().map(words::get).collect(Collectors.joining(","));
             String parseIdsStr = DebugPrinter.getShortListString(ao.parseIds);
             System.out.println(String.format("%.2f\t%s%d\t%s:%s\t%s\t%s", ao.probability, match, i, argIdsStr,

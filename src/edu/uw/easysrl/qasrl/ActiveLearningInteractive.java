@@ -142,7 +142,7 @@ public class ActiveLearningInteractive {
                 .collect(Collectors.toList());
 
         /******************* Response simulator ************/
-        RerankerSimple reranker = new RerankerSimple(allParses, allQueries);
+        Reranker reranker = new RerankerExponentiated(allParses, 1.0);
         List<GroupedQuery> asked = new ArrayList<>();
         List<Response> responses = new ArrayList<>();
         for (int i = 0; i < queryList.size(); i++) {

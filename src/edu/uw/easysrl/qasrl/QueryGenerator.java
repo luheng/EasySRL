@@ -13,7 +13,7 @@ import java.util.stream.Collectors;
 
 
 /**
- * QueryOld generator.
+ * Query generator.
  * Created by luheng on 1/17/16.
  */
 public class QueryGenerator {
@@ -67,9 +67,8 @@ public class QueryGenerator {
                         question.stream().collect(Collectors.joining(" "));
                 if (groupSameLabelDependencies) {
                     Set<Integer> answerIds = new HashSet<>();
-                    dependencies.stream().forEach(dep -> {
-                        answerIds.addAll(AnswerGenerator.getArgumentIdsForDependency(words, parse, dep));
-                    });
+                    dependencies.stream().forEach(dep ->
+                            answerIds.addAll(AnswerGenerator.getArgumentIdsForDependency(words, parse, dep)));
                     List<Integer> answerIdList = new ArrayList<>(answerIds);
                     Collections.sort(answerIdList);
                     Query query = new Query(predicateId, category, argNum, answerIdList, rankId, questionStr);
@@ -116,11 +115,9 @@ public class QueryGenerator {
             }
             questionToParses.get(query.question).add(query.parseId);
             answerToParses.get(argList).add(query.parseId);
-            // answerToSpan.put(argList, query.answer);
         });
 
-        // merge answer chosenOptions
-        // TODO: debug
+        // merge answer options
         double bestQuestionScore = -1.0;
         String bestQuestion = "";
         Query bestQuery = null;

@@ -35,8 +35,9 @@ public class WebUI extends AbstractHandler {
     @Override
     public void handle(final String target, final Request baseRequest, final HttpServletRequest request,
                        final HttpServletResponse httpResponse) throws IOException, ServletException {
-        final String[] userAnswerInfo = baseRequest.getParameter("UserAnswer").split("_");
-        if (!userAnswerInfo[0].equals("null")) {
+        final String userAnswer = baseRequest.getParameter("UserAnswer");
+        if (userAnswer != null) {
+            String[] userAnswerInfo = userAnswer.split("_");
             int queryId = Integer.parseInt(userAnswerInfo[1]);
             int optionId = Integer.parseInt(userAnswerInfo[3]);
             GroupedQuery query = activeLearning.getQueryById(queryId);
@@ -56,53 +57,53 @@ public class WebUI extends AbstractHandler {
     // @formatter:off
 
     private void update(final PrintWriter httpResponse) {
-        httpResponse.println(
-                "<html><head><title>Annotation Prototype</title></head><script src=\"https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js\"></script>\n"
-                + "<!-- Latest compiled and minified CSS -->\n"
-                + "<link rel=\"stylesheet\" href=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css\" integrity=\"sha512-dTfge/zgoMYpP7QbHy4gWMEGsbsdZeCXz7irItjcC3sPUFtf0kuFbDz/ixG7ArTxmDjLXDmezHubeNikyKGVyQ==\" crossorigin=\"anonymous\">\n"
-                + "\n"
-                + "<!-- Optional theme -->\n"
-                + "<link rel=\"stylesheet\" href=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap-theme.min.css\" integrity=\"sha384-aUGj/X2zp5rLCbBxumKTCw2Z50WgIr1vs/PFN4praOTvYXWlVyh2UtNUU0KAUhAX\" crossorigin=\"anonymous\">\n"
-                + "\n"
-                + "<!-- Latest compiled and minified JavaScript -->\n"
-                + "<script src=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js\" integrity=\"sha512-K1qjQ+NcF2TYO/eI3M6v8EiNYZfA95pQumfvcVrTHtwQVDG+aHRqLi/ETn2uB+1JqwYqVG3LIvdm9lj6imS/pQ==\" crossorigin=\"anonymous\"></script>"
-                + "<style> hr{display:block; height: 1px; border:0; border-top: 1px solid #000000; margin: 1em 50; padding: 0; } </style>"
-                + "<body style=\"padding:20\">");
+        httpResponse.println(WebUIHelper.printHTMLHeader());
 
-        httpResponse.println("<h1><font face=\"arial\">Annotation Demo</font></h1>");
-        httpResponse.println(WebUIHelper.printInstructions());
+        httpResponse.println("<body>");
+        httpResponse.println("<container>\n" + WebUIHelper.printInstructions() + "</container>\n");
+
+        httpResponse.println("<container>");
 
         // Get next query.
         GroupedQuery nextQuery = activeLearning.getNextQueryInQueue();
         // Print sentence
         final List<String> words = nextQuery.getSentence();
-        String sentenceStr = IntStream.range(0, words.size())
-                .mapToObj(i -> i == nextQuery.getPredicateIndex() ? "<mark>" + words.get(i) + "</mark>" : words.get(i))
-                .collect(Collectors.joining(" "));
-        httpResponse.println("<p>" + sentenceStr + "</p>");
-        httpResponse.println("<p>" + nextQuery.getQuestion() + "</p>");
+        httpResponse.println("<span class=\"label label-primary\">Sentence:</span>");
+        httpResponse.println("<p>" + WebUIHelper.getHighlightedSentenceString(words, nextQuery.getPredicateIndex()) + "</p>");
+        httpResponse.println("<span class=\"label label-primary\">Question:</span>");
+        httpResponse.println("<p>" + WebUIHelper.getQuestionString(nextQuery.getQuestion()) + "</p>");
 
-
+        httpResponse.println("<span class=\"label label-primary\">Answer Options:</span>");
         httpResponse.println("<br><form action=\"\" method=\"get\">");
-        final List<GroupedQuery.AnswerOption> options = nextQuery.getTopAnswerOptions(maxNumAnswerOptionsPerQuery);
+        final List<GroupedQuery.AnswerOption> options = nextQuery.getAnswerOptions();
+        String qLabel = "q_" + nextQuery.getQueryId();
+
+        int badQuestionOptionId = nextQuery.getAnswerOptions().size() - 1;
         for (int i = 0; i < options.size(); i++) {
             GroupedQuery.AnswerOption option = options.get(i);
             if (option.isNAOption()) {
                 continue;
             }
-            String optionValue = "q_" + nextQuery.getQueryId() + "_a_" + i;
+            String optionValue = qLabel + "_a_" + i;
             String optionString = option.getAnswer();
             httpResponse.println(
                     String.format("<label><input name=\"UserAnswer\" type=\"radio\" value=\"%s\" />%s</label><br/>",
                             optionValue, optionString));
         }
+        httpResponse.println(String.format(
+                "<label><input name=\"UserAnswer\" type=\"radio\" value=\"%s\"/>" +
+                "Question is not understandable.</label><br/>",
+                qLabel + "_a_" + badQuestionOptionId));
+        httpResponse.println(String.format(
+                "<label><input name=\"UserAnswer\" type=\"radio\" value=\"%s\"/>" +
+                "Question is understandable, but not answerable given information in the sentence.</label><br/>",
+                qLabel + "_a_" + badQuestionOptionId));
         httpResponse.println(
-                "<label><input name=\"UserAnswer\" type=\"radio\" value=\"bad_q\"/>" +
-                        "Question is not understandable.</label><br/>");
-        httpResponse.println(
-                "<label><input name=\"UserAnswer\" type=\"radio\" value=\"no_ans\"/>" +
-                        "Question is understandable, but not answerable given information in the sentence.</label><br/>");
-        httpResponse.println("<input type=\"submit\" value=\"Submit!\">" + "</form>");
+                "<button class=\"btn btn-primary\" type=\"button\" value=\"Submit!\">Submit!</button>" +
+                "</form>");
+
+        httpResponse.println("</container>\n");
+        httpResponse.println("</body>");
 
         System.out.println("--------");
 
