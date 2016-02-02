@@ -5,9 +5,10 @@ import edu.uw.easysrl.syntax.grammar.Category;
 import java.util.*;
 
 /**
+ * Experimental reranker. Not used now.
  * Created by luheng on 1/28/16.
  */
-public class RerankerDependencyFactored extends Reranker {
+public class RerankerDependencyFactored implements Reranker {
     // Dependency-factored scoring function for each sentence.
     final Map<Integer, List<Parse>> allParses;
     final Map<Integer, ScoreFunction> scoreFunctions;
@@ -16,8 +17,6 @@ public class RerankerDependencyFactored extends Reranker {
         this.allParses = allParses;
         this.scoreFunctions = new HashMap<>();
         allParses.forEach((sentIdx, parses) -> scoreFunctions.put(sentIdx, new ScoreFunction(parses)));
-        numQueries = 0;
-        numEffectiveQueries = 0;
     }
 
     public void rerank(final GroupedQuery query, final Response response) {
@@ -36,7 +35,6 @@ public class RerankerDependencyFactored extends Reranker {
         allArgIds.removeAll(chosenArgIds);
         allArgIds.forEach(argId -> scFun.update(predIdx, argId, category, argNum, -1.0));
         */
-        numQueries ++;
         // TODO: update effective query count
     }
 

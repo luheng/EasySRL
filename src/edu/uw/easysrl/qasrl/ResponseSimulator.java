@@ -1,7 +1,5 @@
 package edu.uw.easysrl.qasrl;
 
-import java.util.List;
-
 /**
  * Simulates user response to a query.
  * Created by luheng on 1/17/16.

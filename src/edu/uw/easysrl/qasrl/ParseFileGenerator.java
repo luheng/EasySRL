@@ -16,7 +16,6 @@ import java.util.*;
  * Created by luheng on 1/30/16.
  */
 public class ParseFileGenerator {
-
     static final int nBest = 50;
 
     public static void main(String[] args) {

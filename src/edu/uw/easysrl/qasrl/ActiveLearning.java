@@ -9,7 +9,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Separating ResponseSimulator and
+ * Separating ResponseSimulator and the other modules. Useful for Web Interface logic.
  * Created by luheng on 2/1/16.
  */
 public class ActiveLearning {

@@ -60,7 +60,6 @@ public class ResponseSimulatorGold extends ResponseSimulator {
                 response.add(i);
             }
         }
-        // System.out.println("[gold]:\t" + answerIndices.stream().map(String::valueOf).collect(Collectors.joining(",")));
         return response;
     }
 }
