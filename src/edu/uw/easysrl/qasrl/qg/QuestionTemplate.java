@@ -23,59 +23,83 @@ import java.util.*;
  */
 public class QuestionTemplate {
 
-    private static final Category[] nounAdjuncts = {
-        Category.valueOf("N|N"),
-        Category.valueOf("NP|NP"),
-    };
+    public enum QuestionType {
+        VERB (
+                    Category.valueOf("S\\NP") // intransitives
+                    ,Category.valueOf("(S\\NP)/NP") // transitives
+                 /* ,Category.valueOf("(S\\NP)/PP")
+                    ,Category.valueOf("((S\\NP)/NP)/PR")
+                    ,Category.valueOf("((S\\NP)/PP)/PR")
+                    // T1 said (that) T2
+                    ,Category.valueOf("(S[dcl]\\NP)/S")
+                    // T1, T2 said, or T1, said T2
+                    ,Category.valueOf("(S[dcl]\\S[dcl])|NP")
+                    // T1 agreed to do T2
+                    ,Category.valueOf("(S\\NP)/(S[to]\\NP)")
+                    // T1 stopped using T2
+                    ,Category.valueOf("(S\\NP)/(S[ng]\\NP)")
+                    // T1 made T3 T2; ditransitives
+                    ,Category.valueOf("((S\\NP)/NP)/NP")
+                    // T1 gave T3 to T2
+                    ,Category.valueOf("((S\\NP)/PP)/NP")
+                    // T1 promised T3 to do T2
+                    ,Category.valueOf("((S\\NP)/(S[to]\\NP))/NP") // Category.valueOf("((S[dcl]\\NP)/(S[to]\\NP))/NP")
+                 */
+            ),
+        ADJECTIVE_ADJUNCT(
+                    Category.valueOf("((S[adj]\\NP)\\(S[adj]\\NP))/NP")
+            ),
+        NOUN_ADJUNCT(
+                    Category.valueOf("(NP\\NP)/NP")
+                    // ,Category.valueOf("N|N"),
+            ),
+        // right now we're assuming the second arg of a verb adjunct is always the main verb.
+        VERB_ADJUNCT(
+                    Category.valueOf("((S\\NP)\\(S\\NP))/NP")
+                 /* ,Category.valueOf("(S\\NP)\\(S\\NP)")
+                    ,Category.valueOf("((S\\NP)\\(S\\NP))/S")
+                    ,Category.valueOf("((S\\NP)\\(S\\NP))/(S[ng]\\NP)") // ``by'' as in ``by doing something''.
+                    ,Category.valueOf("((S\NP)\(S\NP))/PP") // according (to): 
+                    ,Category.valueOf("((S\NP)\(S\NP))/PP") // down (from): 
+                 */
+            ),
+        CLAUSE_ADJUNCT(
+                // Category.valueOf("S|S"),
+                    ),
+        RELATIVIZER(
+                // Category.valueOf("(NP\\NP)/(S[dcl]\\NP)"),
+            ),
+        INVALID();
 
-    private static final Category[] verbAdjuncts = {
-        Category.valueOf("(S\\NP)\\(S\\NP)"),
-        Category.valueOf("((S\\NP)\\(S\\NP))/S"),
-        Category.valueOf("((S\\NP)\\(S\\NP))/(S[ng]\\NP)"), // ``by'' as in ``by doing something''.
-    };
+        public final Category[] categories;
+        QuestionType(Category... categories) {
+            this.categories = categories;
+        }
 
-    private static final Category[] clauseAdjuncts = {
-        Category.valueOf("S|S"),
-    };
+        public boolean admits(Category category) {
+            for (Category c : categories) {
+                if (c.matches(category)) {
+                    return true;
+                }
+            }
+            return false;
+        }
 
-    private static final Category somethingVerbal = Category.valueOf("S|NP");
-    private static final Category intransitiveVerb = Category.valueOf("S\\NP");
+        public static QuestionType getTypeFor(Category category) {
+            for(QuestionType type : QuestionType.values()) {
+                if(type.admits(category)) return type;
+            }
+            return INVALID;
+        }
 
-    private static final Category[] transitiveVerbs = {
-        Category.valueOf("(S\\NP)/NP"),
-        Category.valueOf("(S\\NP)/PP"),
-        Category.valueOf("((S\\NP)/NP)/PR"),
-        Category.valueOf("((S\\NP)/PP)/PR"),
-        // T1 said (that) T2
-        Category.valueOf("(S[dcl]\\NP)/S"),
-        // T1, T2 said, or T1, said T2
-        Category.valueOf("(S[dcl]\\S[dcl])|NP"),
-        // T1 agreed to do T2
-        Category.valueOf("(S\\NP)/(S[to]\\NP)"),
-        // T1 stopped using T2
-        Category.valueOf("(S\\NP)/(S[ng]\\NP)"),
-    };
 
-    private static final Category[] ditransitiveVerbs = {
-        // T1 made T3 T2
-        Category.valueOf("((S\\NP)/NP)/NP"),
-        // T1 gave T3 to T2
-        Category.valueOf("((S\\NP)/PP)/NP"),
-        // T1 promised T3 to do T2
-        Category.valueOf("((S\\NP)/(S[to]\\NP))/NP"), // Category.valueOf("((S[dcl]\\NP)/(S[to]\\NP))/NP")
-    };
-
-    // TODO: special cases:
-    // according (to): ((S\NP)\(S\NP))/PP
-    // down (from): ((S\NP)\(S\NP))/PP
-    // Possible questions: What is the case, according to someone? What is down from something?
-    // What is something according to? What something down from?
+    }
 
     // Categories to skip ..
     // private static final Category auxiliaries = Category.valueOf("(S[dcl]\\NP)/(S[b]\\NP)");
-    //private static final Category controlParticles = Category.valueOf("(S[to]\\NP)/(S[b]\\NP)");
-    private static final Category controlParticles = Category.valueOf("(S\\NP)/(S[b]\\NP)");
-    private static final Category pastParticiples = Category.valueOf("(S[dcl]\\NP)/(S[pt]\\NP)");
+    // private static final Category controlParticles = Category.valueOf("(S[to]\\NP)/(S[b]\\NP)");
+    // private static final Category controlParticles = Category.valueOf("(S\\NP)/(S[b]\\NP)");
+    // private static final Category pastParticiples = Category.valueOf("(S[dcl]\\NP)/(S[pt]\\NP)");
 
     private static final String[] otherFilteredCategories = new String[] {
         "(S/S)/NP",
@@ -94,28 +118,12 @@ public class QuestionTemplate {
         "(((S\\NP)\\(S\\NP))\\((S\\NP)\\(S\\NP)))/(((S\\NP)\\(S\\NP))\\((S\\NP)\\(S\\NP)))",
     };
 
-    private static final Set<String> otherFilteredCategorySet;
-    static {
-        otherFilteredCategorySet = new HashSet<>();
-        Collections.addAll(otherFilteredCategorySet, otherFilteredCategories);
-    }
-
-    private static boolean belongsTo(Category category, Category[] categoryList) {
-        for (Category c : categoryList) {
-            if (category.isFunctionInto(c)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
 
     public Parse parse;
     public List<String> words;
     public List<Category> categories;
     public SyntaxTreeNode tree;
 
-    public List<Integer> auxiliaries;
     public int predicateIndex;
     public Category predicateCategory;
 
@@ -130,7 +138,6 @@ public class QuestionTemplate {
         this.categories = parse.categories;
         this.predicateIndex = predicateIndex;
         this.predicateCategory = categories.get(predicateIndex);
-        this.auxiliaries = verbHelper.getAuxiliaryChain(words, categories, predicateIndex);
         this.parse = parse;
         this.tree = parse.syntaxTree;
         this.verbHelper = verbHelper;
@@ -147,6 +154,9 @@ public class QuestionTemplate {
             if(!argIndices.containsKey(i)) argIndices.put(i, -1);
             argCategories.put(i, predicateCategory.getArgument(i));
         }
+
+        this.type = QuestionType.getTypeFor(predicateCategory);
+
         /*
         // TODO: maybe we should use the identified PP? Add later.
         String ppStr = argumentCategory.isFunctionInto(Category.PP) ?
@@ -160,62 +170,6 @@ public class QuestionTemplate {
             return new QuestionTemplate(pred, slots, tree, words, categories, verbHelper);
         }
         */
-
-        this.type = QuestionType.INVALID;
-        if (numArguments == 0) {
-            type = QuestionType.INVALID;
-        } else if(Category.valueOf("(NP\\NP)/NP").matches(predicateCategory)) {
-            type = QuestionType.NOUN_ADJUNCT;
-        } else if(Category.valueOf("((S\\NP)\\(S\\NP))/NP").matches(predicateCategory)) {
-            if(Category.valueOf("((S[adj]\\NP)\\(S[adj]\\NP))/NP").matches(predicateCategory)) {
-                type = QuestionType.ADJECTIVE_ADJUNCT;
-            } else {
-                type = QuestionType.VERB_ADJUNCT;
-            }
-        } else if(Category.valueOf("(S\\NP)/NP").matches(predicateCategory)) {
-            type = QuestionType.VERB;
-        } else if(Category.valueOf("(NP\\NP)/(S[dcl]\\NP)").matches(predicateCategory)) {
-            type = QuestionType.INVALID;
-            // type = QuestionType.RELATIVIZER;
-        }
-
-        /*
-        // here is the logic that used to be in filterPredicate
-        String word = words.get(predicateIndex);
-        // adjuncts first: because last applied arg of an adjunct is really just an arg of its arg
-        // for example, (S\NP)\(S\NP) reads as a verb because it's a function into (S\NP)
-        if (belongsTo(predicateCategory, nounAdjuncts)) {
-            type = QuestionType.NOUN_ADJUNCT;
-        } else if (belongsTo(predicateCategory, verbAdjuncts)) {
-            type = QuestionType.VERB_ADJUNCT;
-        } else if (belongsTo(predicateCategory, clauseAdjuncts)) {
-            type = QuestionType.INVALID;
-        } else if (VerbHelper.isCopulaVerb(word)) {
-            type = QuestionType.INVALID;
-        } else if (!verbHelper.hasInflectedForms(word) && !predicateCategory.equals(Category.valueOf("(S[adj]\\NP)/(S[to]\\NP)"))  ) {
-            type = QuestionType.INVALID;
-        } else if (predicateCategory.isFunctionInto(intransitiveVerb) ||
-                   belongsTo(predicateCategory, transitiveVerbs) ||
-                   belongsTo(predicateCategory, ditransitiveVerbs)) {
-            type = QuestionType.VERB;
-        } else if (predicateCategory.isFunctionInto(prepositions) ||
-            predicateCategory.isFunctionInto(auxiliaries) ||
-            predicateCategory.isFunctionInto(controlParticles) ||
-            predicateCategory.isFunctionInto(pastParticiples) ||
-            otherFilteredCategorySet.contains(predicateCategory.toString())) {
-            // System.out.println("skipping because in other filtered list");
-            type = QuestionType.INVALID;
-        } else {
-            type = QuestionType.INVALID;
-        }
-        */
-    }
-
-    public enum QuestionType {
-        VERB,
-        ADJECTIVE_ADJUNCT, NOUN_ADJUNCT, VERB_ADJUNCT,
-        RELATIVIZER,
-        INVALID
     }
 
     private boolean cantAskQuestion(int targetArgNum) {
@@ -229,6 +183,8 @@ public class QuestionTemplate {
              argIndices.values().stream()
              .filter(index -> index >= 0)
              .anyMatch(index -> verbHelper.isCopulaVerb(words.get(index)))) || // adverbs of copulas are wonky and not helpful
+            (type == QuestionType.VERB_ADJUNCT &&
+             argCategories.get(targetArgNum).isFunctionInto(Category.valueOf("S[pss]"))) || // I haven't been able to figure out how to ask for passive verbs
             (type == QuestionType.ADJECTIVE_ADJUNCT &&
              targetArgNum == 2) || // "full of promise" -> "something was _ of promise; what's _?" --- can't really ask it.
             categories.get(argIndex.get()).matches(Category.valueOf("PR")) // don't ask about a particle
@@ -243,16 +199,53 @@ public class QuestionTemplate {
      *                       associated with what's being asked about in the question
      * @return a question asking for the targetArgNum'th argument of template's predicate
      */
-    public List<String> instantiateForArgument(int targetArgNum) {
-        List<String> question = new ArrayList<>();
+    public QuestionAnswerPair instantiateForArgument(int targetArgNum) {
+        List<String> questionWords = new ArrayList<>();
+        List<String> answerWords = new ArrayList<>();
         if (cantAskQuestion(targetArgNum)) {
-            return question;
+            return new QuestionAnswerPair(questionWords, answerWords);
         }
-        // add arguments on either side until done, according to CCG category.
-        // split the PRED if the target was not the last argument added to the left.
+
+        String wh = getWhWordByArgNum(targetArgNum);
+        List<String> auxiliaries = new ArrayList<>();
+        // we need the verb of the clause our predicate appears in,
+        // which we will use to determine the auxiliaries we'll be using
+        int verbIndex = -1;
+        if(type == QuestionType.VERB) {
+            verbIndex = predicateIndex;
+        } else if(type == QuestionType.VERB_ADJUNCT) {
+            verbIndex = argIndices.get(2);
+        }
+        // for now, this seems to be a sufficient criterion...
+        boolean shouldSplitVerb = targetArgNum != 1 || argIndices.get(targetArgNum) == verbIndex;
+
+        String predStr;
+        // but if there is no verb, we just put "would be" in there. This works for NP adjuncts.
+        if(verbIndex < 0) {
+            auxiliaries.add("would");
+            predStr = "be " + words.get(predicateIndex);
+        } else {
+            // let's just go ahead and put the auxiliaries in place now rather than waiting.
+            if(shouldSplitVerb) {
+                List<String> splitVerb = getSplitVerbAtIndex(verbIndex);
+                auxiliaries.add(splitVerb.get(0));
+                if(verbIndex == predicateIndex) {
+                    List<String> splitPred = getSplitVerbAtIndex(predicateIndex);
+                    predStr = splitPred.get(1);
+                } else {
+                    predStr = words.get(predicateIndex);
+                }
+            } else if(verbIndex == predicateIndex) {
+                String unsplitPred = getUnsplitVerbAtIndex(predicateIndex);
+                predStr = unsplitPred;
+            } else {
+                predStr = words.get(predicateIndex);
+            }
+        }
+
+        // Add arguments on either side until done, according to CCG category.
         List<String> left = new ArrayList<>();
         List<String> right = new ArrayList<>();
-        boolean isTargetLastAddedToLeft = false;
         Category currentCategory = predicateCategory;
         for(int currentArgNum = predicateCategory.getNumberOfArguments(); currentArgNum > 0; currentArgNum--) {
             // get the surface form of the argument in question
@@ -261,9 +254,20 @@ public class QuestionTemplate {
             if(addingTarget) {
                 argWords = getTargetPlaceholderWords(currentArgNum);
             } else {
+                // this is complicated... consider simplifying.
                 int argIndex = argIndices.get(currentArgNum);
                 Category argCategory = argCategories.get(currentArgNum);
-                argWords = getRepresentativePhrase(argIndex, argCategory);
+                if(argIndex == -1 || argIndex != verbIndex) {
+                    argWords = AnswerGenerator.getRepresentativePhrase(argIndex, argCategory, parse);
+                } else {
+                    if(shouldSplitVerb) {
+                        List<String> splitArg = getSplitVerbAtIndex(argIndex);
+                        argWords = AnswerGenerator.getRepresentativePhrase(argIndex, argCategory, parse, splitArg.get(1));
+                    } else {
+                        String unsplitArg = getUnsplitVerbAtIndex(argIndex);
+                        argWords = AnswerGenerator.getRepresentativePhrase(argIndex, argCategory, parse, unsplitArg);
+                    }
+                }
             }
 
             // add the argument on the left or right side, depending on the slash
@@ -275,10 +279,10 @@ public class QuestionTemplate {
             case BWD:
                 argWords.addAll(left);
                 left = argWords;
-                isTargetLastAddedToLeft = addingTarget;
                 break;
             case EITHER:
                 System.err.println("Undirected slash appeared in supertagged data :(");
+                right.addAll(argWords);
                 break;
             }
 
@@ -286,24 +290,17 @@ public class QuestionTemplate {
             currentCategory = currentCategory.getLeft();
         }
 
-        String wh = getWhWordByArgNum(targetArgNum);
+        List<String> question = new ArrayList<>();
         question.add(wh);
-
-        // split the predicate or don't, depending:
-        if(!isTargetLastAddedToLeft || type == QuestionType.NOUN_ADJUNCT) {
-            List<String> splitPred = getSplitPred();
-            question.add(splitPred.get(0));
-            question.addAll(left);
-            question.add(splitPred.get(1));
-        } else {
-            question.addAll(left);
-            question.addAll(getUnsplitPred());
-        }
-
+        question.addAll(auxiliaries);
+        question.addAll(left);
+        question.add(predStr);
         question.addAll(right);
-        return question.stream()
+        questionWords = question.stream()
             .filter(s -> s != null && !s.isEmpty()) // to mitigate oversights. harmless anyway
             .collect(Collectors.toList());
+        answerWords = AnswerGenerator.getRepresentativePhrase(argIndices.get(targetArgNum), argCategories.get(targetArgNum), parse);
+        return new QuestionAnswerPair(questionWords, answerWords);
     }
 
     /**
@@ -337,108 +334,38 @@ public class QuestionTemplate {
         return result;
     }
 
-    private List<String> getRepresentativePhraseForUnrealized(Category category) {
-        List<String> result = new ArrayList<>();
-        result.add("something");
-        return result;
-    }
-
-    /**
-     * Constructs a phrase with the desired head and category label.
-     */
-    private List<String> getRepresentativePhrase(int headIndex, Category neededCategory) {
-        if(headIndex == -1) {
-            return getRepresentativePhraseForUnrealized(neededCategory);
-        }
-        SyntaxTreeNode headLeaf = tree.getLeaves().get(headIndex);
-        Optional<SyntaxTreeNode> nodeOpt = AnswerGenerator
-            .getLowestAncestorFunctionIntoCategory(headLeaf, neededCategory, tree);
-        if(!nodeOpt.isPresent()) {
-            // fall back to just the original leaf. this failure case is very rare.
-            List<String> result = new ArrayList<>();
-            result.add(headLeaf.getWord());
-            return result;
-        }
-        // here we don't necessarily have the whole phrase. `node` is a function into the phrase.
-        // especially common is the case where we get a transitive verb and it doesn't bother including the object.
-        // so we need to populate the remaining spots by accessing the arguments of THIS guy,
-        // until he exactly matches the category we're looking for.
-        // using this method will capture and appropriately rearrange extracted arguments and such.
-
-        SyntaxTreeNode node = nodeOpt.get();
-        String center = node.getWord();
-        List<String> left = new ArrayList<>();
-        List<String> right = new ArrayList<>();
-
-        // add arguments on either side until done, according to CCG category.
-        Category currentCategory = node.getCategory();
-        for(int currentArgNum = currentCategory.getNumberOfArguments();
-            currentArgNum > neededCategory.getNumberOfArguments();
-            currentArgNum--) {
-            Category argCat = currentCategory.getRight();
-            // recover arg index using the fact that we know the head leaf and the arg num.
-            Set<ResolvedDependency> deps = parse.dependencies;
-            int curArg = currentArgNum; // just so we can use it in the lambda below
-            Optional<ResolvedDependency> depOpt = deps.stream().filter(dep -> {
-                    return dep.getHead() == headIndex && dep.getArgNumber() == curArg;
-                }).findFirst();
-            int argIndex = depOpt.map(dep -> dep.getArgument()).orElse(-1);
-            List<String> argPhrase = getRepresentativePhrase(argIndex, argCat);
-            // add the argument on the left or right side, depending on the slash
-            Slash slash = currentCategory.getSlash();
-            switch(slash) {
-            case FWD:
-                right = Stream.concat(right.stream(), argPhrase.stream()).collect(Collectors.toList());
-                break;
-            case BWD:
-                left = Stream.concat(argPhrase.stream(), left.stream()).collect(Collectors.toList());
-                break;
-            case EITHER:
-                System.err.println("Undirected slash appeared in supertagged data :(");
-                break;
-            }
-            // proceed to the next argument
-            currentCategory = currentCategory.getLeft();
-        }
-
-        List<String> result = new ArrayList<>();
-        result.addAll(left);
-        result.add(center);
-        result.addAll(right);
-        return result;
-    }
-
     /**
      * Create the pred as it should be realized in a question, possibly with a modal.
      * We try to keep in in the tense/aspect/voice/etc. of the clause it appeared in.
      * @return a 2-element array of { "modal", "verb" } where modal may be empty
      */
-    public List<String> getUnsplitPred() {
-        String predStr = words.get(predicateIndex);
-        if(type == QuestionType.VERB) {
-            // If we have the infinitive such as "to allow", change it to would allow.
-            //if (predicateCategory.isFunctionInto(Category.valueOf("S[b]\\NP"))) {
-            // TODO more robust might be to do it based on clause type S[to]
-            if (auxiliaries.size() > 0 && words.get(auxiliaries.get(0)).equalsIgnoreCase("to")) {
-                return Arrays.asList(new String[]{ "would", predStr });
+    public String getUnsplitVerbAtIndex(int index) {
+        String verbStr = words.get(index);
+        Category verbCategory = categories.get(index);
+        List<Integer> auxiliaries = verbHelper.getAuxiliaryChain(words, categories, index);
+        // If we have the infinitive such as "to allow", change it to would allow.
+        //if (predicateCategory.isFunctionInto(Category.valueOf("S[b]\\NP"))) {
+        // TODO more robust might be to do it based on clause type S[to]
+        if (auxiliaries.size() > 0 && words.get(auxiliaries.get(0)).equalsIgnoreCase("to")) {
+            return "would " + verbStr;
+        }
+        // If the verb has its own set of auxiliaries, return those as is.
+        if (auxiliaries.size() > 0) {
+            String aux = "";
+            for (int id : auxiliaries) {
+                aux += words.get(id) + " ";
             }
-
-            // If the verb has its own set of auxiliaries, return those as is.
-            if (auxiliaries.size() > 0) {
-                String aux = "";
-                for (int id : auxiliaries) {
-                    aux += words.get(id) + " ";
-                }
-                return Arrays.asList(new String[] { aux.trim(), predStr });
-            }
-            if (predicateCategory.isFunctionInto(Category.valueOf("S[adj]\\NP")) ||
-                predicateCategory.isFunctionInto(Category.valueOf("S[pss]\\NP")) ||
-                predicateCategory.isFunctionInto(Category.valueOf("S[ng]\\NP"))) {
-                return Arrays.asList(new String[] { "would be", predStr });
-            }
-            if (verbHelper.isUninflected(words, categories, predicateIndex)) {
-                return Arrays.asList(new String[] { "would", predStr });
-            }
+            return aux.trim() + " " + verbStr;
+        }
+        if (verbCategory.isFunctionInto(Category.valueOf("S[adj]\\NP")) ||
+            verbCategory.isFunctionInto(Category.valueOf("S[pss]\\NP")) ||
+            verbCategory.isFunctionInto(Category.valueOf("S[ng]\\NP"))) {
+            return "would be " + verbStr;
+        }
+        if (verbHelper.isUninflected(words, categories, index)) {
+            return "would " + verbStr;
+        }
+            /*
         } else if (type == QuestionType.NOUN_ADJUNCT) {
             return Arrays.asList(new String[] { predStr });
         } else if (type == QuestionType.VERB_ADJUNCT) {
@@ -447,7 +374,8 @@ public class QuestionTemplate {
             System.err.println("Not trying to split the pred for an adjunct of an adjective. Shouldn't happen.");
             return Arrays.asList(new String[] { predStr });
         }
-        return Arrays.asList(new String[] { "", predStr });
+            */
+        return verbStr;
     }
 
     /**
@@ -457,47 +385,49 @@ public class QuestionTemplate {
      * TODO is the below description correct?
      * @return a 2-element array of { "aux", "pred" }
      */
-    public List<String> getSplitPred() {
-        String predStr = words.get(predicateIndex);
+    public List<String> getSplitVerbAtIndex(int index) {
+        String verbStr = words.get(index);
+        Category verbCategory = categories.get(index);
+        List<Integer> auxiliaries = verbHelper.getAuxiliaryChain(words, categories, index);
         String[] result = new String[2];
-        if (type == QuestionType.VERB) {
-            if (auxiliaries.size() == 0 ) {
-                if (predicateCategory.isFunctionInto(Category.valueOf("S[adj]\\NP")) || // predicative adjectives
-                    predicateCategory.isFunctionInto(Category.valueOf("S[pss]\\NP")) || // passive verbs
-                    predicateCategory.isFunctionInto(Category.valueOf("S[ng]\\NP"))) { // progressive verbs
-                    return Arrays.asList(new String[] { "was", predStr });
-                } else if (verbHelper.isCopulaVerb(words.get(predicateIndex))) {
-                    return Arrays.asList(new String[] { predStr, "" });
-                } else {
-                    result = verbHelper.getAuxiliaryAndVerbStrings(words, categories, predicateIndex).orElse(new String [] { "", predStr });
-                }
+        if (auxiliaries.size() == 0 ) {
+            if (verbCategory.isFunctionInto(Category.valueOf("S[adj]\\NP")) || // predicative adjectives
+                verbCategory.isFunctionInto(Category.valueOf("S[pss]\\NP")) || // passive verbs
+                verbCategory.isFunctionInto(Category.valueOf("S[ng]\\NP"))) { // progressive verbs
+                return Arrays.asList(new String[] { "was", verbStr });
+            } else if (verbHelper.isCopulaVerb(words.get(index))) {
+                return Arrays.asList(new String[] { verbStr, "" });
             } else {
-                String[] r = (String[]) getUnsplitPred().toArray();
-                String[] rw = (r[0] + " " + r[1]).split("\\s+");
-                result = new String[] { rw[0], "" };
-                // i.e. What {does n't} someone say ?
-                //      What {is n't} someone going to say ?
-                if (rw.length > 1 && VerbHelper.isNegationWord(rw[1])) {
-                    result[0] += " " + rw[1];
-                    for (int i = 2; i < rw.length; i++) {
-                        result[1] += (i > 2 ? " " : "") + rw[i];
-                    }
-                }
-                // i.e. What {is} someone going to say?
-                else {
-                    for (int i = 1; i < rw.length; i++) {
-                        result[1] += (i > 1 ? " " : "") + rw[i];
-                    }
+                result = verbHelper.getAuxiliaryAndVerbStrings(words, categories, index).orElse(new String [] { "", verbStr });
+            }
+        } else {
+            String[] rw = getUnsplitVerbAtIndex(index).split("\\s+");
+            result = new String[] { rw[0], "" };
+            // i.e. What {does n't} someone say ?
+            //      What {is n't} someone going to say ?
+            if (rw.length > 1 && VerbHelper.isNegationWord(rw[1])) {
+                result[0] += " " + rw[1];
+                for (int i = 2; i < rw.length; i++) {
+                    result[1] += (i > 2 ? " " : "") + rw[i];
                 }
             }
+            // i.e. What {is} someone going to say?
+            else {
+                for (int i = 1; i < rw.length; i++) {
+                    result[1] += (i > 1 ? " " : "") + rw[i];
+                }
+            }
+        }
             // TODO: get information about the clause to use in other cases
+            /*
         } else if (type == QuestionType.NOUN_ADJUNCT) {
-            return Arrays.asList(new String[] { "was", predStr });
+            return Arrays.asList(new String[] { "would", "be " + predStr });
         } else if (type == QuestionType.VERB_ADJUNCT) {
             return Arrays.asList(new String[] { "did", predStr });
         } else if (type == QuestionType.ADJECTIVE_ADJUNCT) {
             return Arrays.asList(new String[] { "was", predStr });
         }
+            */
         return Arrays.asList(result);
     }
 

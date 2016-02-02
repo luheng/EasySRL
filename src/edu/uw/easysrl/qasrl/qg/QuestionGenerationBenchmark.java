@@ -91,7 +91,8 @@ public class QuestionGenerationBenchmark {
                     uncoveredDeps.addString(ccgDep.getCategory().toString());
                     continue;
                 }
-                List<String> question = template.instantiateForArgument(ccgDep.getArgNumber());
+                QuestionAnswerPair qaPair = template.instantiateForArgument(ccgDep.getArgNumber());
+                List<String> question = qaPair.questionWords;
                 if (question.size() == 0) {
                     continue;
                 }

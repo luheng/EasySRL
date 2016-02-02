@@ -40,7 +40,13 @@ public class QuestionGenerator {
         if (template == null) {
             return null;
         }
-        return template.instantiateForArgument(targetDependency.getArgNumber());
+        QuestionAnswerPair qaPair = template.instantiateForArgument(targetDependency.getArgNumber());
+        List<String> result = new ArrayList<String>();
+        String question = qaPair.renderQuestion();
+        if(!question.isEmpty()) {
+            result.add(question);
+        }
+        return result;
     }
 
 }
