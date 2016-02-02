@@ -41,12 +41,11 @@ public class ActiveLearningReranker {
     double rerankerStepSize = 0.5;
     // The file contains the pre-parsed n-best list (of CCGBank dev). Leave file name is empty, if we wish to parse
     // sentences in the experiment.
-    final static String preparsedFile = "parses.10best.out";
+    final static String preparsedFile = "parses.50best.out";
     // After a batch of queries, update query entropy and reorder them based on updated probabilities of parses.
     final static int reorderQueriesEvery = 100;
 
     // TODO: if a parse already has low probability, it should provide very little weight when computing answer entropy.
-
     public static void main(String[] args) {
         EasySRL.CommandLineArguments commandLineOptions;
         try {
@@ -66,7 +65,7 @@ public class ActiveLearningReranker {
 
         /************** manual parameter tuning ... ***********/
         //final int[] nBestList = new int[] { 3, 5, 10, 20, 50, 100, 250, 500, 1000 };
-        final int[] nBestList = new int[] { 10 };
+        final int[] nBestList = new int[] { 50 };
 
         List<Map<String, Double>> allResults = new ArrayList<>();
         for (int nBest : nBestList) {
@@ -216,11 +215,8 @@ public class ActiveLearningReranker {
             Parse goldParse = goldParses.get(sentIdx);
             int bestK = reranker.getRerankedBest(sentIdx);
             int oracleK = oracleParseIds.get(sentIdx);
-
-            boolean bestIsOracle = (bestK == oracleK);
-            boolean oracleIsTop = (oracleK == 0);
-
-            analysis.adjustOrPutValue(String.format("BestIsOracle=%b, OracleIsTop=%b", bestIsOracle, oracleIsTop), 1, 1);
+            analysis.adjustOrPutValue(String.format("BestIsOracle=%b, OracleIsTop=%b", (bestK == oracleK),
+                    (oracleK == 0)), 1, 1);
 
             avgBestK += bestK;
             avgOracleK += oracleK;
