@@ -28,13 +28,10 @@ public class QuestionGenerator {
      * then instantiates it for the appropriate argument.
      * @param targetDependency    : the dependency to ask about
      * @param words               : the sentence
-     * @param categories          : supertags for the sentence
-     * @param deps                : dependencies sharing their predicate with the target
+     * @param parse               : parse information containing categories and dependencies
      * @return the question as a list of non-empty strings
      */
-    public List<String> generateQuestion(ResolvedDependency targetDependency,
-                                         List<String> words,
-                                         Parse parse) {
+    public List<String> generateQuestion(ResolvedDependency targetDependency, List<String> words, Parse parse) {
         int predicateIdx = targetDependency.getHead();
         QuestionTemplate template = new QuestionTemplate(predicateIdx, words, parse, verbHelper);
         if (template == null) {

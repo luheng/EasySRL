@@ -1,6 +1,5 @@
 package edu.uw.easysrl.qasrl;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.Scanner;
@@ -26,8 +25,9 @@ public class ResponseSimulatorMultipleChoice extends ResponseSimulator {
         scanner = new Scanner(System.in);
     }
 
-    public Response answerQuestion(GroupedQuery query, List<String> sentence, Parse goldParse) {
-        int predicateIndex = query.predicateIndex;
+    public Response answerQuestion(GroupedQuery query) {
+        final List<String> sentence = query.sentence;
+        final int predicateIndex = query.predicateIndex;
         // printWithGoldDependency sentence
         for (int i = 0; i < sentence.size(); i++) {
             System.out.print(i > 0 ? " " : "");

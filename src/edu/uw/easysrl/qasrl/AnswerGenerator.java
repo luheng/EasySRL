@@ -48,6 +48,22 @@ public class AnswerGenerator {
         return argumentIds;
     }
 
+    public static Set<Integer> getArgumentIds(final List<String> words, Parse parse, ResolvedDependency dependency) {
+        Set<Integer> answers = new HashSet<>();
+        Category answerCategory = dependency.getCategory().getArgument(dependency.getArgNumber());
+        int argumentId = dependency.getArgument();
+        if (answerCategory.equals(Category.PP) || words.get(argumentId).equals("to")) {
+            parse.dependencies.stream().filter(d -> d.getHead() == argumentId)
+                    .forEach(d2 -> answers.add(d2.getArgument()));
+            if (answers.size() == 0) {
+                answers.add(argumentId);
+            }
+        } else {
+            answers.add(argumentId);
+        }
+        return answers;
+    }
+
     public static Map<ImmutableList<Integer>, String> generateAnswerSpans(int predicateIndex,
             Map<ImmutableList<Integer>, Set<Integer>> answerToParses, List<String> words, List<Parse> parses) {
         Map<ImmutableList<Integer>, String> answerToSpans = new HashMap<>();
@@ -71,8 +87,6 @@ public class AnswerGenerator {
                     excludeIndices.remove(argId);
                     spans.add(getArgumentConstituent(words, root, argId, excludeIndices));
                 }
-                // TODO: handle appositive and conjunction here.
-                answerToSpans.put(argumentIds, spans.stream().collect(Collectors.joining(" and ")));
                 answerToSpans.put(argumentIds, spans.stream().collect(Collectors.joining(", ")));
             }
         }
@@ -264,5 +278,4 @@ public class AnswerGenerator {
         }
         return words;
     }
-
 }

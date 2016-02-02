@@ -1,6 +1,5 @@
 package edu.uw.easysrl.qasrl;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -8,14 +7,12 @@ import java.util.Map;
 /**
  * Created by luheng on 1/29/16.
  */
-public class RerankerExponentiated extends Reranker {
+public class RerankerExponentiated implements Reranker {
     Map<Integer, List<Parse>> allParses;
     Map<Integer, double[]> expScores;
     double stepSize = 0.5;
 
     public RerankerExponentiated(final Map<Integer, List<Parse>> allParses, double stepSize) {
-        numQueries = 0;
-        numEffectiveQueries = 0;
         expScores = new HashMap<>();
         allParses.forEach((sentId, parses) -> {
             double[] scores = new double[parses.size()];
@@ -35,13 +32,12 @@ public class RerankerExponentiated extends Reranker {
         double[] scores = expScores.get(sentenceId);
         for (int k = 0; k < parses.size(); k++) {
             for (int r : response.chosenOptions) {
-                // Multiplicative update: exp(score'(t)) = exp(score(t)) exp(R(q,a,t))
+                // Multiplicative weight update: exp(score'(t)) = exp(score(t)) exp(R(q,a,t))
                 scores[k] = scores[k] * Math.exp(computeDelta(query, query.answerOptions.get(r), k));
             }
         }
-        // Re-normalize
+        // Re-normalize parse distribution.
         normalize(scores);
-        ++ numQueries;
     }
 
     public int getRerankedBest(final int sentenceId) {
@@ -89,6 +85,4 @@ public class RerankerExponentiated extends Reranker {
     private double computeDelta(final GroupedQuery query, GroupedQuery.AnswerOption option, int parseId) {
         return option.parseIds.contains(parseId) ? stepSize : -stepSize;
     }
-
-
 }

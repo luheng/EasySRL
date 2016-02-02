@@ -12,11 +12,15 @@ import java.util.stream.IntStream;
  * Created by luheng on 1/21/16.
  */
 public class GroupedQuery {
-    class AnswerOption {
-        ImmutableList<Integer> argumentIds;
-        String answer;
+    public class AnswerOption {
+        protected ImmutableList<Integer> argumentIds;
+        protected String answer;
         Set<Integer> parseIds;
         double probability;
+
+        AnswerOption(Set<Integer> parseIds) {
+            this.parseIds = parseIds;
+        }
 
         AnswerOption(ImmutableList<Integer> argumentIds, String answer, Set<Integer> parseIds) {
             this.argumentIds = argumentIds;
@@ -24,12 +28,41 @@ public class GroupedQuery {
             this.parseIds = parseIds;
         }
 
+        public String getAnswer() { return answer; }
+
+        public ImmutableList<Integer> getArgumentIds() { return argumentIds; }
+
         public boolean isNAOption() {
-            return argumentIds.get(0) == -1;
+            return BadQuestionOption.class.isInstance(this) || NoAnswerOption.class.isInstance(this);
         }
     }
 
-    int sentenceId, totalNumParses;
+    public class BadQuestionOption extends AnswerOption {
+        BadQuestionOption(Set<Integer> parseIds) {
+            super(parseIds);
+        }
+
+        public ImmutableList<Integer> getArgumentIds() { return null; }
+        public String getAnswer() { return "Question is not understandable."; }
+        public boolean isNAOption() {
+            return true;
+        }
+    }
+
+    public class NoAnswerOption extends AnswerOption {
+        NoAnswerOption(Set<Integer> parseIds) {
+            super(parseIds);
+        }
+        public ImmutableList<Integer> getArgumentIds() { return null; }
+        public String getAnswer() { return "Answer is not listed."; }
+        public boolean isNAOption() {
+            return true;
+        }
+    }
+
+
+    int sentenceId, totalNumParses, queryId;
+    final List<String> sentence;
     final List<Parse> parses;
     Set<Query> queries;
 
@@ -45,16 +78,17 @@ public class GroupedQuery {
     static final double rankDiscountFactor = 0.0;
     static final boolean estimateWithParseScores = true;
 
-    public GroupedQuery(int sentenceId, final List<Parse> parses) {
+    public GroupedQuery(int sentenceId, final List<String> sentence, final List<Parse> parses) {
         this.sentenceId = sentenceId;
+        this.sentence = sentence;
         this.parses = parses;
         this.totalNumParses = parses.size();
         queries = new HashSet<>();
         answerOptions = null;
     }
 
-    public GroupedQuery(int sentenceId, List<Parse> parses, Query query) {
-        this(sentenceId, parses);
+    public GroupedQuery(int sentenceId, final List<String> sentence, List<Parse> parses, Query query) {
+        this(sentenceId, sentence, parses);
         queries.add(query);
     }
 
@@ -91,11 +125,6 @@ public class GroupedQuery {
         queries.add(query);
     }
 
-    @Deprecated
-    public void setUtility(double utility) {
-        // do nothing.
-    }
-
     public void collapse(int predicateIndex, Category category, int argumentNumber, String question,
                          final Map<ImmutableList<Integer>, Set<Integer>> answerToParses,
                          final Map<ImmutableList<Integer>, String> answerToSpans) {
@@ -111,8 +140,27 @@ public class GroupedQuery {
             answerOptions.add(new AnswerOption(argList, answerToSpans.get(argList), parseIds));
             allParseIds.removeAll(parseIds);
         });
-        answerOptions.add(new AnswerOption(ImmutableList.of(-1), "N/A", allParseIds));
+        answerOptions.add(new BadQuestionOption(allParseIds));
+        //answerOptions.add(new AnswerOption(ImmutableList.of(-1), "N/A", allParseIds));
     }
+
+    public void setQueryId(int id) {
+        this.queryId = id;
+    }
+
+    public int getQueryId() {
+        return queryId;
+    }
+
+    public List<String> getSentence() {
+        return sentence;
+    }
+
+    public int getPredicateIndex() { return predicateIndex; }
+
+    public String getQuestion() { return question; }
+
+    public List<AnswerOption> getAnswerOptions() { return answerOptions; }
 
     public void computeProbabilities(double[] parseDist) {
         // Compute p(a|q).
@@ -139,15 +187,16 @@ public class GroupedQuery {
                 //.mapToDouble(ao -> ao.probability * Math.log(ao.probability) / K).sum();
     }
 
-    public void print(final List<String> words, int response) {
+    public void print(final List<String> words, Response response) {
         System.out.println(String.format("%d:%s\t%s\t%d", predicateIndex, words.get(predicateIndex), category,
                 argumentNumber));
         System.out.println(String.format("%.2f\t%.2f\t%s", answerEntropy, answerMargin, question));
         for (int i = 0; i < answerOptions.size(); i++) {
             AnswerOption ao = answerOptions.get(i);
-            String match = (i == response ? "*" : "");
-            String argIdsStr = ao.argumentIds.stream().map(String::valueOf).collect(Collectors.joining(","));
-            String argHeadsStr = ao.argumentIds.get(0) == -1 ? "N/A" :
+            String match = (response.chosenOptions.contains(i) ? "*" : "");
+            String argIdsStr = ao.isNAOption() ? "_" :
+                    ao.argumentIds.stream().map(String::valueOf).collect(Collectors.joining(","));
+            String argHeadsStr = ao.isNAOption() ? "N/A" :
                     ao.argumentIds.stream().map(words::get).collect(Collectors.joining(","));
             String parseIdsStr = DebugPrinter.getShortListString(ao.parseIds);
             System.out.println(String.format("%.2f\t%s%d\t%s:%s\t%s\t%s", ao.probability, match, i, argIdsStr,
@@ -183,4 +232,10 @@ public class GroupedQuery {
         }
         System.out.println();
     }
+
+    public List<AnswerOption> getTopAnswerOptions(final int numOptions) {
+        return answerOptions.stream().sorted((ao1, ao2) -> Double.compare(-ao1.probability, -ao2.probability))
+                .limit(numOptions).collect(Collectors.toList());
+    }
+
 }
