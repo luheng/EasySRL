@@ -152,7 +152,10 @@ public class ActiveLearningReranker {
             queries.forEach(query -> query.computeProbabilities(reranker.expScores.get(query.sentenceId)));
             queryList.addAll(queries);
         }
-        System.out.println("Total number of queries:\t" + queryList.size());;
+        System.out.println("Total number of queries:\t" + queryList.size());
+        int numQueries = queryList.size(),
+            numEffectiveQueries = 0,
+            numSentencesParsed = allParses.size();
 
         TIntIntHashMap numQueriesPerSentence = new TIntIntHashMap();
         allParses.keySet().forEach(sid -> numQueriesPerSentence.put(sid, 0));
@@ -309,10 +312,6 @@ public class ActiveLearningReranker {
             int catCount = missedCategories.getCount(cat);
         }
 
-        // Effect query: a query whose response boosts the score of a non-top parse but not the top one.
-        int numSentencesParsed = allParses.size();
-        int numQueries = reranker.numQueries;
-        int numEffectiveQueries = reranker.numEffectiveQueries;
         System.out.println("\n1-best:\navg-k = 1.0\n" + oneBestAcc + "\n" + oneBest);
         System.out.println("re-ranked:\navg-k = " + 1.0 * avgBestK / numSentencesParsed + "\n" + reRankedAcc + "\n" +
                 reRanked);

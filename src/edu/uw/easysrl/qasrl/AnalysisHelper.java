@@ -10,6 +10,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
+ * Helper class for error analysis.
  * Created by luheng on 1/31/16.
  */
 public class AnalysisHelper {
@@ -18,21 +19,20 @@ public class AnalysisHelper {
                                                               final List<String> words,
                                                               final QuestionGenerator questionGenerator) {
         Set<ResolvedDependency> predDeps = pred.dependencies.stream()
-                .filter(dep -> isCoveredByQuestion(dep, words, pred.categories, pred.dependencies, questionGenerator))
+                .filter(dep -> isCoveredByQuestion(dep, words, pred, questionGenerator))
                 .collect(Collectors.toSet());
         Set<ResolvedDependency> goldDeps = gold.dependencies.stream()
-                .filter(dep -> isCoveredByQuestion(dep, words, gold.categories, gold.dependencies, questionGenerator))
+                .filter(dep -> isCoveredByQuestion(dep, words, gold, questionGenerator))
                 .collect(Collectors.toSet());
         return CcgEvaluation.evaluate(predDeps, goldDeps);
     }
 
     public static boolean isCoveredByQuestion(final ResolvedDependency dependency,
                                               final List<String> words,
-                                              final List<Category> categories,
-                                              final Set<ResolvedDependency> ccgDeps,
+                                              final Parse parse,
                                               final QuestionGenerator questionGenerator) {
 
-        List<String> question = questionGenerator.generateQuestion(dependency, words, categories, ccgDeps);
+        List<String> question = questionGenerator.generateQuestion(dependency, words, parse);
         return question != null && question.size() > 0;
     }
 

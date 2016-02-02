@@ -265,10 +265,9 @@ public class MTurkDataWriter {
                 100.0 * numMultiHeadQueries / queryList.size());
         System.out.println("Number of truly effective queries:\t" + numTrulyEffectiveQueries);
 
-        // Effect query: a query whose response boosts the score of a non-top parse but not the top one.
-        int numSentencesParsed = allParses.size();
-        int numQueries = reranker.numQueries;
-        int numEffectiveQueries = reranker.numEffectiveQueries;
+        int numQueries = queryList.size(),
+            numEffectiveQueries = 0,
+            numSentencesParsed = allParses.size();
         System.out.println("\n1-best:\navg-k = 1.0\n" + oneBestAcc + "\n" + oneBest);
         System.out.println("re-ranked:\navg-k = " + 1.0 * avgBestK / numSentencesParsed + "\n" + reRankedAcc + "\n" +
                 reRanked);

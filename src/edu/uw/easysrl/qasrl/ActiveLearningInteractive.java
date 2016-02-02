@@ -102,7 +102,7 @@ public class ActiveLearningInteractive {
         Accuracy reRankedAcc = new Accuracy();
         Accuracy oracleAcc = new Accuracy();
 
-        int numSentencesParsed = 0;
+        int numQueries = 0, numEffectiveQueries = 0, numSentencesParsed = 0;
         int avgBestK = 0, avgOracleK = 0;
 
         // For debugging.
@@ -151,6 +151,7 @@ public class ActiveLearningInteractive {
             asked.add(query);
             responses.add(response);
             reranker.rerank(query, response);
+            numQueries ++;
 
             /*************** Print Debugging Info *************/
             if (verbose) {
@@ -201,12 +202,12 @@ public class ActiveLearningInteractive {
         System.out.println("\n1-best:\navg-k = 1.0\n" + oneBestAcc + "\n" + oneBest);
         System.out.println("re-ranked:\navg-k = " + 1.0 * avgBestK / numSentencesParsed + "\n" + reRankedAcc + "\n" + reRanked);
         System.out.println("oracle:\navg-k = " + 1.0 * avgOracleK / numSentencesParsed + "\n"+ oracleAcc + "\n" + oracle);
-        System.out.println("Number of queries = " + reranker.numQueries);
-        System.out.println("Number of effective queries = " + reranker.numEffectiveQueries);
-        System.out.println("Effective ratio = " + 1.0 * reranker.numEffectiveQueries / reranker.numQueries);
+        System.out.println("Number of queries = " + numQueries);
+        System.out.println("Number of effective queries = " + numEffectiveQueries);
+        System.out.println("Effective ratio = " + 1.0 * numEffectiveQueries / numQueries);
         double baselineF1 = oneBest.getF1();
         double rerankF1 = reRanked.getF1();
-        double avgGain = (rerankF1 - baselineF1) / reranker.numQueries;
+        double avgGain = (rerankF1 - baselineF1) / numQueries;
         System.out.println("Avg. F1 gain = " + avgGain);
 
         aggregatedResults.put("1-best-acc", oneBestAcc.getAccuracy() * 100);
@@ -215,10 +216,10 @@ public class ActiveLearningInteractive {
         aggregatedResults.put("rerank-f1", reRanked.getF1() * 100);
         aggregatedResults.put("oracle-acc", oracleAcc.getAccuracy() * 100);
         aggregatedResults.put("oracle-f1", oracle.getF1() * 100);
-        aggregatedResults.put("num-queries", (double) reranker.numQueries);
-        aggregatedResults.put("num-eff-queries", (double) reranker.numEffectiveQueries);
-        aggregatedResults.put("num-queries", (double) reranker.numQueries);
-        aggregatedResults.put("eff-ratio", 100.0 * reranker.numEffectiveQueries / reranker.numQueries);
+        aggregatedResults.put("num-queries", (double) numQueries);
+        aggregatedResults.put("num-eff-queries", (double) numEffectiveQueries);
+        aggregatedResults.put("num-queries", (double) numQueries);
+        aggregatedResults.put("eff-ratio", 100.0 * numEffectiveQueries / numQueries);
         aggregatedResults.put("avg-gain", avgGain);
     }
 }

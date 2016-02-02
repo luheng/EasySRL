@@ -26,5 +26,4 @@ public class Query {
         this.parseId = parseId;
         this.question = question;
     }
-
 }
