@@ -56,7 +56,7 @@ public class WebUIHelper {
     public static String printGoldInfo(final GroupedQuery query, final Response goldResponse) {
         String result = "<button type=\"button\" class=\"btn btn-info\" data-toggle=\"collapse\" data-target=\"#goldinfo\">Sneak Peak Gold</button>"
                 + "<div id=\"goldinfo\" class=\"collapse\">";
-        result += "<p>[gold]:<br>" + query.getDebuggingInfo(goldResponse).replace("\n", "<br>").replace("\t", "&nbsp") + "</p>";
+        result += "<p>[gold]:<br>" + query.getDebuggingInfo(goldResponse).replace("\n", "<br>").replace("\t", "&nbsp&nbsp") + "</p>";
         result += "</div>";
         return result;
     }
@@ -65,9 +65,9 @@ public class WebUIHelper {
                                             final Response goldResponse, final Results results) {
         String result = "<button type=\"button\" class=\"btn btn-info\" data-toggle=\"collapse\" data-target=\"#debugging\">Debugging Info</button>"
                         + "<div id=\"debugging\" class=\"collapse\">";
-        result += "<p>[your response]:<br>" + query.getDebuggingInfo(userResponse).replace("\n", "<br>").replace("\t", "&nbsp") + "</p>";
-        result += "<p>[gold]:<br>" + query.getDebuggingInfo(goldResponse).replace("\n", "<br>").replace("\t", "&nbsp") + "</p>";
-        result += "<p>[rerank-result]:<br>" + results.toString().replace("\n", "<br>").replace("\t", "&nbsp") + "</p>";
+        result += "<p>[your response]:<br>" + query.getDebuggingInfo(userResponse).replace("\n", "<br>").replace("\t", "&nbsp&nbsp") + "</p>";
+        result += "<p>[gold]:<br>" + query.getDebuggingInfo(goldResponse).replace("\n", "<br>").replace("\t", "&nbsp&nbsp") + "</p>";
+        result += "<p>[rerank-result]:<br>" + results.toString().replace("\n", "<br>").replace("\t", "&nbsp&nbsp") + "</p>";
         result += "</div>";
         return result;
     }

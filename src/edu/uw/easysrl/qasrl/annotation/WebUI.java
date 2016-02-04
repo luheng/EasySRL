@@ -16,9 +16,8 @@ import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.handler.AbstractHandler;
 
-// TODO: put n-best to config
-// TODO: add (toggleable) debugging panel
-
+// TODO: fix identical answer spans ...
+// TODO: add option to "jump forward" queries
 /**
  * Usage: WebUI [port number] [n-best]
  */
@@ -29,7 +28,9 @@ public class WebUI extends AbstractHandler {
     private List<Response> responseHistory;
     private List<Response> goldResponseHistory;
     private List<Results> evaluationHistory;
+
     private final int maxNumAnswerOptionsPerQuery = 4;
+    static final int reorderQueriesEvery = 5;
 
     public static void main(final String[] args) throws Exception {
         final Server server = new Server(Integer.valueOf(args[0]));
@@ -50,6 +51,12 @@ public class WebUI extends AbstractHandler {
     @Override
     public void handle(final String target, final Request baseRequest, final HttpServletRequest request,
                        final HttpServletResponse httpResponse) throws IOException, ServletException {
+        if (baseRequest.getParameter("SwitchQuestion") != null) {
+            for (int i = 1; i < 10; i++) {
+                activeLearning.getNextQueryInQueue();
+            }
+            activeLearning.refreshQueryList();
+        }
         final String userAnswer = baseRequest.getParameter("UserAnswer");
         if (userAnswer != null) {
             String[] userAnswerInfo = userAnswer.split("_");
@@ -69,14 +76,15 @@ public class WebUI extends AbstractHandler {
             responseHistory.add(response);
             goldResponseHistory.add(goldSimulator.answerQuestion(query));
             evaluationHistory.add(rerankResults);
+            if (queryHistory.size() % reorderQueriesEvery == 0) {
+                activeLearning.refreshQueryList();
+            }
         }
         httpResponse.setContentType("text/html; charset=utf-8");
         httpResponse.setStatus(HttpServletResponse.SC_OK);
         update(httpResponse.getWriter());
         baseRequest.setHandled(true);
     }
-
-    // @formatter:off
 
     private void update(final PrintWriter httpResponse) {
         httpResponse.println(WebUIHelper.printHTMLHeader());
@@ -111,16 +119,16 @@ public class WebUI extends AbstractHandler {
             String optionValue = qLabel + "_a_" + i;
             String optionString = option.getAnswer();
             httpResponse.println(
-                    String.format("<label><input name=\"UserAnswer\" type=\"radio\" value=\"%s\" />%s</label><br/>",
+                    String.format("<label><input name=\"UserAnswer\" type=\"radio\" value=\"%s\" />&nbsp %s</label><br/>",
                             optionValue, optionString));
         }
         httpResponse.println(String.format(
                 "<label><input name=\"UserAnswer\" type=\"radio\" value=\"%s\"/>" +
-                "Question is not understandable.</label><br/>",
+                "&nbsp Question is not understandable.</label><br/>",
                 qLabel + "_a_" + badQuestionOptionId));
         httpResponse.println(String.format(
                 "<label><input name=\"UserAnswer\" type=\"radio\" value=\"%s\"/>" +
-                "Answer is not listed.</label><br/>",
+                "&nbsp Answer is not listed.</label><br/>",
                 qLabel + "_a_" + badQuestionOptionId));
         httpResponse.println(
                 "<button class=\"btn btn-primary\" type=\"submit\" value=\"Submit!\">Submit!</button>" +
@@ -129,6 +137,11 @@ public class WebUI extends AbstractHandler {
         httpResponse.println("</panel>\n</div>\n");
 
         httpResponse.println("<div class=\"span4\">");
+
+        httpResponse.println("<br><form class=\"form-group\" action=\"\" method=\"get\">");
+        httpResponse.println("<button class=\"btn btn-primary\" input name=\"SwitchQuestion\" type=\"button\" value=\"Skip10\">Skip 10 questions.</button>");
+        httpResponse.println("</form>");
+
         httpResponse.println(WebUIHelper.printGoldInfo(nextQuery, goldSimulator.answerQuestion(nextQuery)));
         if (queryHistory.size() > 0) {
             int last = queryHistory.size() - 1;

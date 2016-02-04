@@ -15,7 +15,8 @@ import java.util.stream.Collectors;
 public class SimulatedExperiment {
     static ActiveLearning learner;
     static final int nBest = 50;
-    static final int reorderQueriesEvery = 100;
+    static final int reorderQueriesEvery = 10;
+    static final int maxNumQueries = 10000;
     static final boolean verbose = true;
 
     public static void main(String[] args) {
@@ -43,6 +44,9 @@ public class SimulatedExperiment {
                 learner.refreshQueryList();
             }
             queryCounter ++;
+            if (queryCounter >= maxNumQueries) {
+                break;
+            }
         }
 
         System.out.println("[1-best]:\t" + learner.getOneBestF1());

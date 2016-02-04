@@ -126,22 +126,20 @@ public class GroupedQuery {
     }
 
     public void collapse(int predicateIndex, Category category, int argumentNumber, String question,
-                         final Map<ImmutableList<Integer>, Set<Integer>> answerToParses,
-                         final Map<ImmutableList<Integer>, String> answerToSpans) {
+                         final Map<String, ImmutableList<Integer>> spanToArgList,
+                         final Map<String, Set<Integer>> spanToParses) {
         this.predicateIndex = predicateIndex;
         this.category = category;
         this.argumentNumber = argumentNumber;
         this.question = question;
         this.answerOptions = new ArrayList<>();
-
         Set<Integer> allParseIds = IntStream.range(0, totalNumParses).boxed().collect(Collectors.toSet());
-        answerToParses.keySet().forEach(argList -> {
-            Set<Integer> parseIds = answerToParses.get(argList);
-            answerOptions.add(new AnswerOption(argList, answerToSpans.get(argList), parseIds));
+        spanToParses.forEach((span, parseIds) -> {
+            ImmutableList<Integer> argList = spanToArgList.get(span);
+            answerOptions.add(new AnswerOption(argList, span, parseIds));
             allParseIds.removeAll(parseIds);
         });
         answerOptions.add(new BadQuestionOption(allParseIds));
-        //answerOptions.add(new AnswerOption(ImmutableList.of(-1), "N/A", allParseIds));
     }
 
     // Experimental query collapse function.
@@ -251,7 +249,7 @@ public class GroupedQuery {
             String argHeadsStr = ao.isNAOption() ? "N/A" :
                     ao.argumentIds.stream().map(words::get).collect(Collectors.joining(","));
             String parseIdsStr = DebugPrinter.getShortListString(ao.parseIds);
-            System.out.println(String.format("%.2f\t%s%d\t%s:%s\t%s\t%s", ao.probability, match, i, argIdsStr,
+            System.out.println(String.format("%.2f\t%s%d\t(%s:%s)\t\t\t%s\t%s", ao.probability, match, i, argIdsStr,
                     argHeadsStr, ao.answer, parseIdsStr));
         }
         System.out.println();

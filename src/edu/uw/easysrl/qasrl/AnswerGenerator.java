@@ -115,7 +115,7 @@ public class AnswerGenerator {
                                        Collection<Integer> argIds, Category argCategory) {
         return argIds.stream()
                 .map(id -> getAnswerSpan(parse, words, predId, predCategory, id, argCategory))
-                .collect(Collectors.joining(", "));
+                .collect(Collectors.joining(" , "));
     }
 
     public static String getArgumentConstituent(final List<String> words, final SyntaxTreeNode node,

@@ -103,20 +103,28 @@ public class QueryGenerator {
         return groupedQueryList;
     }
 
+    // FIXME: make the logic better.
     private static void collapseQuery(GroupedQuery groupedQuery, List<String> words, List<Parse> parses) {
         HashMap<String, Set<Integer>> questionToParses = new HashMap<>();
-        HashMap<ImmutableList<Integer>, Set<Integer>> answerToParses = new HashMap<>();
+        // Map the set of argument heads to parses.
+        HashMap<ImmutableList<Integer>, Set<Integer>> argListToParses = new HashMap<>();
+        // Map the set of argument heads (argList) to its score (sum of parse scores)
+        Map<ImmutableList<Integer>, Double> argListToScore = new HashMap<>();
+        // Map a surface string of an answer to its most probable arg list.
+        Map<String, ImmutableList<Integer>> spanToArgList = new HashMap<>();
+        // Map a surface string of an answer to a set of parse ids.
+        Map<String, Set<Integer>> spanToParses = new HashMap<>();
 
         groupedQuery.queries.forEach(query -> {
             ImmutableList<Integer> argList = ImmutableList.copyOf(query.argumentIds);
             if (!questionToParses.containsKey(query.question)) {
                 questionToParses.put(query.question, new HashSet<>());
             }
-            if (!answerToParses.containsKey(argList)) {
-                answerToParses.put(argList, new HashSet<>());
+            if (!argListToParses.containsKey(argList)) {
+                argListToParses.put(argList, new HashSet<>());
             }
             questionToParses.get(query.question).add(query.parseId);
-            answerToParses.get(argList).add(query.parseId);
+            argListToParses.get(argList).add(query.parseId);
         });
 
         // merge answer options
@@ -138,15 +146,16 @@ public class QueryGenerator {
         }
 
         assert bestQuery != null;
-        Map<ImmutableList<Integer>, String> answerToSpans = new HashMap<>();
-        // Map<ImmutableList<Integer>, String> answerToSpans = AnswerGenerator.generateAnswerSpans(
-        //        bestQuery.predicateIndex, answerToParses, words, parses);
+
         int predId = bestQuery.predicateIndex;
         int argNum = bestQuery.argumentNumber;
         Category predCategory = bestQuery.category;
         Category argCategory = predCategory.getArgument(argNum);
-        answerToParses.forEach((argList, parseIds) -> {
-            TObjectDoubleHashMap<String> spanToScore = new TObjectDoubleHashMap();
+        argListToParses.forEach((argList, parseIds) -> {
+            double argListScore = parseIds.stream().mapToDouble(id -> parses.get(id).score).sum();
+            argListToScore.put(argList, argListScore);
+
+            TObjectDoubleHashMap<String> spanToScore = new TObjectDoubleHashMap<>();
             parseIds.forEach(parseId -> {
                 Parse parse = parses.get(parseId);
                 String span = AnswerGenerator.getAnswerSpan(parse, words, predId, predCategory, argList, argCategory);
@@ -161,10 +170,18 @@ public class QueryGenerator {
                     bestSpan = span;
                 }
             }
-            answerToSpans.put(argList, bestSpan);
+
+            if (!spanToArgList.containsKey(bestSpan) ||
+                    (argListScore > argListToScore.get(spanToArgList.get(bestSpan)))) {
+                spanToArgList.put(bestSpan, argList);
+            }
+            if (!spanToParses.containsKey(bestSpan)) {
+                spanToParses.put(bestSpan, new HashSet<>());
+            }
+            spanToParses.get(bestSpan).addAll(parseIds);
         });
         groupedQuery.collapse(bestQuery.predicateIndex, bestQuery.category, bestQuery.argumentNumber, bestQuestion,
-                answerToParses, answerToSpans);
+                              spanToArgList, spanToParses);
     }
 
 }
