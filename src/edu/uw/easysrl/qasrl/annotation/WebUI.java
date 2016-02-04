@@ -19,6 +19,7 @@ import org.eclipse.jetty.server.handler.AbstractHandler;
 
 public class WebUI extends AbstractHandler {
     private final ActiveLearning activeLearning;
+    private final int nBest = 10;
     private final int maxNumAnswerOptionsPerQuery = 4;
 
     public static void main(final String[] args) throws Exception {
@@ -29,7 +30,7 @@ public class WebUI extends AbstractHandler {
     }
 
     private WebUI() throws IOException {
-        activeLearning = new ActiveLearning();
+        activeLearning = new ActiveLearning(nBest);
     }
 
     @Override
@@ -59,22 +60,23 @@ public class WebUI extends AbstractHandler {
     private void update(final PrintWriter httpResponse) {
         httpResponse.println(WebUIHelper.printHTMLHeader());
 
-        httpResponse.println("<body>");
+        httpResponse.println("<body style=\"padding-left: 50px; padding-right=50px;\">");
         httpResponse.println("<container>\n" + WebUIHelper.printInstructions() + "</container>\n");
-
-        httpResponse.println("<container>");
 
         // Get next query.
         GroupedQuery nextQuery = activeLearning.getNextQueryInQueue();
         // Print sentence
         final List<String> words = nextQuery.getSentence();
+
+        httpResponse.println("<container><div class=\"row\">\n<div class=\"span12\">");
+        httpResponse.println("<panel panel-default>\n");
         httpResponse.println("<span class=\"label label-primary\">Sentence:</span>");
         httpResponse.println("<p>" + WebUIHelper.getHighlightedSentenceString(words, nextQuery.getPredicateIndex()) + "</p>");
         httpResponse.println("<span class=\"label label-primary\">Question:</span>");
-        httpResponse.println("<p>" + WebUIHelper.getQuestionString(nextQuery.getQuestion()) + "</p>");
+        httpResponse.println("<p>" + nextQuery.getQuestion() + "</p>");
 
         httpResponse.println("<span class=\"label label-primary\">Answer Options:</span>");
-        httpResponse.println("<br><form action=\"\" method=\"get\">");
+        httpResponse.println("<br><form class=\"form-group\" action=\"\" method=\"get\">");
         final List<GroupedQuery.AnswerOption> options = nextQuery.getAnswerOptions();
         String qLabel = "q_" + nextQuery.getQueryId();
 
@@ -87,22 +89,23 @@ public class WebUI extends AbstractHandler {
             String optionValue = qLabel + "_a_" + i;
             String optionString = option.getAnswer();
             httpResponse.println(
-                    String.format("<label><input name=\"UserAnswer\" type=\"radio\" value=\"%s\" />%s</label><br/>",
+                    String.format("<label><input name=\"UserAnswer\" type=\"radio\" class=\"radio\" value=\"%s\" />%s</label><br/>",
                             optionValue, optionString));
         }
         httpResponse.println(String.format(
-                "<label><input name=\"UserAnswer\" type=\"radio\" value=\"%s\"/>" +
+                "<label><input name=\"UserAnswer\" type=\"radio\" class=\"radio\" value=\"%s\"/>" +
                 "Question is not understandable.</label><br/>",
                 qLabel + "_a_" + badQuestionOptionId));
         httpResponse.println(String.format(
-                "<label><input name=\"UserAnswer\" type=\"radio\" value=\"%s\"/>" +
-                "Question is understandable, but not answerable given information in the sentence.</label><br/>",
+                "<label><input name=\"UserAnswer\" type=\"radio\" class=\"radio\" value=\"%s\"/>" +
+                "Answer is not listed.</label><br/>",
                 qLabel + "_a_" + badQuestionOptionId));
         httpResponse.println(
-                "<button class=\"btn btn-primary\" type=\"button\" value=\"Submit!\">Submit!</button>" +
+                "<button class=\"btn btn-primary\" type=\"submit\" value=\"Submit!\">Submit!</button>" +
                 "</form>");
 
-        httpResponse.println("</container>\n");
+        httpResponse.println("</panel>\n");
+        httpResponse.println("</div></div></container>\n");
         httpResponse.println("</body>");
 
         System.out.println("--------");

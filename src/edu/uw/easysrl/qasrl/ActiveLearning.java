@@ -13,9 +13,8 @@ import java.util.stream.Collectors;
  * Created by luheng on 2/1/16.
  */
 public class ActiveLearning {
-
-    final List<List<InputReader.InputWord>> sentences;
-    final List<Parse> goldParses;
+    public final List<List<InputReader.InputWord>> sentences;
+    public final List<Parse> goldParses;
     final BaseCcgParser parser;
     final QuestionGenerator questionGenerator;
     // Reranker needs to be initialized after we parse all the sentences .. maybe not?
@@ -30,71 +29,42 @@ public class ActiveLearning {
 
     private final Comparator<GroupedQuery> queryComparator = new Comparator<GroupedQuery>() {
         public int compare(GroupedQuery q1, GroupedQuery q2) {
-            return Double.compare(-q1.answerEntropy, -q2.answerEntropy);
+            return Double.compare(-q1.normalziedAnswerEntropy, -q2.normalziedAnswerEntropy);
         }
     };
 
-    // Print debugging info or not.
-    final boolean verbose = true;
-    // Plot learning curve (F1 vs. number of queries).
-    final boolean plotCurve = true;
-    // Maximum number of queries per sentence.
-    final int maxNumQueriesPerSentence = 100;
     // Incorporate -NOQ- queries (dependencies we can't generate questions for) in reranking to see potential
     // improvements.
     boolean generatePseudoQuestions = false;
     boolean groupSameLabelDependencies = true;
     // The change inflicted on distribution of parses after each query update.
-    double rerankerStepSize = 1.0;
 
     // The file contains the pre-parsed n-best list (of CCGBank dev). Leave file name is empty, if we wish to parse
     // sentences in the experiment.
-    String preparsedFile = "parses.50best.out";
-    int nBest = 50;
+    String preparsedFile = "";
+    int nBest;
+    double rerankerStepSize = 1.0;
 
-    // After a batch of queries, update query entropy and reorder them based on updated probabilities of parses.
-    final static int reorderQueriesEvery = 10;
-
-    final static String modelFolder = "/Users/luheng/Workspace/EasySRL/model_tritrain_big/";
+    final static String modelFolder = "./model_tritrain_big/";
     final static List<Category> rootCategories =  Arrays.asList(
             Category.valueOf("S[dcl]"), Category.valueOf("S[wq]"), Category.valueOf("S[q]"),
             Category.valueOf("S[b]\\NP"), Category.valueOf("NP"));
 
-    public static void main(String[] args) {
-        ActiveLearning learner = new ActiveLearning();
-        ResponseSimulator responseSimulator = new ResponseSimulatorGold(learner.goldParses, new QuestionGenerator());
-        Map<Integer, Results> budgetCurve = new HashMap<>();
-
-        int queryCounter = 0;
-        while (learner.getNumberOfRemainingQueries() > 0) {
-            GroupedQuery query = learner.getNextQueryInQueue();
-            Response response = responseSimulator.answerQuestion(query);
-            learner.respondToQuery(query, response);
-            if (queryCounter % 200 == 0) {
-                budgetCurve.put(queryCounter, learner.getRerankedF1());
-            }
-            if (queryCounter > 0 && reorderQueriesEvery > 0 && queryCounter % reorderQueriesEvery == 0) {
-                learner.refreshQueryList();
-            }
-            queryCounter ++;
-        }
-
-        System.out.println("[1-best]:\t" + learner.getOneBestF1());
-        System.out.println("[reranked]:\t" + learner.getRerankedF1());
-        System.out.println("[oracle]:\t" + learner.getOracleF1());
-
-        budgetCurve.keySet().stream().sorted().forEach(i -> System.out.print("\t" + i));
-        System.out.println();
-        budgetCurve.keySet().stream().sorted().forEach(i -> System.out.print("\t" +
-                String.format("%.3f", budgetCurve.get(i).getF1() * 100.0)));
-        System.out.println();
-    }
-
-    public ActiveLearning() {
+    public ActiveLearning(int nBest) {
+        this.nBest = nBest;
         sentences = new ArrayList<>();
         goldParses = new ArrayList<>();
         DataLoader.readDevPool(sentences, goldParses);
         questionGenerator = new QuestionGenerator();
+        if (nBest <= 10) {
+            preparsedFile = "parses.10best.out";
+        } else if (nBest <= 50) {
+            preparsedFile = "parses.50best.out";
+        } else if (nBest <= 100) {
+            preparsedFile = "parses.100best.out";
+        } else if (nBest <= 1000) {
+            preparsedFile = "parses.1000best.out";
+        }
         parser = preparsedFile.isEmpty() ?
                 new BaseCcgParser.AStarParser(modelFolder, rootCategories, nBest) :
                 new BaseCcgParser.MockParser(preparsedFile, nBest);
@@ -148,7 +118,8 @@ public class ActiveLearning {
             List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
             List<Parse> parses = allParses.get(sentIdx);
             List<GroupedQuery> queries = QueryGenerator.generateQueries(sentIdx, words, parses, questionGenerator,
-                    generatePseudoQuestions, groupSameLabelDependencies);
+                                                                        generatePseudoQuestions,
+                                                                        groupSameLabelDependencies);
             queries.forEach(query -> {
                 query.computeProbabilities(reranker.expScores.get(query.sentenceId));
                 query.setQueryId(queryPool.size());

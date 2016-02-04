@@ -70,6 +70,8 @@ public class AnswerGenerator {
         Set<Integer> allIndices = new HashSet<>();
         answerToParses.keySet().forEach(allIndices::addAll);
         allIndices.add(predicateIndex);
+
+
         for (ImmutableList<Integer> argumentIds : answerToParses.keySet()) {
             Set<Integer> parseIds = answerToParses.get(argumentIds);
             // use the highest ranked parse to get answer span.
@@ -91,6 +93,29 @@ public class AnswerGenerator {
             }
         }
         return answerToSpans;
+    }
+
+    /**
+     *
+     * @param parse
+     * @param words
+     * @param predId
+     * @param predCategory
+     * @param argId
+     * @param argCategory
+     * @return
+     */
+    public static String getAnswerSpan(Parse parse, List<String> words, int predId, Category predCategory,
+                                       int argId, Category argCategory) {
+        List<String> phrase = getRepresentativePhrase(argId, argCategory, parse);
+        return phrase.stream().collect(Collectors.joining(" "));
+    }
+
+    public static String getAnswerSpan(Parse parse, List<String> words, int predId, Category predCategory,
+                                       Collection<Integer> argIds, Category argCategory) {
+        return argIds.stream()
+                .map(id -> getAnswerSpan(parse, words, predId, predCategory, id, argCategory))
+                .collect(Collectors.joining(", "));
     }
 
     public static String getArgumentConstituent(final List<String> words, final SyntaxTreeNode node,
@@ -168,7 +193,8 @@ public class AnswerGenerator {
         return lastCandidate;
     }
 
-    public static Optional<SyntaxTreeNode> getLowestAncestorFunctionIntoCategory(SyntaxTreeNode node, Category category, SyntaxTreeNode wholeTree) {
+    public static Optional<SyntaxTreeNode> getLowestAncestorFunctionIntoCategory(SyntaxTreeNode node, Category category,
+                                                                                 SyntaxTreeNode wholeTree) {
         Optional<SyntaxTreeNode> curNode = Optional.of(node);
         Optional<Category> curCat = curNode.map(n -> n.getCategory());
         while(curNode.isPresent() && !curCat.get().isFunctionInto(category)) {
@@ -189,7 +215,8 @@ public class AnswerGenerator {
         return getRepresentativePhrase(headIndex, neededCategory, parse, Optional.empty());
     }
 
-    public static List<String> getRepresentativePhrase(int headIndex, Category neededCategory, Parse parse, String replacementWord) {
+    public static List<String> getRepresentativePhrase(int headIndex, Category neededCategory, Parse parse,
+                                                       String replacementWord) {
         return getRepresentativePhrase(headIndex, neededCategory, parse, Optional.of(replacementWord));
     }
 
@@ -200,7 +227,8 @@ public class AnswerGenerator {
      * TODO: does not handle coordination; we might want to include both args in the case of coordination.
      * In particular this would be for the phrases inside questions: consider "What did something do between April 1991?"
      */
-    public static List<String> getRepresentativePhrase(int headIndex, Category neededCategory, Parse parse, Optional<String> replacementWord) {
+    public static List<String> getRepresentativePhrase(int headIndex, Category neededCategory, Parse parse,
+                                                       Optional<String> replacementWord) {
         SyntaxTreeNode tree = parse.syntaxTree;
         if(headIndex == -1) {
             return getRepresentativePhraseForUnrealized(neededCategory);
