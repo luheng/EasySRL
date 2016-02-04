@@ -193,6 +193,10 @@ public class AnswerGenerator {
         return getRepresentativePhrase(headIndex, neededCategory, parse, Optional.of(replacementWord));
     }
 
+    public static List<String> getRepresentativePhrase(int headIndex, Category neededCategory, Parse parse, Optional<String> replacementWord) {
+        return getRepresentativePhrase(headIndex, neededCategory, parse, headIndex, replacementWord, true);
+    }
+
     /**
      * Constructs a phrase with the desired head and category label.
      * takes an optional (by overloading---see above) argument asking for the head word to be replaced by something else.
@@ -200,7 +204,9 @@ public class AnswerGenerator {
      * TODO: does not handle coordination; we might want to include both args in the case of coordination.
      * In particular this would be for the phrases inside questions: consider "What did something do between April 1991?"
      */
-    public static List<String> getRepresentativePhrase(int headIndex, Category neededCategory, Parse parse, Optional<String> replacementWord) {
+    private static List<String> getRepresentativePhrase(int headIndex, Category neededCategory,
+                                                        Parse parse, int replacementIndex,
+                                                        Optional<String> replacementWord, boolean lookForOf) {
         SyntaxTreeNode tree = parse.syntaxTree;
         if(headIndex == -1) {
             return getRepresentativePhraseForUnrealized(neededCategory);
@@ -211,7 +217,7 @@ public class AnswerGenerator {
         if(!nodeOpt.isPresent()) {
             // fall back to just the original leaf. this failure case is very rare.
             List<String> result = new ArrayList<>();
-            result.addAll(getNodeWords(headLeaf));
+            result.addAll(getNodeWords(headLeaf, replacementIndex, replacementWord));
             return result;
         }
         // here we don't necessarily have the whole phrase. `node` is a function into the phrase.
@@ -221,60 +227,79 @@ public class AnswerGenerator {
         // using this method will capture and appropriately rearrange extracted arguments and such.
 
         SyntaxTreeNode node = nodeOpt.get();
-        List<String> center = getNodeWords(node);
-        if(replacementWord.isPresent()) {
-            int indexInCenter = headIndex - node.getStartIndex();
-            center.set(indexInCenter, replacementWord.get());
-        }
-        List<String> left = new ArrayList<>();
-        List<String> right = new ArrayList<>();
-
-        // add arguments on either side until done, according to CCG category.
         Category currentCategory = node.getCategory();
-        for(int currentArgNum = currentCategory.getNumberOfArguments();
-            currentArgNum > neededCategory.getNumberOfArguments();
-            currentArgNum--) {
-            Category argCat = currentCategory.getRight();
-            // recover arg index using the fact that we know the head leaf and the arg num.
-            Set<ResolvedDependency> deps = parse.dependencies;
-            int curArg = currentArgNum; // just so we can use it in the lambda below
-            Optional<ResolvedDependency> depOpt = deps.stream().filter(dep -> {
-                    return dep.getHead() == headIndex && dep.getArgNumber() == curArg;
-                }).findFirst();
-            int argIndex = depOpt.map(dep -> dep.getArgument()).orElse(-1);
-            List<String> argPhrase = getRepresentativePhrase(argIndex, argCat, parse);
-            // add the argument on the left or right side, depending on the slash
-            Slash slash = currentCategory.getSlash();
-            switch(slash) {
-            case FWD:
-                right = Stream.concat(right.stream(), argPhrase.stream()).collect(Collectors.toList());
-                break;
-            case BWD:
-                left = Stream.concat(argPhrase.stream(), left.stream()).collect(Collectors.toList());
-                break;
-            case EITHER:
-                System.err.println("Undirected slash appeared in supertagged data :(");
-                break;
+
+        if(neededCategory.matches(currentCategory)) {
+            // if we already have the right kind of phrase, consider adding a trailing "of"-phrase.
+            if(lookForOf && // that is, if we're not in the midst of deriving an "of"-phrase already...
+               node.getEndIndex() < tree.getEndIndex() &&
+               tree.getLeaves().get(node.getEndIndex()).getWord().equals("of") // if the next word is "of",
+               ) {
+                return getRepresentativePhrase(node.getEndIndex(), neededCategory, parse, replacementIndex, replacementWord, false);
+            } else {
+                return getNodeWords(node, replacementIndex, replacementWord);
             }
-            // proceed to the next argument
-            currentCategory = currentCategory.getLeft();
+        } else {
+            List<String> left = new ArrayList<>();
+            List<String> center = getNodeWords(node, replacementIndex, replacementWord);
+            List<String> right = new ArrayList<>();
+
+            for(int currentArgNum = currentCategory.getNumberOfArguments();
+                currentArgNum > neededCategory.getNumberOfArguments();
+                currentArgNum--) {
+                // otherwise, add arguments on either side until done, according to CCG category.
+                Category argCat = currentCategory.getRight();
+                // recover arg index using the fact that we know the head leaf and the arg num.
+                Set<ResolvedDependency> deps = parse.dependencies;
+                final int curArg = currentArgNum; // just so we can use it in the lambda below
+                Optional<ResolvedDependency> depOpt = deps.stream().filter(dep -> {
+                        return dep.getHead() == headIndex && dep.getArgNumber() == curArg;
+                    }).findFirst();
+                // if we can't find the argument, we put index -1 so the recursive call considers it "unrealized"
+                // and says, e.g., "something"
+                int argIndex = depOpt.map(dep -> dep.getArgument()).orElse(-1);
+                List<String> argPhrase = getRepresentativePhrase(argIndex, argCat, parse, replacementIndex, replacementWord, lookForOf);
+                // add the argument on the left or right side, depending on the slash
+                Slash slash = currentCategory.getSlash();
+                switch(slash) {
+                case FWD:
+                    right.addAll(argPhrase);
+                    break;
+                case BWD:
+                    argPhrase.addAll(left);
+                    left = argPhrase;
+                    break;
+                case EITHER:
+                    System.err.println("Undirected slash appeared in supertagged data :(");
+                    break;
+                }
+                // proceed to the next argument
+                currentCategory = currentCategory.getLeft();
+            }
+            List<String> result = new ArrayList<>();
+            result.addAll(left);
+            result.addAll(center);
+            result.addAll(right);
+            return result;
         }
 
-        List<String> result = new ArrayList<>();
-        result.addAll(left);
-        result.addAll(center);
-        result.addAll(right);
-        return result;
     }
 
     // helper method to make sure we decapitalize the first letter of the sentence
-    private static List<String> getNodeWords(SyntaxTreeNode node) {
+    // and replace a word if necessary.
+    private static List<String> getNodeWords(SyntaxTreeNode node, int replaceIndex, Optional<String> replacementWord) {
         List<String> words = node.getLeaves()
             .stream()
             .map(leaf -> leaf.getWord())
             .collect(Collectors.toList());
         if(node.getStartIndex() == 0) {
             words.set(0, Character.toLowerCase(words.get(0).charAt(0)) + words.get(0).substring(1));
+        }
+        if(replacementWord.isPresent()) {
+            int indexInWords = replaceIndex - node.getStartIndex();
+            if(indexInWords >= 0 && indexInWords <= words.size()) {
+                words.set(indexInWords, replacementWord.get());
+            }
         }
         return words;
     }

@@ -3,8 +3,10 @@ package edu.uw.easysrl.qasrl;
 import edu.uw.easysrl.main.EasySRL;
 import edu.uw.easysrl.main.InputReader.InputWord;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
+import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.dependencies.ResolvedDependency;
 
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
@@ -41,7 +43,10 @@ public class ActiveLearningReranker {
     double rerankerStepSize = 1.0;
     // The file contains the pre-parsed n-best list (of CCGBank dev). Leave file name is empty, if we wish to parse
     // sentences in the experiment.
-    final static String preparsedFile = "parses.50best.out";
+    final static Optional<String> preparsedFile(int n) {
+        return Optional.of("parses." + n + "best.out");
+        // return Optional.empty();
+    }
     // After a batch of queries, update query entropy and reorder them based on updated probabilities of parses.
     final static int reorderQueriesEvery = 100;
 
@@ -65,14 +70,15 @@ public class ActiveLearningReranker {
 
         /************** manual parameter tuning ... ***********/
         //final int[] nBestList = new int[] { 3, 5, 10, 20, 50, 100, 250, 500, 1000 };
-        final int[] nBestList = new int[] { 50 };
+        final int[] nBestList = new int[] { 10 };
 
         List<Map<String, Double>> allResults = new ArrayList<>();
         for (int nBest : nBestList) {
+            Optional<String> filenameOpt = preparsedFile(nBest);
             BaseCcgParser parser =
-                    preparsedFile.isEmpty() ?
-                            new BaseCcgParser.AStarParser(modelFolder, rootCategories, nBest) :
-                            new BaseCcgParser.MockParser(preparsedFile, nBest);
+                filenameOpt.isPresent() ?
+                new BaseCcgParser.MockParser(filenameOpt.get(), nBest) :
+                new BaseCcgParser.AStarParser(modelFolder, rootCategories, nBest);
             ActiveLearningReranker learner = new ActiveLearningReranker(sentences, goldParses, parser,
                                                                         questionGenerator, responseSimulator, nBest);
             learner.run();
@@ -182,6 +188,8 @@ public class ActiveLearningReranker {
             queryCounter ++;
             GroupedQuery query = queryList.poll();
             Response response = responseSimulator.answerQuestion(query);
+            System.out.println(QuestionAnswerPair.renderString(query.sentence));
+            query.print(query.sentence, response);
 
             int sentId = query.sentenceId;
             double entropy = reranker.computeParsesEntropy(sentId);
@@ -243,7 +251,6 @@ public class ActiveLearningReranker {
             oneBestAcc.add(CcgEvaluation.evaluateTags(parses.get(0).categories, goldParse.categories));
             reRankedAcc.add(CcgEvaluation.evaluateTags(parses.get(bestK).categories, goldParse.categories));
             oracleAcc.add(CcgEvaluation.evaluateTags(parses.get(oracleK).categories, goldParse.categories));
-            /*
             if (verbose) {
                 Parse oracleParse = parses.get(oracleK);
                 Set<ResolvedDependency> oraclePrecisionMistakes =
@@ -253,8 +260,7 @@ public class ActiveLearningReranker {
                 // only print the extra info for ones where we could do better
                 // also, only print the mistakes that were corrected by the oracle
                 List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
-                DebugPrinter.printQueryListInfo(sentIdx, words, queryList, responseList);
-                // if(oracleK != bestK) {
+                if(oracleK != bestK) {
                     // what if the reranker gave us something worse?
                     if(results.get(0).getF1() > results.get(bestK).getF1()) {
                         System.out.println("====== Reranker produced worse result! ======");
@@ -290,9 +296,21 @@ public class ActiveLearningReranker {
                                 }
                             }
                         });
+                }
             }
-            */
         }
+        if(verbose) {
+            System.out.println("Categories of the heads of mistakes:");
+            List<String> missedCats = missedCategories.getStrings()
+                .stream()
+                .sorted((c1, c2) -> Integer.compare(missedCategories.getCount(c1), missedCategories.getCount(c2)))
+                .collect(Collectors.toList());
+            for (String cat : missedCats) {
+                int catCount = missedCategories.getCount(cat);
+                System.out.println(cat + ": " + catCount);
+            }
+        }
+
 
         for (String s : analysis.keySet()) {
             System.out.println(s + "\t" + analysis.get(s));
@@ -302,15 +320,6 @@ public class ActiveLearningReranker {
         System.out.println(numMultiHeadQueries + "\t" + queryList.size() + "\t" +
                 100.0 * numMultiHeadQueries / queryList.size());
         System.out.println("Number of truly effective queries:\t" + numTrulyEffectiveQueries);
-
-        System.out.println("Categories of the heads of mistakes:");
-        List<String> missedCats = missedCategories.getStrings()
-            .stream()
-            .sorted((c1, c2) -> Integer.compare(missedCategories.getCount(c1), missedCategories.getCount(c2)))
-            .collect(Collectors.toList());
-        for (String cat : missedCats) {
-            int catCount = missedCategories.getCount(cat);
-        }
 
         System.out.println("\n1-best:\navg-k = 1.0\n" + oneBestAcc + "\n" + oneBest);
         System.out.println("re-ranked:\navg-k = " + 1.0 * avgBestK / numSentencesParsed + "\n" + reRankedAcc + "\n" +

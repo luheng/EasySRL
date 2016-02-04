@@ -3,6 +3,7 @@ package edu.uw.easysrl.qasrl.qg;
 import java.util.List;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.Optional;
 
 public class QuestionAnswerPair {
     public final List<String> questionWords;
@@ -11,17 +12,21 @@ public class QuestionAnswerPair {
     // here is the punctuation we want to avoid spaces before,
     // and that we don't want at the end of the question or answer.
     // For now, those are the same.
-    private static final String trimPunctuation = ",.:;!?";
-    private static Set<String> noSpaceWords = new HashSet<String>();
+    private static final String trimPunctuation = " ,.:;!?";
+    private static Set<String> noSpaceBefore = new HashSet<String>();
+    private static Set<String> noSpaceAfter = new HashSet<String>();
     static {
-        noSpaceWords.add(".");
-        noSpaceWords.add(",");
-        noSpaceWords.add("\'");
-        noSpaceWords.add("!");
-        noSpaceWords.add("?");
-        noSpaceWords.add(";");
-        noSpaceWords.add(":");
-        noSpaceWords.add("n\'t");
+        noSpaceBefore.add(".");
+        noSpaceBefore.add(",");
+        noSpaceBefore.add("\'");
+        noSpaceBefore.add("!");
+        noSpaceBefore.add("?");
+        noSpaceBefore.add(";");
+        noSpaceBefore.add(":");
+        noSpaceBefore.add("n\'t");
+        noSpaceBefore.add("%");
+
+        noSpaceAfter.add("$");
     }
 
 
@@ -40,14 +45,17 @@ public class QuestionAnswerPair {
         return renderString(answerWords);
     }
 
-    private static String renderString(List<String> words) {
+    public static String renderString(List<String> words) {
         StringBuilder result = new StringBuilder();
         if(words.size() == 0) return "";
+        Optional<String> prevWord = Optional.empty();
         for(String word : words) {
-            if(!noSpaceWords.contains(""+word.charAt(0))) {
+            boolean noSpace = (prevWord.isPresent() && noSpaceAfter.contains(prevWord.get())) || noSpaceBefore.contains(word);
+            if(!noSpace) {
                 result.append(" ");
             }
             result.append(word);
+            prevWord = Optional.of(word);
         }
         result.deleteCharAt(0);
         while(result.length() > 0 &&
