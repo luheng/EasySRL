@@ -4,6 +4,8 @@
   <property name="lib"      value="lib"/>
   <property name="bin"      value="bin"/>
   <property name="jar"      value="easysrl.jar"/>
+  <property name="JDK1.8.dir" location="/etc/alternatives/java_sdk_1.8.0" />
+  <property name="javac1.8" location="${JDK1.8.dir}/bin/javac" />
 
   <path id="classpath">
     <fileset dir="lib">
@@ -18,7 +20,7 @@
 
     <target name="compile" depends="clean">
         <mkdir dir="${bin}"/>
-        <javac srcdir="src" destdir="${bin}" includeantruntime="false">
+        <javac executable="${javac1.8}" srcdir="src" destdir="${bin}" includeantruntime="false">
            <classpath refid="classpath"/>
         </javac>
     </target>
