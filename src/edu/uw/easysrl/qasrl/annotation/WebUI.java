@@ -55,7 +55,6 @@ public class WebUI extends AbstractHandler {
             for (int i = 1; i < 10; i++) {
                 activeLearning.getNextQueryInQueue();
             }
-            activeLearning.refreshQueryList();
         }
         final String userAnswer = baseRequest.getParameter("UserAnswer");
         if (userAnswer != null) {
@@ -139,7 +138,7 @@ public class WebUI extends AbstractHandler {
         httpResponse.println("<div class=\"span4\">");
 
         httpResponse.println("<br><form class=\"form-group\" action=\"\" method=\"get\">");
-        httpResponse.println("<button class=\"btn btn-primary\" input name=\"SwitchQuestion\" type=\"button\" value=\"Skip10\">Skip 10 questions.</button>");
+        httpResponse.println("<button class=\"btn btn-primary\" input name=\"SwitchQuestion\" type=\"submit\" value=\"Skip10\">Skip 10 questions.</button>");
         httpResponse.println("</form>");
 
         httpResponse.println(WebUIHelper.printGoldInfo(nextQuery, goldSimulator.answerQuestion(nextQuery)));
