@@ -29,7 +29,7 @@ public class ActiveLearning {
 
     private final Comparator<GroupedQuery> queryComparator = new Comparator<GroupedQuery>() {
         public int compare(GroupedQuery q1, GroupedQuery q2) {
-            return Double.compare(-q1.normalziedAnswerEntropy, -q2.normalziedAnswerEntropy);
+            return Double.compare(-q1.answerEntropy, -q2.answerEntropy);
         }
     };
 

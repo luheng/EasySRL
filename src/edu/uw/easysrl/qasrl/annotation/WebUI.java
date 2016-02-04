@@ -2,35 +2,49 @@ package edu.uw.easysrl.qasrl.annotation;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import edu.uw.easysrl.qasrl.ActiveLearning;
-import edu.uw.easysrl.qasrl.GroupedQuery;
-import edu.uw.easysrl.qasrl.Response;
+import edu.uw.easysrl.qasrl.*;
+import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
+import edu.uw.easysrl.syntax.evaluation.Results;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.handler.AbstractHandler;
 
+// TODO: put n-best to config
+// TODO: add (toggleable) debugging panel
+
+/**
+ * Usage: WebUI [port number] [n-best]
+ */
 public class WebUI extends AbstractHandler {
     private final ActiveLearning activeLearning;
-    private final int nBest = 10;
+    private ResponseSimulatorGold goldSimulator;
+    private List<GroupedQuery> queryHistory;
+    private List<Response> responseHistory;
+    private List<Response> goldResponseHistory;
+    private List<Results> evaluationHistory;
     private final int maxNumAnswerOptionsPerQuery = 4;
 
     public static void main(final String[] args) throws Exception {
         final Server server = new Server(Integer.valueOf(args[0]));
-        server.setHandler(new WebUI());
+        server.setHandler(new WebUI(Integer.parseInt(args[1])));
         server.start();
         server.join();
     }
 
-    private WebUI() throws IOException {
+    private WebUI(int nBest) throws IOException {
         activeLearning = new ActiveLearning(nBest);
+        goldSimulator = new ResponseSimulatorGold(activeLearning.goldParses, new QuestionGenerator());
+        queryHistory = new ArrayList<>();
+        responseHistory = new ArrayList<>();
+        goldResponseHistory = new ArrayList<>();
+        evaluationHistory = new ArrayList<>();
     }
 
     @Override
@@ -43,11 +57,18 @@ public class WebUI extends AbstractHandler {
             int optionId = Integer.parseInt(userAnswerInfo[3]);
             GroupedQuery query = activeLearning.getQueryById(queryId);
             Response response =new Response(optionId);
-            // TODO: compare with gold simulator.
-            query.print(query.getSentence(), response);
 
+            query.print(query.getSentence(), response);
             activeLearning.respondToQuery(query, response);
-            System.out.println(activeLearning.getRerankedF1());
+
+            Results rerankResults = activeLearning.getRerankedF1();
+            System.out.println(rerankResults);
+
+            // Append to history
+            queryHistory.add(query);
+            responseHistory.add(response);
+            goldResponseHistory.add(goldSimulator.answerQuestion(query));
+            evaluationHistory.add(rerankResults);
         }
         httpResponse.setContentType("text/html; charset=utf-8");
         httpResponse.setStatus(HttpServletResponse.SC_OK);
@@ -68,7 +89,8 @@ public class WebUI extends AbstractHandler {
         // Print sentence
         final List<String> words = nextQuery.getSentence();
 
-        httpResponse.println("<container><div class=\"row\">\n<div class=\"span12\">");
+        httpResponse.println("<container><div class=\"row\">\n<div class=\"span8\">");
+
         httpResponse.println("<panel panel-default>\n");
         httpResponse.println("<span class=\"label label-primary\">Sentence:</span>");
         httpResponse.println("<p>" + WebUIHelper.getHighlightedSentenceString(words, nextQuery.getPredicateIndex()) + "</p>");
@@ -89,27 +111,32 @@ public class WebUI extends AbstractHandler {
             String optionValue = qLabel + "_a_" + i;
             String optionString = option.getAnswer();
             httpResponse.println(
-                    String.format("<label><input name=\"UserAnswer\" type=\"radio\" class=\"radio\" value=\"%s\" />%s</label><br/>",
+                    String.format("<label><input name=\"UserAnswer\" type=\"radio\" value=\"%s\" />%s</label><br/>",
                             optionValue, optionString));
         }
         httpResponse.println(String.format(
-                "<label><input name=\"UserAnswer\" type=\"radio\" class=\"radio\" value=\"%s\"/>" +
+                "<label><input name=\"UserAnswer\" type=\"radio\" value=\"%s\"/>" +
                 "Question is not understandable.</label><br/>",
                 qLabel + "_a_" + badQuestionOptionId));
         httpResponse.println(String.format(
-                "<label><input name=\"UserAnswer\" type=\"radio\" class=\"radio\" value=\"%s\"/>" +
+                "<label><input name=\"UserAnswer\" type=\"radio\" value=\"%s\"/>" +
                 "Answer is not listed.</label><br/>",
                 qLabel + "_a_" + badQuestionOptionId));
         httpResponse.println(
                 "<button class=\"btn btn-primary\" type=\"submit\" value=\"Submit!\">Submit!</button>" +
                 "</form>");
 
-        httpResponse.println("</panel>\n");
+        httpResponse.println("</panel>\n</div>\n");
+
+        httpResponse.println("<div class=\"span4\">");
+        httpResponse.println(WebUIHelper.printGoldInfo(nextQuery, goldSimulator.answerQuestion(nextQuery)));
+        if (queryHistory.size() > 0) {
+            int last = queryHistory.size() - 1;
+            httpResponse.println(WebUIHelper.printDebuggingInfo(queryHistory.get(last), responseHistory.get(last),
+                    goldResponseHistory.get(last), evaluationHistory.get(last)));
+        }
         httpResponse.println("</div></div></container>\n");
+
         httpResponse.println("</body>");
-
-        System.out.println("--------");
-
-        // TODO: print debugging info.
     }
 }

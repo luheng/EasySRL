@@ -257,6 +257,24 @@ public class GroupedQuery {
         System.out.println();
     }
 
+    public String getDebuggingInfo(final Response response) {
+        String result = String.format("%d:%s\t%s\t%d", predicateIndex, sentence.get(predicateIndex), category,
+                argumentNumber) + "\n";
+        result += String.format("%.2f\t%.2f\t%s", answerEntropy, answerMargin, question) + "\n";
+        for (int i = 0; i < answerOptions.size(); i++) {
+            AnswerOption ao = answerOptions.get(i);
+            String match = (response.chosenOptions.contains(i) ? "*" : "");
+            String argIdsStr = ao.isNAOption() ? "_" :
+                    ao.argumentIds.stream().map(String::valueOf).collect(Collectors.joining(","));
+            String argHeadsStr = ao.isNAOption() ? "N/A" :
+                    ao.argumentIds.stream().map(sentence::get).collect(Collectors.joining(","));
+            String parseIdsStr = DebugPrinter.getShortListString(ao.parseIds);
+            result += String.format("%.2f\t%s%d\t%s:%s\t%s\t%s", ao.probability, match, i, argIdsStr, argHeadsStr,
+                    ao.answer, parseIdsStr) + "\n";
+        }
+        return result + "\n";
+    }
+
     public void printWithGoldDependency(final List<String> words, int response, Parse goldParse) {
         System.out.print(String.format("\t%d:%s\t%s.%d",
                 predicateIndex,
