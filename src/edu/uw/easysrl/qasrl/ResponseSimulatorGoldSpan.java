@@ -43,7 +43,7 @@ public class ResponseSimulatorGoldSpan extends ResponseSimulator {
             if (dep.getHead() != predId) {
                 continue;
             }
-            List<String> goldQuestion = questionGenerator.generateQuestion(dep, sentence, goldParse);
+            List<String> goldQuestion = questionGenerator.generateQuestion(dep, sentence, goldParse).questionWords;
             String goldQuestionStr = (goldQuestion == null || goldQuestion.size() == 0) ? "-NOQ-" :
                     goldQuestion.stream().collect(Collectors.joining(" "));
             boolean questionMatch = query.question.equalsIgnoreCase(goldQuestionStr);

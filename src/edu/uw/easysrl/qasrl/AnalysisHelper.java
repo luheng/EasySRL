@@ -32,7 +32,7 @@ public class AnalysisHelper {
                                               final Parse parse,
                                               final QuestionGenerator questionGenerator) {
 
-        List<String> question = questionGenerator.generateQuestion(dependency, words, parse);
+        List<String> question = questionGenerator.generateQuestion(dependency, words, parse).questionWords;
         return question != null && question.size() > 0;
     }
 

@@ -6,6 +6,7 @@ import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.*;
+import java.util.concurrent.SynchronousQueue;
 import java.util.stream.Collectors;
 
 /**
@@ -26,6 +27,10 @@ public class ActiveLearning {
     private Map<Integer, List<Parse>> allParses;
     private Map<Integer, List<Results>> allResults;
     private Map<Integer, Integer> oracleParseIds;
+
+    // History: sent_id.pred_id.category.arg_num
+    private Set<Integer> recentlyUpdatedSentences;
+    private Map<Integer, Set<String>> askedDependencies;
 
     private final Comparator<GroupedQuery> queryComparator = new Comparator<GroupedQuery>() {
         public int compare(GroupedQuery q1, GroupedQuery q2) {
@@ -65,6 +70,7 @@ public class ActiveLearning {
         } else if (nBest <= 1000) {
             preparsedFile = "parses.1000best.out";
         }
+        // TODO: check existence of parse files.
         parser = preparsedFile.isEmpty() ?
                 new BaseCcgParser.AStarParser(modelFolder, rootCategories, nBest) :
                 new BaseCcgParser.MockParser(preparsedFile, nBest);
@@ -83,11 +89,17 @@ public class ActiveLearning {
     }
 
     private void initialize() {
-        /****************** Base n-best Parser ***************/
+        initializeParses();
+        initializeQueries();
+        // History.
+        recentlyUpdatedSentences = new HashSet<>();
+        askedDependencies = new HashMap<>();
+    }
+
+    private void initializeParses() {
         allParses = new HashMap<>();
         allResults = new HashMap<>();
         oracleParseIds = new HashMap<>();
-
         for (int sentIdx = 0; sentIdx < sentences.size(); sentIdx ++) {
             List<Parse> parses = parser.parseNBest(sentIdx, sentences.get(sentIdx));
             if (parses == null) {
@@ -109,8 +121,9 @@ public class ActiveLearning {
                 System.out.println("Parsed:\t" + allParses.size() + " sentences ...");
             }
         }
+    }
 
-        /****************** Initialize Query List ******************/
+    private void initializeQueries() {
         reranker = new RerankerExponentiated(allParses, rerankerStepSize);
         queryPool = new ArrayList<>();
         queryQueue = new PriorityQueue<>(queryComparator);
@@ -118,8 +131,7 @@ public class ActiveLearning {
             List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
             List<Parse> parses = allParses.get(sentIdx);
             List<GroupedQuery> queries = QueryGenerator.generateQueries(sentIdx, words, parses, questionGenerator,
-                                                                        generatePseudoQuestions,
-                                                                        groupSameLabelDependencies);
+                    generatePseudoQuestions, groupSameLabelDependencies);
             queries.forEach(query -> {
                 query.computeProbabilities(reranker.expScores.get(query.sentenceId));
                 query.setQueryId(queryPool.size());
@@ -127,7 +139,45 @@ public class ActiveLearning {
             });
         }
         queryQueue.addAll(queryPool);
-        System.out.println("Total number of queries:\t" + queryQueue.size());;
+        System.out.println("Total number of queries:\t" + queryQueue.size());
+    }
+
+
+    public void refreshQueryList() {
+        Collection<GroupedQuery> queryBuffer = new ArrayList<>(queryQueue);
+        queryBuffer.forEach(query -> query.computeProbabilities(reranker.expScores.get(query.sentenceId)));
+        queryQueue.clear();
+        queryQueue.addAll(queryBuffer);
+    }
+
+    public void regenerateQueries() {
+        System.out.println(recentlyUpdatedSentences.stream().map(String::valueOf).collect(Collectors.joining(", ")));
+        Collection<GroupedQuery> queryBuffer = new ArrayList<>();
+        while (!queryQueue.isEmpty()) {
+            GroupedQuery query = queryQueue.poll();
+            if (!recentlyUpdatedSentences.contains(query.sentenceId)) {
+                queryBuffer.add(query);
+            }
+        }
+        recentlyUpdatedSentences.forEach(sentIdx -> {
+            List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
+            List<Parse> parses = allParses.get(sentIdx);
+            List<GroupedQuery> queries = QueryGenerator.generateQueries(sentIdx, words, parses, questionGenerator,
+                    generatePseudoQuestions, groupSameLabelDependencies);
+            queries.forEach(query -> {
+                String depStr = query.predicateIndex + "." + query.category + "." + query.argumentNumber;
+                // Skip queries that we already asked about.
+                if (!askedDependencies.get(sentIdx).contains(depStr)) {
+                    query.setQueryId(queryPool.size());
+                    queryPool.add(query);
+                    queryBuffer.add(query);
+                }
+            });
+        });
+        queryBuffer.forEach(query -> query.computeProbabilities(reranker.expScores.get(query.sentenceId)));
+        queryQueue.clear();
+        queryQueue.addAll(queryBuffer);
+        recentlyUpdatedSentences.clear();
     }
 
     public List<String> getSentenceById(int sentenceId) {
@@ -147,14 +197,13 @@ public class ActiveLearning {
 
     public void respondToQuery(GroupedQuery query, Response response) {
         reranker.rerank(query, response);
-    }
-
-    public void refreshQueryList() {
-        Collection<GroupedQuery> queryBuffer = new ArrayList<>(queryQueue);
-        queryBuffer.forEach(query -> query.computeProbabilities(reranker.expScores.get(query.sentenceId)));
-        queryQueue.clear();
-        queryQueue.addAll(queryBuffer);
-        System.out.println("Remaining number of queries:\t" + queryQueue.size());
+        // Register processed query history.
+        int sentId = query.sentenceId;
+        if (!askedDependencies.containsKey(sentId)) {
+            askedDependencies.put(sentId, new HashSet<>());
+        }
+        askedDependencies.get(sentId).add(query.predicateIndex + "." + query.category + "." + query.argumentNumber);
+        recentlyUpdatedSentences.add(sentId);
     }
 
     public int getNumberOfRemainingQueries() {

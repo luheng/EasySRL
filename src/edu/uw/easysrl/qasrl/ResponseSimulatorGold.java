@@ -1,6 +1,7 @@
 package edu.uw.easysrl.qasrl;
 
 import edu.uw.easysrl.dependencies.ResolvedDependency;
+import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 
 import java.util.ArrayList;
@@ -15,6 +16,7 @@ import java.util.stream.Collectors;
 public class ResponseSimulatorGold extends ResponseSimulator {
     private final List<Parse> goldParses;
     private QuestionGenerator questionGenerator;
+    private boolean allowLabelMatch = true;
 
     // TODO: simulate noise level.
     // TODO: partial reward for parses that got part of the answer heads right ..
@@ -22,6 +24,12 @@ public class ResponseSimulatorGold extends ResponseSimulator {
         this.goldParses = goldParses;
         this.questionGenerator = questionGenerator;
     }
+
+    public ResponseSimulatorGold(List<Parse> goldParses, QuestionGenerator questionGenerator, boolean allowLabelMatch) {
+        this(goldParses, questionGenerator);
+        this.allowLabelMatch = allowLabelMatch;
+    }
+
 
     /**
      * If exists a gold dependency that generates the same question ...
@@ -37,15 +45,15 @@ public class ResponseSimulatorGold extends ResponseSimulator {
             if (dep.getHead() != query.predicateIndex) {
                 continue;
             }
-            List<String> goldQuestion = questionGenerator.generateQuestion(dep, sentence, goldParse);
-            String goldQuestionStr = (goldQuestion == null || goldQuestion.size() == 0) ? "-NOQ-" :
-                    goldQuestion.stream().collect(Collectors.joining(" "));
-            boolean questionMatch = query.question.equalsIgnoreCase(goldQuestionStr);
+            // TODO: use qaPair.
+            // TODO: try gold simulator without label match
+            QuestionAnswerPair goldQA = questionGenerator.generateQuestion(dep, sentence, goldParse);
+            String goldQuestionStr = (goldQA == null || goldQA.questionWords.size() == 0) ?
+                    "-NOQ-" : goldQA.renderQuestion();
+            boolean questionMatch = query.question.equalsIgnoreCase(goldQuestionStr) && !goldQuestionStr.equals("-NOQ-");
             boolean labelMatch = (dep.getCategory() == query.category && dep.getArgNumber() == query.argumentNumber);
-            if (questionMatch || labelMatch) {
-                if (!goldQuestionStr.equals("-NOQ-") || labelMatch) {
-                    answerIndices.addAll(AnswerGenerator.getArgumentIdsForDependency(sentence, goldParse, dep));
-                }
+            if (questionMatch || (allowLabelMatch && labelMatch)) {
+                answerIndices.addAll(AnswerGenerator.getArgumentIdsForDependency(sentence, goldParse, dep));
             }
         }
         Response response = new Response();

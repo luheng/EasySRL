@@ -5,6 +5,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Table;
 import com.google.common.collect.Table.Cell;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
+import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.grammar.Category;
 import gnu.trove.map.hash.TObjectDoubleHashMap;
@@ -61,7 +62,10 @@ public class QueryGenerator {
                 Category category = anyDependency.getCategory();
 
                 ResolvedDependency dependency = dependencies.iterator().next();
-                List<String> question = questionGenerator.generateQuestion(dependency, words, parse);
+
+                // TODO: use answers too.
+                QuestionAnswerPair qaPair = questionGenerator.generateQuestion(dependency, words, parse);
+                List<String> question = qaPair.questionWords;
                 if (!generatePseudoQuestions && (question == null || question.size() == 0)) {
                     continue;
                 }
@@ -73,13 +77,13 @@ public class QueryGenerator {
                             answerIds.addAll(AnswerGenerator.getArgumentIdsForDependency(words, parse, dep)));
                     List<Integer> answerIdList = new ArrayList<>(answerIds);
                     Collections.sort(answerIdList);
-                    Query query = new Query(predicateId, category, argNum, answerIdList, rankId, questionStr);
+                    Query query = new Query(predicateId, category, argNum, answerIdList, rankId, qaPair);
                     unmergedQueryList.add(query);
                 } else {
                     for (ResolvedDependency dep : dependencies) {
                         List<Integer> answerIds = AnswerGenerator.getArgumentIdsForDependency(words, parse, dep)
                                 .stream().sorted().collect(Collectors.toList());
-                        Query query = new Query(predicateId, category, argNum, answerIds, rankId, questionStr);
+                        Query query = new Query(predicateId, category, argNum, answerIds, rankId, qaPair);
                         unmergedQueryList.add(query);
                     }
                 }

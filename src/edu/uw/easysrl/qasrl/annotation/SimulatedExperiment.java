@@ -10,18 +10,21 @@ import java.util.stream.Collectors;
 
 /**
  * New sandbox :)
+ * TODO: debug question re-generator. print original queries and regenerated queries.
  * Created by luheng on 2/2/16.
  */
 public class SimulatedExperiment {
     static ActiveLearning learner;
     static final int nBest = 50;
+    static final boolean regenerateQueries = true;
     static final int reorderQueriesEvery = 10;
     static final int maxNumQueries = 10000;
-    static final boolean verbose = true;
+    static final boolean verbose = false;
 
     public static void main(String[] args) {
         learner = new ActiveLearning(nBest);
-        ResponseSimulator responseSimulator = new ResponseSimulatorGold(learner.goldParses, new QuestionGenerator());
+        ResponseSimulator responseSimulator = new ResponseSimulatorGold(learner.goldParses, new QuestionGenerator(),
+                                                                        true /* Allow label match */);
         Map<Integer, Results> budgetCurve = new HashMap<>();
 
         int queryCounter = 0;
@@ -41,7 +44,12 @@ public class SimulatedExperiment {
                 System.out.println(response.debugInfo + "\n");
             }
             if (queryCounter > 0 && reorderQueriesEvery > 0 && queryCounter % reorderQueriesEvery == 0) {
-                learner.refreshQueryList();
+                System.out.println(queryCounter);
+                if (regenerateQueries) {
+                    learner.regenerateQueries();
+                } else {
+                    learner.refreshQueryList();
+                }
             }
             queryCounter ++;
             if (queryCounter >= maxNumQueries) {

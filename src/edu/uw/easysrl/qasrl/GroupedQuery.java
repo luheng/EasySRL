@@ -73,7 +73,7 @@ public class GroupedQuery {
     String question;
     List<AnswerOption> answerOptions;
 
-    double answerMargin, answerEntropy, normalziedAnswerEntropy;
+    double answerMargin, answerEntropy, normalizedAnswerEntropy;
     // TODO: move this to ActiveLearning ...
     static final double rankDiscountFactor = 0.0;
     static final boolean estimateWithParseScores = true;
@@ -103,6 +103,7 @@ public class GroupedQuery {
 
     private static boolean canMerge(Query q1, Query q2) {
         if (q1.predicateIndex == q2.predicateIndex) {
+            // Doing exact match.
             if (q1.question.equals(q2.question) && !q1.question.equalsIgnoreCase("-NOQ-")) {
                 return true;
             }
@@ -204,8 +205,8 @@ public class GroupedQuery {
         return answerEntropy;
     }
 
-    public double getNormalziedAnswerEntropy() {
-        return normalziedAnswerEntropy;
+    public double getNormalizedAnswerEntropy() {
+        return normalizedAnswerEntropy;
     }
 
     public double getAnswerMargin() {
@@ -234,7 +235,7 @@ public class GroupedQuery {
         answerEntropy = -1.0 * answerOptions.stream()
                 .filter(ao -> ao.probability > 0)
                 .mapToDouble(ao -> ao.probability * Math.log(ao.probability)).sum();
-        normalziedAnswerEntropy = answerEntropy / Math.log(answerOptions.size());
+        normalizedAnswerEntropy = answerEntropy / Math.log(answerOptions.size());
     }
 
     public void print(final List<String> words, Response response) {

@@ -3,6 +3,7 @@ package edu.uw.easysrl.qasrl;
 import com.google.common.collect.*;
 import com.google.common.collect.Table.Cell;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
+import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.grammar.Category;
 
@@ -58,25 +59,25 @@ public class QueryGeneratorExperimental {
                 Category category = anyDependency.getCategory();
 
                 ResolvedDependency dependency = dependencies.iterator().next();
-                List<String> question = questionGenerator.generateQuestion(dependency, words, parse);
-                if (!generatePseudoQuestions && (question == null || question.size() == 0)) {
+                QuestionAnswerPair qaPair = questionGenerator.generateQuestion(dependency, words, parse);
+                if (!generatePseudoQuestions && (qaPair == null || qaPair.questionWords.size() == 0)) {
                     continue;
                 }
-                String questionStr = (question == null || question.size() == 0) ? "-NOQ-" :
-                        question.stream().collect(Collectors.joining(" "));
+                String questionStr = (qaPair == null || qaPair.questionWords.size() == 0) ? "-NOQ-" :
+                        qaPair.questionWords.stream().collect(Collectors.joining(" "));
                 if (groupSameLabelDependencies) {
                     Set<Integer> answerIds = new HashSet<>();
                     dependencies.stream().forEach(dep ->
                             answerIds.addAll(AnswerGenerator.getArgumentIdsForDependency(words, parse, dep)));
                     List<Integer> answerIdList = new ArrayList<>(answerIds);
                     Collections.sort(answerIdList);
-                    Query query = new Query(predicateId, category, argNum, answerIdList, rankId, questionStr);
+                    Query query = new Query(predicateId, category, argNum, answerIdList, rankId, qaPair);
                     unmergedQueryList.add(query);
                 } else {
                     for (ResolvedDependency dep : dependencies) {
                         List<Integer> answerIds = AnswerGenerator.getArgumentIdsForDependency(words, parse, dep)
                                 .stream().sorted().collect(Collectors.toList());
-                        Query query = new Query(predicateId, category, argNum, answerIds, rankId, questionStr);
+                        Query query = new Query(predicateId, category, argNum, answerIds, rankId, qaPair);
                         unmergedQueryList.add(query);
                     }
                 }
@@ -188,7 +189,7 @@ public class QueryGeneratorExperimental {
         //groupedQuery.collapse(bestQuery.predicateIndex, bestQuery.category, bestQuery.argumentNumber, bestQuestion,
         //        argSetToParses, answerToSpans);
         groupedQuery.collapseNew(representativeQuery.predicateIndex, representativeQuery.category,
-                                 representativeQuery.argumentNumber, bestQuestion, spanToParses, spanToArgIds);
+                representativeQuery.argumentNumber, bestQuestion, spanToParses, spanToArgIds);
     }
 
 }

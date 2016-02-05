@@ -25,14 +25,12 @@ public class WebUIHelper {
                 + "<script src=\"https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js\"></script>\n"
                 + "<!-- Latest compiled and minified CSS -->\n"
                 + "<link rel=\"stylesheet\" href=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css\">"
-                + "\n"
                 + "<!-- Optional theme -->\n"
                 + "<link rel=\"stylesheet\" href=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap-theme.min.css\">\n"
-                + "\n"
+                + "<link rel=\"stylesheet\" href=\"WEB-INF/style.css\">\n"
                 + "<!-- Latest compiled and minified JavaScript -->\n"
                 + "<script src=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js\"></script>"
-                + "</head>"
-                + "<h1><font face=\"arial\">Annotation Demo</font></h1>\n";
+                + "</head>";
     }
 
     public static String printInstructions() {
