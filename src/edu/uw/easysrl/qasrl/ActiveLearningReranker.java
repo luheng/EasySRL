@@ -188,7 +188,7 @@ public class ActiveLearningReranker {
             queryCounter ++;
             GroupedQuery query = queryList.poll();
             Response response = responseSimulator.answerQuestion(query);
-            System.out.println(QuestionAnswerPair.renderString(query.sentence));
+            System.out.println(TextGenerationHelper.renderString(query.sentence));
             query.print(query.sentence, response);
 
             int sentId = query.sentenceId;

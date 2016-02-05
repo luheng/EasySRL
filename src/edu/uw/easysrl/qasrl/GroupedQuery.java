@@ -211,7 +211,7 @@ public class GroupedQuery {
                 words.get(predicateIndex),
                 category,
                 argumentNumber));
-        AnswerGenerator.getArgumentIds(words, goldParse, predicateIndex, category, argumentNumber).stream().sorted()
+        TextGenerationHelper.getArgumentIds(words, goldParse, predicateIndex, category, argumentNumber).stream().sorted()
                 .forEach(argId -> System.out.print(String.format("\t%d:%s", argId, words.get(argId))));
         System.out.println();
         System.out.println(String.format("%.2f\t \t%s", answerEntropy, question));

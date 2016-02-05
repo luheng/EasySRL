@@ -5,7 +5,8 @@ import edu.uw.easysrl.syntax.grammar.Category.Slash;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.Parse;
-import edu.uw.easysrl.qasrl.AnswerGenerator;
+import edu.uw.easysrl.qasrl.TextGenerationHelper;
+import edu.uw.easysrl.qasrl.TextGenerationHelper.TextWithDependencies;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -127,8 +128,13 @@ public class QuestionTemplate {
     public int predicateIndex;
     public Category predicateCategory;
 
-    public Map<Integer, Integer> argIndices;
+    // the category here is the one of the argument of the head's category,
+    // so it's not sensitive to having multiple arguments or locations.
     public Map<Integer, Category> argCategories;
+    // for each arg num, lists all of the deps ending in arguments
+    public Map<Integer, List<ResolvedDependency>> allArgDeps;
+    // this is for convenience and just returns the index of the first one
+    public Map<Integer, Integer> argIndices;
 
     public VerbHelper verbHelper;
 
@@ -142,12 +148,17 @@ public class QuestionTemplate {
         this.tree = parse.syntaxTree;
         this.verbHelper = verbHelper;
         this.words = words;
-        this.argIndices = new HashMap<Integer, Integer>();
+        this.allArgDeps = new HashMap<Integer, List<ResolvedDependency>>();
         for (ResolvedDependency dep : parse.dependencies) {
             if (dep.getHead() == predicateIndex && dep.getArgument() != dep.getHead()) {
-                argIndices.put(dep.getArgNumber(), dep.getArgument());
+                if(!allArgDeps.containsKey(dep.getArgNumber())) {
+                    allArgDeps.put(dep.getArgNumber(), new ArrayList<ResolvedDependency>());
+                }
+                allArgDeps.get(dep.getArgNumber()).add(dep);
             }
         }
+        this.argIndices = new HashMap<Integer, Integer>();
+        allArgDeps.forEach((k, v) -> argIndices.put(k, v.get(0).getArgument()));
         int numArguments = predicateCategory.getNumberOfArguments();
         this.argCategories = new HashMap<Integer, Category>();
         for (int i = 1; i <= numArguments; i++) {
@@ -199,15 +210,15 @@ public class QuestionTemplate {
      *                       associated with what's being asked about in the question
      * @return a question asking for the targetArgNum'th argument of template's predicate
      */
-    public QuestionAnswerPair instantiateForArgument(int targetArgNum) {
-        List<String> questionWords = new ArrayList<>();
-        List<String> answerWords = new ArrayList<>();
+    public Optional<QuestionAnswerPair> instantiateForArgument(int targetArgNum) {
         if (cantAskQuestion(targetArgNum)) {
-            return new QuestionAnswerPair(questionWords, answerWords);
+            return Optional.empty();
         }
 
-        String wh = getWhWordByArgNum(targetArgNum);
-        List<String> auxiliaries = new ArrayList<>();
+        final List<ResolvedDependency> questionDeps = new ArrayList<>();
+
+        final String wh = getWhWordByArgNum(targetArgNum);
+        final List<String> auxiliaries = new ArrayList<>();
         // we need the verb of the clause our predicate appears in,
         // which we will use to determine the auxiliaries we'll be using
         int verbIndex = -1;
@@ -217,7 +228,7 @@ public class QuestionTemplate {
             verbIndex = argIndices.get(2);
         }
         // for now, this seems to be a sufficient criterion...
-        boolean shouldSplitVerb = targetArgNum != 1 || argIndices.get(targetArgNum) == verbIndex;
+        final boolean shouldSplitVerb = targetArgNum != 1 || argIndices.get(targetArgNum) == verbIndex;
 
         String predStr;
         // but if there is no verb, we just put "would be" in there. This works for NP adjuncts.
@@ -244,41 +255,51 @@ public class QuestionTemplate {
         }
 
         // Add arguments on either side until done, according to CCG category.
-        List<String> left = new ArrayList<>();
-        List<String> right = new ArrayList<>();
+        final List<String> left = new ArrayList<>();
+        final List<String> right = new ArrayList<>();
         Category currentCategory = predicateCategory;
         for(int currentArgNum = predicateCategory.getNumberOfArguments(); currentArgNum > 0; currentArgNum--) {
             // get the surface form of the argument in question
             List<String> argWords;
-            boolean addingTarget = currentArgNum == targetArgNum;
+            final boolean addingTarget = currentArgNum == targetArgNum;
             if(addingTarget) {
                 argWords = getTargetPlaceholderWords(currentArgNum);
             } else {
                 // this is complicated... consider simplifying.
-                int argIndex = argIndices.get(currentArgNum);
-                Category argCategory = argCategories.get(currentArgNum);
+                // first we add the dependency to the list of deps we've touched
+                final Optional<ResolvedDependency> firstArgDepOpt = Optional.ofNullable(allArgDeps.get(currentArgNum)).map(deps -> deps.get(0));
+                firstArgDepOpt.ifPresent(dep -> questionDeps.add(dep));
+                // then we locate the argument in the sentence
+                final int argIndex = firstArgDepOpt.map(ResolvedDependency::getArgument).orElse(-1);
+                final Category argCategory = argCategories.get(currentArgNum);
+                // then we generate the text for that argument, again logging the dependencies touched.
                 if(argIndex == -1 || argIndex != verbIndex) {
-                    argWords = AnswerGenerator.getRepresentativePhrase(argIndex, argCategory, parse);
+                    TextWithDependencies argWithDeps = TextGenerationHelper.getRepresentativePhrase(argIndex, argCategory, parse);
+                    questionDeps.addAll(argWithDeps.dependencies);
+                    argWords = argWithDeps.tokens;
                 } else {
                     if(shouldSplitVerb) {
-                        List<String> splitArg = getSplitVerbAtIndex(argIndex);
-                        argWords = AnswerGenerator.getRepresentativePhrase(argIndex, argCategory, parse, splitArg.get(1));
+                        final List<String> splitArg = getSplitVerbAtIndex(argIndex);
+                        TextWithDependencies argWithDeps = TextGenerationHelper.getRepresentativePhrase(argIndex, argCategory, parse, splitArg.get(1));
+                        questionDeps.addAll(argWithDeps.dependencies);
+                        argWords = argWithDeps.tokens;
                     } else {
-                        String unsplitArg = getUnsplitVerbAtIndex(argIndex);
-                        argWords = AnswerGenerator.getRepresentativePhrase(argIndex, argCategory, parse, unsplitArg);
+                        final String unsplitArg = getUnsplitVerbAtIndex(argIndex);
+                        TextWithDependencies argWithDeps = TextGenerationHelper.getRepresentativePhrase(argIndex, argCategory, parse, unsplitArg);
+                        questionDeps.addAll(argWithDeps.dependencies);
+                        argWords = argWithDeps.tokens;
                     }
                 }
             }
 
             // add the argument on the left or right side, depending on the slash
-            Slash slash = currentCategory.getSlash();
+            final Slash slash = currentCategory.getSlash();
             switch(slash) {
             case FWD:
                 right.addAll(argWords);
                 break;
             case BWD:
-                argWords.addAll(left);
-                left = argWords;
+                left.addAll(0, argWords);
                 break;
             case EITHER:
                 System.err.println("Undirected slash appeared in supertagged data :(");
@@ -290,17 +311,30 @@ public class QuestionTemplate {
             currentCategory = currentCategory.getLeft();
         }
 
-        List<String> question = new ArrayList<>();
-        question.add(wh);
-        question.addAll(auxiliaries);
-        question.addAll(left);
-        question.add(predStr);
-        question.addAll(right);
-        questionWords = question.stream()
+        final List<String> questionWords = new ArrayList<>();
+        questionWords.add(wh);
+        questionWords.addAll(auxiliaries);
+        questionWords.addAll(left);
+        questionWords.add(predStr);
+        questionWords.addAll(right);
+
+        final List<String> question = questionWords
+            .stream()
             .filter(s -> s != null && !s.isEmpty()) // to mitigate oversights. harmless anyway
             .collect(Collectors.toList());
-        answerWords = AnswerGenerator.getRepresentativePhrase(argIndices.get(targetArgNum), argCategories.get(targetArgNum), parse);
-        return new QuestionAnswerPair(questionWords, answerWords);
+        final List<ResolvedDependency> targetDeps = allArgDeps.get(targetArgNum);
+        final List<TextWithDependencies> answers = targetDeps
+            .stream()
+            .map(ResolvedDependency::getArgument)
+            .map(index -> TextGenerationHelper.getRepresentativePhrase(index, argCategories.get(targetArgNum), parse))
+            .collect(Collectors.toList());
+
+        return Optional.of(new QuestionAnswerPair(predicateIndex,
+                                                  predicateCategory,
+                                                  questionDeps,
+                                                  question,
+                                                  targetDeps,
+                                                  answers));
     }
 
     /**

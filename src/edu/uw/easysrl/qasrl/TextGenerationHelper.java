@@ -13,10 +13,81 @@ import java.util.stream.Collectors;
 import java.util.stream.*;
 
 /**
- * Print answer spans ..
+ * Tools for generating text from trees, dependencies, and lists of tokens.
  * Created by luheng on 1/20/16.
  */
-public class AnswerGenerator {
+public class TextGenerationHelper {
+
+    // here is the punctuation we want to avoid spaces before,
+    // and that we don't want at the end of the question or answer.
+    // For now, those are the same.
+    private static final String trimPunctuation = " ,.:;!?";
+    private static Set<String> noSpaceBefore = new HashSet<String>();
+    private static Set<String> noSpaceAfter = new HashSet<String>();
+    static {
+        noSpaceBefore.add(".");
+        noSpaceBefore.add(",");
+        noSpaceBefore.add("!");
+        noSpaceBefore.add("?");
+        noSpaceBefore.add(";");
+        noSpaceBefore.add(":");
+        noSpaceBefore.add("n\'t");
+        noSpaceBefore.add("\'s");
+        noSpaceBefore.add("%");
+        noSpaceBefore.add(")");
+        noSpaceBefore.add("]");
+        noSpaceBefore.add("}");
+
+        noSpaceAfter.add("$");
+        noSpaceAfter.add("#");
+        noSpaceAfter.add("(");
+        noSpaceAfter.add("[");
+        noSpaceAfter.add("{");
+    }
+
+    /**
+     * Turns a list of tokens into a nicely rendered string, spacing everything appropriately.
+     * Trims extra punctuation at the end though. (Useful feature for now; might want to change later.)
+     */
+    public static String renderString(List<String> rawWords) {
+        StringBuilder result = new StringBuilder();
+        if(rawWords.size() == 0) {
+            return "";
+        }
+        List<String> words = rawWords.stream().map(TextGenerationHelper::translateBrackets).collect(Collectors.toList());
+        Optional<String> prevWord = Optional.empty();
+        for(String word : words) {
+            boolean noSpace = (prevWord.isPresent() && noSpaceAfter.contains(prevWord.get())) || noSpaceBefore.contains(word);
+            if(!noSpace) {
+                result.append(" ");
+            }
+            result.append(word);
+            prevWord = Optional.of(word);
+        }
+        result.deleteCharAt(0);
+        while(result.length() > 0 &&
+              trimPunctuation.indexOf(result.charAt(result.length() - 1)) >= 0) {
+            result.deleteCharAt(result.length() - 1);
+        }
+        return result.toString();
+    }
+
+    private static String translateBrackets(String word) {
+        if (word.equalsIgnoreCase("-LRB-")) {
+            word = "(";
+        } else if (word.equalsIgnoreCase("-RRB-")) {
+            word = ")";
+        } else if (word.equalsIgnoreCase("-LCB-")) {
+            word = "{";
+        } else if (word.equalsIgnoreCase("-RCB-")) {
+            word = "}";
+        } else if (word.equalsIgnoreCase("-LSB-")) {
+            word = "[";
+        } else if (word.equalsIgnoreCase("-RSB-")) {
+            word = "]";
+        }
+        return word;
+    }
 
     public static Set<Integer> getArgumentIdsForDependency(final List<String> words, Parse parse,
                                                            ResolvedDependency dependency) {
@@ -130,23 +201,6 @@ public class AnswerGenerator {
         return null;
     }
 
-    private static String translateBrackets(String word) {
-        if (word.equalsIgnoreCase("-LRB-")) {
-            word = "(";
-        } else if (word.equalsIgnoreCase("-RRB-")) {
-            word = ")";
-        } else if (word.equalsIgnoreCase("-LCB-")) {
-            word = "{";
-        } else if (word.equalsIgnoreCase("-RCB-")) {
-            word = "}";
-        } else if (word.equalsIgnoreCase("-LSB-")) {
-            word = "[";
-        } else if (word.equalsIgnoreCase("-RSB-")) {
-            word = "]";
-        }
-        return word;
-    }
-
     /**
      * Tries to get the parent of a node in a tree.
      * Assumes the given node is in the given tree. If not, it will probably return empty, maybe... but maybe not.
@@ -168,32 +222,38 @@ public class AnswerGenerator {
         return lastCandidate;
     }
 
+    /**
+     * Climbs up the tree, starting at the given node,
+     * until we reach a node whose category is a function into (i.e., ends on the left with)
+     * the given category. If none is found before getting to the root, returns empty.
+     */
     public static Optional<SyntaxTreeNode> getLowestAncestorFunctionIntoCategory(SyntaxTreeNode node, Category category, SyntaxTreeNode wholeTree) {
         Optional<SyntaxTreeNode> curNode = Optional.of(node);
-        Optional<Category> curCat = curNode.map(n -> n.getCategory());
+        Optional<Category> curCat = curNode.map(SyntaxTreeNode::getCategory);
         while(curNode.isPresent() && !curCat.get().isFunctionInto(category)) {
-            curNode = AnswerGenerator.getParent(curNode.get(), wholeTree);
+            curNode = getParent(curNode.get(), wholeTree);
             curCat = curNode.map(SyntaxTreeNode::getCategory);
         }
         return curNode;
     }
 
     // Could be improved for PPs and such if necessary.
-    public static List<String> getRepresentativePhraseForUnrealized(Category category) {
-        List<String> result = new ArrayList<>();
-        result.add("something");
-        return result;
+    public static TextWithDependencies getRepresentativePhraseForUnrealized(Category category) {
+        List<String> words = new ArrayList<>();
+        Set<ResolvedDependency> deps = new HashSet<>();
+        words.add("something");
+        return new TextWithDependencies(words, deps);
     }
 
-    public static List<String> getRepresentativePhrase(int headIndex, Category neededCategory, Parse parse) {
+    public static TextWithDependencies getRepresentativePhrase(int headIndex, Category neededCategory, Parse parse) {
         return getRepresentativePhrase(headIndex, neededCategory, parse, Optional.empty());
     }
 
-    public static List<String> getRepresentativePhrase(int headIndex, Category neededCategory, Parse parse, String replacementWord) {
+    public static TextWithDependencies getRepresentativePhrase(int headIndex, Category neededCategory, Parse parse, String replacementWord) {
         return getRepresentativePhrase(headIndex, neededCategory, parse, Optional.of(replacementWord));
     }
 
-    public static List<String> getRepresentativePhrase(int headIndex, Category neededCategory, Parse parse, Optional<String> replacementWord) {
+    public static TextWithDependencies getRepresentativePhrase(int headIndex, Category neededCategory, Parse parse, Optional<String> replacementWord) {
         return getRepresentativePhrase(headIndex, neededCategory, parse, headIndex, replacementWord, true);
     }
 
@@ -203,8 +263,10 @@ public class AnswerGenerator {
      *   the optional argument is used when stripping verbs of their tense. (maybe there's a less hacky way to deal with that...)
      * TODO: does not handle coordination; we might want to include both args in the case of coordination.
      * In particular this would be for the phrases inside questions: consider "What did something do between April 1991?"
+     * For multiple answers to the same question, we just call this multiple times. (it should only get one of multiple
+     * constituents together in a coordination construction.)
      */
-    private static List<String> getRepresentativePhrase(int headIndex, Category neededCategory,
+    private static TextWithDependencies getRepresentativePhrase(int headIndex, Category neededCategory,
                                                         Parse parse, int replacementIndex,
                                                         Optional<String> replacementWord, boolean lookForOf) {
         SyntaxTreeNode tree = parse.syntaxTree;
@@ -212,21 +274,26 @@ public class AnswerGenerator {
             return getRepresentativePhraseForUnrealized(neededCategory);
         }
         SyntaxTreeNode headLeaf = tree.getLeaves().get(headIndex);
-        Optional<SyntaxTreeNode> nodeOpt = AnswerGenerator
-            .getLowestAncestorFunctionIntoCategory(headLeaf, neededCategory, tree);
+        Set<ResolvedDependency> touchedDeps = new HashSet<>();
+
+        Optional<SyntaxTreeNode> nodeOpt = getLowestAncestorFunctionIntoCategory(headLeaf, neededCategory, tree);
         if(!nodeOpt.isPresent()) {
             // fall back to just the original leaf. this failure case is very rare.
             List<String> result = new ArrayList<>();
             result.addAll(getNodeWords(headLeaf, replacementIndex, replacementWord));
-            return result;
+            return new TextWithDependencies(result, touchedDeps);
         }
+
+        // get all of the dependencies that were (presumably) touched in the course of getting the lowest good ancestor
+        SyntaxTreeNode node = nodeOpt.get();
+        touchedDeps.addAll(getContainedDependencies(node, parse));
+
         // here we don't necessarily have the whole phrase. `node` is a function into the phrase.
         // especially common is the case where we get a transitive verb and it doesn't bother including the object.
         // so we need to populate the remaining spots by accessing the arguments of THIS guy,
         // until he exactly matches the category we're looking for.
         // using this method will capture and appropriately rearrange extracted arguments and such.
 
-        SyntaxTreeNode node = nodeOpt.get();
         Category currentCategory = node.getCategory();
 
         if(neededCategory.matches(currentCategory)) {
@@ -237,7 +304,7 @@ public class AnswerGenerator {
                ) {
                 return getRepresentativePhrase(node.getEndIndex(), neededCategory, parse, replacementIndex, replacementWord, false);
             } else {
-                return getNodeWords(node, replacementIndex, replacementWord);
+                return new TextWithDependencies(getNodeWords(node, replacementIndex, replacementWord), touchedDeps);
             }
         } else {
             List<String> left = new ArrayList<>();
@@ -257,8 +324,11 @@ public class AnswerGenerator {
                     }).findFirst();
                 // if we can't find the argument, we put index -1 so the recursive call considers it "unrealized"
                 // and says, e.g., "something"
+                depOpt.map(dep -> touchedDeps.add(dep));
                 int argIndex = depOpt.map(dep -> dep.getArgument()).orElse(-1);
-                List<String> argPhrase = getRepresentativePhrase(argIndex, argCat, parse, replacementIndex, replacementWord, lookForOf);
+                TextWithDependencies argTextWithDeps = getRepresentativePhrase(argIndex, argCat, parse, replacementIndex, replacementWord, lookForOf);
+                List<String> argPhrase = argTextWithDeps.tokens;
+                touchedDeps.addAll(argTextWithDeps.dependencies);
                 // add the argument on the left or right side, depending on the slash
                 Slash slash = currentCategory.getSlash();
                 switch(slash) {
@@ -280,7 +350,7 @@ public class AnswerGenerator {
             result.addAll(left);
             result.addAll(center);
             result.addAll(right);
-            return result;
+            return new TextWithDependencies(result, touchedDeps);
         }
 
     }
@@ -302,5 +372,35 @@ public class AnswerGenerator {
             }
         }
         return words;
+    }
+
+    /**
+     * Gets all of the dependencies that start and end inside the syntax tree rooted at the given node
+     */
+    private static Set<ResolvedDependency> getContainedDependencies(SyntaxTreeNode node, Parse parse) {
+        final Set<ResolvedDependency> deps = new HashSet<>();
+        final int minIndex = node.getStartIndex();
+        final int maxIndex = node.getEndIndex();
+        for (ResolvedDependency dep : parse.dependencies) {
+            if (dep.getHead() >= minIndex && dep.getHead() < maxIndex &&
+                dep.getArgument() >= minIndex && dep.getArgument() <= maxIndex) {
+                deps.add(dep);
+            }
+        }
+        return deps;
+    }
+
+    /**
+     * Data structure used to return text generated from a parsed sentence.
+     * Indicates which dependencies were used in constructing the text.
+     * This is returned by getRepresentativePhrase to indicate what parts of the parse were used.
+     */
+    public static class TextWithDependencies {
+        public final List<String> tokens;
+        public final Set<ResolvedDependency> dependencies;
+        public TextWithDependencies(List<String> tokens, Set<ResolvedDependency> dependencies) {
+            this.tokens = tokens;
+            this.dependencies = dependencies;
+        }
     }
 }
