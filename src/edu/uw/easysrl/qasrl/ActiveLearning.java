@@ -4,6 +4,7 @@ import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
+import org.omg.PortableInterceptor.ACTIVE;
 
 import java.util.*;
 import java.util.concurrent.SynchronousQueue;
@@ -81,11 +82,31 @@ public class ActiveLearning {
                           BaseCcgParser parser, QuestionGenerator questionGenerator, int nBest) {
         this.sentences = sentences;
         this.goldParses = goldParses;
-        DataLoader.readDevPool(sentences, goldParses);
         this.questionGenerator = questionGenerator;
         this.parser = parser;
         this.nBest = nBest;
         initialize();
+    }
+
+    public ActiveLearning(ActiveLearning other) {
+        this.sentences = other.sentences;
+        this.goldParses = other.goldParses;
+        this.questionGenerator = other.questionGenerator;
+        this.parser = other.parser;
+        this.nBest = other.nBest;
+
+        this.allParses = other.allParses;
+        this.allResults = other.allResults;
+        this.oracleParseIds = other.oracleParseIds;
+
+        this.reranker = new RerankerExponentiated(allParses, rerankerStepSize);
+        this.queryPool = other.queryPool;
+        this.queryQueue = new PriorityQueue<>(queryComparator);
+        queryQueue.addAll(queryPool);
+        System.out.println("Total number of queries:\t" + queryQueue.size());
+
+        recentlyUpdatedSentences = new HashSet<>();
+        askedDependencies = new HashMap<>();
     }
 
     private void initialize() {

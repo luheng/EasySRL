@@ -2,18 +2,19 @@ package edu.uw.easysrl.qasrl.annotation;
 
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
 
+import edu.uw.easysrl.syntax.grammar.Category;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.plus.servlet.ServletHandler;
@@ -28,17 +29,26 @@ import org.eclipse.jetty.servlet.ServletContextHandler;
  * Usage: WebUI [port number] [n-best]
  */
 public class WebUI {
+    // Parameters.
+    private static int nBest = 50;
+    private static int maxNumAnswerOptionsPerQuery = 4;
+    private static int reorderQueriesEvery = 5;
+
+    private static ActiveLearning baseLearner;
+    private static ResponseSimulatorGold goldSimulator;
+    private static Map<String, ActiveLearning> activeLearningMap;
+    private static Map<String, ActiveLearningHistory> activeLearningHistoryMap;
+
     public static void main(final String[] args) throws Exception {
         final Server server = new Server(Integer.valueOf(args[0]));
         nBest = Integer.parseInt(args[1]);
 
-        activeLearning = new ActiveLearning(nBest);
-        goldSimulator = new ResponseSimulatorGold(activeLearning.goldParses, new QuestionGenerator());
-        queryHistory = new ArrayList<>();
-        responseHistory = new ArrayList<>();
-        goldResponseHistory = new ArrayList<>();
-        evaluationHistory = new ArrayList<>();
+        baseLearner = new ActiveLearning(nBest);
+        goldSimulator = new ResponseSimulatorGold(baseLearner.goldParses, new QuestionGenerator());
+        activeLearningMap = new HashMap<>();
+        activeLearningHistoryMap = new HashMap<>();
 
+        // Initialize server and handler.
         ServletContextHandler handler = new ServletContextHandler(ServletContextHandler.SESSIONS);
         handler.setContextPath("/");
         handler.setResourceBase(System.getProperty("java.io.tmpdir"));
@@ -50,18 +60,6 @@ public class WebUI {
         server.start();
         server.join();
     }
-
-    private static ActiveLearning activeLearning;
-    private static ResponseSimulatorGold goldSimulator;
-    private static List<GroupedQuery> queryHistory;
-    private static List<Response> responseHistory;
-    private static List<Response> goldResponseHistory;
-    private static List<Results> evaluationHistory;
-
-    private static int nBest = 50;
-    private static int maxNumAnswerOptionsPerQuery = 4;
-    private static int reorderQueriesEvery = 5;
-
 
     public static class LoginServlet extends HttpServlet {
         public void doGet(final HttpServletRequest request, final HttpServletResponse httpResponse)
@@ -85,8 +83,6 @@ public class WebUI {
     }
 
     public static class AnnotationServlet extends HttpServlet {
-        public AnnotationServlet() {
-        }
 
         @Override
         public void doGet(final HttpServletRequest request, final HttpServletResponse httpResponse)
@@ -95,12 +91,22 @@ public class WebUI {
                 httpResponse.sendRedirect(httpResponse.encodeRedirectURL("/login"));
                 return;
             }
+            final String userName = request.getParameter("UserName");
+            // New user.
+            if (!activeLearningMap.containsKey(userName)) {
+                activeLearningMap.put(userName, new ActiveLearning(baseLearner));
+                activeLearningHistoryMap.put(userName, new ActiveLearningHistory());
+            }
+
+            final ActiveLearning activeLearning = activeLearningMap.get(userName);
+            final ActiveLearningHistory history = activeLearningHistoryMap.get(userName);
+
             if (request.getParameter("SwitchQuestion") != null) {
                 for (int i = 1; i < 10; i++) {
                     activeLearning.getNextQueryInQueue();
                 }
             }
-            final String userName = request.getParameter("UserName");
+
             final String userAnswer = request.getParameter("UserAnswer");
             if (userAnswer != null) {
                 String[] userAnswerInfo = userAnswer.split("_");
@@ -116,11 +122,8 @@ public class WebUI {
                 System.out.println(rerankResults);
 
                 // Append to history
-                queryHistory.add(query);
-                responseHistory.add(response);
-                goldResponseHistory.add(goldSimulator.answerQuestion(query));
-                evaluationHistory.add(rerankResults);
-                if (queryHistory.size() % reorderQueriesEvery == 0) {
+                history.add(query, response, goldSimulator.answerQuestion(query), rerankResults);
+                if (history.size() % reorderQueriesEvery == 0) {
                     activeLearning.refreshQueryList();
                 }
             }
@@ -137,7 +140,7 @@ public class WebUI {
             httpWriter.println("<container>\n" + WebUIHelper.printInstructions() + "</container>\n");
 
             // Get next query.
-            GroupedQuery nextQuery = activeLearning.getNextQueryInQueue();
+            GroupedQuery nextQuery = activeLearningMap.get(userName).getNextQueryInQueue();
             // Print sentence
             final List<String> words = nextQuery.getSentence();
 
@@ -190,12 +193,12 @@ public class WebUI {
 
             // Gold info and debugging info.
             httpWriter.println(WebUIHelper.printGoldInfo(nextQuery, goldSimulator.answerQuestion(nextQuery)));
-            if (queryHistory.size() > 0) {
-                int last = queryHistory.size() - 1;
-                httpWriter.println(WebUIHelper.printDebuggingInfo(queryHistory.get(last), responseHistory.get(last),
-                        goldResponseHistory.get(last), evaluationHistory.get(last)));
+            ActiveLearningHistory history = activeLearningHistoryMap.get(userName);
+            if (history.size() > 0) {
+                int last = history.size() - 1;
+                httpWriter.println(WebUIHelper.printDebuggingInfo(history.getQuery(last), history.getResponse(last),
+                        history.getGoldResponse(last), history.getResult(last)));
             }
-
             httpWriter.println("</div></div></container>\n");
             httpWriter.println("</body>");
         }
