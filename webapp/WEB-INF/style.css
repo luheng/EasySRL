@@ -1,0 +1,161 @@
+html {
+  overflow-y: scroll;
+}
+body {
+  background: #FFFFFF;
+  font-family: Segoe UI,Helvetica Neue,Open Sans,Helvetica,Tahoma,Arial,Verdana,sans-serif;
+  font-size: 14pt;
+  font-weight: 300;
+  color: #404040;
+  line-height: 140%;
+  padding-top: 50px;
+}
+
+h1{
+  font-family: Helvetica Neue,Segoe UI Light, Helvetica,Open Sans,Tahoma,Arial,Verdana,sans-serif;
+  font-size: 32pt;
+  font-weight: 1200;
+  /* color: rgb(72, 57, 130); */
+}
+
+h2 {
+  font-family: Segoe UI Light,Helvetica Neue, Helvetica,Open Sans,Tahoma,Arial,Verdana,sans-serif;
+  font-size: 18pt;
+  font-weight: 600;
+  /* color: rgb(72, 57, 130); */
+}
+
+h3 {
+  font-family: Segoe UI Light,Helvetica Neue, Helvetica,Open Sans,Tahoma,Arial,Verdana,sans-serif;
+  font-size: 14pt;
+  font-weight: 600;
+  /* color: rgb(72, 57, 130); */
+}
+
+.simple{
+  padding: 20px 15px;
+  text-align: left;
+}
+
+a {
+  link: #101010;
+  visited: #00FF00;
+  hover: #FF00FF;
+  active: #000FF;
+}
+a:hover {
+  text-decoration: underline;
+  color: #0066cc;
+}
+
+a.conference_title{
+  font-weight: 500;
+  font-size: 12pt;
+  font-style: italic;
+  text-decoration: underline
+}
+
+img.logo{
+  padding-left: 50px;
+}
+
+table.t1{
+  border: 1px solid #646464;
+}
+table.t2{
+  border: 0px solid #FFFFFF;
+}
+
+b{
+  font-weight: 500;
+  color: #000000;
+}
+
+strong{
+  color: #000000;
+  font-weight: 400;
+  font-size: 12pt;
+}
+
+tr.content {
+  background: #ffffff url(none) repeat scroll 0%;
+}
+td.padding {
+  padding: 30px 40px;
+}
+img.portrait {
+  padding: 30px 40px;
+}
+.main_container{
+  background: #FFFFFF url(none) repeat scroll 0%;
+  
+  /* round corner
+  border: 1px solid #FFFFFF;
+  -moz-border-radius: 10px;
+  -khtml-border-radius: 10px;
+  -webkit-border-radius: 10px;
+  border-radius: 10px;
+  color: #383838 ;
+  */
+  width:900px;
+  padding-top: 10px;
+  padding-bottom:20px;
+  padding-left: 20px;
+  padding-right: 20px;
+  background-color: #FFFFFF;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.white{
+	background: #ffffff url(none) repeat scroll 0%;
+}
+
+.indent1{
+	text-indent: 0%;
+}
+
+a img.icon:hover {
+  background: #aaa;
+  -webkit-box-shadow: 0 0 5px #49568A;
+}
+
+.header {
+  margin-top: 20px;
+  padding-left: 15px;
+   padding-right: 15px;
+  /*background-color: #eedd82;*/
+  position: relative;
+}
+
+.page_content {
+  padding: 15px;
+  position: relative;
+}
+
+.clear {
+    clear: both;
+}
+
+.horizontal_line {
+    clear: both;
+    margin: 0;
+    margin-top: 8px;
+    margin-bottom: 10px;
+    border-bottom: solid 1px #DBDBDB;
+    width: inherit;
+}
+
+.header {
+  text-align: center;
+}
+
+div.photo {
+  float: left;
+}
+
+img.photo {
+  height: 150px;
+}
+
+
