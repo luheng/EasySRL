@@ -13,12 +13,14 @@ public class ActiveLearningHistory {
     List<GroupedQuery> queries;
     List<Response> responses, goldResponses;
     List<Results> results;
+    int numCorrectAnswers;
 
     public ActiveLearningHistory() {
         queries = new ArrayList<>();
         responses = new ArrayList<>();
         goldResponses = new ArrayList<>();
         results = new ArrayList<>();
+        numCorrectAnswers = 0;
     }
 
     public void add(final GroupedQuery query, final Response response, final Response goldResponse,
@@ -27,6 +29,9 @@ public class ActiveLearningHistory {
         responses.add(response);
         goldResponses.add(goldResponse);
         results.add(result);
+        if (response.chosenOptions.get(0).equals(goldResponse.chosenOptions.get(0))) {
+            numCorrectAnswers ++;
+        }
     }
 
     public GroupedQuery getQuery(int id) {
@@ -47,5 +52,17 @@ public class ActiveLearningHistory {
 
     public int size() {
         return queries.size();
+    }
+
+    public String printLatestHistory() {
+        if (size() == 0) {
+            return "";
+        }
+        final int last = size() - 1;
+        String str = String.format("ITER=%d\n", last);
+        str += queries.get(last).getDebuggingInfo(responses.get(last), goldResponses.get(last)) + "\n";
+        str += String.format("USER_ACC=%.2f%%\n", 100.0 * numCorrectAnswers / size());
+        str += "[ReRanked]:\n" + results.get(last).toString() + "\n";
+        return str;
     }
 }

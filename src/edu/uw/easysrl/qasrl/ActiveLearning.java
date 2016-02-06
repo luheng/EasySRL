@@ -139,7 +139,7 @@ public class ActiveLearning {
             allParses.put(sentIdx, parses);
             allResults.put(sentIdx, results);
             oracleParseIds.put(sentIdx, oracleK);
-            if (allParses.size() % 100 == 0) {
+            if (allParses.size() % 500 == 0) {
                 System.out.println("Parsed:\t" + allParses.size() + " sentences ...");
             }
         }

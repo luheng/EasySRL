@@ -141,6 +141,7 @@ public class GroupedQuery {
             allParseIds.removeAll(parseIds);
         });
         answerOptions.add(new BadQuestionOption(allParseIds));
+        //answerOptions.add(new NoAnswerOption(unlistedParses));
     }
 
     // Experimental query collapse function.
@@ -272,6 +273,25 @@ public class GroupedQuery {
                     ao.answer, parseIdsStr) + "\n";
         }
         return result + "\n";
+    }
+
+    public String getDebuggingInfo(final Response response, final Response goldResponse) {
+        String result = String.format("SID=%d\t%s\n", sentenceId, sentence.stream().collect(Collectors.joining(" ")));
+        result += String.format("%d:%s\t%s.%d\n", predicateIndex, sentence.get(predicateIndex), category, argumentNumber);
+        result += String.format("QID=%d\tent=%.2f\tmarg=%.2f\t%s\n", queryId, answerEntropy, answerMargin, question);
+        for (int i = 0; i < answerOptions.size(); i++) {
+            AnswerOption ao = answerOptions.get(i);
+            String match = (response.chosenOptions.contains(i) ? "*" : " ")
+                            + (goldResponse.chosenOptions.contains(i) ? "G" : " ");
+            String argIdsStr = ao.isNAOption() ? "_" :
+                    ao.argumentIds.stream().map(String::valueOf).collect(Collectors.joining(","));
+            String argHeadsStr = ao.isNAOption() ? "N/A" :
+                    ao.argumentIds.stream().map(sentence::get).collect(Collectors.joining(","));
+            String parseIdsStr = DebugPrinter.getShortListString(ao.parseIds);
+            result += String.format("%d\t%s\tprob=%.2f\t%s\t(%s:%s)\t%s\n", i, match, ao.probability, ao.answer,
+                    argIdsStr, argHeadsStr, parseIdsStr);
+        }
+        return result;
     }
 
     public void printWithGoldDependency(final List<String> words, int response, Parse goldParse) {

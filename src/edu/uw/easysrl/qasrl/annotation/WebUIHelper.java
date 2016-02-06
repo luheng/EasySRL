@@ -54,8 +54,6 @@ public class WebUIHelper {
         int w1 = (int) Math.ceil(1.0 * numAnswered / numTotal);
         int w2 = (int) Math.ceil(1.0 * numSkipped / numTotal);
 
-        System.err.println(numAnswered + "\t" + numSkipped + "\t" + numTotal + "\t" + w1 + "\t" + w2);
-
         return String.format("<span class=\"label label-info\" for=\"progress\">%d answered. %d skipped. %d remaining.</span>\n",
                         numAnswered, numSkipped, numTotal - numAnswered - numSkipped)
                 + "<div class=\"progress\" id=\"progress\">"
