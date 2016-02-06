@@ -291,6 +291,9 @@ public class GroupedQuery {
             result += String.format("%d\t%s\tprob=%.2f\t%s\t(%s:%s)\t%s\n", i, match, ao.probability, ao.answer,
                     argIdsStr, argHeadsStr, parseIdsStr);
         }
+        if (response.debugInfo.length() > 0) {
+            result += "Comment:\t" + response.debugInfo;
+        }
         return result;
     }
 

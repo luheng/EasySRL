@@ -131,17 +131,20 @@ public class WebUI {
                 int queryId = Integer.parseInt(userAnswerInfo[1]);
                 int optionId = Integer.parseInt(userAnswerInfo[3]);
                 GroupedQuery query = activeLearning.getQueryById(queryId);
+                // Create user response objective.
                 Response response = new Response(optionId);
+                if (request.getParameter("Comment") != null) {
+                    response.debugInfo = request.getParameter("Comment").trim();
+                }
+                // Get gold response for debugging.
                 Response goldResponse = goldSimulator.answerQuestion(query);
                 activeLearning.respondToQuery(query, response);
                 Results rerankResults = activeLearning.getRerankedF1();
-
                 // Append to history
                 history.add(query, response, goldResponse, rerankResults);
                 if (history.size() % reorderQueriesEvery == 0) {
                     activeLearning.refreshQueryList();
                 }
-
                 // Print latest history.
                 final String latestHistoryStr = history.printLatestHistory();
                 System.out.println(latestHistoryStr);
@@ -241,7 +244,7 @@ public class WebUI {
             }
 
             // File download link
-            httpWriter.println(String.format("<a href=\"%s\" download>", annotationFilePathMap.get(userName)));
+            httpWriter.println(String.format("<a href=\"%s\">Click to download annotation file.</a>", annotationFilePathMap.get(userName)));
 
             httpWriter.println("</div></div></container>\n");
             httpWriter.println("</body>");
