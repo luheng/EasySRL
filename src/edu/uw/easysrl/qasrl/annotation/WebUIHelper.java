@@ -7,7 +7,6 @@ import edu.uw.easysrl.syntax.evaluation.Results;
 import java.util.List;
 import java.util.stream.IntStream;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 /**
  * Created by luheng on 2/1/16.
@@ -27,7 +26,7 @@ public class WebUIHelper {
                 + "<link rel=\"stylesheet\" href=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css\">"
                 + "<!-- Optional theme -->\n"
                 + "<link rel=\"stylesheet\" href=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap-theme.min.css\">\n"
-                + "<link rel=\"stylesheet\" href=\"WEB-INF/style.css\">\n"
+                + "<link rel=\"stylesheet\" href=\"webapp/WEB-INF/style.css\">\n"
                 + "<!-- Latest compiled and minified JavaScript -->\n"
                 + "<script src=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js\"></script>"
                 + "</head>";
@@ -46,9 +45,27 @@ public class WebUIHelper {
     public static String getHighlightedSentenceString(List<String> words, int predicateIndex) {
         return IntStream.range(0, words.size())
                 .mapToObj(i -> {
-                    String w = translateBrackets(words.get(i));
-                    return i == predicateIndex ? "<mark>" + w + "</mark>" : w;
+                    String w = translatePTBTokens(words.get(i));
+                    return i == predicateIndex ? "<mark><strong>" + w + "</mark></strong>" : w;
                 }).collect(Collectors.joining(" "));
+    }
+
+    public static String printProgressBar(int numAnswered, int numSkipped, int numTotal) {
+        int w1 = (int) Math.ceil(1.0 * numAnswered / numTotal);
+        int w2 = (int) Math.ceil(1.0 * numSkipped / numTotal);
+
+        System.err.println(numAnswered + "\t" + numSkipped + "\t" + numTotal + "\t" + w1 + "\t" + w2);
+
+        return String.format("<span class=\"label label-info\" for=\"progress\">%d answered. %d skipped. %d remaining.</span>\n",
+                        numAnswered, numSkipped, numTotal - numAnswered - numSkipped)
+                + "<div class=\"progress\" id=\"progress\">"
+                + String.format("<div class=\"progress-bar progress-bar-success\" style=\"width: %d%%\">", w1)
+                + String.format("<span class=\"sr-only\">%d Answered</span>", numAnswered)
+                + "</div>"
+                + String.format("<div class=\"progress-bar progress-bar-warning\" style=\"width: %d%%\">", w2)
+                + String.format("<span class=\"sr-only\">%d Skipped</span>", numSkipped)
+                + "</div>"
+                + "</div>\n</div>";
     }
 
     public static String printGoldInfo(final GroupedQuery query, final Response goldResponse) {
@@ -74,7 +91,7 @@ public class WebUIHelper {
         return question.substring(0, 1).toUpperCase() + question.substring(1) + "?";
     }
 
-    public static String translateBrackets(String word) {
+    public static String translatePTBTokens(String word) {
         if (word.equalsIgnoreCase("-LRB-")) {
             word = "(";
         } else if (word.equalsIgnoreCase("-RRB-")) {
@@ -87,8 +104,20 @@ public class WebUIHelper {
             word = "[";
         } else if (word.equalsIgnoreCase("-RSB-")) {
             word = "]";
+        } else if (word.equalsIgnoreCase("\\/")) {
+            return "/";
         }
         return word;
+    }
+
+    public static String substitutePTBToken(String word) {
+        return word.replace("-LRB-", "(")
+                .replace("-RRB-", ")")
+                .replace("-LCB-", "{")
+                .replace("-RCB-", "}")
+                .replace("-LSB-", "[")
+                .replace("-RSB-", "]")
+                .replace("\\/", "/");
     }
 
     // TODO: group words such as A - B

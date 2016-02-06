@@ -9,17 +9,11 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
 
-import edu.uw.easysrl.syntax.grammar.Category;
-import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.plus.servlet.ServletHandler;
-import org.eclipse.jetty.server.handler.ContextHandler;
-import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 
 
@@ -133,54 +127,70 @@ public class WebUI {
         }
 
         private void update(final String userName, final PrintWriter httpWriter) {
+            final ActiveLearning activeLearning = activeLearningMap.get(userName);
+            final ActiveLearningHistory history = activeLearningHistoryMap.get(userName);
+
             httpWriter.println(WebUIHelper.printHTMLHeader());
             httpWriter.println("<h1><font face=\"arial\">Annotation Demo</font></h1>\n");
 
-            httpWriter.println("<body style=\"padding-left: 50px; padding-right=50px;\">");
+            httpWriter.println("<body style=\"padding-left: 80px; padding-right=80px;\">");
             httpWriter.println("<container>\n" + WebUIHelper.printInstructions() + "</container>\n");
 
+            // Print progress bar.
+            int numAnswered = history.size();
+            int numTotal = activeLearning.getTotalNumberOfQueries();
+            int numSkipped = numTotal - activeLearning.getNumberOfRemainingQueries() - numAnswered;
+            httpWriter.println(WebUIHelper.printProgressBar(numAnswered, numSkipped, numTotal));
+
             // Get next query.
-            GroupedQuery nextQuery = activeLearningMap.get(userName).getNextQueryInQueue();
+            GroupedQuery nextQuery = activeLearning.getNextQueryInQueue();
             // Print sentence
             final List<String> words = nextQuery.getSentence();
 
-            httpWriter.println("<container><div class=\"row\">\n<div class=\"col-md-12\">");
-
+            httpWriter.println("<container><div class=\"row\">\n");
+            // httpWriter.println("<div class=\"col-md-2\"> </div>");
+            httpWriter.println("<div class=\"col-md-12\">");
+            // Annotation margin.
             httpWriter.println("<panel panel-default>\n");
-            httpWriter.println("<span class=\"label label-primary\">Sentence:</span>");
-            httpWriter.println(WebUIHelper.getHighlightedSentenceString(words, nextQuery.getPredicateIndex()) + "<br>");
-            httpWriter.println("<span class=\"label label-primary\">Question:</span>");
-            httpWriter.println(nextQuery.getQuestion() + "<br>");
+            httpWriter.println("<h4><span class=\"label label-primary\" for=\"Sentence\">Sentence:</span></h4>");
+            httpWriter.println("<div id=\"Sentence\"> " + WebUIHelper.getHighlightedSentenceString(words, nextQuery.getPredicateIndex()) + " </div>");
+            httpWriter.println("<h4><span class=\"label label-primary\" for=\"Question\">Question:</span><br></h4>");
+            httpWriter.println("<div id=\"Question\"> " + nextQuery.getQuestion() + " </div>");
 
-            httpWriter.println("<span class=\"label label-primary\">Answer Options:</span>");
-            httpWriter.println("<br><form class=\"form-group\" action=\"\" method=\"get\">");
+            httpWriter.println("<h4><span class=\"label label-primary\" for=\"AnswerOptions\">Answer Options:</span></h4>");
+            httpWriter.println("<form class=\"form-group\" id=\"AnswerOptions\" action=\"\" method=\"get\">");
             httpWriter.println(String.format("<input type=\"hidden\" input name=\"UserName\" value=\"%s\"/>", userName));
             final List<GroupedQuery.AnswerOption> options = nextQuery.getAnswerOptions();
             String qLabel = "q_" + nextQuery.getQueryId();
 
-            int badQuestionOptionId = nextQuery.getAnswerOptions().size() - 1;
+            int badQuestionOptionId = 0, unlistedAnswerId = 0;
             for (int i = 0; i < options.size(); i++) {
                 GroupedQuery.AnswerOption option = options.get(i);
-                if (option.isNAOption()) {
+                if (GroupedQuery.BadQuestionOption.class.isInstance(option)) {
+                    badQuestionOptionId = i;
+                    continue;
+                }
+                if (GroupedQuery.NoAnswerOption.class.isInstance(option)) {
+                    unlistedAnswerId = i;
                     continue;
                 }
                 String optionValue = qLabel + "_a_" + i;
                 String optionString = option.getAnswer();
-                httpWriter.println(
-                        String.format("<label><input name=\"UserAnswer\" type=\"radio\" value=\"%s\" />&nbsp %s</label><br/>",
-                                optionValue, WebUIHelper.translateBrackets(optionString)));
+                httpWriter.println(String.format("<label><input name=\"UserAnswer\" type=\"radio\" value=\"%s\" />&nbsp %s</label><br/>",
+                        optionValue, WebUIHelper.substitutePTBToken(optionString)));
             }
-            httpWriter.println(String.format(
-                    "<label><input name=\"UserAnswer\" type=\"radio\" value=\"%s\"/>" +
-                            "&nbsp Question is not understandable.</label><br/>",
+            httpWriter.println(String.format("<label><input name=\"UserAnswer\" type=\"radio\" value=\"%s\"/> &nbsp Question is not understandable.</label><br/>",
                     qLabel + "_a_" + badQuestionOptionId));
-            httpWriter.println(String.format(
-                    "<label><input name=\"UserAnswer\" type=\"radio\" value=\"%s\"/>" +
-                            "&nbsp Answer is not listed.</label><br/>",
-                    qLabel + "_a_" + badQuestionOptionId));
-            httpWriter.println(
-                    "<button class=\"btn btn-primary\" type=\"submit\" value=\"Submit!\">Submit!</button>" +
-                            "</form>");
+            httpWriter.println(String.format("<label><input name=\"UserAnswer\" type=\"radio\" value=\"%s\"/> &nbsp Answer is not listed.</label><br/>",
+                    qLabel + "_a_" + unlistedAnswerId));
+
+            // Comment box.
+            httpWriter.println("<br><span class=\"label label-primary\" for=\"Comment\">Comments (if any):</span> <br>");
+            httpWriter.println("<input type=\"textarea\" name=\"Comment\" id=\"Comment\" class=\"form-control\" placeholder=\"Comments (if any)\"/> <br>");
+
+
+            httpWriter.println("<button class=\"btn btn-primary\" type=\"submit\" value=\"Submit!\">Submit!</button>");
+            httpWriter.println("</form>");
 
             httpWriter.println("</panel>\n");
 
@@ -193,7 +203,6 @@ public class WebUI {
 
             // Gold info and debugging info.
             httpWriter.println(WebUIHelper.printGoldInfo(nextQuery, goldSimulator.answerQuestion(nextQuery)));
-            ActiveLearningHistory history = activeLearningHistoryMap.get(userName);
             if (history.size() > 0) {
                 int last = history.size() - 1;
                 httpWriter.println(WebUIHelper.printDebuggingInfo(history.getQuery(last), history.getResponse(last),

@@ -50,6 +50,7 @@ public class ActiveLearning {
     String preparsedFile = "";
     int nBest;
     double rerankerStepSize = 1.0;
+    double minAnswerEntropy = 1e-2;
 
     final static String modelFolder = "./model_tritrain_big/";
     final static List<Category> rootCategories =  Arrays.asList(
@@ -155,8 +156,10 @@ public class ActiveLearning {
                     generatePseudoQuestions, groupSameLabelDependencies);
             queries.forEach(query -> {
                 query.computeProbabilities(reranker.expScores.get(query.sentenceId));
-                query.setQueryId(queryPool.size());
-                queryPool.add(query);
+                if (query.answerEntropy > minAnswerEntropy) {
+                    query.setQueryId(queryPool.size());
+                    queryPool.add(query);
+                }
             });
         }
         queryQueue.addAll(queryPool);
@@ -229,6 +232,10 @@ public class ActiveLearning {
 
     public int getNumberOfRemainingQueries() {
         return queryQueue.size();
+    }
+
+    public int getTotalNumberOfQueries() {
+        return queryPool.size();
     }
 
     public Results getRerankedF1() {
