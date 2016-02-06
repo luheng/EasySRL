@@ -17,7 +17,6 @@ import edu.uw.easysrl.syntax.evaluation.Results;
 
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.handler.HandlerCollection;
-import org.eclipse.jetty.server.handler.ResourceHandler;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 
@@ -37,6 +36,7 @@ public class WebUI {
     private static Map<String, ActiveLearning> activeLearningMap;
     private static Map<String, ActiveLearningHistory> activeLearningHistoryMap;
     private static Map<String, BufferedWriter> annotationFileWriterMap;
+    private static Map<String, String> annotationFilePathMap;
 
     private static final DateFormat dateFormat = new SimpleDateFormat("yyyyMMdd-HHmm");
     private static final String annotationPath  = "./webapp/annotation/";
@@ -50,6 +50,7 @@ public class WebUI {
         activeLearningMap = new HashMap<>();
         activeLearningHistoryMap = new HashMap<>();
         annotationFileWriterMap = new HashMap<>();
+        annotationFilePathMap = new HashMap<>();
 
         // Servlet Context Handler
         ServletContextHandler servletHandler = new ServletContextHandler(ServletContextHandler.SESSIONS);
@@ -59,13 +60,15 @@ public class WebUI {
         servletHandler.addServlet(LoginServlet.class, "/login/*");
 
         // Resource handler
+        /*
         ResourceHandler resourceHandler = new ResourceHandler();
-        resourceHandler.setDirectoriesListed(true); 
-        resourceHandler.setWelcomeFiles(new String[]{"index.html"});
-        resourceHandler.setResourceBase(annotationPath);
+        resourceHandler.setDirectoriesListed(true);
+        resourceHandler.setWelcomeFiles(new String[]{"download.html"});
+        resourceHandler.setResourceBase("./webapp/");
+        */
 
         HandlerCollection handlerCollection = new HandlerCollection();
-        handlerCollection.setHandlers(new Handler[] {servletHandler, resourceHandler});
+        handlerCollection.setHandlers(new Handler[] {servletHandler, /* resourceHandler */});
 
         server.setHandler(handlerCollection);
         server.start();
@@ -103,12 +106,13 @@ public class WebUI {
                 return;
             }
             final String userName = request.getParameter("UserName");
-            // New user.
+            // Add new user.
             if (!activeLearningMap.containsKey(userName)) {
                 activeLearningMap.put(userName, new ActiveLearning(baseLearner));
                 activeLearningHistoryMap.put(userName, new ActiveLearningHistory());
                 String userFilePath = annotationPath + userName + "_" + dateFormat.format(new Date()) + ".txt";
                 annotationFileWriterMap.put(userName, new BufferedWriter(new FileWriter(new File(userFilePath))));
+                annotationFilePathMap.put(userName, userFilePath);
             }
 
             final ActiveLearning activeLearning = activeLearningMap.get(userName);
@@ -175,12 +179,12 @@ public class WebUI {
             httpWriter.println("<div class=\"col-md-12\">");
             // Annotation margin.
             httpWriter.println("<panel panel-default>\n");
-            httpWriter.println("<h4><span class=\"label label-primary\" for=\"Sentence\">Sentence:</span></h4>");
+            httpWriter.println("<h5><span class=\"label label-primary\" for=\"Sentence\">Sentence:</span></h5>");
             httpWriter.println("<div id=\"Sentence\"> " + WebUIHelper.getHighlightedSentenceString(words, nextQuery.getPredicateIndex()) + " </div>");
-            httpWriter.println("<h4><span class=\"label label-primary\" for=\"Question\">Question:</span><br></h4>");
+            httpWriter.println("<h5><span class=\"label label-primary\" for=\"Question\">Question:</span><br></h5>");
             httpWriter.println("<div id=\"Question\"> " + nextQuery.getQuestion() + " </div>");
 
-            httpWriter.println("<h4><span class=\"label label-primary\" for=\"AnswerOptions\">Answer Options:</span></h4>");
+            httpWriter.println("<h5><span class=\"label label-primary\" for=\"AnswerOptions\">Answer Options:</span></h5>");
             httpWriter.println("<form class=\"form-group\" id=\"AnswerOptions\" action=\"\" method=\"get\">");
             httpWriter.println(String.format("<input type=\"hidden\" input name=\"UserName\" value=\"%s\"/>", userName));
             final List<GroupedQuery.AnswerOption> options = nextQuery.getAnswerOptions();
@@ -235,6 +239,10 @@ public class WebUI {
                 httpWriter.println(WebUIHelper.printDebuggingInfo(history.getQuery(last), history.getResponse(last),
                         history.getGoldResponse(last), history.getResult(last)));
             }
+
+            // File download link
+            httpWriter.println(String.format("<a href=\"%s\" download>", annotationFilePathMap.get(userName)));
+
             httpWriter.println("</div></div></container>\n");
             httpWriter.println("</body>");
         }
