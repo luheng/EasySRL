@@ -29,7 +29,7 @@ public class QuestionGenerator {
      * @param targetDependency    : the dependency to ask about
      * @param words               : the sentence
      * @param parse               : parse information containing categories and dependencies
-     * @return the question as a list of non-empty strings
+     * @return a QuestionAnswerPair if we could construct an answer successfully
      */
     public Optional<QuestionAnswerPair> generateQuestion(ResolvedDependency targetDependency, List<String> words, Parse parse) {
         int predicateIdx = targetDependency.getHead();

@@ -245,16 +245,16 @@ public class TextGenerationHelper {
         return new TextWithDependencies(words, deps);
     }
 
-    public static TextWithDependencies getRepresentativePhrase(int headIndex, Category neededCategory, Parse parse) {
-        return getRepresentativePhrase(headIndex, neededCategory, parse, Optional.empty());
+    public static TextWithDependencies getRepresentativePhrase(Optional<Integer> headIndexOpt, Category neededCategory, Parse parse) {
+        return getRepresentativePhrase(headIndexOpt, neededCategory, parse, Optional.empty());
     }
 
-    public static TextWithDependencies getRepresentativePhrase(int headIndex, Category neededCategory, Parse parse, String replacementWord) {
-        return getRepresentativePhrase(headIndex, neededCategory, parse, Optional.of(replacementWord));
+    public static TextWithDependencies getRepresentativePhrase(Optional<Integer> headIndexOpt, Category neededCategory, Parse parse, String replacementWord) {
+        return getRepresentativePhrase(headIndexOpt, neededCategory, parse, Optional.of(replacementWord));
     }
 
-    public static TextWithDependencies getRepresentativePhrase(int headIndex, Category neededCategory, Parse parse, Optional<String> replacementWord) {
-        return getRepresentativePhrase(headIndex, neededCategory, parse, headIndex, replacementWord, true);
+    public static TextWithDependencies getRepresentativePhrase(Optional<Integer> headIndexOpt, Category neededCategory, Parse parse, Optional<String> replacementWord) {
+        return getRepresentativePhrase(headIndexOpt, neededCategory, parse, headIndexOpt, replacementWord, true);
     }
 
     /**
@@ -266,13 +266,14 @@ public class TextGenerationHelper {
      * For multiple answers to the same question, we just call this multiple times. (it should only get one of multiple
      * constituents together in a coordination construction.)
      */
-    private static TextWithDependencies getRepresentativePhrase(int headIndex, Category neededCategory,
-                                                        Parse parse, int replacementIndex,
+    private static TextWithDependencies getRepresentativePhrase(Optional<Integer> headIndexOpt, Category neededCategory,
+                                                        Parse parse, Optional<Integer> replacementIndexOpt,
                                                         Optional<String> replacementWord, boolean lookForOf) {
         SyntaxTreeNode tree = parse.syntaxTree;
-        if(headIndex == -1) {
+        if(!headIndexOpt.isPresent()) {
             return getRepresentativePhraseForUnrealized(neededCategory);
         }
+        int headIndex = headIndexOpt.get();
         SyntaxTreeNode headLeaf = tree.getLeaves().get(headIndex);
         Set<ResolvedDependency> touchedDeps = new HashSet<>();
 
@@ -280,7 +281,7 @@ public class TextGenerationHelper {
         if(!nodeOpt.isPresent()) {
             // fall back to just the original leaf. this failure case is very rare.
             List<String> result = new ArrayList<>();
-            result.addAll(getNodeWords(headLeaf, replacementIndex, replacementWord));
+            result.addAll(getNodeWords(headLeaf, replacementIndexOpt, replacementWord));
             return new TextWithDependencies(result, touchedDeps);
         }
 
@@ -302,13 +303,13 @@ public class TextGenerationHelper {
                node.getEndIndex() < tree.getEndIndex() &&
                tree.getLeaves().get(node.getEndIndex()).getWord().equals("of") // if the next word is "of",
                ) {
-                return getRepresentativePhrase(node.getEndIndex(), neededCategory, parse, replacementIndex, replacementWord, false);
+                return getRepresentativePhrase(Optional.of(node.getEndIndex()), neededCategory, parse, replacementIndexOpt, replacementWord, false);
             } else {
-                return new TextWithDependencies(getNodeWords(node, replacementIndex, replacementWord), touchedDeps);
+                return new TextWithDependencies(getNodeWords(node, replacementIndexOpt, replacementWord), touchedDeps);
             }
         } else {
             List<String> left = new ArrayList<>();
-            List<String> center = getNodeWords(node, replacementIndex, replacementWord);
+            List<String> center = getNodeWords(node, replacementIndexOpt, replacementWord);
             List<String> right = new ArrayList<>();
 
             for(int currentArgNum = currentCategory.getNumberOfArguments();
@@ -325,8 +326,8 @@ public class TextGenerationHelper {
                 // if we can't find the argument, we put index -1 so the recursive call considers it "unrealized"
                 // and says, e.g., "something"
                 depOpt.map(dep -> touchedDeps.add(dep));
-                int argIndex = depOpt.map(dep -> dep.getArgument()).orElse(-1);
-                TextWithDependencies argTextWithDeps = getRepresentativePhrase(argIndex, argCat, parse, replacementIndex, replacementWord, lookForOf);
+                Optional<Integer> argIndexOpt = depOpt.map(dep -> dep.getArgument());
+                TextWithDependencies argTextWithDeps = getRepresentativePhrase(argIndexOpt, argCat, parse, replacementIndexOpt, replacementWord, lookForOf);
                 List<String> argPhrase = argTextWithDeps.tokens;
                 touchedDeps.addAll(argTextWithDeps.dependencies);
                 // add the argument on the left or right side, depending on the slash
@@ -357,7 +358,7 @@ public class TextGenerationHelper {
 
     // helper method to make sure we decapitalize the first letter of the sentence
     // and replace a word if necessary.
-    private static List<String> getNodeWords(SyntaxTreeNode node, int replaceIndex, Optional<String> replacementWord) {
+    private static List<String> getNodeWords(SyntaxTreeNode node, Optional<Integer> replaceIndexOpt, Optional<String> replacementWord) {
         List<String> words = node.getLeaves()
             .stream()
             .map(leaf -> leaf.getWord())
@@ -365,8 +366,8 @@ public class TextGenerationHelper {
         if(node.getStartIndex() == 0) {
             words.set(0, Character.toLowerCase(words.get(0).charAt(0)) + words.get(0).substring(1));
         }
-        if(replacementWord.isPresent()) {
-            int indexInWords = replaceIndex - node.getStartIndex();
+        if(replacementWord.isPresent() && replaceIndexOpt.isPresent()) {
+            int indexInWords = replaceIndexOpt.get() - node.getStartIndex();
             if(indexInWords >= 0 && indexInWords <= words.size()) {
                 words.set(indexInWords, replacementWord.get());
             }
