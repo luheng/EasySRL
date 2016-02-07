@@ -73,7 +73,7 @@ public class GroupedQuery {
     String question;
     List<AnswerOption> answerOptions;
 
-    double answerMargin, answerEntropy;
+    double answerMargin, answerEntropy, normalizedAnswerEntropy;
     // TODO: move this to ActiveLearning ...
     static final double rankDiscountFactor = 0.0;
     static final boolean estimateWithParseScores = true;
@@ -103,6 +103,7 @@ public class GroupedQuery {
 
     private static boolean canMerge(Query q1, Query q2) {
         if (q1.predicateIndex == q2.predicateIndex) {
+            // Doing exact match.
             if (q1.question.equals(q2.question) && !q1.question.equalsIgnoreCase("-NOQ-")) {
                 return true;
             }
@@ -126,8 +127,27 @@ public class GroupedQuery {
     }
 
     public void collapse(int predicateIndex, Category category, int argumentNumber, String question,
-                         final Map<ImmutableList<Integer>, Set<Integer>> answerToParses,
-                         final Map<ImmutableList<Integer>, String> answerToSpans) {
+                         final Map<String, ImmutableList<Integer>> spanToArgList,
+                         final Map<String, Set<Integer>> spanToParses) {
+        this.predicateIndex = predicateIndex;
+        this.category = category;
+        this.argumentNumber = argumentNumber;
+        this.question = question;
+        this.answerOptions = new ArrayList<>();
+        Set<Integer> allParseIds = IntStream.range(0, totalNumParses).boxed().collect(Collectors.toSet());
+        spanToParses.forEach((span, parseIds) -> {
+            ImmutableList<Integer> argList = spanToArgList.get(span);
+            answerOptions.add(new AnswerOption(argList, span, parseIds));
+            allParseIds.removeAll(parseIds);
+        });
+        answerOptions.add(new BadQuestionOption(allParseIds));
+        //answerOptions.add(new NoAnswerOption(unlistedParses));
+    }
+
+    // Experimental query collapse function.
+    public void collapseNew(int predicateIndex, Category category, int argumentNumber, String question,
+                            final Map<String, Set<Integer>> spanToParses,
+                            final Map<String, Set<Integer>> spanToArgIds) {
         this.predicateIndex = predicateIndex;
         this.category = category;
         this.argumentNumber = argumentNumber;
@@ -135,13 +155,33 @@ public class GroupedQuery {
         this.answerOptions = new ArrayList<>();
 
         Set<Integer> allParseIds = IntStream.range(0, totalNumParses).boxed().collect(Collectors.toSet());
-        answerToParses.keySet().forEach(argList -> {
-            Set<Integer> parseIds = answerToParses.get(argList);
-            answerOptions.add(new AnswerOption(argList, answerToSpans.get(argList), parseIds));
-            allParseIds.removeAll(parseIds);
+        double scoreSum = parses.stream().mapToDouble(p->p.score).sum();
+
+        Map<String, Double> answerSpanToScore = new HashMap<>();
+        spanToParses.forEach((span, parseIds) -> {
+            double score = parseIds.stream().mapToDouble(id -> parses.get(id).score).sum() / scoreSum;
+            answerSpanToScore.put(span, score);
         });
+        List<String> sortedSpans = answerSpanToScore.keySet().stream()
+                .sorted((a1, a2) -> Double.compare(-answerSpanToScore.get(a1), -answerSpanToScore.get(a2)))
+                .collect(Collectors.toList());
+        Set<Integer> unlistedParses = new HashSet<>();
+        double accumulatedScore = 0.0;
+        for (int i = 0; i < sortedSpans.size(); i++) {
+            String span = sortedSpans.get(i);
+            Set<Integer> parseIds = spanToParses.get(span);
+            if (accumulatedScore > 0.8) {
+                unlistedParses.addAll(parseIds);
+            } else {
+                ImmutableList<Integer> argList = ImmutableList.copyOf(spanToArgIds.get(span).stream().sorted()
+                        .collect(Collectors.toList()));
+                answerOptions.add(new AnswerOption(argList, span, spanToParses.get(span)));
+            }
+            allParseIds.removeAll(parseIds);
+            accumulatedScore += answerSpanToScore.get(span);
+        }
         answerOptions.add(new BadQuestionOption(allParseIds));
-        //answerOptions.add(new AnswerOption(ImmutableList.of(-1), "N/A", allParseIds));
+        answerOptions.add(new NoAnswerOption(unlistedParses));
     }
 
     public void setQueryId(int id) {
@@ -161,6 +201,18 @@ public class GroupedQuery {
     public String getQuestion() { return question; }
 
     public List<AnswerOption> getAnswerOptions() { return answerOptions; }
+
+    public double getAnswerEntropy() {
+        return answerEntropy;
+    }
+
+    public double getNormalizedAnswerEntropy() {
+        return normalizedAnswerEntropy;
+    }
+
+    public double getAnswerMargin() {
+        return answerMargin;
+    }
 
     public void computeProbabilities(double[] parseDist) {
         // Compute p(a|q).
@@ -184,7 +236,7 @@ public class GroupedQuery {
         answerEntropy = -1.0 * answerOptions.stream()
                 .filter(ao -> ao.probability > 0)
                 .mapToDouble(ao -> ao.probability * Math.log(ao.probability)).sum();
-                //.mapToDouble(ao -> ao.probability * Math.log(ao.probability) / K).sum();
+        normalizedAnswerEntropy = answerEntropy / Math.log(answerOptions.size());
     }
 
     public void print(final List<String> words, Response response) {
@@ -199,10 +251,50 @@ public class GroupedQuery {
             String argHeadsStr = ao.isNAOption() ? "N/A" :
                     ao.argumentIds.stream().map(words::get).collect(Collectors.joining(","));
             String parseIdsStr = DebugPrinter.getShortListString(ao.parseIds);
-            System.out.println(String.format("%.2f\t%s%d\t%s:%s\t%s\t%s", ao.probability, match, i, argIdsStr,
+            System.out.println(String.format("%.2f\t%s%d\t(%s:%s)\t\t\t%s\t%s", ao.probability, match, i, argIdsStr,
                     argHeadsStr, ao.answer, parseIdsStr));
         }
         System.out.println();
+    }
+
+    public String getDebuggingInfo(final Response response) {
+        String result = String.format("%d:%s\t%s\t%d", predicateIndex, sentence.get(predicateIndex), category,
+                argumentNumber) + "\n";
+        result += String.format("%.2f\t%.2f\t%s", answerEntropy, answerMargin, question) + "\n";
+        for (int i = 0; i < answerOptions.size(); i++) {
+            AnswerOption ao = answerOptions.get(i);
+            String match = (response.chosenOptions.contains(i) ? "*" : "");
+            String argIdsStr = ao.isNAOption() ? "_" :
+                    ao.argumentIds.stream().map(String::valueOf).collect(Collectors.joining(","));
+            String argHeadsStr = ao.isNAOption() ? "N/A" :
+                    ao.argumentIds.stream().map(sentence::get).collect(Collectors.joining(","));
+            String parseIdsStr = DebugPrinter.getShortListString(ao.parseIds);
+            result += String.format("%.2f\t%s%d\t%s:%s\t%s\t%s", ao.probability, match, i, argIdsStr, argHeadsStr,
+                    ao.answer, parseIdsStr) + "\n";
+        }
+        return result + "\n";
+    }
+
+    public String getDebuggingInfo(final Response response, final Response goldResponse) {
+        String result = String.format("SID=%d\t%s\n", sentenceId, sentence.stream().collect(Collectors.joining(" ")));
+        result += String.format("%d:%s\t%s.%d\n", predicateIndex, sentence.get(predicateIndex), category, argumentNumber);
+        result += String.format("QID=%d\tent=%.2f\tmarg=%.2f\t%s\n", queryId, answerEntropy, answerMargin, question);
+        for (int i = 0; i < answerOptions.size(); i++) {
+            AnswerOption ao = answerOptions.get(i);
+            String match = (response.chosenOptions.contains(i) ? "*" : " ")
+                            + (goldResponse.chosenOptions.contains(i) ? "G" : " ");
+            String argIdsStr = ao.isNAOption() ? "_" :
+                    ao.argumentIds.stream().map(String::valueOf).collect(Collectors.joining(","));
+            String argHeadsStr = ao.isNAOption() ? "N/A" :
+                    ao.argumentIds.stream().map(sentence::get).collect(Collectors.joining(","));
+            String parseIdsStr = DebugPrinter.getShortListString(ao.parseIds);
+            result += String.format("%d\t%s\tprob=%.2f\t%s\t(%s:%s)\t%s\n", i, match, ao.probability, ao.answer,
+                    argIdsStr, argHeadsStr, parseIdsStr);
+        }
+        if (response.debugInfo.length() > 0) {
+            result += "Comment:\t" + response.debugInfo;
+        }
+        return result;
     }
 
     public void printWithGoldDependency(final List<String> words, int response, Parse goldParse) {

@@ -33,7 +33,6 @@ public class AnalysisHelper {
                                               final List<String> words,
                                               final Parse parse,
                                               final QuestionGenerator questionGenerator) {
-
         Optional<QuestionAnswerPair> questionOpt = questionGenerator.generateQuestion(dependency, words, parse);
         return questionOpt.isPresent();
     }

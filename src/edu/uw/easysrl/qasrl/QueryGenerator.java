@@ -5,9 +5,11 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Table;
 import com.google.common.collect.Table.Cell;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
+import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.syntax.grammar.Category;
+import gnu.trove.map.hash.TObjectDoubleHashMap;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -68,19 +70,20 @@ public class QueryGenerator {
                 String questionStr = qaPairOpt
                     .map(QuestionAnswerPair::renderQuestion)
                     .orElse("-NOQ-");
+                QuestionAnswerPair qaPair = qaPairOpt.get();
                 if (groupSameLabelDependencies) {
                     Set<Integer> answerIds = new HashSet<>();
                     dependencies.stream().forEach(dep ->
                             answerIds.addAll(TextGenerationHelper.getArgumentIdsForDependency(words, parse, dep)));
                     List<Integer> answerIdList = new ArrayList<>(answerIds);
                     Collections.sort(answerIdList);
-                    Query query = new Query(predicateId, category, argNum, answerIdList, rankId, questionStr);
+                    Query query = new Query(predicateId, category, argNum, answerIdList, rankId, qaPairOpt.get());
                     unmergedQueryList.add(query);
                 } else {
                     for (ResolvedDependency dep : dependencies) {
                         List<Integer> answerIds = TextGenerationHelper.getArgumentIdsForDependency(words, parse, dep)
                                 .stream().sorted().collect(Collectors.toList());
-                        Query query = new Query(predicateId, category, argNum, answerIds, rankId, questionStr);
+                        Query query = new Query(predicateId, category, argNum, answerIds, rankId, qaPairOpt.get());
                         unmergedQueryList.add(query);
                     }
                 }
@@ -104,23 +107,32 @@ public class QueryGenerator {
         return groupedQueryList;
     }
 
+    // FIXME: make the logic better.
     private static void collapseQuery(GroupedQuery groupedQuery, List<String> words, List<Parse> parses) {
         HashMap<String, Set<Integer>> questionToParses = new HashMap<>();
-        HashMap<ImmutableList<Integer>, Set<Integer>> answerToParses = new HashMap<>();
+        // Map the set of argument heads (argList) to its score (sum of parse scores)
+        Map<ImmutableList<Integer>, Double> argListToScore = new HashMap<>();
+        // Map a surface string of an answer to its most probable arg list.
+        Map<String, ImmutableList<Integer>> answerToArgList = new HashMap<>();
+        // Map a surface string of an answer to a set of parse ids.
+        Map<String, Set<Integer>> answerToParses = new HashMap<>();
 
         groupedQuery.queries.forEach(query -> {
             ImmutableList<Integer> argList = ImmutableList.copyOf(query.argumentIds);
             if (!questionToParses.containsKey(query.question)) {
                 questionToParses.put(query.question, new HashSet<>());
             }
-            if (!answerToParses.containsKey(argList)) {
-                answerToParses.put(argList, new HashSet<>());
+            if (!answerToParses.containsKey(query.answer)) {
+                answerToParses.put(query.answer, new HashSet<>());
             }
             questionToParses.get(query.question).add(query.parseId);
-            answerToParses.get(argList).add(query.parseId);
+            answerToParses.get(query.answer).add(query.parseId);
+            if (!answerToArgList.containsKey(query.answer)) {
+                answerToArgList.put(query.answer, argList);
+            }
         });
 
-        // merge answer options
+        // Get most representative question.
         double bestQuestionScore = -1.0;
         String bestQuestion = "";
         Query bestQuery = null;
@@ -138,10 +150,13 @@ public class QueryGenerator {
             }
         }
 
-        Map<ImmutableList<Integer>, String> answerToSpans = TextGenerationHelper.generateAnswerSpans(
-                bestQuery.predicateIndex, answerToParses, words, parses);
+        assert bestQuery != null;
+        int predId = bestQuery.predicateIndex;
+        int argNum = bestQuery.argumentNumber;
+        Category predCategory = bestQuery.category;
+        Category argCategory = predCategory.getArgument(argNum);
         groupedQuery.collapse(bestQuery.predicateIndex, bestQuery.category, bestQuery.argumentNumber, bestQuestion,
-                              answerToParses, answerToSpans);
+                              answerToArgList, answerToParses);
     }
 
 }

@@ -1,6 +1,7 @@
 package edu.uw.easysrl.qasrl;
 
 import edu.uw.easysrl.dependencies.ResolvedDependency;
+import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 
@@ -17,6 +18,7 @@ import java.util.stream.Collectors;
 public class ResponseSimulatorGold extends ResponseSimulator {
     private final List<Parse> goldParses;
     private QuestionGenerator questionGenerator;
+    private boolean allowLabelMatch = true;
 
     // TODO: simulate noise level.
     // TODO: partial reward for parses that got part of the answer heads right ..
@@ -24,6 +26,12 @@ public class ResponseSimulatorGold extends ResponseSimulator {
         this.goldParses = goldParses;
         this.questionGenerator = questionGenerator;
     }
+
+    public ResponseSimulatorGold(List<Parse> goldParses, QuestionGenerator questionGenerator, boolean allowLabelMatch) {
+        this(goldParses, questionGenerator);
+        this.allowLabelMatch = allowLabelMatch;
+    }
+
 
     /**
      * If exists a gold dependency that generates the same question ...
@@ -43,10 +51,8 @@ public class ResponseSimulatorGold extends ResponseSimulator {
             String goldQuestionStr = goldQaPairOpt.map(QuestionAnswerPair::renderQuestion).orElse("-NOQ-");
             boolean questionMatch = query.question.equalsIgnoreCase(goldQuestionStr);
             boolean labelMatch = (dep.getCategory() == query.category && dep.getArgNumber() == query.argumentNumber);
-            if (questionMatch || labelMatch) {
-                if (!goldQuestionStr.equals("-NOQ-") || labelMatch) {
-                    answerIndices.addAll(TextGenerationHelper.getArgumentIdsForDependency(sentence, goldParse, dep));
-                }
+            if (questionMatch || (allowLabelMatch && labelMatch)) {
+                answerIndices.addAll(TextGenerationHelper.getArgumentIdsForDependency(sentence, goldParse, dep));
             }
         }
         Response response = new Response();

@@ -141,6 +141,8 @@ public class TextGenerationHelper {
         Set<Integer> allIndices = new HashSet<>();
         answerToParses.keySet().forEach(allIndices::addAll);
         allIndices.add(predicateIndex);
+
+
         for (ImmutableList<Integer> argumentIds : answerToParses.keySet()) {
             Set<Integer> parseIds = answerToParses.get(argumentIds);
             // use the highest ranked parse to get answer span.
@@ -163,6 +165,21 @@ public class TextGenerationHelper {
         }
         return answerToSpans;
     }
+
+   /*
+    public static String getAnswerSpan(Parse parse, List<String> words, int predId, Category predCategory,
+                                       int argId, Category argCategory) {
+        List<String> phrase = getRepresentativePhrase(Optional.of(argId), argCategory, parse);
+        return phrase.stream().collect(Collectors.joining(" "));
+    }
+
+    public static String getAnswerSpan(Parse parse, List<String> words, int predId, Category predCategory,
+                                       Collection<Integer> argIds, Category argCategory) {
+        return argIds.stream()
+                .map(id -> getAnswerSpan(parse, words, predId, predCategory, id, argCategory))
+                .collect(Collectors.joining(" , "));
+    }
+   */
 
     public static String getArgumentConstituent(final List<String> words, final SyntaxTreeNode node,
                                                 final int argumentHead, final Set<Integer> excludeIndices) {
