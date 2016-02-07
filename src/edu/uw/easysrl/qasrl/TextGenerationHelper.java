@@ -416,6 +416,7 @@ public class TextGenerationHelper {
     public static class TextWithDependencies {
         public final List<String> tokens;
         public final Set<ResolvedDependency> dependencies;
+
         public TextWithDependencies(List<String> tokens, Set<ResolvedDependency> dependencies) {
             this.tokens = tokens;
             this.dependencies = dependencies;

@@ -244,7 +244,7 @@ public class WebUI {
                         history.getGoldResponse(last), history.getResult(last)));
             }
             // "Skip 10" button
-            httpWriter.println("<form class=\"form-group\" action=\"\" method=\"get\">");
+            httpWriter.println("<br><form class=\"form-group\" action=\"\" method=\"get\">");
             // Add user name parameter ..
             httpWriter.println(String.format("<input type=\"hidden\" input name=\"UserName\" value=\"%s\"/>", userName));
             httpWriter.println("<button class=\"btn btn-primary\" input name=\"SwitchQuestion\" type=\"submit\" value=\"Skip10\">Skip 10 questions</button>");

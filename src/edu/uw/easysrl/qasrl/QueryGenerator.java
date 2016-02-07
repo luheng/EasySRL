@@ -12,6 +12,7 @@ import edu.uw.easysrl.syntax.grammar.Category;
 import gnu.trove.map.hash.TObjectDoubleHashMap;
 
 import java.util.*;
+import java.util.Map.Entry;
 import java.util.stream.Collectors;
 
 
@@ -103,43 +104,48 @@ public class QueryGenerator {
                 groupedQueryList.add(new GroupedQuery(sentenceId, words, parses, query));
             }
         }
-        groupedQueryList.forEach(groupedQuery -> collapseQuery(groupedQuery, words, parses));
+        groupedQueryList.forEach(groupedQuery -> collapseQuery(groupedQuery, parses));
         return groupedQueryList;
     }
 
-    // FIXME: make the logic better.
-    private static void collapseQuery(GroupedQuery groupedQuery, List<String> words, List<Parse> parses) {
+    private static void collapseQuery(GroupedQuery groupedQuery, List<Parse> parses) {
         HashMap<String, Set<Integer>> questionToParses = new HashMap<>();
+        Table<ImmutableList<Integer>, String, Set<Integer>> argListToSpanToParses = HashBasedTable.create();
+        Map<ImmutableList<Integer>, Set<Integer>> argListToParses = new HashMap<>();
+
         // Map the set of argument heads (argList) to its score (sum of parse scores)
         Map<ImmutableList<Integer>, Double> argListToScore = new HashMap<>();
         // Map a surface string of an answer to its most probable arg list.
-        Map<String, ImmutableList<Integer>> answerToArgList = new HashMap<>();
+        Map<String, ImmutableList<Integer>> spanToArgList = new HashMap<>();
         // Map a surface string of an answer to a set of parse ids.
-        Map<String, Set<Integer>> answerToParses = new HashMap<>();
+        Map<String, Set<Integer>> spanToParses = new HashMap<>();
 
         groupedQuery.queries.forEach(query -> {
             ImmutableList<Integer> argList = ImmutableList.copyOf(query.argumentIds);
             if (!questionToParses.containsKey(query.question)) {
                 questionToParses.put(query.question, new HashSet<>());
             }
-            if (!answerToParses.containsKey(query.answer)) {
-                answerToParses.put(query.answer, new HashSet<>());
+            if (!argListToParses.containsKey(argList)) {
+                argListToParses.put(argList, new HashSet<>());
             }
+            if (!argListToSpanToParses.contains(argList, query.answer)) {
+                argListToSpanToParses.put(argList, query.answer, new HashSet<>());
+            }
+            argListToSpanToParses.get(argList, query.answer).add(query.parseId);
             questionToParses.get(query.question).add(query.parseId);
-            answerToParses.get(query.answer).add(query.parseId);
-            if (!answerToArgList.containsKey(query.answer)) {
-                answerToArgList.put(query.answer, argList);
-            }
+            argListToParses.get(argList).add(query.parseId);
         });
 
         // Get most representative question.
         double bestQuestionScore = -1.0;
         String bestQuestion = "";
         Query bestQuery = null;
-        for (String question : questionToParses.keySet()) {
-            double score = questionToParses.get(question).stream().mapToDouble(pid -> parses.get(pid).score).sum();
-            if (score > bestQuestionScore) {
-                bestQuestionScore = score;
+        for (Entry<String, Set<Integer>> entry : questionToParses.entrySet()) {
+            final String question = entry.getKey();
+            final Set<Integer> parseIds = entry.getValue();
+            double questionScore = parseIds.stream().mapToDouble(pid -> parses.get(pid).score).sum();
+            if (questionScore > bestQuestionScore) {
+                bestQuestionScore = questionScore;
                 bestQuestion = question;
             }
         }
@@ -150,13 +156,41 @@ public class QueryGenerator {
             }
         }
 
+        // Get best set of answer strings.
+        argListToSpanToParses.rowKeySet().forEach(argList -> {
+            double argListScore = 0.0;
+            double bestSpanScore = Double.MIN_VALUE;
+            String bestSpan = "";
+            for (Entry<String, Set<Integer>> entry : argListToSpanToParses.row(argList).entrySet()) {
+                final String span = entry.getKey();
+                final Set<Integer> parseIds = entry.getValue();
+                double spanScore = parseIds.stream().mapToDouble(id -> parses.get(id).score).sum();
+                argListScore += spanScore;
+                if (spanScore > bestSpanScore) {
+                    bestSpanScore = spanScore;
+                    bestSpan = span;
+                }
+            }
+            argListToScore.put(argList, argListScore);
+            if (!spanToArgList.containsKey(argList)) {
+                spanToArgList.put(bestSpan, argList);
+            } else {
+                ImmutableList<Integer> otherArgList = spanToArgList.get(bestSpan);
+                if (argListScore > argListToScore.get(otherArgList)) {
+                    spanToArgList.put(bestSpan, argList);
+                }
+            }
+            if (!spanToParses.containsKey(bestSpan)) {
+                spanToParses.put(bestSpan, new HashSet<>());
+            }
+            for (Set<Integer> parseIds : argListToSpanToParses.row(argList).values()) {
+                spanToParses.get(bestSpan).addAll(parseIds);
+            }
+        });
+
         assert bestQuery != null;
-        int predId = bestQuery.predicateIndex;
-        int argNum = bestQuery.argumentNumber;
-        Category predCategory = bestQuery.category;
-        Category argCategory = predCategory.getArgument(argNum);
         groupedQuery.collapse(bestQuery.predicateIndex, bestQuery.category, bestQuery.argumentNumber, bestQuestion,
-                              answerToArgList, answerToParses);
+                spanToArgList, spanToParses);
     }
 
 }

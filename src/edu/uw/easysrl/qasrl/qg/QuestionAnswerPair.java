@@ -29,11 +29,11 @@ public class QuestionAnswerPair {
         this.question = question;
         this.targetDeps = targetDeps;
         this.answers = answers.stream()
-            .map(twd -> twd.tokens)
-            .collect(Collectors.toList());
+                .map(twd -> twd.tokens)
+                .collect(Collectors.toList());
         this.answerDeps = answers.stream()
-            .map(twd -> twd.dependencies)
-            .collect(Collectors.toList());
+                .map(twd -> twd.dependencies)
+                .collect(Collectors.toList());
     }
 
     public String renderQuestion() {
