@@ -5,7 +5,8 @@ import edu.uw.easysrl.syntax.grammar.Category.Slash;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.Parse;
-import edu.uw.easysrl.qasrl.AnswerGenerator;
+import edu.uw.easysrl.qasrl.TextGenerationHelper;
+import edu.uw.easysrl.qasrl.TextGenerationHelper.TextWithDependencies;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -127,8 +128,13 @@ public class QuestionTemplate {
     public int predicateIndex;
     public Category predicateCategory;
 
-    public Map<Integer, Integer> argIndices;
+    // the category here is the one of the argument of the head's category,
+    // so it's not sensitive to having multiple arguments or locations.
     public Map<Integer, Category> argCategories;
+    // for each arg num, lists all of the deps ending in arguments
+    public Map<Integer, List<ResolvedDependency>> allArgDeps;
+    // this is for convenience and just returns the index of the first one
+    public Map<Integer, Optional<Integer>> argIndices;
 
     public VerbHelper verbHelper;
 
@@ -142,16 +148,21 @@ public class QuestionTemplate {
         this.tree = parse.syntaxTree;
         this.verbHelper = verbHelper;
         this.words = words;
-        this.argIndices = new HashMap<Integer, Integer>();
+        this.allArgDeps = new HashMap<Integer, List<ResolvedDependency>>();
         for (ResolvedDependency dep : parse.dependencies) {
             if (dep.getHead() == predicateIndex && dep.getArgument() != dep.getHead()) {
-                argIndices.put(dep.getArgNumber(), dep.getArgument());
+                if(!allArgDeps.containsKey(dep.getArgNumber())) {
+                    allArgDeps.put(dep.getArgNumber(), new ArrayList<ResolvedDependency>());
+                }
+                allArgDeps.get(dep.getArgNumber()).add(dep);
             }
         }
+        this.argIndices = new HashMap<Integer, Optional<Integer>>();
+        allArgDeps.forEach((k, v) -> argIndices.put(k, Optional.of(v.get(0).getArgument())));
         int numArguments = predicateCategory.getNumberOfArguments();
         this.argCategories = new HashMap<Integer, Category>();
         for (int i = 1; i <= numArguments; i++) {
-            if(!argIndices.containsKey(i)) argIndices.put(i, -1);
+            if(!argIndices.containsKey(i)) argIndices.put(i, Optional.empty());
             argCategories.put(i, predicateCategory.getArgument(i));
         }
 
@@ -173,23 +184,24 @@ public class QuestionTemplate {
     }
 
     private boolean cantAskQuestion(int targetArgNum) {
-        Optional<Integer> argIndex = Optional.of(argIndices.get(targetArgNum));
+        Optional<Integer> argIndexOpt = Optional.ofNullable(argIndices.get(targetArgNum)).flatMap(x -> x);
+        if(!argIndexOpt.isPresent()) {
+            return false;
+        }
+        int argIndex = argIndexOpt.get();
         boolean cantAsk = type == QuestionType.INVALID ||
-            !argIndex.isPresent() ||
-            argIndex.get() == -1 || // don't ask about an unrealized arg
             (type == QuestionType.NOUN_ADJUNCT &&
              words.get(predicateIndex).equals("of")) || // "of" is just a doozy
             (type == QuestionType.VERB_ADJUNCT &&
              argIndices.values().stream()
-             .filter(index -> index >= 0)
+             .filter(Optional::isPresent).map(Optional::get)
              .anyMatch(index -> verbHelper.isCopulaVerb(words.get(index)))) || // adverbs of copulas are wonky and not helpful
             (type == QuestionType.VERB_ADJUNCT &&
-             argCategories.get(targetArgNum).isFunctionInto(Category.valueOf("S[pss]"))) || // I haven't been able to figure out how to ask for passive verbs
+             categories.get(argIndex).isFunctionInto(Category.valueOf("S[pss]"))) || // passive verbs will take lots of extra work
             (type == QuestionType.ADJECTIVE_ADJUNCT &&
              targetArgNum == 2) || // "full of promise" -> "something was _ of promise; what's _?" --- can't really ask it.
-            categories.get(argIndex.get()).matches(Category.valueOf("PR")) // don't ask about a particle
+            categories.get(argIndex).matches(Category.valueOf("PR")) // don't ask about a particle; TODO should look at arg category instead?
             ;
-        // return type != QuestionType.VERB;
         return cantAsk;
     }
 
@@ -199,25 +211,25 @@ public class QuestionTemplate {
      *                       associated with what's being asked about in the question
      * @return a question asking for the targetArgNum'th argument of template's predicate
      */
-    public QuestionAnswerPair instantiateForArgument(int targetArgNum) {
-        List<String> questionWords = new ArrayList<>();
-        List<String> answerWords = new ArrayList<>();
+    public Optional<QuestionAnswerPair> instantiateForArgument(int targetArgNum) {
         if (cantAskQuestion(targetArgNum)) {
-            return new QuestionAnswerPair(questionWords, answerWords);
+            return Optional.empty();
         }
 
-        String wh = getWhWordByArgNum(targetArgNum);
-        List<String> auxiliaries = new ArrayList<>();
+        final List<ResolvedDependency> questionDeps = new ArrayList<>();
+
+        final String wh = getWhWordByArgNum(targetArgNum);
+        final List<String> auxiliaries = new ArrayList<>();
         // we need the verb of the clause our predicate appears in,
         // which we will use to determine the auxiliaries we'll be using
         int verbIndex = -1;
         if(type == QuestionType.VERB) {
             verbIndex = predicateIndex;
         } else if(type == QuestionType.VERB_ADJUNCT) {
-            verbIndex = argIndices.get(2);
+            verbIndex = argIndices.get(2).orElse(-1);
         }
         // for now, this seems to be a sufficient criterion...
-        boolean shouldSplitVerb = targetArgNum != 1 || argIndices.get(targetArgNum) == verbIndex;
+        final boolean shouldSplitVerb = targetArgNum != 1;
 
         String predStr;
         // but if there is no verb, we just put "would be" in there. This works for NP adjuncts.
@@ -244,41 +256,70 @@ public class QuestionTemplate {
         }
 
         // Add arguments on either side until done, according to CCG category.
-        List<String> left = new ArrayList<>();
-        List<String> right = new ArrayList<>();
+        final List<String> left = new ArrayList<>();
+        final List<String> right = new ArrayList<>();
         Category currentCategory = predicateCategory;
         for(int currentArgNum = predicateCategory.getNumberOfArguments(); currentArgNum > 0; currentArgNum--) {
             // get the surface form of the argument in question
-            List<String> argWords;
-            boolean addingTarget = currentArgNum == targetArgNum;
-            if(addingTarget) {
-                argWords = getTargetPlaceholderWords(currentArgNum);
+            List<String> argWords = new ArrayList<>();
+            // TODO: restructure/simplify this, we have lots of things only working because of guarantees established earlier in the code...
+            if(currentArgNum == targetArgNum) { // if we're asking about the target, we have to put in placeholder words
+                // we won't ask about the target if it's unrealized, so this is safe
+                if(argIndices.get(currentArgNum).get() == verbIndex) {
+                    // this can only happen when we're asking about the verb,
+                    // which means we're not asking about the subject,
+                    // which means the verb must be split.
+                    // in any such situation the result should be "do" anyway.
+                    argWords.add("do");
+                } else {
+                    argWords.addAll(getTargetPlaceholderWords(currentArgNum));
+                }
             } else {
                 // this is complicated... consider simplifying.
-                int argIndex = argIndices.get(currentArgNum);
-                Category argCategory = argCategories.get(currentArgNum);
-                if(argIndex == -1 || argIndex != verbIndex) {
-                    argWords = AnswerGenerator.getRepresentativePhrase(argIndex, argCategory, parse);
-                } else {
-                    if(shouldSplitVerb) {
-                        List<String> splitArg = getSplitVerbAtIndex(argIndex);
-                        argWords = AnswerGenerator.getRepresentativePhrase(argIndex, argCategory, parse, splitArg.get(1));
+                // first we add the dependency to the list of deps we've touched
+                final Optional<ResolvedDependency> firstArgDepOpt = Optional.ofNullable(allArgDeps.get(currentArgNum)).map(deps -> deps.get(0));
+                firstArgDepOpt.ifPresent(dep -> questionDeps.add(dep));
+                // then we locate the argument in the sentence
+                final Optional<Integer> argIndexOpt = firstArgDepOpt.map(ResolvedDependency::getArgument);
+                final Category argCategory = argCategories.get(currentArgNum);
+                // then we generate the text for that argument, again logging the dependencies touched.
+                if(!argIndexOpt.isPresent() || argIndexOpt.get() != verbIndex) {
+                    // replace the word with a pronoun of the proper case, if necessary
+                    Optional<Pronoun> pronounOpt = argIndexOpt.flatMap(index -> Pronoun.fromString(words.get(index)));
+                    Optional<String> fixedPronounString;
+                    if(currentArgNum == 1) { // TODO: check if this heuristic is right for nominative case.
+                        fixedPronounString = pronounOpt.map(pron -> pron.withCase(Pronoun.Case.NOMINATIVE).toString());
                     } else {
-                        String unsplitArg = getUnsplitVerbAtIndex(argIndex);
-                        argWords = AnswerGenerator.getRepresentativePhrase(argIndex, argCategory, parse, unsplitArg);
+                        fixedPronounString = pronounOpt.map(pron -> pron.withCase(Pronoun.Case.ACCUSATIVE).toString());
+                    }
+                    TextWithDependencies argWithDeps = TextGenerationHelper.getRepresentativePhrase(argIndexOpt, argCategory, parse, fixedPronounString);
+                    questionDeps.addAll(argWithDeps.dependencies);
+                    argWords = argWithDeps.tokens;
+                } else {
+                    // this works because the above conditional captured cases in which it was empty
+                    int argIndex = argIndexOpt.get();
+                    if(shouldSplitVerb) {
+                        final List<String> splitArg = getSplitVerbAtIndex(argIndex);
+                        TextWithDependencies argWithDeps = TextGenerationHelper.getRepresentativePhrase(Optional.of(argIndex), argCategory, parse, splitArg.get(1));
+                        questionDeps.addAll(argWithDeps.dependencies);
+                        argWords = argWithDeps.tokens;
+                    } else {
+                        final String unsplitArg = getUnsplitVerbAtIndex(argIndex);
+                        TextWithDependencies argWithDeps = TextGenerationHelper.getRepresentativePhrase(Optional.of(argIndex), argCategory, parse, unsplitArg);
+                        questionDeps.addAll(argWithDeps.dependencies);
+                        argWords = argWithDeps.tokens;
                     }
                 }
             }
 
             // add the argument on the left or right side, depending on the slash
-            Slash slash = currentCategory.getSlash();
+            final Slash slash = currentCategory.getSlash();
             switch(slash) {
             case FWD:
                 right.addAll(argWords);
                 break;
             case BWD:
-                argWords.addAll(left);
-                left = argWords;
+                left.addAll(0, argWords);
                 break;
             case EITHER:
                 System.err.println("Undirected slash appeared in supertagged data :(");
@@ -290,17 +331,36 @@ public class QuestionTemplate {
             currentCategory = currentCategory.getLeft();
         }
 
-        List<String> question = new ArrayList<>();
-        question.add(wh);
-        question.addAll(auxiliaries);
-        question.addAll(left);
-        question.add(predStr);
-        question.addAll(right);
-        questionWords = question.stream()
+        final List<String> questionWords = new ArrayList<>();
+        questionWords.add(wh);
+        questionWords.addAll(auxiliaries);
+        questionWords.addAll(left);
+        questionWords.add(predStr);
+        questionWords.addAll(right);
+
+        final List<String> question = questionWords
+            .stream()
             .filter(s -> s != null && !s.isEmpty()) // to mitigate oversights. harmless anyway
             .collect(Collectors.toList());
-        answerWords = AnswerGenerator.getRepresentativePhrase(argIndices.get(targetArgNum), argCategories.get(targetArgNum), parse);
-        return new QuestionAnswerPair(questionWords, answerWords);
+        final List<ResolvedDependency> targetDeps = allArgDeps.get(targetArgNum);
+        final List<TextWithDependencies> answers = targetDeps
+            .stream()
+            .map(ResolvedDependency::getArgument)
+            .map(index -> { // we need to un-tense verbs that appear as answers
+                    Optional<String> replaceOpt = Optional.of(argCategories.get(targetArgNum))
+                    .filter(cat -> cat.isFunctionInto(Category.valueOf("S\\NP")))
+                    .flatMap(arg -> verbHelper.getAuxiliaryAndVerbStrings(words, categories, index))
+                    .map(arr -> arr[1]);
+                    return TextGenerationHelper.getRepresentativePhrase(Optional.of(index), argCategories.get(targetArgNum), parse, replaceOpt);
+                })
+            .collect(Collectors.toList());
+
+        return Optional.of(new QuestionAnswerPair(predicateIndex,
+                                                  predicateCategory,
+                                                  questionDeps,
+                                                  question,
+                                                  targetDeps,
+                                                  answers));
     }
 
     /**
@@ -314,17 +374,23 @@ public class QuestionTemplate {
         return "what";
     }
 
+    /**
+     * Assumes the argument at argNum is present.
+     */
     public List<String> getTargetPlaceholderWords(int argNum) {
         ArrayList<String> result = new ArrayList<>();
         if(type == QuestionType.NOUN_ADJUNCT) {
             return result;
         }
-        int argIndex = argIndices.get(argNum);
-        Category argCategory = argCategories.get(argNum);
+        int argIndex = argIndices.get(argNum).get();
+        // category of actual arg as it appears in the sentence.
+        Category argCategory = categories.get(argIndex);
         if (argCategory.isFunctionInto(Category.valueOf("S[to]\\NP"))) {
             result.add("to do");
         } else if (argCategory.isFunctionInto(Category.valueOf("S[ng]\\NP"))) {
             result.add("doing");
+        } else if (argCategory.isFunctionInto(Category.valueOf("S[pt]\\NP"))) {
+            result.add("done");
         } else if (argCategory.isFunctionInto(Category.valueOf("S[dcl]\\NP"))) {
             result.add("do");
         } else if (argCategory.isFunctionInto(Category.valueOf("S\\NP"))) { // catch-all for verbs

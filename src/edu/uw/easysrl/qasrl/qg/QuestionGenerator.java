@@ -29,22 +29,12 @@ public class QuestionGenerator {
      * @param targetDependency    : the dependency to ask about
      * @param words               : the sentence
      * @param parse               : parse information containing categories and dependencies
-     * @return the question as a list of non-empty strings
+     * @return a QuestionAnswerPair if we could construct an answer successfully
      */
-    public List<String> generateQuestion(ResolvedDependency targetDependency, List<String> words, Parse parse) {
+    public Optional<QuestionAnswerPair> generateQuestion(ResolvedDependency targetDependency, List<String> words, Parse parse) {
         int predicateIdx = targetDependency.getHead();
         QuestionTemplate template = new QuestionTemplate(predicateIdx, words, parse, verbHelper);
-        if (template == null) {
-            return null;
-        }
-        QuestionAnswerPair qaPair = template.instantiateForArgument(targetDependency.getArgNumber());
-        List<String> result = new ArrayList<String>();
-        String question = qaPair.renderQuestion();
-        if(!question.isEmpty()) {
-            result.add(question);
-        }
-        return result;
+        return template.instantiateForArgument(targetDependency.getArgNumber());
     }
-
 }
 

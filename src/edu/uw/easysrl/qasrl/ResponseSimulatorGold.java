@@ -2,9 +2,11 @@ package edu.uw.easysrl.qasrl;
 
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
+import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -37,14 +39,13 @@ public class ResponseSimulatorGold extends ResponseSimulator {
             if (dep.getHead() != query.predicateIndex) {
                 continue;
             }
-            List<String> goldQuestion = questionGenerator.generateQuestion(dep, sentence, goldParse);
-            String goldQuestionStr = (goldQuestion == null || goldQuestion.size() == 0) ? "-NOQ-" :
-                    goldQuestion.stream().collect(Collectors.joining(" "));
+            Optional<QuestionAnswerPair> goldQaPairOpt = questionGenerator.generateQuestion(dep, sentence, goldParse);
+            String goldQuestionStr = goldQaPairOpt.map(QuestionAnswerPair::renderQuestion).orElse("-NOQ-");
             boolean questionMatch = query.question.equalsIgnoreCase(goldQuestionStr);
             boolean labelMatch = (dep.getCategory() == query.category && dep.getArgNumber() == query.argumentNumber);
             if (questionMatch || labelMatch) {
                 if (!goldQuestionStr.equals("-NOQ-") || labelMatch) {
-                    answerIndices.addAll(AnswerGenerator.getArgumentIdsForDependency(sentence, goldParse, dep));
+                    answerIndices.addAll(TextGenerationHelper.getArgumentIdsForDependency(sentence, goldParse, dep));
                 }
             }
         }

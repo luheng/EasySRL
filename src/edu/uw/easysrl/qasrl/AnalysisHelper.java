@@ -2,11 +2,13 @@ package edu.uw.easysrl.qasrl;
 
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
+import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.List;
 import java.util.Set;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -32,8 +34,8 @@ public class AnalysisHelper {
                                               final Parse parse,
                                               final QuestionGenerator questionGenerator) {
 
-        List<String> question = questionGenerator.generateQuestion(dependency, words, parse);
-        return question != null && question.size() > 0;
+        Optional<QuestionAnswerPair> questionOpt = questionGenerator.generateQuestion(dependency, words, parse);
+        return questionOpt.isPresent();
     }
 
 }
