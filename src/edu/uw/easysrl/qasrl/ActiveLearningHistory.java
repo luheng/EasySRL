@@ -61,7 +61,7 @@ public class ActiveLearningHistory {
         final int last = size() - 1;
         String str = String.format("ITER=%d\n", last);
         str += queries.get(last).getDebuggingInfo(responses.get(last), goldResponses.get(last)) + "\n";
-        str += String.format("USER_ACC=%.2f%%\n", 100.0 * numCorrectAnswers / size());
+        str += String.format("USER_ACC:\t%.2f%%\n", 100.0 * numCorrectAnswers / size());
         str += "[ReRanked]:\n" + results.get(last).toString() + "\n";
         return str;
     }

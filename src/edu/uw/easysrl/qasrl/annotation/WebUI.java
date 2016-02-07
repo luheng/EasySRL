@@ -5,7 +5,6 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
-import javax.annotation.Resource;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -16,8 +15,11 @@ import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
 
 import org.eclipse.jetty.server.Handler;
+import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.HandlerCollection;
 import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.handler.ResourceHandler;
+import org.eclipse.jetty.servlet.DefaultServlet;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 
 
@@ -36,10 +38,12 @@ public class WebUI {
     private static Map<String, ActiveLearning> activeLearningMap;
     private static Map<String, ActiveLearningHistory> activeLearningHistoryMap;
     private static Map<String, BufferedWriter> annotationFileWriterMap;
-    private static Map<String, String> annotationFilePathMap;
+    private static Map<String, String> annotationFileNameMap;
+
+    private static final int maxNumberOfUsers = 100;
 
     private static final DateFormat dateFormat = new SimpleDateFormat("yyyyMMdd-HHmm");
-    private static final String annotationPath  = "./webapp/annotation/";
+    private static final String annotationPath  = "./webapp/annotation_files/";
 
     public static void main(final String[] args) throws Exception {
         final Server server = new Server(Integer.valueOf(args[0]));
@@ -50,7 +54,7 @@ public class WebUI {
         activeLearningMap = new HashMap<>();
         activeLearningHistoryMap = new HashMap<>();
         annotationFileWriterMap = new HashMap<>();
-        annotationFilePathMap = new HashMap<>();
+        annotationFileNameMap = new HashMap<>();
 
         // Servlet Context Handler
         ServletContextHandler servletHandler = new ServletContextHandler(ServletContextHandler.SESSIONS);
@@ -59,21 +63,21 @@ public class WebUI {
         servletHandler.addServlet(AnnotationServlet.class, "/annotate/*");
         servletHandler.addServlet(LoginServlet.class, "/login/*");
 
-        // Resource handler
-        /*
+        // Resource handler wrapped with context.
         ResourceHandler resourceHandler = new ResourceHandler();
         resourceHandler.setDirectoriesListed(true);
-        resourceHandler.setWelcomeFiles(new String[]{"download.html"});
-        resourceHandler.setResourceBase("./webapp/");
-        */
+        resourceHandler.setResourceBase(annotationPath);
+        ContextHandler resourceContextHandler = new ContextHandler("/annotation_files");
+        resourceContextHandler.setHandler(resourceHandler);
 
         HandlerCollection handlerCollection = new HandlerCollection();
-        handlerCollection.setHandlers(new Handler[] {servletHandler, /* resourceHandler */});
+        handlerCollection.setHandlers(new Handler[] {servletHandler, resourceContextHandler});
 
         server.setHandler(handlerCollection);
         server.start();
         server.join();
     }
+
 
     public static class LoginServlet extends HttpServlet {
         public void doGet(final HttpServletRequest request, final HttpServletResponse httpResponse)
@@ -108,11 +112,15 @@ public class WebUI {
             final String userName = request.getParameter("UserName");
             // Add new user.
             if (!activeLearningMap.containsKey(userName)) {
+                if (activeLearningMap.size() >= maxNumberOfUsers) {
+
+                }
                 activeLearningMap.put(userName, new ActiveLearning(baseLearner));
                 activeLearningHistoryMap.put(userName, new ActiveLearningHistory());
-                String userFilePath = annotationPath + userName + "_" + dateFormat.format(new Date()) + ".txt";
-                annotationFileWriterMap.put(userName, new BufferedWriter(new FileWriter(new File(userFilePath))));
-                annotationFilePathMap.put(userName, userFilePath);
+                String userFileName = userName + "_" + dateFormat.format(new Date()) + ".txt";
+                annotationFileWriterMap.put(userName, new BufferedWriter(new FileWriter(
+                        new File(annotationPath + userFileName))));
+                annotationFileNameMap.put(userName, userFileName);
             }
 
             final ActiveLearning activeLearning = activeLearningMap.get(userName);
@@ -228,13 +236,6 @@ public class WebUI {
 
             httpWriter.println("</panel>\n");
 
-            // "Skip 10" button
-            httpWriter.println("<br><form class=\"form-group\" action=\"\" method=\"get\">");
-            // Add user name parameter ..
-            httpWriter.println(String.format("<input type=\"hidden\" input name=\"UserName\" value=\"%s\"/>", userName));
-            httpWriter.println("<button class=\"btn btn-primary\" input name=\"SwitchQuestion\" type=\"submit\" value=\"Skip10\">Skip 10 questions.</button>");
-            httpWriter.println("</form>");
-
             // Gold info and debugging info.
             httpWriter.println(WebUIHelper.printGoldInfo(nextQuery, goldSimulator.answerQuestion(nextQuery)));
             if (history.size() > 0) {
@@ -242,9 +243,19 @@ public class WebUI {
                 httpWriter.println(WebUIHelper.printDebuggingInfo(history.getQuery(last), history.getResponse(last),
                         history.getGoldResponse(last), history.getResult(last)));
             }
+            // "Skip 10" button
+            httpWriter.println("<form class=\"form-group\" action=\"\" method=\"get\">");
+            // Add user name parameter ..
+            httpWriter.println(String.format("<input type=\"hidden\" input name=\"UserName\" value=\"%s\"/>", userName));
+            httpWriter.println("<button class=\"btn btn-primary\" input name=\"SwitchQuestion\" type=\"submit\" value=\"Skip10\">Skip 10 questions</button>");
+            httpWriter.println("</form>");
 
             // File download link
-            httpWriter.println(String.format("<a href=\"%s\">Click to download annotation file.</a>", annotationFilePathMap.get(userName)));
+            if (history.size() > 0) {
+                String annotationFileName = annotationFileNameMap.get(userName);
+                httpWriter.println(String.format("<br><a href=\"%s\" download=\"%s\">Click to download annotation file.</a>",
+                        "/annotation_files/" + annotationFileName, annotationFileName));
+            }
 
             httpWriter.println("</div></div></container>\n");
             httpWriter.println("</body>");
