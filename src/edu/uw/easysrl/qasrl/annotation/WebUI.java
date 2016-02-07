@@ -113,7 +113,7 @@ public class WebUI {
             // Add new user.
             if (!activeLearningMap.containsKey(userName)) {
                 if (activeLearningMap.size() >= maxNumberOfUsers) {
-
+                    // TODO: limit number of users.
                 }
                 activeLearningMap.put(userName, new ActiveLearning(baseLearner));
                 activeLearningHistoryMap.put(userName, new ActiveLearningHistory());

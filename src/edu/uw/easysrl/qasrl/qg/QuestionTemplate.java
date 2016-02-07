@@ -344,13 +344,14 @@ public class QuestionTemplate {
             .collect(Collectors.toList());
         final List<ResolvedDependency> targetDeps = allArgDeps.get(targetArgNum);
         final List<TextWithDependencies> answers = targetDeps
-            .stream()
-            .map(ResolvedDependency::getArgument)
-            .map(index -> { // we need to un-tense verbs that appear as answers
+                .stream()
+                .map(ResolvedDependency::getArgument)
+                .sorted(Integer::compare)
+                .map(index -> { // we need to un-tense verbs that appear as answers
                     Optional<String> replaceOpt = Optional.of(argCategories.get(targetArgNum))
-                    .filter(cat -> cat.isFunctionInto(Category.valueOf("S\\NP")))
-                    .flatMap(arg -> verbHelper.getAuxiliaryAndVerbStrings(words, categories, index))
-                    .map(arr -> arr[1]);
+                            .filter(cat -> cat.isFunctionInto(Category.valueOf("S\\NP")))
+                            .flatMap(arg -> verbHelper.getAuxiliaryAndVerbStrings(words, categories, index))
+                            .map(arr -> arr[1]);
                     return TextGenerationHelper.getRepresentativePhrase(Optional.of(index), argCategories.get(targetArgNum), parse, replaceOpt);
                 })
             .collect(Collectors.toList());
