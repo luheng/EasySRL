@@ -191,7 +191,7 @@ public class WebUI {
             // Annotation margin.
             httpWriter.println("<panel panel-default>\n");
             httpWriter.println("<h5><span class=\"label label-primary\" for=\"Sentence\">Sentence:</span></h5>");
-            httpWriter.println("<div id=\"Sentence\"> " + WebUIHelper.getHighlightedSentenceString(words, nextQuery.getPredicateIndex()) + " </div>");
+            httpWriter.println("<div id=\"Sentence\"> " + TextGenerationHelper.renderHTMLString(words, nextQuery.getPredicateIndex()) + " </div>");
             httpWriter.println("<h5><span class=\"label label-primary\" for=\"Question\">Question:</span><br></h5>");
             httpWriter.println("<div id=\"Question\"> " + nextQuery.getQuestion() + " </div>");
 
@@ -215,7 +215,7 @@ public class WebUI {
                 String optionValue = qLabel + "_a_" + i;
                 String optionString = option.getAnswer();
                 httpWriter.println(String.format("<label><input name=\"UserAnswer\" type=\"radio\" value=\"%s\" />&nbsp %s</label><br/>",
-                        optionValue, WebUIHelper.substitutePTBToken(optionString)));
+                        optionValue, optionString));
             }
             if (badQuestionOptionId >= 0) {
                 httpWriter.println(String.format("<label><input name=\"UserAnswer\" type=\"radio\" value=\"%s\"/> &nbsp Question is not understandable.</label><br/>",
@@ -239,9 +239,7 @@ public class WebUI {
             // Gold info and debugging info.
             httpWriter.println(WebUIHelper.printGoldInfo(nextQuery, goldSimulator.answerQuestion(nextQuery)));
             if (history.size() > 0) {
-                int last = history.size() - 1;
-                httpWriter.println(WebUIHelper.printDebuggingInfo(history.getQuery(last), history.getResponse(last),
-                        history.getGoldResponse(last), history.getResult(last)));
+                httpWriter.println(WebUIHelper.printDebuggingInfo(history));
             }
             // "Skip 10" button
             httpWriter.println("<br><form class=\"form-group\" action=\"\" method=\"get\">");

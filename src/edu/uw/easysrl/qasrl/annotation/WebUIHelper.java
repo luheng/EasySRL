@@ -1,12 +1,10 @@
 package edu.uw.easysrl.qasrl.annotation;
 
+import edu.uw.easysrl.qasrl.ActiveLearningHistory;
 import edu.uw.easysrl.qasrl.GroupedQuery;
 import edu.uw.easysrl.qasrl.Response;
 import edu.uw.easysrl.syntax.evaluation.Results;
 
-import java.util.List;
-import java.util.stream.IntStream;
-import java.util.stream.Collectors;
 
 /**
  * Created by luheng on 2/1/16.
@@ -42,14 +40,6 @@ public class WebUIHelper {
         + "</ul></div></div> ";
     }
 
-    public static String getHighlightedSentenceString(List<String> words, int predicateIndex) {
-        return IntStream.range(0, words.size())
-                .mapToObj(i -> {
-                    String w = translatePTBTokens(words.get(i));
-                    return i == predicateIndex ? "<mark><strong>" + w + "</mark></strong>" : w;
-                }).collect(Collectors.joining(" "));
-    }
-
     public static String printProgressBar(int numAnswered, int numSkipped, int numTotal) {
         int w1 = (int) Math.ceil(1.0 * numAnswered / numTotal);
         int w2 = (int) Math.ceil(1.0 * numSkipped / numTotal);
@@ -67,56 +57,18 @@ public class WebUIHelper {
     }
 
     public static String printGoldInfo(final GroupedQuery query, final Response goldResponse) {
-        String result = "<button type=\"button\" class=\"btn btn-info\" data-toggle=\"collapse\" data-target=\"#goldinfo\">Sneak Peak Gold</button>"
+        String result = "<button type=\"button\" class=\"btn btn-info\" data-toggle=\"collapse\" data-target=\"#goldinfo\">Sneak Peek Gold</button>"
                 + "<div id=\"goldinfo\" class=\"collapse\">";
         result += "<p>[gold]:<br>" + query.getDebuggingInfo(goldResponse).replace("\n", "<br>").replace("\t", "&nbsp&nbsp") + "</p>";
         result += "</div>";
         return result;
     }
 
-    public static String printDebuggingInfo(final GroupedQuery query, final Response userResponse,
-                                            final Response goldResponse, final Results results) {
+    public static String printDebuggingInfo(final ActiveLearningHistory history) {
         String result = "<button type=\"button\" class=\"btn btn-info\" data-toggle=\"collapse\" data-target=\"#debugging\">Debugging Info</button>"
                         + "<div id=\"debugging\" class=\"collapse\">";
-        result += "<p>[your response]:<br>" + query.getDebuggingInfo(userResponse).replace("\n", "<br>").replace("\t", "&nbsp&nbsp") + "</p>";
-        result += "<p>[gold]:<br>" + query.getDebuggingInfo(goldResponse).replace("\n", "<br>").replace("\t", "&nbsp&nbsp") + "</p>";
-        result += "<p>[rerank-result]:<br>" + results.toString().replace("\n", "<br>").replace("\t", "&nbsp&nbsp") + "</p>";
+        result += "<p>" + history.printLatestHistory().replace("\n", "<br>").replace("\t", "&nbsp&nbsp") + "</p>";
         result += "</div>";
         return result;
     }
-
-    public static String getQuestionString(String question) {
-        return question.substring(0, 1).toUpperCase() + question.substring(1) + "?";
-    }
-
-    public static String translatePTBTokens(String word) {
-        if (word.equalsIgnoreCase("-LRB-")) {
-            word = "(";
-        } else if (word.equalsIgnoreCase("-RRB-")) {
-            word = ")";
-        } else if (word.equalsIgnoreCase("-LCB-")) {
-            word = "{";
-        } else if (word.equalsIgnoreCase("-RCB-")) {
-            word = "}";
-        } else if (word.equalsIgnoreCase("-LSB-")) {
-            word = "[";
-        } else if (word.equalsIgnoreCase("-RSB-")) {
-            word = "]";
-        } else if (word.equalsIgnoreCase("\\/")) {
-            return "/";
-        }
-        return word;
-    }
-
-    public static String substitutePTBToken(String word) {
-        return word.replace("-LRB-", "(")
-                .replace("-RRB-", ")")
-                .replace("-LCB-", "{")
-                .replace("-RCB-", "}")
-                .replace("-LSB-", "[")
-                .replace("-RSB-", "]")
-                .replace("\\/", "/");
-    }
-
-    // TODO: group words such as A - B
 }
