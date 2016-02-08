@@ -52,9 +52,10 @@ public class VerbHelper {
     };
 
     private static final String[] enCopulaVerbs = {
-        "be", "being", "am", "\'m", "is",
+        "am", "is", "are", "was", "were",
+        "be", "being", "been",
         "ai", // as in "ai n't"
-        "\'re", "\'s", "are", "\'re", "was", "were", "been", "being"
+        "\'re", "\'s", "\'re", "\'m"
     };
 
     private static final Set<String> enAuxiliaryVerbSet;
@@ -151,6 +152,11 @@ public class VerbHelper {
 
     public boolean hasInflectedForms(String word) {
         return inflectionDictionary.getBestInflections(word.toLowerCase()) != null;
+    }
+
+    public Optional<String> getUninflected(String word) {
+        Optional<String[]> inflections = Optional.ofNullable(inflectionDictionary.getBestInflections(word.toLowerCase()));
+        return inflections.map(infl -> infl[0]);
     }
 
     public boolean isUninflected(List<String> words, List<Category> categories, int index) {
