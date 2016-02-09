@@ -120,6 +120,10 @@ final class Pronoun {
         return new Pronoun(caseMarking, this.number, this.gender, this.person);
     }
 
+    public boolean isAnimate() {
+        return gender.map(gen -> gen != Gender.NEUTER).orElse(true);
+    }
+
     /**
      * Any pronoun should be guaranteed to find at least one string realization given our little lexicon above.
      * ideally it will be completely specified, but if not we'll just choose the first that comes.

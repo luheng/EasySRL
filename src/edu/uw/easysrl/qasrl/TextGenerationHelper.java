@@ -29,10 +29,14 @@ public class TextGenerationHelper {
         noSpaceBefore.add("?");
         noSpaceBefore.add(";");
         noSpaceBefore.add(":");
-        noSpaceBefore.add("n\'t");
-        noSpaceBefore.add("\'s");
-        noSpaceBefore.add("\'m");
         noSpaceBefore.add("\'");
+        noSpaceBefore.add("n't");
+        noSpaceBefore.add("'s");
+        noSpaceBefore.add("'re");
+        noSpaceBefore.add("'ve");
+        noSpaceBefore.add("'ll");
+        noSpaceBefore.add("'m");
+        noSpaceBefore.add("'d");
         noSpaceBefore.add("%");
         noSpaceBefore.add(")");
         noSpaceBefore.add("]");
@@ -57,14 +61,15 @@ public class TextGenerationHelper {
         List<String> words = rawWords.stream().map(TextGenerationHelper::translateTreeBankSymbols).collect(Collectors.toList());
         Optional<String> prevWord = Optional.empty();
         for(String word : words) {
-            boolean noSpace = (prevWord.isPresent() && noSpaceAfter.contains(prevWord.get())) || noSpaceBefore.contains(word);
+            boolean noSpace = !prevWord.isPresent() ||
+                (prevWord.isPresent() && noSpaceAfter.contains(prevWord.get())) ||
+                noSpaceBefore.contains(word);
             if(!noSpace) {
                 result.append(" ");
             }
             result.append(word);
             prevWord = Optional.of(word);
         }
-        result.deleteCharAt(0);
         while(result.length() > 0 &&
               trimPunctuation.indexOf(result.charAt(result.length() - 1)) >= 0) {
             result.deleteCharAt(result.length() - 1);
@@ -322,7 +327,7 @@ public class TextGenerationHelper {
 
     // helper method to make sure we decapitalize the first letter of the sentence
     // and replace a word if necessary.
-    private static List<String> getNodeWords(SyntaxTreeNode node, Optional<Integer> replaceIndexOpt, Optional<String> replacementWord) {
+    public static List<String> getNodeWords(SyntaxTreeNode node, Optional<Integer> replaceIndexOpt, Optional<String> replacementWord) {
         List<String> words = node.getLeaves()
             .stream()
             .map(leaf -> leaf.getWord())
@@ -332,7 +337,7 @@ public class TextGenerationHelper {
         }
         if(replacementWord.isPresent() && replaceIndexOpt.isPresent()) {
             int indexInWords = replaceIndexOpt.get() - node.getStartIndex();
-            if(indexInWords >= 0 && indexInWords <= words.size()) {
+            if(indexInWords >= 0 && indexInWords < words.size()) {
                 words.set(indexInWords, replacementWord.get());
             }
         }
