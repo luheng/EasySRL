@@ -57,8 +57,8 @@ public class QuestionTemplate {
         // right now we're assuming the second arg of a verb adjunct is always the main verb.
         VERB_ADJUNCT(
                     Category.valueOf("((S\\NP)\\(S\\NP))/NP")
-                 /* ,Category.valueOf("((S\\NP)\\(S\\NP))/S[dcl]")
-                    ,Category.valueOf("(S\\NP)\\(S\\NP)")
+                    ,Category.valueOf("((S\\NP)\\(S\\NP))/S[dcl]")
+                 /* ,Category.valueOf("(S\\NP)\\(S\\NP)")
                     ,Category.valueOf("((S\\NP)\\(S\\NP))/S")
                     ,Category.valueOf("((S\\NP)\\(S\\NP))/(S[ng]\\NP)") // ``by'' as in ``by doing something''.
                     ,Category.valueOf("((S\NP)\(S\NP))/PP") // according (to): 
@@ -69,7 +69,7 @@ public class QuestionTemplate {
                 // Category.valueOf("S|S"),
                     ),
         RELATIVIZER(
-                // Category.valueOf("(NP\\NP)/(S[dcl]\\NP)"),
+                // Category.valueOf("(NP\\NP)/(S[dcl]\\NP)")
             ),
         INVALID();
 
@@ -197,14 +197,11 @@ public class QuestionTemplate {
              argIndices.values().stream()
              .filter(Optional::isPresent).map(Optional::get)
              .anyMatch(index -> verbHelper.isCopulaVerb(words.get(index)))) || // adverbs of copulas are wonky and not helpful
-            (type == QuestionType.VERB_ADJUNCT &&
-             categories.get(argIndex).isFunctionInto(Category.valueOf("S[pss]"))) || // passive verbs will take lots of extra work
             (type == QuestionType.ADJECTIVE_ADJUNCT &&
              targetArgNum == 2) || // "full of promise" -> "something was _ of promise; what's _?" --- can't really ask it.
-            categories.get(argIndex).matches(Category.valueOf("PR")) // don't ask about a particle; TODO should look at arg category instead?
+            categories.get(argIndex).matches(Category.valueOf("PR")) // don't ask about a particle; TODO where are all the PR arguments...?
             ;
         return cantAsk;
-        // return !Category.valueOf("((S\\NP)\\(S\\NP))/S[dcl]").matches(predicateCategory);
     }
 
     /**
@@ -229,8 +226,9 @@ public class QuestionTemplate {
             verbIndexOpt = Optional.of(predicateIndex);
         } else if(type == QuestionType.VERB_ADJUNCT) {
             verbIndexOpt = argIndices.get(2);
+        } else if(type == QuestionType.RELATIVIZER) {
+            verbIndexOpt = argIndices.get(2);
         }
-        Optional<String> verbArgReplacement = Optional.empty();
         // for now, this seems to be a sufficient criterion...
         final boolean shouldSplitVerb = targetArgNum != 1;
 
@@ -242,59 +240,21 @@ public class QuestionTemplate {
             pred.add(words.get(predicateIndex));
         } else {
             int verbIndex = verbIndexOpt.get();
-
-            /*
-            // now, let's examine the clause...
-            List<String> features = new ArrayList<String>();
-            List<String> auxWords = new ArrayList<String>();
-            SyntaxTreeNode verbNode = tree.getLeaves().get(verbIndex);
-            String verbWord = verbNode.getWord();
-            Optional<String> prevFeatureString = Optional.empty();
-            while(TextGenerationHelper.getParent(verbNode, tree).isPresent()) {
-                String catString = verbNode.getCategory().getHeadCategory().toString();
-                if(catString.startsWith("S")) {
-                    Optional<String> featureString = Optional.empty();
-                    if(catString.length() > 1) {
-                        featureString = Optional.of(catString.substring(2, catString.length() - 1));
-                    }
-                    String word = words.get(verbNode.getStartIndex());
-                    if(word.equalsIgnoreCase("not") || word.equalsIgnoreCase("n't")) {
-                        auxWords.add(0, word);
-                    }
-                    if(featureString.isPresent() &&
-                       (!prevFeatureString.isPresent() ||
-                        !featureString.get().equals(prevFeatureString.get()))) {
-                        features.add(0, featureString.get());
-                        auxWords.add(0, word);
-                        if(featureString.get().equals("dcl")) {
-                            break;
-                        }
-                        prevFeatureString = featureString;
-                    }
-                    verbNode = TextGenerationHelper.getParent(verbNode, tree).get();
-                } else {
-                    break;
-                }
-            }
-            System.out.println(TextGenerationHelper.renderString(words));
-            System.out.println(verbIndex + ":\t" + verbWord);
-            System.out.println(String.join(" ", features));
-            System.out.println(String.join(" ", auxWords));
-            */
-
-            // let's just go ahead and put the auxiliaries in place now rather than waiting.
             if(verbIndex == predicateIndex) {
                 if(shouldSplitVerb) {
                     auxiliaries.addAll(getAuxiliariesForPredVerb(predicateIndex));
-                    pred.addAll(getBareVerb(predicateIndex));
+                    pred.addAll(getBarePredVerb(predicateIndex));
                 } else {
-                    pred.addAll(getUnsplitVerb(predicateIndex));
+                    pred.addAll(getUnsplitPredVerb(predicateIndex));
                 }
             } else {
+                // do this whether we split the verb or not. whatever.
                 auxiliaries.addAll(getAuxiliariesForArgVerb(verbIndex));
-                verbArgReplacement = Optional.of(TextGenerationHelper.renderString(getNonTargetArgumentBareVerb(verbIndex)));
-                // use the non-verb pred
-                pred.add(words.get(predicateIndex));
+                // unless our pred is a relativizer,
+                if(type != QuestionType.RELATIVIZER) {
+                    // use the non-verb pred.
+                    pred.add(words.get(predicateIndex));
+                }
             }
         }
 
@@ -345,6 +305,7 @@ public class QuestionTemplate {
                         questionDeps.addAll(argWithDeps.dependencies);
                         argWords = argWithDeps.tokens;
                     } else if(verbIndexOpt.isPresent() && argIndex == verbIndexOpt.get()) {
+                        String verbArgReplacement = TextGenerationHelper.renderString(getNonTargetBareArgumentVerb(verbIndexOpt.get()));
                         TextWithDependencies argWithDeps = TextGenerationHelper.getRepresentativePhrase(Optional.of(argIndex), argCategory, parse, verbArgReplacement);
                         questionDeps.addAll(argWithDeps.dependencies);
                         argWords = argWithDeps.tokens;
@@ -352,19 +313,6 @@ public class QuestionTemplate {
                         TextWithDependencies argWithDeps = TextGenerationHelper.getRepresentativePhrase(Optional.of(argIndex), argCategory, parse);
                         questionDeps.addAll(argWithDeps.dependencies);
                         argWords = argWithDeps.tokens;
-                        /*
-                        if(shouldSplitVerb) {
-                            final List<String> splitArg = getSplitVerbAtIndex(argIndex);
-                            TextWithDependencies argWithDeps = TextGenerationHelper.getRepresentativePhrase(Optional.of(argIndex), argCategory, parse, splitArg.get(1));
-                            questionDeps.addAll(argWithDeps.dependencies);
-                            argWords = argWithDeps.tokens;
-                        } else {
-                            final String unsplitArg = getUnsplitVerb(argIndex);
-                            TextWithDependencies argWithDeps = TextGenerationHelper.getRepresentativePhrase(Optional.of(argIndex), argCategory, parse, unsplitArg);
-                            questionDeps.addAll(argWithDeps.dependencies);
-                            argWords = argWithDeps.tokens;
-                        }
-                        */
                     }
                 }
             }
@@ -495,7 +443,7 @@ public class QuestionTemplate {
         return result;
     }
 
-    public List<String> getNonTargetArgumentBareVerb(int argIndex) {
+    public List<String> getNonTargetBareArgumentVerb(int argIndex) {
         ArrayList<String> result = new ArrayList<>();
         if(type == QuestionType.NOUN_ADJUNCT) {
             return result;
@@ -531,7 +479,7 @@ public class QuestionTemplate {
      * We try to keep in in the tense/aspect/voice/etc. of the clause it appeared in.
      * @return a 2-element array of { "modal", "verb" } where modal may be empty
      */
-    public List<String> getUnsplitVerb(int index) {
+    public List<String> getUnsplitPredVerb(int index) {
         String verbStr = words.get(index);
         Category verbCategory = categories.get(index);
         List<Integer> auxiliaries = verbHelper.getAuxiliaryChain(words, categories, index);
@@ -565,13 +513,13 @@ public class QuestionTemplate {
 
     public List<String> getAuxiliariesForPredVerb(int index) {
         List<String> result = new ArrayList<>();
-        result.addAll(getSplitVerb(index)[0]);
+        result.addAll(getSplitPredVerb(index)[0]);
         return result;
     }
 
-    public List<String> getBareVerb(int index) {
+    public List<String> getBarePredVerb(int index) {
         List<String> result = new ArrayList<>();
-        result.addAll(getSplitVerb(index)[1]);
+        result.addAll(getSplitPredVerb(index)[1]);
         return result;
     }
 
@@ -582,7 +530,7 @@ public class QuestionTemplate {
      * TODO is the below description correct?
      * @return a 2-element array of { "aux", "pred" }
      */
-    public List<String>[] getSplitVerb(int index) {
+    public List<String>[] getSplitPredVerb(int index) {
         String verbStr = words.get(index);
         Category verbCategory = categories.get(index);
         List<Integer> auxiliaries = verbHelper.getAuxiliaryChain(words, categories, index);
@@ -626,7 +574,7 @@ public class QuestionTemplate {
                 }
             }
         } else {
-            List<String> rw = getUnsplitVerb(index);
+            List<String> rw = getUnsplitPredVerb(index);
             result[0].add(rw.get(0));
             // i.e. What {does n't} someone say ?
             //      What {is n't} someone going to say ?
