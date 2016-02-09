@@ -76,6 +76,17 @@ public class VerbHelper {
         this.inflectionDictionary = inflectionDictionary;
     }
 
+    public Optional<String> getCopulaNegation(List<String> words, List<Category> categories, int index) {
+        for(int i = index + 1; i < words.size(); i++) {
+            if(isNegationWord(words, categories, i)) {
+                return Optional.of(words.get(i));
+            } else if(!isModifierWord(words, categories, i)) {
+                return Optional.empty();
+            }
+        }
+        return Optional.empty();
+    }
+
     public List<Integer> getAuxiliaryChain(List<String> words, List<Category> categories, int index) {
         List<Integer> auxliaryIndices = new ArrayList<>();
         for (int i = index - 1; i >= 0; i--) {

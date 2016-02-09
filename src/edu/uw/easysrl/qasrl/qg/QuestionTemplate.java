@@ -546,6 +546,11 @@ public class QuestionTemplate {
             for (int id : auxiliaries) {
                 result.add(words.get(id));
             }
+        } else if (verbHelper.isCopulaVerb(words.get(index))) {
+            result.add(verbStr);
+            Optional<String> negOpt = verbHelper.getCopulaNegation(words, categories, index);
+            negOpt.ifPresent(result::add);
+            return result;
         } else if (verbCategory.isFunctionInto(Category.valueOf("S[adj]\\NP")) ||
             verbCategory.isFunctionInto(Category.valueOf("S[pss]\\NP")) ||
             verbCategory.isFunctionInto(Category.valueOf("S[ng]\\NP"))) {
@@ -598,8 +603,15 @@ public class QuestionTemplate {
                 result[1].add(verbStr);
                 return result;
             } else if (verbHelper.isCopulaVerb(words.get(index))) {
-                // TODO fix issue with negation n't stuff
                 result[0].add(verbStr);
+                Optional<String> negOpt = verbHelper.getCopulaNegation(words, categories, index);
+                negOpt.ifPresent(neg -> {
+                        if(neg.equals("not")) {
+                            result[1].add(neg);
+                        } else if(neg.equals("n't")) {
+                            result[0].add(neg);
+                        }
+                    });
                 return result;
             } else {
                 Optional<String[]> auxAndVerbStringsOpt = verbHelper.getAuxiliaryAndVerbStrings(words, categories, index);
