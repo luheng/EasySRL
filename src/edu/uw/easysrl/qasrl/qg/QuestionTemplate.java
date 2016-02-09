@@ -221,13 +221,15 @@ public class QuestionTemplate {
         final List<String> auxiliaries = new ArrayList<>();
         // we need the verb of the clause our predicate appears in,
         // which we will use to determine the auxiliaries we'll be using
-        Optional<Integer> verbIndexOpt = Optional.empty();
+        final Optional<Integer> verbIndexOpt;
         if(type == QuestionType.VERB) {
             verbIndexOpt = Optional.of(predicateIndex);
         } else if(type == QuestionType.VERB_ADJUNCT) {
             verbIndexOpt = argIndices.get(2);
         } else if(type == QuestionType.RELATIVIZER) {
             verbIndexOpt = argIndices.get(2);
+        } else {
+            verbIndexOpt = Optional.empty();
         }
         // for now, this seems to be a sufficient criterion...
         final boolean shouldSplitVerb = targetArgNum != 1;
@@ -280,12 +282,21 @@ public class QuestionTemplate {
             } else {
                 // this is complicated... consider simplifying.
                 // first we add the dependency to the list of deps we've touched
-                final Optional<ResolvedDependency> firstArgDepOpt = Optional.ofNullable(allArgDeps.get(currentArgNum)).map(deps -> deps.get(0));
+                Optional<ResolvedDependency> firstArgDepOpt = Optional.ofNullable(allArgDeps.get(currentArgNum)).map(deps -> deps.get(0));
+                // and now, we have an XXX HACK workaround to get subjects to show up when using adverbs!
+                if(type == QuestionType.VERB_ADJUNCT && currentArgNum == 1) {
+                    firstArgDepOpt = parse.dependencies.stream()
+                        .filter(dep -> dep.getHead() == verbIndexOpt.get() &&
+                                dep.getArgument() != dep.getHead() &&
+                                dep.getArgNumber() == 1)
+                        .findFirst();
+                }
                 firstArgDepOpt.ifPresent(dep -> questionDeps.add(dep));
                 // then we locate the argument in the sentence
                 final Optional<Integer> argIndexOpt = firstArgDepOpt.map(ResolvedDependency::getArgument);
                 final Category argCategory = argCategories.get(currentArgNum);
                 // then we generate the text for that argument, again logging the dependencies touched.
+
                 if(!argIndexOpt.isPresent()) {
                     TextWithDependencies argWithDeps = TextGenerationHelper.getRepresentativePhrase(argIndexOpt, argCategory, parse);
                     questionDeps.addAll(argWithDeps.dependencies);
