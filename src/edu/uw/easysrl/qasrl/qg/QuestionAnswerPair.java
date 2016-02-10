@@ -47,8 +47,12 @@ public class QuestionAnswerPair {
     }
 
     public String renderAnswer() {
-        return answers.stream()
-            .map(TextGenerationHelper::renderString)
-            .collect(Collectors.joining(", "));
+        if (answers.size() == 1) {
+            return TextGenerationHelper.renderString(answers.get(0));
+        } else {
+            return "{ " + answers.stream()
+                    .map(TextGenerationHelper::renderString)
+                    .collect(Collectors.joining(" # ")) + " }";
+        }
     }
 }

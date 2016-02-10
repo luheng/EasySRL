@@ -154,7 +154,7 @@ public class ActiveLearningReranker {
             List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
             List<Parse> parses = allParses.get(sentIdx);
             List<GroupedQuery> queries = QueryGenerator.generateQueries(sentIdx, words, parses, questionGenerator,
-                    generatePseudoQuestions, groupSameLabelDependencies);
+                    generatePseudoQuestions);
             queries.forEach(query -> query.computeProbabilities(reranker.expScores.get(query.sentenceId)));
             queryList.addAll(queries);
         }

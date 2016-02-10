@@ -1,6 +1,7 @@
 package edu.uw.easysrl.qasrl;
 
 import com.google.common.collect.ImmutableList;
+import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.*;
@@ -73,32 +74,35 @@ public class GroupedQuery {
     String question;
     List<AnswerOption> answerOptions;
 
+    // The probability mass of non-NA options.
+    public double questionConfidence;
+    public double attachmentUncertainty;
+
     double answerMargin, answerEntropy, normalizedAnswerEntropy;
     // TODO: move this to ActiveLearning ...
     static final double rankDiscountFactor = 0.0;
     static final boolean estimateWithParseScores = true;
 
-    public GroupedQuery(int sentenceId, final List<String> sentence, final List<Parse> parses) {
+    public GroupedQuery(int sentenceId, final List<String> sentence, List<Parse> parses, Query query) {
         this.sentenceId = sentenceId;
         this.sentence = sentence;
         this.parses = parses;
         this.totalNumParses = parses.size();
         queries = new HashSet<>();
-        answerOptions = null;
-    }
-
-    public GroupedQuery(int sentenceId, final List<String> sentence, List<Parse> parses, Query query) {
-        this(sentenceId, sentence, parses);
         queries.add(query);
     }
 
-    public boolean canMerge(Query query) {
-        for (Query q : queries) {
-            if (canMerge(q, query)) {
+    public boolean canMerge(final Query queryToMerge) {
+        for (Query query : queries) {
+            if (canMerge(queryToMerge, query)) {
                 return true;
             }
         }
         return false;
+    }
+
+    public void addQuery(final Query query) {
+        this.queries.add(query);
     }
 
     private static boolean canMerge(Query q1, Query q2) {
@@ -122,10 +126,6 @@ public class GroupedQuery {
         return false;
     }
 
-    public void add(Query query) {
-        queries.add(query);
-    }
-
     public void collapse(int predicateIndex, Category category, int argumentNumber, String question,
                          final Map<String, ImmutableList<Integer>> spanToArgList,
                          final Map<String, Set<Integer>> spanToParses) {
@@ -142,46 +142,6 @@ public class GroupedQuery {
         });
         answerOptions.add(new BadQuestionOption(allParseIds));
         //answerOptions.add(new NoAnswerOption(unlistedParses));
-    }
-
-    // Experimental query collapse function.
-    public void collapseNew(int predicateIndex, Category category, int argumentNumber, String question,
-                            final Map<String, Set<Integer>> spanToParses,
-                            final Map<String, Set<Integer>> spanToArgIds) {
-        this.predicateIndex = predicateIndex;
-        this.category = category;
-        this.argumentNumber = argumentNumber;
-        this.question = question;
-        this.answerOptions = new ArrayList<>();
-
-        Set<Integer> allParseIds = IntStream.range(0, totalNumParses).boxed().collect(Collectors.toSet());
-        double scoreSum = parses.stream().mapToDouble(p->p.score).sum();
-
-        Map<String, Double> answerSpanToScore = new HashMap<>();
-        spanToParses.forEach((span, parseIds) -> {
-            double score = parseIds.stream().mapToDouble(id -> parses.get(id).score).sum() / scoreSum;
-            answerSpanToScore.put(span, score);
-        });
-        List<String> sortedSpans = answerSpanToScore.keySet().stream()
-                .sorted((a1, a2) -> Double.compare(-answerSpanToScore.get(a1), -answerSpanToScore.get(a2)))
-                .collect(Collectors.toList());
-        Set<Integer> unlistedParses = new HashSet<>();
-        double accumulatedScore = 0.0;
-        for (int i = 0; i < sortedSpans.size(); i++) {
-            String span = sortedSpans.get(i);
-            Set<Integer> parseIds = spanToParses.get(span);
-            if (accumulatedScore > 0.8) {
-                unlistedParses.addAll(parseIds);
-            } else {
-                ImmutableList<Integer> argList = ImmutableList.copyOf(spanToArgIds.get(span).stream().sorted()
-                        .collect(Collectors.toList()));
-                answerOptions.add(new AnswerOption(argList, span, spanToParses.get(span)));
-            }
-            allParseIds.removeAll(parseIds);
-            accumulatedScore += answerSpanToScore.get(span);
-        }
-        answerOptions.add(new BadQuestionOption(allParseIds));
-        answerOptions.add(new NoAnswerOption(unlistedParses));
     }
 
     public void setQueryId(int id) {
@@ -236,7 +196,27 @@ public class GroupedQuery {
         answerEntropy = -1.0 * answerOptions.stream()
                 .filter(ao -> ao.probability > 0)
                 .mapToDouble(ao -> ao.probability * Math.log(ao.probability)).sum();
-        normalizedAnswerEntropy = answerEntropy / Math.log(answerOptions.size());
+        normalizedAnswerEntropy = answerEntropy / K;
+
+        // Question confidence and attachment ambiguity.
+        double allParsesMass = .0;
+        for (double p : parseDist) {
+            allParsesMass += p;
+        }
+        double nonNaMass = .0;
+        prob = new ArrayList<>();
+        for (AnswerOption option : answerOptions) {
+            if (!GroupedQuery.BadQuestionOption.class.isInstance(option)) {
+                double score = option.parseIds.stream().mapToDouble(id -> parseDist[id]).sum();
+                prob.add(score);
+                nonNaMass += score;
+            }
+        }
+        questionConfidence = nonNaMass / allParsesMass;
+        attachmentUncertainty = .0;
+        for (double d : prob) {
+            attachmentUncertainty -= (d / nonNaMass) * Math.log(d / nonNaMass) / Math.log(2);
+        }
     }
 
     public void print(final List<String> words, Response response) {

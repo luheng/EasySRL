@@ -30,30 +30,41 @@ public class SimulatedExperiment2 {
             int sentenceId = learner.getNextSentenceInQueue();
             Map<Integer, List<GroupedQuery>>  queries = learner.getQueryBySentenceId(sentenceId);
             List<Integer> predicates = queries.keySet().stream().sorted().collect(Collectors.toList());
-            boolean firstQueryOfSentence = true;
+
+            // Print debugging info.
+            if (sentenceCounter < 200) {
+                System.out.println("SID=" + sentenceId + "\t" + learner.getSentenceScore(sentenceId));
+                System.out.println(learner.getSentenceById(sentenceId).stream().collect(Collectors.joining(" ")));
+                System.out.println();
+                learner.printQueriesBySentenceId(sentenceId);
+                System.out.println();
+            }
 
             for (int predId : predicates) {
                 for (GroupedQuery query : queries.get(predId)) {
                     Response response = responseSimulator.answerQuestion(query);
                     learner.respondToQuery(query, response);
+                    learner.updateQueryScoresBySentenceId(sentenceId);
+
                     // TODO: update query scores.
                     queryCounter ++;
                     if (queryCounter % 200 == 0) {
                         budgetCurve.put(queryCounter, learner.getRerankedF1());
                     }
                     // Print debugging info.
-                    if (sentenceCounter < 50) {
-                        if (firstQueryOfSentence) {
-                            System.out.println("SID=" + sentenceId + "\t" + learner.getSentenceScore(sentenceId));
-                            System.out.println(query.getSentence().stream().collect(Collectors.joining(" ")));
-                            firstQueryOfSentence = false;
-                        }
+                    if (sentenceCounter < 200) {
+                        System.out.println("query confidence:\t" + query.questionConfidence);
+                        System.out.println("attachment uncertainty:\t" + query.attachmentUncertainty);
                         query.print(query.getSentence(), response);
+
+                        learner.printQueriesBySentenceId(sentenceId);
+                        System.out.println();
                     }
                 }
             }
 
-            if (sentenceCounter < 50) {
+            // Print debugging info.
+            if (sentenceCounter < 200) {
                 System.out.println("[1-best]\n" + learner.getOneBestF1(sentenceId));
                 System.out.println("[rerank]\n" + learner.getRerankedF1(sentenceId));
                 System.out.println("[oracle]\n" + learner.getOracleF1(sentenceId) + "\n");

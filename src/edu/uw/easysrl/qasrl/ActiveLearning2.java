@@ -151,26 +151,24 @@ public class ActiveLearning2 {
             List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
             List<Parse> parses = allParses.get(sentIdx);
             List<GroupedQuery> queries = QueryGenerator.generateQueries(sentIdx, words, parses, questionGenerator,
-                    generatePseudoQuestions, groupSameLabelDependencies);
+                    generatePseudoQuestions);
             queries.forEach(query -> {
-                query.computeProbabilities(reranker.expScores.get(query.sentenceId));
-                if (query.answerEntropy > minAnswerEntropy) {
-                    // query.setQueryId(queryPool.size());
-                    int predIdx = query.predicateIndex;
-                    if (!queryPool.contains(sentIdx, predIdx)) {
-                        queryPool.put(sentIdx, predIdx, new ArrayList<>());
-                    }
-                    queryPool.get(sentIdx, predIdx).add(query);
+                // query.setQueryId(queryPool.size());
+                int predIdx = query.predicateIndex;
+                if (!queryPool.contains(sentIdx, predIdx)) {
+                    queryPool.put(sentIdx, predIdx, new ArrayList<>());
                 }
+                queryPool.get(sentIdx, predIdx).add(query);
             });
         }
         int totalNumQueries = 0;
         for (int sentIdx : queryPool.rowKeySet()) {
+            updateQueryScoresBySentenceId(sentIdx);
+            int numQueries = 0;
             double sentScore = .0;
-            int numQueries= 0;
             for (int predIdx : queryPool.row(sentIdx).keySet()) {
-                for (GroupedQuery query : queryPool.row(sentIdx).get(predIdx)) {
-                    sentScore += query.answerEntropy;
+                for (GroupedQuery query : queryPool.get(sentIdx, predIdx)) {
+                    sentScore += query.attachmentUncertainty;
                     numQueries ++;
                 }
             }
@@ -179,6 +177,23 @@ public class ActiveLearning2 {
         }
         sentenceQueue.addAll(queryPool.rowKeySet());
         System.out.println("Total number of queries:\t" + totalNumQueries);
+    }
+
+    public void updateQueryScoresBySentenceId(int sentIdx) {
+        for (int predIdx : queryPool.row(sentIdx).keySet()) {
+            for (GroupedQuery query : queryPool.row(sentIdx).get(predIdx)) {
+                query.computeProbabilities(reranker.expScores.get(query.sentenceId));
+            }
+        }
+    }
+
+    public void printQueriesBySentenceId(int sentIdx) {
+        for (int predIdx : queryPool.row(sentIdx).keySet()) {
+            for (GroupedQuery query : queryPool.row(sentIdx).get(predIdx)) {
+                System.out.println(String.format("%.3f\t%.3f\t%s", query.questionConfidence, query.attachmentUncertainty,
+                        query.question));
+            }
+        }
     }
 
     public void refreshQueryList() {
