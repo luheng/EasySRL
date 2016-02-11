@@ -40,6 +40,10 @@ public class RerankerExponentiated implements Reranker {
         normalize(scores);
     }
 
+    public double[] getParseScores(final int sentenceId) {
+        return expScores.get(sentenceId);
+    }
+
     public int getRerankedBest(final int sentenceId) {
         double[] votes = expScores.get(sentenceId);
         int bestK = 0;

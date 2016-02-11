@@ -148,6 +148,7 @@ public class GroupedQuery {
             allParseIds.removeAll(parseIds);
         });
         answerOptions.add(new BadQuestionOption(allParseIds));
+        answerOptions.add(new NoAnswerOption(new HashSet<>()));
     }
 
     public void setQueryId(int id) {
@@ -209,9 +210,11 @@ public class GroupedQuery {
         questionConfidence = nonNaMass / allParsesMass;
         attachmentUncertainty = .0;
         for (double d : prob) {
-            attachmentUncertainty -= (d / nonNaMass) * Math.log(d / nonNaMass);
+            if (d > 0) {
+                attachmentUncertainty -= (d / nonNaMass) * Math.log(d / nonNaMass);
+            }
         }
-        attachmentUncertainty /= Math.log(prob.size());
+        //attachmentUncertainty /= Math.log(prob.size());
     }
 
     public void print(final List<String> words, Response response) {
@@ -227,7 +230,7 @@ public class GroupedQuery {
                     ao.argumentIds.stream().map(words::get).collect(Collectors.joining(","));
             String parseIdsStr = DebugPrinter.getShortListString(ao.parseIds);
             System.out.println(String.format("%.2f\t%s%d\t(%s:%s)\t\t\t%s\t%s", ao.probability, match, i, argIdsStr,
-                    argHeadsStr, ao.answer, parseIdsStr));
+                    argHeadsStr, ao.getAnswer(), parseIdsStr));
         }
         System.out.println();
     }
@@ -245,7 +248,7 @@ public class GroupedQuery {
                     ao.argumentIds.stream().map(sentence::get).collect(Collectors.joining(","));
             String parseIdsStr = DebugPrinter.getShortListString(ao.parseIds);
             result += String.format("%.2f\t%s%d\t%s:%s\t%s\t%s", ao.probability, match, i, argIdsStr, argHeadsStr,
-                    ao.answer, parseIdsStr) + "\n";
+                    ao.getAnswer(), parseIdsStr) + "\n";
         }
         return result + "\n";
     }
@@ -263,7 +266,7 @@ public class GroupedQuery {
             String argHeadsStr = ao.isNAOption() ? "N/A" :
                     ao.argumentIds.stream().map(sentence::get).collect(Collectors.joining(","));
             String parseIdsStr = DebugPrinter.getShortListString(ao.parseIds);
-            result += String.format("%d\t%s\tprob=%.2f\t%s\t(%s:%s)\t%s\n", i, match, ao.probability, ao.answer,
+            result += String.format("%d\t%s\tprob=%.2f\t%s\t(%s:%s)\t%s\n", i, match, ao.probability, ao.getAnswer(),
                     argIdsStr, argHeadsStr, parseIdsStr);
         }
         if (response.debugInfo.length() > 0) {
@@ -292,7 +295,7 @@ public class GroupedQuery {
             System.out.println(String.format("%.2f\t%s[%d]\t%s\t%s:%s\t%s",
                     ao.probability,
                     match, i,
-                    ao.answer,
+                    ao.getAnswer(),
                     argIdsStr,
                     argHeadsStr,
                     parseIdsStr));

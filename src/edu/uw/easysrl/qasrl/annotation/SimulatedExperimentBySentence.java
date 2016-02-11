@@ -28,11 +28,9 @@ public class SimulatedExperimentBySentence {
         int sentenceCounter = 0;
         List<Integer> sentenceIds = new ArrayList<>();
 
-        while (learner.getNumberOfRemainingSentences() > 0) {
-            int sentenceId = learner.getNextSentenceInQueue();
+        while (learner.getNumRemainingSentences() > 0) {
+            int sentenceId = learner.getCurrentSentenceId();
             sentenceIds.add(sentenceId);
-            Map<Integer, List<GroupedQuery>>  queries = learner.getQueryBySentenceId(sentenceId);
-            List<Integer> predicates = queries.keySet().stream().sorted().collect(Collectors.toList());
 
             // Print debugging info.
             if (sentenceCounter < 200) {
@@ -43,29 +41,24 @@ public class SimulatedExperimentBySentence {
                 //System.out.println();
             }
 
-            for (int predId : predicates) {
-                for (GroupedQuery query : queries.get(predId)) {
-                    /*if (query.questionConfidence < 0.3 || query.attachmentUncertainty < 0.3) {
-                        continue;
-                    }*/
-                    Response response = responseSimulator.answerQuestion(query);
-
-                    queryCounter ++;
-                    // Print debugging info.
-                    if (sentenceCounter < 200) {
-                        System.out.println("query confidence:\t" + query.questionConfidence);
-                        System.out.println("attachment uncertainty:\t" + query.attachmentUncertainty);
-                        query.print(query.getSentence(), response);
-                    }
-                    learner.respondToQuery(query, response);
-                    learner.updateQueryScoresBySentenceId(sentenceId);
-                    if (sentenceCounter < 200) {
-                        //learner.printQueriesBySentenceId(sentenceId);
-                        //System.out.println();
-                    }
+            Optional<GroupedQuery> optQuery;
+            while ((optQuery = learner.getNextQuery()).isPresent()) {
+                GroupedQuery query = optQuery.get();
+                Response response = responseSimulator.answerQuestion(query);
+                queryCounter ++;
+                // Print debugging info.
+                if (sentenceCounter < 200) {
+                    System.out.println("query confidence:\t" + query.questionConfidence);
+                    System.out.println("attachment uncertainty:\t" + query.attachmentUncertainty);
+                    query.print(query.getSentence(), response);
+                }
+                learner.respondToQuery(query, response);
+                learner.refereshQueryQueue();
+                if (sentenceCounter < 200) {
+                    learner.printQueriesBySentenceId(sentenceId);
+                    System.out.println();
                 }
             }
-
             sentenceCounter ++;
             if (sentenceCounter % 5 == 0) {
                 rerankCurve.put(sentenceCounter, learner.getRerankedF1(sentenceIds));
@@ -79,10 +72,10 @@ public class SimulatedExperimentBySentence {
                 System.out.println("[rerank]\n" + learner.getRerankedF1(sentenceId));
                 System.out.println("[oracle]\n" + learner.getOracleF1(sentenceId) + "\n");
             }
-
             if (queryCounter >= maxNumQueries) {
                 break;
             }
+            learner.switchToNextSentence();
         }
 
         System.out.println("[1-best]:\t" + learner.getOneBestF1());

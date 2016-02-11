@@ -7,5 +7,6 @@ package edu.uw.easysrl.qasrl;
 public interface Reranker {
     void rerank(final GroupedQuery query, final Response response);
     int getRerankedBest(final int sentenceId);
+    double[] getParseScores(final int sentenceId);
     void printVotes();
 }

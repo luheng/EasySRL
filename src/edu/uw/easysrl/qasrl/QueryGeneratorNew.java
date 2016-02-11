@@ -9,14 +9,13 @@ import edu.uw.easysrl.syntax.grammar.Category;
 import gnu.trove.map.hash.TObjectDoubleHashMap;
 
 import java.util.*;
-import java.util.Map.Entry;
-
+import java.util.stream.Collectors;
 
 /**
  * Query generator.
  * Created by luheng on 1/17/16.
  */
-public class QueryGenerator2 {
+public class QueryGeneratorNew {
 
     /**
      * @param words the sentence
@@ -29,6 +28,9 @@ public class QueryGenerator2 {
                                                      final QuestionGenerator questionGenerator) {
         List<GroupedQuery> groupedQueryList = new ArrayList<>();
         int numParses = parses.size();
+        double totalScores = parses.stream().mapToDouble(p -> p.score).sum();
+        // Debugging
+        // System.out.println(words.stream().collect(Collectors.joining(" ")));
         for (int i = 0; i < words.size(); i++) {
             // For lambda.
             final int predId = i;
@@ -47,11 +49,15 @@ public class QueryGenerator2 {
                             depToParses.get(category, argNum).add(parseId);
                         });
             }
+            // Debugging
+            // System.out.println("[predicate]:\t" + words.get(i));
             for (Category category : depToParses.rowKeySet()) {
+                // Debugging
+                // System.out.println("\t[category]:\t" + category);
                 for (int argNum : depToParses.row(category).keySet()) {
                     TObjectDoubleHashMap<String> questionScores = new TObjectDoubleHashMap<>(),
                                                  answerScores = new TObjectDoubleHashMap<>();
-                    // Generate a group query.
+                    // Generate a grouped query.
                     GroupedQuery groupedQuery = new GroupedQuery(sentenceId, words, parses);
                     for (int parseId : depToParses.get(category, argNum)) {
                         final Parse parse = parses.get(parseId);
@@ -63,13 +69,16 @@ public class QueryGenerator2 {
                         QuestionAnswerPair qa = qaPairOpt.get();
                         String question = qa.renderQuestion(), answer = qa.renderAnswer();
                         // A very crude estimation.
-                        double depScore = 1.0 * parse.score / parse.dependencies.size();
-                        questionScores.adjustOrPutValue(question, depScore, depScore);
-                        answerScores.adjustOrPutValue(answer, depScore, depScore);
+                        questionScores.adjustOrPutValue(question, parse.score, parse.score);
+                        answerScores.adjustOrPutValue(answer, parse.score, parse.score);
                         // Legacy.
                         Query query = new Query(qa, parseId);
                         groupedQuery.addQuery(query);
                     }
+                    // Debugging
+                    /* for (String question : questionScores.keySet()) {
+                        System.out.println("\t\t\t" + question + "\t" + questionScores.get(question) / totalScores);
+                    } */
                     // Legacy.
                     Map<ImmutableList<Integer>, String> argListToSpan = new HashMap<>();
                     Map<String, ImmutableList<Integer>> spanToArgList = new HashMap<>();
