@@ -20,6 +20,8 @@ public class QuestionAnswerPair {
     public final List<List<String>> answers;
     public final List<Set<ResolvedDependency>> answerDeps;
 
+    public final List<Integer> answerWordIndices;
+
     public QuestionAnswerPair(int predicateIndex, Category predicateCategory,
                               List<ResolvedDependency> questionDeps, List<String> question,
                               List<ResolvedDependency> targetDeps, List<TextWithDependencies> answers) {
@@ -33,6 +35,13 @@ public class QuestionAnswerPair {
                 .collect(Collectors.toList());
         this.answerDeps = answers.stream()
                 .map(twd -> twd.dependencies)
+                .collect(Collectors.toList());
+        this.answerWordIndices = answers.stream()
+                .flatMap(twd -> twd.dependencies.stream()
+                .map(d -> d.getArgumentIndex()))
+                .collect(Collectors.toSet())
+                .stream()
+                .sorted()
                 .collect(Collectors.toList());
     }
 
@@ -50,9 +59,9 @@ public class QuestionAnswerPair {
         if (answers.size() == 1) {
             return TextGenerationHelper.renderString(answers.get(0));
         } else {
-            return "{ " + answers.stream()
+            return answers.stream()
                     .map(TextGenerationHelper::renderString)
-                    .collect(Collectors.joining(" # ")) + " }";
+                    .collect(Collectors.joining(" # "));
         }
     }
 }

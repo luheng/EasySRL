@@ -72,12 +72,14 @@ public class QueryGenerator {
                 groupedQueryList.add(new GroupedQuery(sentenceId, words, parses, query));
             }
         }
+        /*
         double[] parseDist = new double[parses.size()];
         double norm = parses.stream().mapToDouble(p -> p.score).sum();
         for (int i = 0; i < parses.size(); i++) {
             parseDist[i] = parses.get(i).score / norm;
         }
-        groupedQueryList.forEach(groupedQuery -> collapseQuery2(groupedQuery, parses, parseDist));
+        */
+        groupedQueryList.forEach(groupedQuery -> collapseQuery(groupedQuery, parses));
         return groupedQueryList;
     }
 
@@ -92,6 +94,8 @@ public class QueryGenerator {
         Map<String, ImmutableList<Integer>> spanToArgList = new HashMap<>();
         // Map a surface string of an answer to a set of parse ids.
         Map<String, Set<Integer>> spanToParses = new HashMap<>();
+
+        Map<String, Query> spanToQuery = new HashMap<>();
 
         groupedQuery.queries.forEach(query -> {
             ImmutableList<Integer> argList = ImmutableList.copyOf(query.argumentIds);
@@ -164,8 +168,10 @@ public class QueryGenerator {
         assert bestQuery != null;
         groupedQuery.collapse(bestQuery.predicateIndex, bestQuery.category, bestQuery.argumentNumber, bestQuestion,
                 spanToArgList, spanToParses);
+        //groupedQuery.questionDependencies = bestQuery.qaPair.questionDeps;
     }
 
+    @Deprecated
     private static void collapseQuery2(GroupedQuery groupedQuery, List<Parse> parses, final double[] parseDist) {
         HashMap<String, Set<Integer>> questionToParses = new HashMap<>();
         Table<Integer, String, Set<Integer>> argHeadToSpanToParses = HashBasedTable.create();

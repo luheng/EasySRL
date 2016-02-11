@@ -6,17 +6,15 @@ import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
-import org.omg.PortableInterceptor.ACTIVE;
 
 import java.util.*;
-import java.util.concurrent.SynchronousQueue;
 import java.util.stream.Collectors;
 
 /**
  * Group questions by sentences and predicates.
  * Created by luheng on 2/1/16.
  */
-public class ActiveLearning2 {
+public class ActiveLearningBySentence {
     public final List<List<InputReader.InputWord>> sentences;
     public final List<Parse> goldParses;
     final BaseCcgParser parser;
@@ -54,14 +52,14 @@ public class ActiveLearning2 {
     String preparsedFile = "";
     int nBest;
     double rerankerStepSize = 1.0;
-    double minAnswerEntropy = 1e-2;
+    double minAnswerEntropy = 1e-3;
 
     final static String modelFolder = "./model_tritrain_big/";
     final static List<Category> rootCategories =  Arrays.asList(
             Category.valueOf("S[dcl]"), Category.valueOf("S[wq]"), Category.valueOf("S[q]"),
             Category.valueOf("S[b]\\NP"), Category.valueOf("NP"));
 
-    public ActiveLearning2(int nBest) {
+    public ActiveLearningBySentence(int nBest) {
         this.nBest = nBest;
         sentences = new ArrayList<>();
         goldParses = new ArrayList<>();
@@ -83,7 +81,7 @@ public class ActiveLearning2 {
         initialize();
     }
 
-    public ActiveLearning2(ActiveLearning2 other) {
+    public ActiveLearningBySentence(ActiveLearningBySentence other) {
         this.sentences = other.sentences;
         this.goldParses = other.goldParses;
         this.questionGenerator = other.questionGenerator;
@@ -152,13 +150,16 @@ public class ActiveLearning2 {
             List<Parse> parses = allParses.get(sentIdx);
             List<GroupedQuery> queries = QueryGenerator.generateQueries(sentIdx, words, parses, questionGenerator,
                     generatePseudoQuestions);
-            queries.forEach(query -> {
-                // query.setQueryId(queryPool.size());
-                int predIdx = query.predicateIndex;
-                if (!queryPool.contains(sentIdx, predIdx)) {
-                    queryPool.put(sentIdx, predIdx, new ArrayList<>());
+            queries.stream().forEach(query -> {
+                query.computeProbabilities(reranker.expScores.get(query.sentenceId));
+                if (query.answerEntropy > minAnswerEntropy) {
+                    // query.setQueryId(queryPool.size());
+                    int predIdx = query.predicateIndex;
+                    if (!queryPool.contains(sentIdx, predIdx)) {
+                        queryPool.put(sentIdx, predIdx, new ArrayList<>());
+                    }
+                    queryPool.get(sentIdx, predIdx).add(query);
                 }
-                queryPool.get(sentIdx, predIdx).add(query);
             });
         }
         int totalNumQueries = 0;
@@ -172,7 +173,7 @@ public class ActiveLearning2 {
                     numQueries ++;
                 }
             }
-            sentenceScores.put(sentIdx, sentScore / numQueries);
+            sentenceScores.put(sentIdx, sentScore / Math.sqrt(numQueries));
             totalNumQueries += numQueries;
         }
         sentenceQueue.addAll(queryPool.rowKeySet());
@@ -190,14 +191,10 @@ public class ActiveLearning2 {
     public void printQueriesBySentenceId(int sentIdx) {
         for (int predIdx : queryPool.row(sentIdx).keySet()) {
             for (GroupedQuery query : queryPool.row(sentIdx).get(predIdx)) {
-                System.out.println(String.format("%.3f\t%.3f\t%s", query.questionConfidence, query.attachmentUncertainty,
-                        query.question));
+                System.out.println(String.format("%.3f\t%.3f\t%s", query.questionConfidence,
+                        query.attachmentUncertainty, query.question));
             }
         }
-    }
-
-    public void refreshQueryList() {
-        // do nothing.
     }
 
     public List<String> getSentenceById(int sentenceId) {
@@ -246,10 +243,22 @@ public class ActiveLearning2 {
         return allResults.get(sid).get(reranker.getRerankedBest(sid));
     }
 
+    public Results getRerankedF1(Collection<Integer> sentenceIds) {
+        Results results = new Results();
+        sentenceIds.forEach(sid -> results.add(allResults.get(sid).get(reranker.getRerankedBest(sid))));
+        return results;
+    }
+
     public Results getOneBestF1() {
         Results oneBestF1 = new Results();
         allParses.keySet().forEach(sid -> oneBestF1.add(allResults.get(sid).get(0)));
         return oneBestF1;
+    }
+
+    public Results getOneBestF1(Collection<Integer> sentenceIds) {
+        Results results = new Results();
+        sentenceIds.forEach(sid -> results.add(allResults.get(sid).get(0)));
+        return results;
     }
 
     public Results getOneBestF1(int sid) {
@@ -260,6 +269,12 @@ public class ActiveLearning2 {
         Results oracleF1 = new Results();
         allParses.keySet().forEach(sid -> oracleF1.add(allResults.get(sid).get(oracleParseIds.get(sid))));
         return oracleF1;
+    }
+
+    public Results getOracleF1(Collection<Integer> sentenceIds) {
+        Results results = new Results();
+        sentenceIds.forEach(sid -> results.add(allResults.get(sid).get(oracleParseIds.get(sid))));
+        return results;
     }
 
     public Results getOracleF1(int sid) {

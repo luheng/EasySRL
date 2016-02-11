@@ -1,6 +1,8 @@
 package edu.uw.easysrl.qasrl;
 
+import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
+import gnu.trove.map.hash.TObjectDoubleHashMap;
 
 import java.util.*;
 
@@ -11,12 +13,13 @@ import java.util.*;
 public class RerankerDependencyFactored implements Reranker {
     // Dependency-factored scoring function for each sentence.
     final Map<Integer, List<Parse>> allParses;
-    final Map<Integer, ScoreFunction> scoreFunctions;
+    final Map<Integer, DependencyScoreFunction> scoreFunctions;
+    final static double stepSize = 0.5;
 
     public RerankerDependencyFactored(final Map<Integer, List<Parse>> allParses) {
         this.allParses = allParses;
         this.scoreFunctions = new HashMap<>();
-        allParses.forEach((sentIdx, parses) -> scoreFunctions.put(sentIdx, new ScoreFunction(parses)));
+        allParses.forEach((sentIdx, parses) -> scoreFunctions.put(sentIdx, new DependencyScoreFunction(parses)));
     }
 
     public void rerank(final GroupedQuery query, final Response response) {
@@ -26,8 +29,8 @@ public class RerankerDependencyFactored implements Reranker {
         final List<GroupedQuery.AnswerOption> options = query.answerOptions;
         for (int r : response.chosenOptions) {
             final List<Integer> chosenArgIds = options.get(r).argumentIds;
-            final ScoreFunction scoreFunction = scoreFunctions.get(query.sentenceId);
-            chosenArgIds.forEach(argId -> scoreFunction.update(predIdx, argId, category, argNum, 1.0));
+            final DependencyScoreFunction scoreFunction = scoreFunctions.get(query.sentenceId);
+            chosenArgIds.forEach(argId -> scoreFunction.update(predIdx, argId, category, argNum, stepSize));
         }
         /*
         Set<Integer> allArgIds = new HashSet<>();
@@ -40,7 +43,7 @@ public class RerankerDependencyFactored implements Reranker {
 
     public int getRerankedBest(final int sentenceId) {
         final List<Parse> parses = allParses.get(sentenceId);
-        ScoreFunction scoreFunction = scoreFunctions.get(sentenceId);
+        DependencyScoreFunction scoreFunction = scoreFunctions.get(sentenceId);
         int bestK = 0;
         double bestScore = scoreFunction.getScore(parses.get(0));
         for (int k = 1; k < parses.size(); k++) {

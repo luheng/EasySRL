@@ -1,7 +1,8 @@
 package edu.uw.easysrl.qasrl;
 
 import com.google.common.collect.ImmutableList;
-import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
+import edu.stanford.nlp.util.ArrayMap;
+import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.*;
@@ -61,7 +62,6 @@ public class GroupedQuery {
         }
     }
 
-
     int sentenceId, totalNumParses, queryId;
     final List<String> sentence;
     final List<Parse> parses;
@@ -75,20 +75,27 @@ public class GroupedQuery {
     List<AnswerOption> answerOptions;
 
     // The probability mass of non-NA options.
-    public double questionConfidence;
-    public double attachmentUncertainty;
+    public double questionConfidence, attachmentUncertainty;
+    public double answerMargin, answerEntropy, normalizedAnswerEntropy;
 
-    double answerMargin, answerEntropy, normalizedAnswerEntropy;
     // TODO: move this to ActiveLearning ...
     static final double rankDiscountFactor = 0.0;
     static final boolean estimateWithParseScores = true;
 
-    public GroupedQuery(int sentenceId, final List<String> sentence, List<Parse> parses, Query query) {
+    // Other dependencies
+    Set<ResolvedDependency> questionDependencies;
+    List<Set<ResolvedDependency>> answerDependencies;
+
+    public GroupedQuery(int sentenceId, final List<String> sentence, final List<Parse> parses) {
         this.sentenceId = sentenceId;
         this.sentence = sentence;
         this.parses = parses;
         this.totalNumParses = parses.size();
         queries = new HashSet<>();
+    }
+
+    public GroupedQuery(int sentenceId, final List<String> sentence, final List<Parse> parses, Query query) {
+        this(sentenceId, sentence, parses);
         queries.add(query);
     }
 
@@ -141,7 +148,6 @@ public class GroupedQuery {
             allParseIds.removeAll(parseIds);
         });
         answerOptions.add(new BadQuestionOption(allParseIds));
-        //answerOptions.add(new NoAnswerOption(unlistedParses));
     }
 
     public void setQueryId(int id) {
@@ -162,18 +168,7 @@ public class GroupedQuery {
 
     public List<AnswerOption> getAnswerOptions() { return answerOptions; }
 
-    public double getAnswerEntropy() {
-        return answerEntropy;
-    }
-
-    public double getNormalizedAnswerEntropy() {
-        return normalizedAnswerEntropy;
-    }
-
-    public double getAnswerMargin() {
-        return answerMargin;
-    }
-
+    // TODO: clean this up.
     public void computeProbabilities(double[] parseDist) {
         // Compute p(a|q).
         if (estimateWithParseScores) {
@@ -192,11 +187,10 @@ public class GroupedQuery {
         answerMargin = len < 2 ? 1.0 : prob.get(len - 1) - prob.get(len - 2);
 
         // Entropy divided by log(number of chosenOptions) to stay in range [0,1].
-        double K = Math.log(answerOptions.size());
         answerEntropy = -1.0 * answerOptions.stream()
                 .filter(ao -> ao.probability > 0)
                 .mapToDouble(ao -> ao.probability * Math.log(ao.probability)).sum();
-        normalizedAnswerEntropy = answerEntropy / K;
+        normalizedAnswerEntropy = answerEntropy / Math.log(answerOptions.size());
 
         // Question confidence and attachment ambiguity.
         double allParsesMass = .0;
@@ -215,8 +209,9 @@ public class GroupedQuery {
         questionConfidence = nonNaMass / allParsesMass;
         attachmentUncertainty = .0;
         for (double d : prob) {
-            attachmentUncertainty -= (d / nonNaMass) * Math.log(d / nonNaMass) / Math.log(2);
+            attachmentUncertainty -= (d / nonNaMass) * Math.log(d / nonNaMass);
         }
+        attachmentUncertainty /= Math.log(prob.size());
     }
 
     public void print(final List<String> words, Response response) {

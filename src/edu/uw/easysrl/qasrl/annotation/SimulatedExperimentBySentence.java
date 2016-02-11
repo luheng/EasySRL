@@ -11,23 +11,26 @@ import java.util.stream.Collectors;
  * Group query by sentences.
  * Created by luheng on 2/9/16.
  */
-public class SimulatedExperiment2 {
-    static ActiveLearning2 learner;
+public class SimulatedExperimentBySentence {
+    static ActiveLearningBySentence learner;
     static final int nBest = 50;
     static final int maxNumQueries = 20000;
 
     public static void main(String[] args) {
-        learner = new ActiveLearning2(nBest);
+        learner = new ActiveLearningBySentence(nBest);
         ResponseSimulator responseSimulator = new ResponseSimulatorGold(learner.goldParses, new QuestionGenerator(),
                 true /* Allow label match */);
-        Map<Integer, Results> budgetCurve = new HashMap<>();
+        Map<Integer, Results> rerankCurve = new HashMap<>(),
+                              oracleCurve = new HashMap<>(),
+                              oneBestCurve = new HashMap<>();
 
         int queryCounter = 0;
         int sentenceCounter = 0;
-        // TODO: print accuracy before and after for each sentence.
-        // TODO: print sentence ID
+        List<Integer> sentenceIds = new ArrayList<>();
+
         while (learner.getNumberOfRemainingSentences() > 0) {
             int sentenceId = learner.getNextSentenceInQueue();
+            sentenceIds.add(sentenceId);
             Map<Integer, List<GroupedQuery>>  queries = learner.getQueryBySentenceId(sentenceId);
             List<Integer> predicates = queries.keySet().stream().sorted().collect(Collectors.toList());
 
@@ -35,32 +38,39 @@ public class SimulatedExperiment2 {
             if (sentenceCounter < 200) {
                 System.out.println("SID=" + sentenceId + "\t" + learner.getSentenceScore(sentenceId));
                 System.out.println(learner.getSentenceById(sentenceId).stream().collect(Collectors.joining(" ")));
-                System.out.println();
-                learner.printQueriesBySentenceId(sentenceId);
-                System.out.println();
+                //System.out.println();
+                //learner.printQueriesBySentenceId(sentenceId);
+                //System.out.println();
             }
 
             for (int predId : predicates) {
                 for (GroupedQuery query : queries.get(predId)) {
+                    /*if (query.questionConfidence < 0.3 || query.attachmentUncertainty < 0.3) {
+                        continue;
+                    }*/
                     Response response = responseSimulator.answerQuestion(query);
-                    learner.respondToQuery(query, response);
-                    learner.updateQueryScoresBySentenceId(sentenceId);
 
-                    // TODO: update query scores.
                     queryCounter ++;
-                    if (queryCounter % 200 == 0) {
-                        budgetCurve.put(queryCounter, learner.getRerankedF1());
-                    }
                     // Print debugging info.
                     if (sentenceCounter < 200) {
                         System.out.println("query confidence:\t" + query.questionConfidence);
                         System.out.println("attachment uncertainty:\t" + query.attachmentUncertainty);
                         query.print(query.getSentence(), response);
-
-                        learner.printQueriesBySentenceId(sentenceId);
-                        System.out.println();
+                    }
+                    learner.respondToQuery(query, response);
+                    learner.updateQueryScoresBySentenceId(sentenceId);
+                    if (sentenceCounter < 200) {
+                        //learner.printQueriesBySentenceId(sentenceId);
+                        //System.out.println();
                     }
                 }
+            }
+
+            sentenceCounter ++;
+            if (sentenceCounter % 5 == 0) {
+                rerankCurve.put(sentenceCounter, learner.getRerankedF1(sentenceIds));
+                oracleCurve.put(sentenceCounter, learner.getOracleF1(sentenceIds));
+                oneBestCurve.put(sentenceCounter, learner.getOneBestF1(sentenceIds));
             }
 
             // Print debugging info.
@@ -69,7 +79,7 @@ public class SimulatedExperiment2 {
                 System.out.println("[rerank]\n" + learner.getRerankedF1(sentenceId));
                 System.out.println("[oracle]\n" + learner.getOracleF1(sentenceId) + "\n");
             }
-            sentenceCounter ++;
+
             if (queryCounter >= maxNumQueries) {
                 break;
             }
@@ -78,10 +88,14 @@ public class SimulatedExperiment2 {
         System.out.println("[1-best]:\t" + learner.getOneBestF1());
         System.out.println("[reranked]:\t" + learner.getRerankedF1());
         System.out.println("[oracle]:\t" + learner.getOracleF1());
-        budgetCurve.keySet().stream().sorted().forEach(i -> System.out.print("\t" + i));
+        List<Integer> axis = rerankCurve.keySet().stream().sorted().collect(Collectors.toList());
+        axis.forEach(i -> System.out.print("\t" + i));
         System.out.println();
-        budgetCurve.keySet().stream().sorted().forEach(i -> System.out.print("\t" +
-                String.format("%.3f", budgetCurve.get(i).getF1() * 100.0)));
+        axis.forEach(i -> System.out.print("\t" + String.format("%.3f", oneBestCurve.get(i).getF1() * 100.0)));
+        System.out.println();
+        axis.forEach(i -> System.out.print("\t" + String.format("%.3f", rerankCurve.get(i).getF1() * 100.0)));
+        System.out.println();
+        axis.forEach(i -> System.out.print("\t" + String.format("%.3f", oracleCurve.get(i).getF1() * 100.0)));
         System.out.println();
     }
 }
