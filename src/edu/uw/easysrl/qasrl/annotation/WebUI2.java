@@ -238,11 +238,11 @@ public class WebUI2 {
             httpWriter.println("</panel>\n");
 
             // "Skip sentence" button
-            httpWriter.println("<br><br><form class=\"form-group\" action=\"\" method=\"get\">");
+            httpWriter.println("<form class=\"form-group\" action=\"\" method=\"get\">");
             // Add user name parameter ..
             httpWriter.println(String.format("<input type=\"hidden\" input name=\"UserName\" value=\"%s\"/>", userName));
             httpWriter.println("<button class=\"btn btn-primary\" input name=\"NextSentence\" type=\"submit\" value=\"Skip10\">Switch to Next Sentence</button>");
-            httpWriter.println("</form><br><br>");
+            httpWriter.println("</form>");
 
             // Gold info and debugging info.
             if (history.size() > 0) {
