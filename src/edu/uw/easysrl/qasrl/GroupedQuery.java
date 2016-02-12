@@ -236,19 +236,19 @@ public class GroupedQuery {
     }
 
     public String getDebuggingInfo(final Response response) {
-        String result = String.format("%d:%s\t%s\t%d", predicateIndex, sentence.get(predicateIndex), category,
-                argumentNumber) + "\n";
-        result += String.format("%.2f\t%.2f\t%s", answerEntropy, answerMargin, question) + "\n";
+        String result = String.format("SID=%d\t%s\n", sentenceId, sentence.stream().collect(Collectors.joining(" ")));
+        result += String.format("%d:%s\t%s.%d\n", predicateIndex, sentence.get(predicateIndex), category, argumentNumber);
+        result += String.format("QID=%d\tent=%.2f\tmarg=%.2f\t%s\n", queryId, answerEntropy, answerMargin, question);
         for (int i = 0; i < answerOptions.size(); i++) {
             AnswerOption ao = answerOptions.get(i);
-            String match = (response.chosenOptions.contains(i) ? "*" : "");
+            String match = (response.chosenOptions.contains(i) ? "G" : " ");
             String argIdsStr = ao.isNAOption() ? "_" :
                     ao.argumentIds.stream().map(String::valueOf).collect(Collectors.joining(","));
             String argHeadsStr = ao.isNAOption() ? "N/A" :
                     ao.argumentIds.stream().map(sentence::get).collect(Collectors.joining(","));
             String parseIdsStr = DebugPrinter.getShortListString(ao.parseIds);
-            result += String.format("%.2f\t%s%d\t%s:%s\t%s\t%s", ao.probability, match, i, argIdsStr, argHeadsStr,
-                    ao.getAnswer(), parseIdsStr) + "\n";
+            result += String.format("%d\t%s\tprob=%.2f\t%s\t(%s:%s)\t%s\n", i, match, ao.probability, ao.getAnswer(),
+                    argIdsStr, argHeadsStr, parseIdsStr);
         }
         return result + "\n";
     }
