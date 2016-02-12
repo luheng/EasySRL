@@ -103,9 +103,13 @@ public class ActiveLearningHistory {
         str += "[OneBest-sentence]:\t" + oneBestResults.get(sentenceId).toString().replace("\n", "\t") + "\n";
         str += "[Oracle-sentence]:\t"  + oracleResults.get(sentenceId).toString().replace("\n", "\t") + "\n";
 
-        Results sentAvg = new Results();
-        rerankedResults.values().forEach(sentAvg::add);
-        str += "[ReRank-sentence-avg]:\t" + sentAvg.toString().replace("\n", "\t") + "\n";
+        Results rerankAvg = new Results(), oneBestAvg = new Results(), oracleAvg = new Results();
+        rerankedResults.values().forEach(rerankAvg::add);
+        oracleResults.values().forEach(oracleAvg::add);
+        oneBestResults.values().forEach(oneBestAvg::add);
+        str += "[ReRank-sentence-avg]:\t" + rerankAvg.toString().replace("\n", "\t") + "\n";
+        str += "[OneBest-sentence-avg]:\t" + oneBestAvg.toString().replace("\n", "\t") + "\n";
+        str += "[Oracle-sentence-avg]:\t" + oracleAvg.toString().replace("\n", "\t") + "\n";
         str += "[ReRank-corpus]:\t"    + corpusResults.get(last).toString().replace("\n", "\t") + "\n";
         return str;
     }
