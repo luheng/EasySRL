@@ -66,26 +66,33 @@ public class WebUIHelper {
     }
 
     public static String printDebuggingInfo(final ActiveLearningHistory history) {
-        String result = "<button type=\"button\" class=\"btn btn-info\" data-toggle=\"collapse\" data-target=\"#debugging\">Debugging Info</button>"
+        String result = "<button type=\"button\" class=\"btn btn-info\" data-toggle=\"collapse\" data-target=\"#debugging\">Debug Last Query</button>"
                         + "<div id=\"debugging\" class=\"collapse\">";
         result += "<p>" + history.printLatestHistory().replace("\n", "<br>").replace("\t", "&nbsp&nbsp") + "</p>";
         result += "</div>";
         return result;
     }
 
-    public static String printResultsInOneLine(final Results result) {
-        return result.toString().replace("\n", "&nbsp&nbsp");
-    }
-
-    public static String printDebuggingInfo(final ActiveLearningBySentence learner,
-                                            final ActiveLearningHistory history) {
-        String result = "<button type=\"button\" class=\"btn btn-info\" data-toggle=\"collapse\" data-target=\"#debugging\">Debugging Info</button>"
-                + "<div id=\"debugging\" class=\"collapse\">";
-        int sentId = history.getSentenceId(history.size() - 1);
-        result += "<p>" + history.printLatestHistory().replace("\n", "<br>").replace("\t", "&nbsp&nbsp") + "</p>";
-        result += "<p> [OneBest-sentence] &nbsp" + printResultsInOneLine(learner.getOneBestF1(sentId)) + " <br>\n";
-        result += "[Oracle-sentence]] &nbsp" + printResultsInOneLine(learner.getOracleF1(sentId)) + " </p>";
-        result += "</div>";
+    public static String printSentenceDebuggingInfo(final ActiveLearningHistory history) {
+        String result = "<button type=\"button\" class=\"btn btn-info\" data-toggle=\"collapse\" data-target=\"#debugging\">Debug Sentences</button>"
+                + "<div id=\"debugsent\" class=\"collapse\">";
+        result += "<table class=\"table\">\n<thead>\n<tr>\n" +
+                    "<th>SID</th>\n<th>#Q</th>\n<th>Acc.</th>\n<th>1-Best</th>\n<th>Re-Rank</th>\n<th>Oracle</th>\n" +
+                    "</tr>\n</thead>\n" + "<tbody>\n";
+        for (int sentId : history.sentenceIds) {
+            int numAnnotated = history.numQueriesPerSentence.get(sentId);
+            int numCorrect = history.numCorrectPerSentence.get(sentId);
+            double acc = numAnnotated > 0 ? 100.0 * numCorrect / numAnnotated : .0;
+            result += "<tr>\n" +
+                    "<td>" + sentId + "</td>\n" +
+                    "<td>" + numAnnotated + "</td>\n" +
+                    "<td>" + String.format("%d (%.3f%%)", numCorrect, acc) + "</td>\n" +
+                    "<td>" + history.oneBestResults.get(sentId).getF1() + "</td>\n" +
+                    "<td>" + history.rerankedResults.get(sentId).getF1() + "</td>\n" +
+                    "<td>" + history.oracleResults.get(sentId).getF1() + "</td>\n" +
+                    "</tr>";
+        }
+        result += "</tbody></table>\n</div>";
         return result;
     }
 }
