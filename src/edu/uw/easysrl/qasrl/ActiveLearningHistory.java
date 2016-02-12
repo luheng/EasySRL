@@ -98,10 +98,14 @@ public class ActiveLearningHistory {
         String str = String.format("ITER=%d\n", last);
         str += queries.get(last).getDebuggingInfo(responses.get(last), goldResponses.get(last)) + "\n";
         str += String.format("USER_ACC:\t%.2f%%\n", 100.0 * numCorrectAnswers / size());
-        int sentenceId = sentenceIds.get(last);
+        int sentenceId = queries.get(last).sentenceId;
         str += "[ReRank-sentence]:\t"  + sentenceResults.get(last).toString().replace("\n", "\t") + "\n";
         str += "[OneBest-sentence]:\t" + oneBestResults.get(sentenceId).toString().replace("\n", "\t") + "\n";
         str += "[Oracle-sentence]:\t"  + oracleResults.get(sentenceId).toString().replace("\n", "\t") + "\n";
+
+        Results sentAvg = new Results();
+        rerankedResults.values().forEach(sentAvg::add);
+        str += "[ReRank-sentence-avg]:\t" + sentAvg.toString().replace("\n", "\t") + "\n";
         str += "[ReRank-corpus]:\t"    + corpusResults.get(last).toString().replace("\n", "\t") + "\n";
         return str;
     }

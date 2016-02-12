@@ -237,23 +237,24 @@ public class WebUI2 {
 
             httpWriter.println("</panel>\n");
 
-            // Gold info and debugging info.
-            httpWriter.println(WebUIHelper.printGoldInfo(nextQuery, goldSimulator.answerQuestion(nextQuery)) + "<br>");
-            if (history.size() > 0) {
-                httpWriter.println(WebUIHelper.printDebuggingInfo(history) + "<br>");
-                httpWriter.println(WebUIHelper.printSentenceDebuggingInfo(history));
-            }
             // "Skip sentence" button
-            httpWriter.println("<br><form class=\"form-group\" action=\"\" method=\"get\">");
+            httpWriter.println("<br><br><form class=\"form-group\" action=\"\" method=\"get\">");
             // Add user name parameter ..
             httpWriter.println(String.format("<input type=\"hidden\" input name=\"UserName\" value=\"%s\"/>", userName));
             httpWriter.println("<button class=\"btn btn-primary\" input name=\"NextSentence\" type=\"submit\" value=\"Skip10\">Switch to Next Sentence</button>");
-            httpWriter.println("</form>");
+            httpWriter.println("</form><br><br>");
+
+            // Gold info and debugging info.
+            if (history.size() > 0) {
+                httpWriter.println(WebUIHelper.printDebuggingInfo(history) + "<br><br>");
+                httpWriter.println(WebUIHelper.printSentenceDebuggingInfo(history) + "<br><br>");
+            }
+            httpWriter.println(WebUIHelper.printGoldInfo(nextQuery, goldSimulator.answerQuestion(nextQuery)) + "<br><br>");
 
             // File download link
             if (history.size() > 0) {
                 String annotationFileName = annotationFileNameMap.get(userName);
-                httpWriter.println(String.format("<br><a href=\"%s\" download=\"%s\">Click to download annotation file.</a>",
+                httpWriter.println(String.format("<a href=\"%s\" download=\"%s\">Click to download annotation file.</a>",
                         "/annotation_files/" + annotationFileName, annotationFileName));
             }
 

@@ -74,7 +74,7 @@ public class WebUIHelper {
     }
 
     public static String printSentenceDebuggingInfo(final ActiveLearningHistory history) {
-        String result = "<button type=\"button\" class=\"btn btn-info\" data-toggle=\"collapse\" data-target=\"#debugging\">Debug Sentences</button>"
+        String result = "<button type=\"button\" class=\"btn btn-info\" data-toggle=\"collapse\" data-target=\"#debugsent\">Debug Sentences</button>"
                 + "<div id=\"debugsent\" class=\"collapse\">";
         result += "<table class=\"table\">\n<thead>\n<tr>\n" +
                     "<th>SID</th>\n<th>#Q</th>\n<th>Acc.</th>\n<th>1-Best</th>\n<th>Re-Rank</th>\n<th>Oracle</th>\n" +
@@ -87,9 +87,9 @@ public class WebUIHelper {
                     "<td>" + sentId + "</td>\n" +
                     "<td>" + numAnnotated + "</td>\n" +
                     "<td>" + String.format("%d (%.3f%%)", numCorrect, acc) + "</td>\n" +
-                    "<td>" + history.oneBestResults.get(sentId).getF1() + "</td>\n" +
-                    "<td>" + history.rerankedResults.get(sentId).getF1() + "</td>\n" +
-                    "<td>" + history.oracleResults.get(sentId).getF1() + "</td>\n" +
+                    "<td>" + String.format("%.3f", history.oneBestResults.get(sentId).getF1()) + "</td>\n" +
+                    "<td>" + String.format("%.3f", history.rerankedResults.get(sentId).getF1()) + "</td>\n" +
+                    "<td>" + String.format("%.3f", history.oracleResults.get(sentId).getF1()) + "</td>\n" +
                     "</tr>";
         }
         result += "</tbody></table>\n</div>";
