@@ -1,22 +1,19 @@
 package edu.uw.easysrl.qasrl;
 
-import com.google.common.collect.HashBasedTable;
-import com.google.common.collect.Table;
 import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
-import org.omg.PortableInterceptor.ACTIVE;
 
+import javax.swing.text.html.Option;
 import java.util.*;
-import java.util.concurrent.SynchronousQueue;
 import java.util.stream.Collectors;
 
 /**
  * Group questions by sentences and predicates.
  * Created by luheng on 2/1/16.
  */
-public class ActiveLearning2 {
+public class ActiveLearningBySentence {
     public final List<List<InputReader.InputWord>> sentences;
     public final List<Parse> goldParses;
     final BaseCcgParser parser;
@@ -24,44 +21,43 @@ public class ActiveLearning2 {
     // Reranker needs to be initialized after we parse all the sentences .. maybe not?
     RerankerExponentiated reranker;
 
-    // All queries: sentence id, predicate id, query list.
-    private Table<Integer, Integer, List<GroupedQuery>> queryPool;
-    private Map<Integer, Double> sentenceScores;
+    // All queries for each sentence id.
+    private Map<Integer, List<GroupedQuery>> queryPool;
+    private PriorityQueue<GroupedQuery> queryQueue;
     private PriorityQueue<Integer> sentenceQueue;
-    // private PriorityQueue<Tuple<Integer, Integer>> predicateQueue;
+    private Map<Integer, Double> sentenceScores;
+
     private Map<Integer, List<Parse>> allParses;
     private Map<Integer, List<Results>> allResults;
     private Map<Integer, Integer> oracleParseIds;
 
-    // History: sent_id.pred_id.category.arg_num
-    private Set<Integer> recentlyUpdatedSentences;
-    private Map<Integer, Set<String>> askedDependencies;
+    private static final double minAnswerEntropy = 1e-3;
 
+    // Default order of sentneces: by average question entropy.
     private final Comparator<Integer> sentenceComparator = new Comparator<Integer>() {
-        public int compare(Integer s1, Integer s2) {
+        public int compare(final Integer s1, final Integer s2) {
             return Double.compare(-sentenceScores.get(s1), -sentenceScores.get(s2));
         }
     };
 
-    // Incorporate -NOQ- queries (dependencies we can't generate questions for) in reranking to see potential
-    // improvements.
-    boolean generatePseudoQuestions = false;
-    boolean groupSameLabelDependencies = true;
-    // The change inflicted on distribution of parses after each query update.
+    private final Comparator<GroupedQuery> queryComparator = new Comparator<GroupedQuery>() {
+        public int compare(final GroupedQuery q1, final GroupedQuery q2) {
+            return Double.compare(-q1.answerEntropy, -q2.answerEntropy);
+        }
+    };
 
     // The file contains the pre-parsed n-best list (of CCGBank dev). Leave file name is empty, if we wish to parse
     // sentences in the experiment.
     String preparsedFile = "";
     int nBest;
     double rerankerStepSize = 1.0;
-    double minAnswerEntropy = 1e-2;
 
     final static String modelFolder = "./model_tritrain_big/";
     final static List<Category> rootCategories =  Arrays.asList(
             Category.valueOf("S[dcl]"), Category.valueOf("S[wq]"), Category.valueOf("S[q]"),
             Category.valueOf("S[b]\\NP"), Category.valueOf("NP"));
 
-    public ActiveLearning2(int nBest) {
+    public ActiveLearningBySentence(int nBest) {
         this.nBest = nBest;
         sentences = new ArrayList<>();
         goldParses = new ArrayList<>();
@@ -83,35 +79,27 @@ public class ActiveLearning2 {
         initialize();
     }
 
-    public ActiveLearning2(ActiveLearning2 other) {
+    public ActiveLearningBySentence(ActiveLearningBySentence other) {
         this.sentences = other.sentences;
         this.goldParses = other.goldParses;
         this.questionGenerator = other.questionGenerator;
         this.parser = other.parser;
         this.nBest = other.nBest;
-
         this.allParses = other.allParses;
         this.allResults = other.allResults;
         this.oracleParseIds = other.oracleParseIds;
-
         this.reranker = new RerankerExponentiated(allParses, rerankerStepSize);
         this.queryPool = other.queryPool;
-        //this.sentenceScores =
+        this.sentenceScores = other.sentenceScores;
         this.sentenceQueue = new PriorityQueue<>(sentenceComparator);
-        // sen
-        // queryQueue.addAll(queryPool);
-        System.out.println("Total number of queries:\t" + sentenceQueue.size());
-
-        recentlyUpdatedSentences = new HashSet<>();
-        askedDependencies = new HashMap<>();
+        sentenceQueue.addAll(sentenceScores.keySet());
+        initializeQueryQueue();
     }
 
     private void initialize() {
         initializeParses();
-        initializeQueries();
-        // History.
-        recentlyUpdatedSentences = new HashSet<>();
-        askedDependencies = new HashMap<>();
+        initializeQueryPool();
+        initializeQueryQueue();
     }
 
     private void initializeParses() {
@@ -141,83 +129,121 @@ public class ActiveLearning2 {
         }
     }
 
-    private void initializeQueries() {
+    private void initializeQueryPool() {
         reranker = new RerankerExponentiated(allParses, rerankerStepSize);
-        queryPool = HashBasedTable.create();
-        sentenceQueue = new PriorityQueue<>(sentenceComparator);
+        queryPool = new HashMap<>();
         sentenceScores = new HashMap<>();
-
+        sentenceQueue = new PriorityQueue<>(sentenceComparator);
         for (int sentIdx : allParses.keySet()) {
             List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
             List<Parse> parses = allParses.get(sentIdx);
-            List<GroupedQuery> queries = QueryGenerator.generateQueries(sentIdx, words, parses, questionGenerator,
-                    generatePseudoQuestions, groupSameLabelDependencies);
-            queries.forEach(query -> {
+            List<GroupedQuery> queries = QueryGeneratorNew.generateQueries(sentIdx, words, parses, questionGenerator);
+            queries.stream().forEach(query -> {
                 query.computeProbabilities(reranker.expScores.get(query.sentenceId));
                 if (query.answerEntropy > minAnswerEntropy) {
-                    // query.setQueryId(queryPool.size());
-                    int predIdx = query.predicateIndex;
-                    if (!queryPool.contains(sentIdx, predIdx)) {
-                        queryPool.put(sentIdx, predIdx, new ArrayList<>());
+                    if (!queryPool.containsKey(sentIdx)) {
+                        queryPool.put(sentIdx, new ArrayList<>());
                     }
-                    queryPool.get(sentIdx, predIdx).add(query);
+                    final List<GroupedQuery> pool = queryPool.get(sentIdx);
+                    query.setQueryId(pool.size());
+                    pool.add(query);
                 }
             });
         }
         int totalNumQueries = 0;
-        for (int sentIdx : queryPool.rowKeySet()) {
+        for (int sentIdx : queryPool.keySet()) {
+            //updateQueryScoresBySentenceId(sentIdx);
+            int numQueriesInSentence = 0;
             double sentScore = .0;
-            int numQueries= 0;
-            for (int predIdx : queryPool.row(sentIdx).keySet()) {
-                for (GroupedQuery query : queryPool.row(sentIdx).get(predIdx)) {
-                    sentScore += query.answerEntropy;
-                    numQueries ++;
-                }
+            for (GroupedQuery query : queryPool.get(sentIdx)) {
+                sentScore += query.attachmentUncertainty;
+                numQueriesInSentence ++;
             }
-            sentenceScores.put(sentIdx, sentScore / numQueries);
-            totalNumQueries += numQueries;
+            sentenceScores.put(sentIdx, sentScore / Math.sqrt(numQueriesInSentence));
+            totalNumQueries += numQueriesInSentence;
         }
-        sentenceQueue.addAll(queryPool.rowKeySet());
+        sentenceQueue.addAll(sentenceScores.keySet());
         System.out.println("Total number of queries:\t" + totalNumQueries);
     }
 
-    public void refreshQueryList() {
-        // do nothing.
+    /**
+     * Move on to next sentence in queue.
+     * @return true if there is sentence left in the queue.
+     */
+    public boolean switchToNextSentence() {
+        if (!sentenceQueue.isEmpty()) {
+            sentenceQueue.poll();
+        }
+        if (!sentenceQueue.isEmpty()) {
+            initializeQueryQueue();
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Initialize query queue for the current sentence.
+     */
+    private void initializeQueryQueue() {
+        int sentenceId = sentenceQueue.peek();
+        queryQueue = new PriorityQueue<>(queryComparator);
+        queryQueue.addAll(queryPool.get(sentenceId));
+    }
+
+    public int getCurrentSentenceId() {
+        return sentenceQueue.isEmpty() ? -1 : sentenceQueue.peek();
+    }
+
+    public Optional<GroupedQuery> getNextQuery() {
+        return queryQueue.isEmpty() ? Optional.empty() : Optional.of(queryQueue.poll());
+    }
+
+    public GroupedQuery getNextNonEmptyQuery() {
+        Optional<GroupedQuery> queryOpt;
+        while (!(queryOpt = getNextQuery()).isPresent()) {
+            if (!switchToNextSentence()) {
+                return null;
+            }
+        }
+        return queryOpt.get();
+    }
+
+    public void refereshQueryQueue() {
+        Set<GroupedQuery> buffer = new HashSet<>(queryQueue);
+        buffer.forEach(query -> query.computeProbabilities(reranker.getParseScores(query.sentenceId)));
+        queryQueue = new PriorityQueue<>(queryComparator);
+        queryQueue.addAll(buffer);
+    }
+
+    public void printQueriesBySentenceId(int sentIdx) {
+        for (GroupedQuery query : queryPool.get(sentIdx)) {
+            System.out.println(String.format("%.3f\t%.3f\t%s", query.questionConfidence, query.attachmentUncertainty,
+                    query.question));
+        }
     }
 
     public List<String> getSentenceById(int sentenceId) {
         return sentences.get(sentenceId).stream().map(w -> w.word).collect(Collectors.toList());
     }
 
-    public Map<Integer, List<GroupedQuery>> getQueryBySentenceId(int sentId) {
-        return queryPool.row(sentId);
-    }
-
-    public List<GroupedQuery> getQueryById(int sentId, int predId) {
-        return queryPool.get(sentId, predId);
+    public GroupedQuery getQueryById(int sentenceId, int queryId) {
+        return queryPool.get(sentenceId).get(queryId);
     }
 
     public double getSentenceScore(int sentIdx) {
         return sentenceScores.get(sentIdx);
     }
 
-    public int getNextSentenceInQueue() {
-        return sentenceQueue.poll();
+    public int getNumSentences() {
+        return sentenceScores.size();
     }
 
-    public int getNumberOfRemainingSentences() {
+    public int getNumRemainingSentences() {
         return sentenceQueue.size();
     }
 
     public void respondToQuery(GroupedQuery query, Response response) {
         reranker.rerank(query, response);
-        // Register processed query history.
-        int sentId = query.sentenceId;
-        if (!askedDependencies.containsKey(sentId)) {
-            askedDependencies.put(sentId, new HashSet<>());
-        }
-        askedDependencies.get(sentId).add(query.predicateIndex + "." + query.category + "." + query.argumentNumber);
-        recentlyUpdatedSentences.add(sentId);
     }
 
     public Results getRerankedF1() {
@@ -231,10 +257,22 @@ public class ActiveLearning2 {
         return allResults.get(sid).get(reranker.getRerankedBest(sid));
     }
 
+    public Results getRerankedF1(Collection<Integer> sentenceIds) {
+        Results results = new Results();
+        sentenceIds.forEach(sid -> results.add(allResults.get(sid).get(reranker.getRerankedBest(sid))));
+        return results;
+    }
+
     public Results getOneBestF1() {
         Results oneBestF1 = new Results();
         allParses.keySet().forEach(sid -> oneBestF1.add(allResults.get(sid).get(0)));
         return oneBestF1;
+    }
+
+    public Results getOneBestF1(Collection<Integer> sentenceIds) {
+        Results results = new Results();
+        sentenceIds.forEach(sid -> results.add(allResults.get(sid).get(0)));
+        return results;
     }
 
     public Results getOneBestF1(int sid) {
@@ -245,6 +283,12 @@ public class ActiveLearning2 {
         Results oracleF1 = new Results();
         allParses.keySet().forEach(sid -> oracleF1.add(allResults.get(sid).get(oracleParseIds.get(sid))));
         return oracleF1;
+    }
+
+    public Results getOracleF1(Collection<Integer> sentenceIds) {
+        Results results = new Results();
+        sentenceIds.forEach(sid -> results.add(allResults.get(sid).get(oracleParseIds.get(sid))));
+        return results;
     }
 
     public Results getOracleF1(int sid) {

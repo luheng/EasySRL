@@ -56,15 +56,33 @@ public class ResponseSimulatorGold extends ResponseSimulator {
             }
         }
         Response response = new Response();
+        int bestOption = -1;
+        int maxOverlap = 0;
+        int badQuestionOptionId = -1, noAnswerOptionId = -1;
         for (int i = 0; i < query.answerOptions.size(); i++) {
             GroupedQuery.AnswerOption option = query.answerOptions.get(i);
-            // If gold choose N/A option.
             if (GroupedQuery.BadQuestionOption.class.isInstance(option)) {
-                if (answerIndices.size() == 0) {
-                    response.add(i);
-                }
-            } else if (option.argumentIds.containsAll(answerIndices) && answerIndices.containsAll(option.argumentIds)) {
+                badQuestionOptionId = i;
+                continue;
+            } else if (GroupedQuery.NoAnswerOption.class.isInstance(option)) {
+                noAnswerOptionId = i;
+                continue;
+            }
+            int argOverlap = (int) option.argumentIds.stream().filter(answerIndices::contains).count();
+            //if (argOverlap > maxOverlap) {
+            if (argOverlap == answerIndices.size() && argOverlap == option.argumentIds.size()) {
+                maxOverlap = argOverlap;
+                //bestOption = i;
                 response.add(i);
+            }
+        }
+        if (response.chosenOptions.size() == 0) {
+            if (answerIndices.size() > 0) {
+                response.add(noAnswerOptionId);
+                response.debugInfo = "[gold]:\t" + answerIndices.stream().map(String::valueOf)
+                        .collect(Collectors.joining(", "));
+            } else {
+                response.add(badQuestionOptionId);
             }
         }
         return response;

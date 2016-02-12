@@ -4,10 +4,8 @@ import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
-import org.omg.PortableInterceptor.ACTIVE;
 
 import java.util.*;
-import java.util.concurrent.SynchronousQueue;
 import java.util.stream.Collectors;
 
 /**
@@ -20,7 +18,7 @@ public class ActiveLearning {
     final BaseCcgParser parser;
     final QuestionGenerator questionGenerator;
     // Reranker needs to be initialized after we parse all the sentences .. maybe not?
-    RerankerExponentiated reranker;
+    Reranker reranker;
 
     // All queries.
     private List<GroupedQuery> queryPool;
@@ -36,14 +34,9 @@ public class ActiveLearning {
     private final Comparator<GroupedQuery> queryComparator = new Comparator<GroupedQuery>() {
         public int compare(GroupedQuery q1, GroupedQuery q2) {
             return Double.compare(-q1.answerEntropy, -q2.answerEntropy);
+            //return Double.compare(-q1.questionConfidence-q1.answerEntropy, -q2.questionConfidence-q2.answerEntropy);
         }
     };
-
-    // Incorporate -NOQ- queries (dependencies we can't generate questions for) in reranking to see potential
-    // improvements.
-    boolean generatePseudoQuestions = false;
-    boolean groupSameLabelDependencies = true;
-    // The change inflicted on distribution of parses after each query update.
 
     // The file contains the pre-parsed n-best list (of CCGBank dev). Leave file name is empty, if we wish to parse
     // sentences in the experiment.
@@ -100,7 +93,8 @@ public class ActiveLearning {
         this.allResults = other.allResults;
         this.oracleParseIds = other.oracleParseIds;
 
-        this.reranker = new RerankerExponentiated(allParses, rerankerStepSize);
+        //this.reranker = new RerankerExponentiated(allParses, rerankerStepSize);
+        this.reranker = new RerankerDependencyFactored(allParses);
         this.queryPool = other.queryPool;
         this.queryQueue = new PriorityQueue<>(queryComparator);
         queryQueue.addAll(queryPool);
@@ -152,11 +146,10 @@ public class ActiveLearning {
         for (int sentIdx : allParses.keySet()) {
             List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
             List<Parse> parses = allParses.get(sentIdx);
-            List<GroupedQuery> queries = QueryGenerator.generateQueries(sentIdx, words, parses, questionGenerator,
-                    generatePseudoQuestions, groupSameLabelDependencies);
+            List<GroupedQuery> queries = QueryGeneratorNew.generateQueries(sentIdx, words, parses, questionGenerator);
             queries.forEach(query -> {
-                query.computeProbabilities(reranker.expScores.get(query.sentenceId));
-                if (query.answerEntropy > minAnswerEntropy) {
+                query.computeProbabilities(reranker.getParseScores(query.sentenceId));
+                if (query.answerEntropy > 1e-3) {
                     query.setQueryId(queryPool.size());
                     queryPool.add(query);
                 }
@@ -169,7 +162,7 @@ public class ActiveLearning {
 
     public void refreshQueryList() {
         Collection<GroupedQuery> queryBuffer = new ArrayList<>(queryQueue);
-        queryBuffer.forEach(query -> query.computeProbabilities(reranker.expScores.get(query.sentenceId)));
+        queryBuffer.forEach(query -> query.computeProbabilities(reranker.getParseScores(query.sentenceId)));
         queryQueue.clear();
         queryQueue.addAll(queryBuffer);
     }
@@ -186,8 +179,7 @@ public class ActiveLearning {
         recentlyUpdatedSentences.forEach(sentIdx -> {
             List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
             List<Parse> parses = allParses.get(sentIdx);
-            List<GroupedQuery> queries = QueryGenerator.generateQueries(sentIdx, words, parses, questionGenerator,
-                    generatePseudoQuestions, groupSameLabelDependencies);
+            List<GroupedQuery> queries = QueryGeneratorNew.generateQueries(sentIdx, words, parses, questionGenerator);
             queries.forEach(query -> {
                 String depStr = query.predicateIndex + "." + query.category + "." + query.argumentNumber;
                 // Skip queries that we already asked about.
@@ -198,7 +190,7 @@ public class ActiveLearning {
                 }
             });
         });
-        queryBuffer.forEach(query -> query.computeProbabilities(reranker.expScores.get(query.sentenceId)));
+        queryBuffer.forEach(query -> query.computeProbabilities(reranker.getParseScores(query.sentenceId)));
         queryQueue.clear();
         queryQueue.addAll(queryBuffer);
         recentlyUpdatedSentences.clear();

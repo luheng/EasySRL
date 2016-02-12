@@ -31,10 +31,18 @@ public class QuestionGenerator {
      * @param parse               : parse information containing categories and dependencies
      * @return a QuestionAnswerPair if we could construct an answer successfully
      */
-    public Optional<QuestionAnswerPair> generateQuestion(ResolvedDependency targetDependency, List<String> words, Parse parse) {
+    public Optional<QuestionAnswerPair> generateQuestion(ResolvedDependency targetDependency, List<String> words,
+                                                         Parse parse) {
         int predicateIdx = targetDependency.getHead();
         QuestionTemplate template = new QuestionTemplate(predicateIdx, words, parse, verbHelper);
         return template.instantiateForArgument(targetDependency.getArgNumber());
+    }
+
+
+    public Optional<QuestionAnswerPair> generateQuestion(int predicateIdx, int argumentNumber, List<String> words,
+                                                         Parse parse) {
+        QuestionTemplate template = new QuestionTemplate(predicateIdx, words, parse, verbHelper);
+        return template.instantiateForArgument(argumentNumber);
     }
 }
 

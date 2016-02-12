@@ -1,6 +1,8 @@
 package edu.uw.easysrl.qasrl;
 
 import com.google.common.collect.ImmutableList;
+import edu.stanford.nlp.util.ArrayMap;
+import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.*;
@@ -60,7 +62,6 @@ public class GroupedQuery {
         }
     }
 
-
     int sentenceId, totalNumParses, queryId;
     final List<String> sentence;
     final List<Parse> parses;
@@ -73,10 +74,17 @@ public class GroupedQuery {
     String question;
     List<AnswerOption> answerOptions;
 
-    double answerMargin, answerEntropy, normalizedAnswerEntropy;
+    // The probability mass of non-NA options.
+    public double questionConfidence, attachmentUncertainty;
+    public double answerMargin, answerEntropy, normalizedAnswerEntropy;
+
     // TODO: move this to ActiveLearning ...
     static final double rankDiscountFactor = 0.0;
     static final boolean estimateWithParseScores = true;
+
+    // Other dependencies
+    Set<ResolvedDependency> questionDependencies;
+    List<Set<ResolvedDependency>> answerDependencies;
 
     public GroupedQuery(int sentenceId, final List<String> sentence, final List<Parse> parses) {
         this.sentenceId = sentenceId;
@@ -84,21 +92,24 @@ public class GroupedQuery {
         this.parses = parses;
         this.totalNumParses = parses.size();
         queries = new HashSet<>();
-        answerOptions = null;
     }
 
-    public GroupedQuery(int sentenceId, final List<String> sentence, List<Parse> parses, Query query) {
+    public GroupedQuery(int sentenceId, final List<String> sentence, final List<Parse> parses, Query query) {
         this(sentenceId, sentence, parses);
         queries.add(query);
     }
 
-    public boolean canMerge(Query query) {
-        for (Query q : queries) {
-            if (canMerge(q, query)) {
+    public boolean canMerge(final Query queryToMerge) {
+        for (Query query : queries) {
+            if (canMerge(queryToMerge, query)) {
                 return true;
             }
         }
         return false;
+    }
+
+    public void addQuery(final Query query) {
+        this.queries.add(query);
     }
 
     private static boolean canMerge(Query q1, Query q2) {
@@ -122,10 +133,6 @@ public class GroupedQuery {
         return false;
     }
 
-    public void add(Query query) {
-        queries.add(query);
-    }
-
     public void collapse(int predicateIndex, Category category, int argumentNumber, String question,
                          final Map<String, ImmutableList<Integer>> spanToArgList,
                          final Map<String, Set<Integer>> spanToParses) {
@@ -141,47 +148,7 @@ public class GroupedQuery {
             allParseIds.removeAll(parseIds);
         });
         answerOptions.add(new BadQuestionOption(allParseIds));
-        //answerOptions.add(new NoAnswerOption(unlistedParses));
-    }
-
-    // Experimental query collapse function.
-    public void collapseNew(int predicateIndex, Category category, int argumentNumber, String question,
-                            final Map<String, Set<Integer>> spanToParses,
-                            final Map<String, Set<Integer>> spanToArgIds) {
-        this.predicateIndex = predicateIndex;
-        this.category = category;
-        this.argumentNumber = argumentNumber;
-        this.question = question;
-        this.answerOptions = new ArrayList<>();
-
-        Set<Integer> allParseIds = IntStream.range(0, totalNumParses).boxed().collect(Collectors.toSet());
-        double scoreSum = parses.stream().mapToDouble(p->p.score).sum();
-
-        Map<String, Double> answerSpanToScore = new HashMap<>();
-        spanToParses.forEach((span, parseIds) -> {
-            double score = parseIds.stream().mapToDouble(id -> parses.get(id).score).sum() / scoreSum;
-            answerSpanToScore.put(span, score);
-        });
-        List<String> sortedSpans = answerSpanToScore.keySet().stream()
-                .sorted((a1, a2) -> Double.compare(-answerSpanToScore.get(a1), -answerSpanToScore.get(a2)))
-                .collect(Collectors.toList());
-        Set<Integer> unlistedParses = new HashSet<>();
-        double accumulatedScore = 0.0;
-        for (int i = 0; i < sortedSpans.size(); i++) {
-            String span = sortedSpans.get(i);
-            Set<Integer> parseIds = spanToParses.get(span);
-            if (accumulatedScore > 0.8) {
-                unlistedParses.addAll(parseIds);
-            } else {
-                ImmutableList<Integer> argList = ImmutableList.copyOf(spanToArgIds.get(span).stream().sorted()
-                        .collect(Collectors.toList()));
-                answerOptions.add(new AnswerOption(argList, span, spanToParses.get(span)));
-            }
-            allParseIds.removeAll(parseIds);
-            accumulatedScore += answerSpanToScore.get(span);
-        }
-        answerOptions.add(new BadQuestionOption(allParseIds));
-        answerOptions.add(new NoAnswerOption(unlistedParses));
+        answerOptions.add(new NoAnswerOption(new HashSet<>()));
     }
 
     public void setQueryId(int id) {
@@ -202,18 +169,7 @@ public class GroupedQuery {
 
     public List<AnswerOption> getAnswerOptions() { return answerOptions; }
 
-    public double getAnswerEntropy() {
-        return answerEntropy;
-    }
-
-    public double getNormalizedAnswerEntropy() {
-        return normalizedAnswerEntropy;
-    }
-
-    public double getAnswerMargin() {
-        return answerMargin;
-    }
-
+    // TODO: clean this up.
     public void computeProbabilities(double[] parseDist) {
         // Compute p(a|q).
         if (estimateWithParseScores) {
@@ -232,11 +188,33 @@ public class GroupedQuery {
         answerMargin = len < 2 ? 1.0 : prob.get(len - 1) - prob.get(len - 2);
 
         // Entropy divided by log(number of chosenOptions) to stay in range [0,1].
-        double K = Math.log(answerOptions.size());
         answerEntropy = -1.0 * answerOptions.stream()
                 .filter(ao -> ao.probability > 0)
                 .mapToDouble(ao -> ao.probability * Math.log(ao.probability)).sum();
         normalizedAnswerEntropy = answerEntropy / Math.log(answerOptions.size());
+
+        // Question confidence and attachment ambiguity.
+        double allParsesMass = .0;
+        for (double p : parseDist) {
+            allParsesMass += p;
+        }
+        double nonNaMass = .0;
+        prob = new ArrayList<>();
+        for (AnswerOption option : answerOptions) {
+            if (!GroupedQuery.BadQuestionOption.class.isInstance(option)) {
+                double score = option.parseIds.stream().mapToDouble(id -> parseDist[id]).sum();
+                prob.add(score);
+                nonNaMass += score;
+            }
+        }
+        questionConfidence = nonNaMass / allParsesMass;
+        attachmentUncertainty = .0;
+        for (double d : prob) {
+            if (d > 0) {
+                attachmentUncertainty -= (d / nonNaMass) * Math.log(d / nonNaMass);
+            }
+        }
+        //attachmentUncertainty /= Math.log(prob.size());
     }
 
     public void print(final List<String> words, Response response) {
@@ -252,25 +230,25 @@ public class GroupedQuery {
                     ao.argumentIds.stream().map(words::get).collect(Collectors.joining(","));
             String parseIdsStr = DebugPrinter.getShortListString(ao.parseIds);
             System.out.println(String.format("%.2f\t%s%d\t(%s:%s)\t\t\t%s\t%s", ao.probability, match, i, argIdsStr,
-                    argHeadsStr, ao.answer, parseIdsStr));
+                    argHeadsStr, ao.getAnswer(), parseIdsStr));
         }
         System.out.println();
     }
 
     public String getDebuggingInfo(final Response response) {
-        String result = String.format("%d:%s\t%s\t%d", predicateIndex, sentence.get(predicateIndex), category,
-                argumentNumber) + "\n";
-        result += String.format("%.2f\t%.2f\t%s", answerEntropy, answerMargin, question) + "\n";
+        String result = String.format("SID=%d\t%s\n", sentenceId, sentence.stream().collect(Collectors.joining(" ")));
+        result += String.format("%d:%s\t%s.%d\n", predicateIndex, sentence.get(predicateIndex), category, argumentNumber);
+        result += String.format("QID=%d\tent=%.2f\tmarg=%.2f\t%s\n", queryId, answerEntropy, answerMargin, question);
         for (int i = 0; i < answerOptions.size(); i++) {
             AnswerOption ao = answerOptions.get(i);
-            String match = (response.chosenOptions.contains(i) ? "*" : "");
+            String match = (response.chosenOptions.contains(i) ? "G" : " ");
             String argIdsStr = ao.isNAOption() ? "_" :
                     ao.argumentIds.stream().map(String::valueOf).collect(Collectors.joining(","));
             String argHeadsStr = ao.isNAOption() ? "N/A" :
                     ao.argumentIds.stream().map(sentence::get).collect(Collectors.joining(","));
             String parseIdsStr = DebugPrinter.getShortListString(ao.parseIds);
-            result += String.format("%.2f\t%s%d\t%s:%s\t%s\t%s", ao.probability, match, i, argIdsStr, argHeadsStr,
-                    ao.answer, parseIdsStr) + "\n";
+            result += String.format("%d\t%s\tprob=%.2f\t%s\t(%s:%s)\t%s\n", i, match, ao.probability, ao.getAnswer(),
+                    argIdsStr, argHeadsStr, parseIdsStr);
         }
         return result + "\n";
     }
@@ -288,7 +266,7 @@ public class GroupedQuery {
             String argHeadsStr = ao.isNAOption() ? "N/A" :
                     ao.argumentIds.stream().map(sentence::get).collect(Collectors.joining(","));
             String parseIdsStr = DebugPrinter.getShortListString(ao.parseIds);
-            result += String.format("%d\t%s\tprob=%.2f\t%s\t(%s:%s)\t%s\n", i, match, ao.probability, ao.answer,
+            result += String.format("%d\t%s\tprob=%.2f\t%s\t(%s:%s)\t%s\n", i, match, ao.probability, ao.getAnswer(),
                     argIdsStr, argHeadsStr, parseIdsStr);
         }
         if (response.debugInfo.length() > 0) {
@@ -317,7 +295,7 @@ public class GroupedQuery {
             System.out.println(String.format("%.2f\t%s[%d]\t%s\t%s:%s\t%s",
                     ao.probability,
                     match, i,
-                    ao.answer,
+                    ao.getAnswer(),
                     argIdsStr,
                     argHeadsStr,
                     parseIdsStr));

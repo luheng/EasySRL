@@ -133,7 +133,7 @@ public class ActiveLearningInteractive {
             List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
             List<Parse> parses = allParses.get(sentIdx);
             allQueries.addAll(QueryGenerator.generateQueries(sentIdx, words, parses, questionGenerator,
-                    false /* generatePseudoQuestions */, groupSameLabelDependencies));
+                    false /* generatePseudoQuestions */));
         }
         List<GroupedQuery> queryList = allQueries.stream()
                 .sorted((q1, q2) -> Double.compare(-q1.answerEntropy, -q2.answerEntropy))

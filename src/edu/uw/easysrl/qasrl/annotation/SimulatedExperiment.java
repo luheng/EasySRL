@@ -30,7 +30,7 @@ public class SimulatedExperiment {
         int queryCounter = 0;
         while (learner.getNumberOfRemainingQueries() > 0) {
             GroupedQuery query = learner.getNextQueryInQueue();
-            if (query.getAnswerEntropy() < 1e-3) {
+            if (query.answerEntropy < 1e-3) {
                 continue;
             }
             Response response = responseSimulator.answerQuestion(query);

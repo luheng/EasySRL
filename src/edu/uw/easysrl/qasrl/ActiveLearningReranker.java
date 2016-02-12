@@ -70,7 +70,7 @@ public class ActiveLearningReranker {
 
         /************** manual parameter tuning ... ***********/
         //final int[] nBestList = new int[] { 3, 5, 10, 20, 50, 100, 250, 500, 1000 };
-        final int[] nBestList = new int[] { 10 };
+        final int[] nBestList = new int[] { 100 };
 
         List<Map<String, Double>> allResults = new ArrayList<>();
         for (int nBest : nBestList) {
@@ -154,7 +154,7 @@ public class ActiveLearningReranker {
             List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
             List<Parse> parses = allParses.get(sentIdx);
             List<GroupedQuery> queries = QueryGenerator.generateQueries(sentIdx, words, parses, questionGenerator,
-                    generatePseudoQuestions, groupSameLabelDependencies);
+                    generatePseudoQuestions);
             queries.forEach(query -> query.computeProbabilities(reranker.expScores.get(query.sentenceId)));
             queryList.addAll(queries);
         }

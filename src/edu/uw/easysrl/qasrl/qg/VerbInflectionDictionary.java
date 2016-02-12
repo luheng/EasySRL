@@ -128,7 +128,7 @@ public class VerbInflectionDictionary {
 		}
 		while (sentenceIterator.hasNext()) {
 			ParallelCorpusReader.Sentence sentence = sentenceIterator.next();
-			sentence.getWords().forEach(word -> wordDict.addString(word));
+			sentence.getWords().forEach(wordDict::addString);
 		}
 		VerbInflectionDictionary inflDict = new VerbInflectionDictionary(wordDict);
 		try {
