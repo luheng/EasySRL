@@ -21,6 +21,7 @@ public class QuestionAnswerPair {
     public final List<Set<ResolvedDependency>> answerDeps;
 
     public final List<Integer> answerWordIndices;
+    public static final String answerDelimiter = " # ";
 
     public QuestionAnswerPair(int predicateIndex, Category predicateCategory,
                               List<ResolvedDependency> questionDeps, List<String> question,
@@ -38,7 +39,7 @@ public class QuestionAnswerPair {
                 .collect(Collectors.toList());
         this.answerWordIndices = answers.stream()
                 .flatMap(twd -> twd.dependencies.stream()
-                .map(d -> d.getArgumentIndex()))
+                .map(ResolvedDependency::getArgumentIndex))
                 .collect(Collectors.toSet())
                 .stream()
                 .sorted()
@@ -61,7 +62,7 @@ public class QuestionAnswerPair {
         } else {
             return answers.stream()
                     .map(TextGenerationHelper::renderString)
-                    .collect(Collectors.joining(" # "));
+                    .collect(Collectors.joining(answerDelimiter));
         }
     }
 }

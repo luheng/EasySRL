@@ -9,10 +9,10 @@ import java.util.List;
  * Created by luheng on 2/5/16.
  */
 public class ActiveLearningHistory {
-
     List<GroupedQuery> queries;
     List<Response> responses, goldResponses;
-    List<Results> results;
+    List<Results> results, sentenceResults;
+    List<Integer> sentenceIds;
     int numCorrectAnswers;
 
     public ActiveLearningHistory() {
@@ -20,15 +20,19 @@ public class ActiveLearningHistory {
         responses = new ArrayList<>();
         goldResponses = new ArrayList<>();
         results = new ArrayList<>();
+        sentenceIds = new ArrayList<>();
+        sentenceResults = new ArrayList<>();
         numCorrectAnswers = 0;
     }
 
     public void add(final GroupedQuery query, final Response response, final Response goldResponse,
-                    final Results result) {
+                    final Results result, final Results sentenceResult) {
         queries.add(query);
         responses.add(response);
         goldResponses.add(goldResponse);
         results.add(result);
+        sentenceIds.add(query.sentenceId);
+        sentenceResults.add(sentenceResult);
         if (response.chosenOptions.get(0).equals(goldResponse.chosenOptions.get(0))) {
             numCorrectAnswers ++;
         }
@@ -44,6 +48,10 @@ public class ActiveLearningHistory {
 
     public Response getGoldResponse(int id) {
         return goldResponses.get(id);
+    }
+
+    public int getSentenceId(int id) {
+        return sentenceIds.get(id);
     }
 
     public Results getResult(int id) {
@@ -62,7 +70,8 @@ public class ActiveLearningHistory {
         String str = String.format("ITER=%d\n", last);
         str += queries.get(last).getDebuggingInfo(responses.get(last), goldResponses.get(last)) + "\n";
         str += String.format("USER_ACC:\t%.2f%%\n", 100.0 * numCorrectAnswers / size());
-        str += "[ReRanked]:\n" + results.get(last).toString() + "\n";
+        str += "[ReRanked-sentence]:\t" + sentenceResults.get(last).toString().replace("\n", "\t") + "\n";
+        str += "[ReRanked-corpus]:\t" + results.get(last).toString().replace("\n", "\t") + "\n";
         return str;
     }
 }

@@ -11,6 +11,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import edu.uw.easysrl.qasrl.*;
+import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
 
@@ -123,9 +124,7 @@ public class WebUI2 {
             final BufferedWriter fileWriter = annotationFileWriterMap.get(userName);
 
             if (request.getParameter("NextSentence") != null) {
-                for (int i = 1; i < 10; i++) {
-                    activeLearning.switchToNextSentence();
-                }
+                activeLearning.switchToNextSentence();
             }
             final String userAnswer = request.getParameter("UserAnswer");
             if (userAnswer != null) {
@@ -142,9 +141,11 @@ public class WebUI2 {
                 // Get gold response for debugging.
                 Response goldResponse = goldSimulator.answerQuestion(query);
                 activeLearning.respondToQuery(query, response);
-                Results rerankResults = activeLearning.getRerankedF1();
+                activeLearning.refereshQueryQueue();
+
                 // Append to history
-                history.add(query, response, goldResponse, rerankResults);
+                history.add(query, response, goldResponse, activeLearning.getRerankedF1(),
+                            activeLearning.getRerankedF1(sentId));
 
                 // Print latest history.
                 final String latestHistoryStr = history.printLatestHistory();
@@ -158,7 +159,7 @@ public class WebUI2 {
         }
 
         private void update(final String userName, final PrintWriter httpWriter) {
-            final ActiveLearningBySentence activeLearning = activeLearningMap.get(userName);
+            final ActiveLearningBySentence learner = activeLearningMap.get(userName);
             final ActiveLearningHistory history = activeLearningHistoryMap.get(userName);
 
             httpWriter.println(WebUIHelper.printHTMLHeader());
@@ -168,12 +169,12 @@ public class WebUI2 {
             httpWriter.println("<container>\n" + WebUIHelper.printInstructions() + "</container>\n");
 
             // Print progress bar.
-            int numTotal = activeLearning.getNumSentences();
-            int numAnswered = numTotal - activeLearning.getNumRemainingSentences();
+            int numTotal = learner.getNumSentences();
+            int numAnswered = numTotal - learner.getNumRemainingSentences();
             httpWriter.println(WebUIHelper.printProgressBar(numAnswered, 0 /* numSkipped */, numTotal));
 
             // Get next query.
-            GroupedQuery nextQuery = activeLearning.getNextNonEmptyQuery();
+            GroupedQuery nextQuery = learner.getNextNonEmptyQuery();
             if (nextQuery == null) {
                 // TODO
             }
@@ -196,7 +197,8 @@ public class WebUI2 {
             final List<GroupedQuery.AnswerOption> options = nextQuery.getAnswerOptions();
             String qLabel = "q_" + nextQuery.getQueryId();
 
-            int badQuestionOptionId = -1, unlistedAnswerId = -1;
+            int badQuestionOptionId = -1,
+                unlistedAnswerId = -1;
             for (int i = 0; i < options.size(); i++) {
                 GroupedQuery.AnswerOption option = options.get(i);
                 if (GroupedQuery.BadQuestionOption.class.isInstance(option)) {
@@ -208,7 +210,7 @@ public class WebUI2 {
                     continue;
                 }
                 String optionValue = qLabel + "_a_" + i;
-                String optionString = option.getAnswer();
+                String optionString = option.getAnswer(); //.replace(QuestionAnswerPair.answerDelimiter, "<i><b> and </i></b>");
                 httpWriter.println(String.format("<label><input name=\"UserAnswer\" type=\"radio\" value=\"%s\" />&nbsp %s</label><br/>",
                         optionValue, optionString));
             }
@@ -225,7 +227,6 @@ public class WebUI2 {
             httpWriter.println("<br><span class=\"label label-primary\" for=\"Comment\">Comments (if any):</span> <br>");
             httpWriter.println("<input type=\"textarea\" name=\"Comment\" id=\"Comment\" class=\"form-control\" placeholder=\"Comments (if any)\"/> <br>");
 
-
             httpWriter.println("<button class=\"btn btn-primary\" type=\"submit\" value=\"Submit!\">Submit!</button>");
             httpWriter.println("</form>");
 
@@ -234,7 +235,7 @@ public class WebUI2 {
             // Gold info and debugging info.
             httpWriter.println(WebUIHelper.printGoldInfo(nextQuery, goldSimulator.answerQuestion(nextQuery)));
             if (history.size() > 0) {
-                httpWriter.println(WebUIHelper.printDebuggingInfo(history));
+                httpWriter.println(WebUIHelper.printDebuggingInfo(learner, history));
             }
             // "Skip 10" button
             httpWriter.println("<br><form class=\"form-group\" action=\"\" method=\"get\">");

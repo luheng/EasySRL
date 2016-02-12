@@ -146,7 +146,7 @@ public class WebUI {
                 activeLearning.respondToQuery(query, response);
                 Results rerankResults = activeLearning.getRerankedF1();
                 // Append to history
-                history.add(query, response, goldResponse, rerankResults);
+                history.add(query, response, goldResponse, rerankResults, rerankResults /* TODO: fix later */ );
                 if (history.size() % reorderQueriesEvery == 0) {
                     activeLearning.refreshQueryList();
                 }

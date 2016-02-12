@@ -93,6 +93,7 @@ public class ActiveLearningBySentence {
         this.sentenceScores = other.sentenceScores;
         this.sentenceQueue = new PriorityQueue<>(sentenceComparator);
         sentenceQueue.addAll(sentenceScores.keySet());
+        initializeQueryQueue();
     }
 
     private void initialize() {

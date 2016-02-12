@@ -1,5 +1,6 @@
 package edu.uw.easysrl.qasrl.annotation;
 
+import edu.uw.easysrl.qasrl.ActiveLearningBySentence;
 import edu.uw.easysrl.qasrl.ActiveLearningHistory;
 import edu.uw.easysrl.qasrl.GroupedQuery;
 import edu.uw.easysrl.qasrl.Response;
@@ -44,11 +45,11 @@ public class WebUIHelper {
         int w1 = (int) Math.ceil(1.0 * numAnswered / numTotal);
         int w2 = (int) Math.ceil(1.0 * numSkipped / numTotal);
 
-        return String.format("<span class=\"label label-info\" for=\"progress\">%d answered. %d skipped. %d remaining.</span>\n",
+        return String.format("<span class=\"label label-info\" for=\"progress\">%d annotated. %d skipped. %d remaining.</span>\n",
                         numAnswered, numSkipped, numTotal - numAnswered - numSkipped)
                 + "<div class=\"progress\" id=\"progress\">"
                 + String.format("<div class=\"progress-bar progress-bar-success\" style=\"width: %d%%\">", w1)
-                + String.format("<span class=\"sr-only\">%d Answered</span>", numAnswered)
+                + String.format("<span class=\"sr-only\">%d Annotated</span>", numAnswered)
                 + "</div>"
                 + String.format("<div class=\"progress-bar progress-bar-warning\" style=\"width: %d%%\">", w2)
                 + String.format("<span class=\"sr-only\">%d Skipped</span>", numSkipped)
@@ -68,6 +69,22 @@ public class WebUIHelper {
         String result = "<button type=\"button\" class=\"btn btn-info\" data-toggle=\"collapse\" data-target=\"#debugging\">Debugging Info</button>"
                         + "<div id=\"debugging\" class=\"collapse\">";
         result += "<p>" + history.printLatestHistory().replace("\n", "<br>").replace("\t", "&nbsp&nbsp") + "</p>";
+        result += "</div>";
+        return result;
+    }
+
+    public static String printResultsInOneLine(final Results result) {
+        return result.toString().replace("\n", "&nbsp&nbsp");
+    }
+
+    public static String printDebuggingInfo(final ActiveLearningBySentence learner,
+                                            final ActiveLearningHistory history) {
+        String result = "<button type=\"button\" class=\"btn btn-info\" data-toggle=\"collapse\" data-target=\"#debugging\">Debugging Info</button>"
+                + "<div id=\"debugging\" class=\"collapse\">";
+        int sentId = history.getSentenceId(history.size() - 1);
+        result += "<p>" + history.printLatestHistory().replace("\n", "<br>").replace("\t", "&nbsp&nbsp") + "</p>";
+        result += "<p> [OneBest-sentence] &nbsp" + printResultsInOneLine(learner.getOneBestF1(sentId)) + " <br>\n";
+        result += "[Oracle-sentence]] &nbsp" + printResultsInOneLine(learner.getOracleF1(sentId)) + " </p>";
         result += "</div>";
         return result;
     }
