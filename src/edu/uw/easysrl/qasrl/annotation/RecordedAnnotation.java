@@ -4,6 +4,7 @@ import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.io.*;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -28,7 +29,7 @@ public class RecordedAnnotation {
     // Other
     public String comment;
 
-    private RecordedAnnotation() {
+    protected RecordedAnnotation() {
         answerStrings = new ArrayList<>();
     }
 
@@ -38,7 +39,7 @@ public class RecordedAnnotation {
 
         reader = new BufferedReader(new FileReader(new File(fileName)));
         String line;
-        RecordedAnnotation curr = null;
+        RecordedAnnotation curr;
         while ((line = reader.readLine()) != null) {
             line = line.trim();
             // Example: ITER=0
@@ -89,6 +90,16 @@ public class RecordedAnnotation {
         return annotations;
     }
 
+    public boolean isSameQuestionAs(final RecordedAnnotation other) {
+        return sentenceId == other.sentenceId
+                && predicateId == other.predicateId
+                && argumentNumber == other.argumentNumber
+                && question.equalsIgnoreCase(other.question)
+                && answerStrings.size() == other.answerStrings.size()
+                && goldAnswerId == other.goldAnswerId;
+    }
+
+    @Override
     public String toString() {
         // Number of iteration in user session.
         String result = "ITER=" + iterationId + "\n"
