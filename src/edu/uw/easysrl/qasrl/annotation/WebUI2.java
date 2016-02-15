@@ -187,7 +187,6 @@ public class WebUI2 {
             final List<String> words = nextQuery.getSentence();
 
             httpWriter.println("<container><div class=\"row\">\n");
-            // httpWriter.println("<div class=\"col-md-2\"> </div>");
             httpWriter.println("<div class=\"col-md-12\">");
             // Annotation margin.
             httpWriter.println("<panel panel-default>\n");

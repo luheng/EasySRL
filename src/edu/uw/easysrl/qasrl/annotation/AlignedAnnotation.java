@@ -1,8 +1,6 @@
 package edu.uw.easysrl.qasrl.annotation;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Created by luheng on 2/13/16.
@@ -40,5 +38,26 @@ public class AlignedAnnotation extends RecordedAnnotation {
 
     int getNumAnnotated() {
         return annotatorToAnswerId.size();
+    }
+
+    public static List<AlignedAnnotation> getAlignedAnnotations(Map<String, List<RecordedAnnotation>> annotations,
+                                                                Collection<String> annotators) {
+        if (annotators == null) {
+            annotators = annotations.keySet();
+        }
+        Map<String, AlignedAnnotation> alignedAnnotations = new HashMap<>();
+        for (String annotator : annotators) {
+            annotations.get(annotator).forEach(annotation -> {
+                String queryKey = "SID=" + annotation.sentenceId + "_PRED=" + annotation.predicateId + "_ARGNUM=" +
+                        annotation.argumentNumber + "_Q=" + annotation.question;
+                if (!alignedAnnotations.containsKey(queryKey)) {
+                    alignedAnnotations.put(queryKey, new AlignedAnnotation(annotation));
+                }
+                AlignedAnnotation alignedAnnotation = alignedAnnotations.get(queryKey);
+                assert alignedAnnotation.isSameQuestionAs(annotation);
+                alignedAnnotation.addAnnotation(annotator, annotation);
+            });
+        }
+        return new ArrayList<>(alignedAnnotations.values());
     }
 }

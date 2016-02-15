@@ -115,6 +115,8 @@ public class TextGenerationHelper {
             word = "/";
         } else if (word.equals("``") || word.equals("\'\'")) {
             word = "\"";
+        } else if (word.contains("\\/")) {
+            word = word.replace("\\/", "/");
         }
         return word;
     }
