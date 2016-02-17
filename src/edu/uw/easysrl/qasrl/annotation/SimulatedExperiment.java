@@ -17,9 +17,9 @@ public class SimulatedExperiment {
     static ActiveLearning learner;
     static final int nBest = 50;
     static final boolean regenerateQueries = false;
-    static final int reorderQueriesEvery = 10;
+    static final int reorderQueriesEvery = 100;
     static final int maxNumQueries = 20000;
-    static final boolean verbose = true;
+    static final boolean verbose = false;
 
     public static void main(String[] args) {
         learner = new ActiveLearning(nBest);

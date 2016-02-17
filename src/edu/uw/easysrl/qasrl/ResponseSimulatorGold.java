@@ -6,9 +6,11 @@ import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.syntax.grammar.Category;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
 /**
@@ -22,7 +24,8 @@ public class ResponseSimulatorGold extends ResponseSimulator {
     private boolean allowLabelMatch = true;
 
     // Evidence propagation switches
-    public boolean propagateArgumentAdjunctEvidence = true;
+    // TODO: debug this ..
+    public boolean propagateArgumentAdjunctEvidence = false;
 
     // TODO: simulate noise level.
     // TODO: partial reward for parses that got part of the answer heads right ..
@@ -94,13 +97,73 @@ public class ResponseSimulatorGold extends ResponseSimulator {
         if (questionMatch || (allowLabelMatch && labelMatch)) {
             return true;
         }
+        if (!goldQaPairOpt.isPresent()) {
+            return false;
+        }
         if (propagateArgumentAdjunctEvidence) {
             final Category verb = Category.valueOf("S\\NP");
-            if (query.category.isFunctionInto(verb) && targetDependency.getCategory().isFunctionInto(verb)) {
-                // 1. If query is has less arguments than gold and the missing arguments have number >= 3.
+            final Category verbAdjunct = Category.valueOf("(S\\NP)\\(S\\NP)");
 
+            if (query.category.isFunctionInto(verbAdjunct) ||
+                    targetDependency.getCategory().isFunctionInto(verbAdjunct)) {
+                return false;
+            }
+            if (query.category.isFunctionInto(verb) && targetDependency.getCategory().isFunctionInto(verb)) {
+                if ((query.argumentNumber == 1 && targetDependency.getArgNumber() > 1) ||
+                        (query.argumentNumber > 1 && targetDependency.getArgNumber() == 1)) {
+                    return false;
+                }
+                List<Category> args = getArgumentChain(query.category);
+                List<Category> goldArgs = getArgumentChain(targetDependency.getCategory());
+                String argsStr= args.stream().map(Category::toString).collect(Collectors.joining(" "));
+                String goldArgsStr = goldArgs.stream().map(Category::toString).collect(Collectors.joining(" "));
+                // 1. If query is has less arguments than gold and the missing arguments have number >= 3.
+                if (args.size() < goldArgs.size() && args.size() >= 2 && goldArgsStr.startsWith(argsStr)) {
+                    // For debugging.
+                    System.out.println(sentence.stream().collect(Collectors.joining(" ")));
+                    System.out.println("Gen:\t" + query.category + "\t" + query.argumentNumber + "\t" + query.question);
+                    System.out.println("Gold:\t" + targetDependency.getCategory() + "\t" + targetDependency.getArgNumber() + "\t" + goldQaPairOpt.get().renderQuestion());
+                    return true;
+                }
                 // 2. If query is has more arguments than gold and the additional arguments are adjuncts in gold.
+                if (args.size() > goldArgs.size() && argsStr.startsWith(goldArgsStr)) {
+                    boolean fuzzyMatch = true;
+                    for (ResolvedDependency dep : query.questionDependencies) {
+                        if (dep.getHead() == query.predicateIndex
+                                && !isArgumentOrAdjunct(dep.getHead(), dep.getArgument(), goldParse)) {
+                            fuzzyMatch = false;
+                            break;
+                        }
+                    }
+                    if (fuzzyMatch) {
+                        // For debugging.
+                        //System.out.println(sentence.stream().collect(Collectors.joining(" ")));
+                        //System.out.println("Gen:\t" + query.argumentNumber + "\t" + query.question);
+                        //System.out.println("Gold:\t" + targetDependency.getArgNumber() + "\t" + goldQaPairOpt.get().renderQuestion());
+                        return true;
+                    }
+                }
             }   
+        }
+        return false;
+    }
+
+    private static List<Category> getArgumentChain(Category predicate) {
+        assert predicate.getNumberOfArguments() > 1;
+        List<Category> arguments = new ArrayList<>();
+        arguments.add(predicate.getArgument(1));
+        for (int i = predicate.getNumberOfArguments(); i > 1; i--) {
+            arguments.add(predicate.getArgument(i));
+        }
+        return arguments;
+    }
+
+    private static boolean isArgumentOrAdjunct(int head1, int head2, Parse parse) {
+        for (ResolvedDependency dep : parse.dependencies) {
+            if ((dep.getHead() == head1 && dep.getArgumentIndex() == head2)
+                    || (dep.getHead() == head2 && dep.getArgumentIndex() == head1)) {
+                return true;
+            }
         }
         return false;
     }
