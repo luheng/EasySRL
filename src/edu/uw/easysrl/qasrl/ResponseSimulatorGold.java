@@ -103,11 +103,11 @@ public class ResponseSimulatorGold extends ResponseSimulator {
         if (propagateArgumentAdjunctEvidence) {
             final Category verb = Category.valueOf("S\\NP");
             final Category verbAdjunct = Category.valueOf("(S\\NP)\\(S\\NP)");
-
+            /*
             if (query.category.isFunctionInto(verbAdjunct) ||
                     targetDependency.getCategory().isFunctionInto(verbAdjunct)) {
                 return false;
-            }
+            }*/
             if (query.category.isFunctionInto(verb) && targetDependency.getCategory().isFunctionInto(verb)) {
                 if ((query.argumentNumber == 1 && targetDependency.getArgNumber() > 1) ||
                         (query.argumentNumber > 1 && targetDependency.getArgNumber() == 1)) {

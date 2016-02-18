@@ -19,7 +19,7 @@ public class QuestionAnswerPair {
     public final List<ResolvedDependency> targetDeps;
     public final List<List<String>> answers;
     public final List<Set<ResolvedDependency>> answerDeps;
-
+;
     public final List<Integer> answerWordIndices;
     public static final String answerDelimiter = " # ";
 
