@@ -85,10 +85,12 @@ public class QueryAnalysisExperiment {
     }
 
     private static void initializeQueries() {
+        QueryGeneratorAnalysis analysis = new QueryGeneratorAnalysis();
         for (int sentIdx : allParses.keySet()) {
             List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
             List<Parse> parses = allParses.get(sentIdx);
-            QueryGeneratorAnalysis.generateQueries(sentIdx, words, parses, questionGenerator);
+            analysis.generateQueries(sentIdx, words, parses, questionGenerator);
         }
+        analysis.printStats();
     }
 }
