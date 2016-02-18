@@ -92,6 +92,8 @@ public class GroupedQuery {
         this.parses = parses;
         this.totalNumParses = parses.size();
         queries = new HashSet<>();
+        questionDependencies = new HashSet<>();
+        answerDependencies = new ArrayList<>();
     }
 
     public GroupedQuery(int sentenceId, final List<String> sentence, final List<Parse> parses, Query query) {

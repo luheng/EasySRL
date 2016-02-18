@@ -60,7 +60,9 @@ public class QueryGeneratorAnalysis {
         Table<String, String, Set<Integer>> questionPool = HashBasedTable.create();
         // argHeadSet -> answer -> parses
         Table<ImmutableList<Integer>, String, Set<Integer>> answerPool = HashBasedTable.create();
-        Table<String, ImmutableList<Integer>, Set<Integer>> qaPool = HashBasedTable.create();
+        // Bipartite, bi-directional question-answer relation.
+        Table<String, ImmutableList<Integer>, Set<Integer>> questionToAnswer = HashBasedTable.create();
+        Table<ImmutableList<Integer>, String, Set<Integer>> answerToQuestion = HashBasedTable.create();
 
         for (int i = 0; i < words.size(); i++) {
             // For lambda.
@@ -110,10 +112,14 @@ public class QueryGeneratorAnalysis {
                         }
                         answerPool.get(heads, answer).add(parseId);
 
-                        if (!qaPool.contains(qkey, heads)) {
-                            qaPool.put(qkey, heads, new HashSet<>());
+                        if (!questionToAnswer.contains(qkey, heads)) {
+                            questionToAnswer.put(qkey, heads, new HashSet<>());
                         }
-                        qaPool.get(qkey, heads).add(parseId);
+                        if (!answerToQuestion.contains(heads, qkey)) {
+                            answerToQuestion.put(heads, qkey, new HashSet<>());
+                        }
+                        questionToAnswer.get(qkey, heads).add(parseId);
+                        answerToQuestion.get(heads, qkey).add(parseId);
 
                         // Register individual answer spans
                         List<String> spans = new ArrayList<>();
@@ -184,11 +190,29 @@ public class QueryGeneratorAnalysis {
             }
         }
         */
-        System.out.println(questionPool.rowKeySet().size() + "\t" + questionPool.cellSet().size());
-        System.out.println(answerPool.rowKeySet().size() + "\t" + answerPool.cellSet().size());
-        System.out.println(qaPool.cellSet().size());
-        avgQuestionConfusion += 1.0 * questionPool.cellSet().size() / questionPool.rowKeySet().size();
-        avgAnswerConfusion += 1.0 * answerPool.cellSet().size() / answerPool.rowKeySet().size();
+       // System.out.println(questionPool.rowKeySet().size() + "\t" + questionPool.cellSet().size());
+       // System.out.println(answerPool.rowKeySet().size() + "\t" + answerPool.cellSet().size());
+       // System.out.println(questionToAnswer.cellSet().size());
+        for (ImmutableList<Integer> heads : answerToQuestion.rowKeySet()) {
+            if (answerToQuestion.row(heads).keySet().size() < 2) {
+                continue;
+            }
+            String headsStr = heads.stream().map(String::valueOf).collect(Collectors.joining(","));
+            System.out.println(headsStr);
+            String answer = getBestSurfaceForm(answerPool.row(heads), parses);
+            for (String qkey : answerToQuestion.row(heads).keySet()) {
+                String question = getBestSurfaceForm(questionPool.row(qkey), parses);
+                double qaScore = answerToQuestion.get(heads, qkey).stream().mapToDouble(i -> parses.get(i).score).sum();
+                System.out.println(String.format("\t%s\t\t%s\t\t%s\t\t%.3f", qkey, question, answer, qaScore / totalScore));
+            }
+        }
+
+        if (questionPool.rowKeySet().size() > 0) {
+            avgQuestionConfusion += 1.0 * questionPool.cellSet().size() / questionPool.rowKeySet().size();
+        }
+        if (answerPool.rowKeySet().size() > 0) {
+            avgAnswerConfusion += 1.0 * answerPool.cellSet().size() / answerPool.rowKeySet().size();
+        }
         numSentences ++;
 
         // Output all registered answer spans.
@@ -220,6 +244,20 @@ public class QueryGeneratorAnalysis {
             }
         }
         */
+    }
+
+    private static String getBestSurfaceForm(final Map<String, Set<Integer>> surfaceFormToParses,
+                                             final List<Parse> parses) {
+        String bestSF = "";
+        double bestScore = Double.NEGATIVE_INFINITY;
+        for (String sf : surfaceFormToParses.keySet()) {
+            double score = surfaceFormToParses.get(sf).stream().mapToDouble(i -> parses.get(i).score).sum();
+            if (score > bestScore) {
+                bestScore = score;
+                bestSF = sf;
+            }
+        }
+        return bestSF;
     }
 
     private static String punctuations = "...,:?!---LRB-RRB-";
