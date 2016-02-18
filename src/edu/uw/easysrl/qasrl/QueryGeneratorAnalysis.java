@@ -8,7 +8,6 @@ import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.grammar.Category;
 import gnu.trove.map.hash.TIntIntHashMap;
-import gnu.trove.map.hash.TObjectDoubleHashMap;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -18,17 +17,23 @@ import java.util.stream.Collectors;
  * Created by luheng on 2/17/16.
  */
 public class QueryGeneratorAnalysis {
-
     TIntIntHashMap answerSpanConfusion;
+    double avgQuestionConfusion, avgAnswerConfusion;
+    int numSentences;
 
     public QueryGeneratorAnalysis() {
         answerSpanConfusion = new TIntIntHashMap();
+        avgQuestionConfusion = .0;
+        avgAnswerConfusion = .0;
+        numSentences = 0;
     }
 
     public void printStats() {
         List<Integer> keys = new ArrayList<>();
         for (int k : answerSpanConfusion.keys()) keys.add(k);
         keys.stream().sorted().forEach(k -> System.out.println(k + "\t" + answerSpanConfusion.get(k)));
+        System.out.println("question confusion:\t" + avgQuestionConfusion / numSentences);
+        System.out.println("answer confusion:\t" + avgAnswerConfusion / numSentences);
     }
 
 
@@ -39,12 +44,9 @@ public class QueryGeneratorAnalysis {
      */
     public void generateQueries(final int sentenceId, final List<String> words, final List<Parse> parses,
                                 final QuestionGenerator questionGenerator) {
-        List<GroupedQuery> groupedQueryList = new ArrayList<>();
         int numParses = parses.size();
-        System.out.println("\n" + words.stream().collect(Collectors.joining(" ")));
         double totalScore = parses.stream().mapToDouble(p->p.score).sum();
         // TODO: DependencyToId, AnswerSpanResolver
-
 
         // word_id -> { span_string -> {set of dependencies, list of parses}}
         List<Map<String, Set<Integer>>> headToSpanToParses = new ArrayList<>();
@@ -53,6 +55,12 @@ public class QueryGeneratorAnalysis {
             headToSpanToParses.add(new HashMap<>());
             headToSpanToDeps.add(new HashMap<>());
         }
+
+        // pred.category.argnum -> question -> parses
+        Table<String, String, Set<Integer>> questionPool = HashBasedTable.create();
+        // argHeadSet -> answer -> parses
+        Table<ImmutableList<Integer>, String, Set<Integer>> answerPool = HashBasedTable.create();
+        Table<String, ImmutableList<Integer>, Set<Integer>> qaPool = HashBasedTable.create();
 
         for (int i = 0; i < words.size(); i++) {
             // For lambda.
@@ -73,13 +81,8 @@ public class QueryGeneratorAnalysis {
                             depToParses.get(category, argNum).add(parseId);
                         });
             }
-            boolean firstQuestionOfPredicate = true;
             for (Category category : depToParses.rowKeySet()) {
                 for (int argNum : depToParses.row(category).keySet()) {
-                    TObjectDoubleHashMap<String> questionScores = new TObjectDoubleHashMap<>(),
-                            answerScores = new TObjectDoubleHashMap<>();
-                    // Generate a grouped query.
-                    GroupedQuery groupedQuery = new GroupedQuery(sentenceId, words, parses);
                     for (int parseId : depToParses.get(category, argNum)) {
                         final Parse parse = parses.get(parseId);
                         Optional<QuestionAnswerPair> qaPairOpt = questionGenerator.generateQuestion(predId, argNum,
@@ -88,22 +91,31 @@ public class QueryGeneratorAnalysis {
                             continue;
                         }
                         QuestionAnswerPair qa = qaPairOpt.get();
-                        String question = qa.renderQuestion(), answer = qa.renderAnswer();
-                        // A very crude estimation.
-                        questionScores.adjustOrPutValue(question, parse.score, parse.score);
-                        answerScores.adjustOrPutValue(answer, parse.score, parse.score);
-
-                        Query query = new Query(qa, parseId);
-                        groupedQuery.addQuery(query);
-                        if (!depToQAs.contains(category, argNum)) {
-                            depToQAs.put(category, argNum, new HashSet<>());
-                        }
-                        depToQAs.get(category, argNum).add(qa);
-
-                        // Register answers
-                        final List<Integer> heads = qa.targetDeps.stream()
+                        String question = qa.renderQuestion();
+                        String answer = qa.renderAnswer();
+                        final ImmutableList<Integer> heads = ImmutableList.copyOf(qa.targetDeps.stream()
                                 .map(ResolvedDependency::getArgument).sorted()
-                                .collect(Collectors.toList());
+                                .collect(Collectors.toList()));
+                        String qkey = String.format("%d.%s.%d", predId, category, argNum);
+
+                        // Register to question pool.
+                        if (!questionPool.contains(qkey, question)) {
+                            questionPool.put(qkey, question, new HashSet<>());
+                        }
+                        questionPool.get(qkey, question).add(parseId);
+
+                        // Register to answer pool.
+                        if (!answerPool.contains(heads, answer)) {
+                            answerPool.put(heads, answer, new HashSet<>());
+                        }
+                        answerPool.get(heads, answer).add(parseId);
+
+                        if (!qaPool.contains(qkey, heads)) {
+                            qaPool.put(qkey, heads, new HashSet<>());
+                        }
+                        qaPool.get(qkey, heads).add(parseId);
+
+                        // Register individual answer spans
                         List<String> spans = new ArrayList<>();
                         for (int j = 0; j < heads.size(); j++) {
                             spans.add(getAnswerSpan(qa.answers.get(j), heads.get(j), words));
@@ -122,8 +134,8 @@ public class QueryGeneratorAnalysis {
                             }
                         }
                     }
-                    // Debugging
                     /*
+                     // Debugging
                     if (questionScores.size() > 0) {
                         if (firstQuestionOfPredicate) {
                             System.out.println(String.format("[predicate]:\t%s", words.get(i)));
@@ -138,83 +150,79 @@ public class QueryGeneratorAnalysis {
                         // Print answers.
                         TObjectDoubleHashMap<String> answers = new TObjectDoubleHashMap<>();
                         for (QuestionAnswerPair qa : depToQAs.get(category, argNum)) {
-                            //if (qa.renderQuestion().equals(question)) {
                                 String astr = String.format("%s\t%s",
                                         qa.targetDeps.stream().map(ResolvedDependency::getArgument).sorted()
                                                 .map(String::valueOf).collect(Collectors.joining(",")),
                                         qa.renderAnswer());
                                 answers.adjustOrPutValue(astr, 1, 1);
-                            //}
+                            }
+                            for (String astr : answers.keySet()) {
+                                System.out.println("\t\t\t\t" + astr + "\t" + answers.get(astr));
+                            }
                         }
-                        for (String astr : answers.keySet()) {
-                            System.out.println("\t\t\t\t" + astr + "\t" + answers.get(astr));
-                        }
-                    }
-                    */
-                    // Legacy.
-                    Map<ImmutableList<Integer>, String> argListToSpan = new HashMap<>();
-                    Map<String, ImmutableList<Integer>> spanToArgList = new HashMap<>();
-                    Map<String, Set<Integer>> spanToParseIds = new HashMap<>();
-                    for (Query query : groupedQuery.queries) {
-                        String answer = query.answer;
-                        ImmutableList<Integer> argList = ImmutableList.copyOf(query.argumentIds);
-                        if (!argListToSpan.containsKey(argList) ||
-                                answerScores.get(answer) > answerScores.get(argListToSpan.get(argList))) {
-                            argListToSpan.put(argList, answer);
-                            spanToArgList.put(answer, argList);
-                        }
-                    }
-                    for (Query query : groupedQuery.queries) {
-                        ImmutableList<Integer> argList = ImmutableList.copyOf(query.argumentIds);
-                        String answer = argListToSpan.get(argList);
-                        if (!spanToParseIds.containsKey(answer)) {
-                            spanToParseIds.put(answer, new HashSet<>());
-                        }
-                        spanToParseIds.get(answer).add(query.parseId);
-                    }
-                    double bestQuestionScore = Double.MIN_VALUE;
-                    String bestQuestion = "";
-                    for (String question : questionScores.keySet()) {
-                        double score = questionScores.get(question);
-                        if (score > bestQuestionScore) {
-                            bestQuestion = question;
-                            bestQuestionScore = score;
-                        }
-                    }
-                    assert !bestQuestion.isEmpty();
-                    groupedQuery.collapse(predId, category, argNum, bestQuestion, spanToArgList, spanToParseIds);
-                    for (Query query : groupedQuery.queries) {
-                        if (query.question.equals(bestQuestion)) {
-                            groupedQuery.questionDependencies = new HashSet<>();
-                            groupedQuery.questionDependencies.addAll(query.qaPair.questionDeps);
-                            break;
-                        }
-                    }
-                    groupedQueryList.add(groupedQuery);
+                     */
                 }
             }
         }
+        System.out.println("\n" + sentenceId + "\t" + words.stream().collect(Collectors.joining(" ")));
+
+        // Output all question-answer relations.
+        /*
+        for (String qkey : qaPool.rowKeySet()) {
+            System.out.println(qkey);
+            for (String question : questionPool.row(qkey).keySet()) {
+                double score = questionPool.get(qkey, question).stream().mapToDouble(id -> parses.get(id).score).sum();
+                System.out.println("\t" + question + "\t" + score / totalScore);
+            }
+            for (ImmutableList<Integer> heads : qaPool.row(qkey).keySet()) {
+                String headsStr = heads.stream().map(String::valueOf).collect(Collectors.joining(","));
+                System.out.println("\t" + headsStr);
+                for (String answer : answerPool.row(heads).keySet()) {
+                    double score = answerPool.get(heads, answer).stream().mapToDouble(id -> parses.get(id).score).sum();
+                    System.out.println("\t\t" + answer + "\t" + score / totalScore);
+                }
+            }
+        }
+        */
+        System.out.println(questionPool.rowKeySet().size() + "\t" + questionPool.cellSet().size());
+        System.out.println(answerPool.rowKeySet().size() + "\t" + answerPool.cellSet().size());
+        System.out.println(qaPool.cellSet().size());
+        avgQuestionConfusion += 1.0 * questionPool.cellSet().size() / questionPool.rowKeySet().size();
+        avgAnswerConfusion += 1.0 * answerPool.cellSet().size() / answerPool.rowKeySet().size();
+        numSentences ++;
+
         // Output all registered answer spans.
+        /*
         System.out.println("[global answers]");
+        boolean outputSentence = true;
         for (int i = 0; i < words.size(); i++) {
             int numSpans = headToSpanToDeps.get(i).size();
+            answerSpanConfusion.adjustOrPutValue(numSpans, 1, 1);
             if (numSpans < 1) {
                 continue;
             }
+            if (outputSentence) {
+                //System.out.println("\n" + sentenceId + "\t" + words.stream().collect(Collectors.joining(" ")));
+                //System.out.println("[global answers]");
+                outputSentence = false;
+            }
             System.out.println(i + "\t" + words.get(i));
-            for (String span : headToSpanToDeps.get(i).keySet()) {
+            List<String> sortedSpans = headToSpanToDeps.get(i).keySet().stream()
+                    .sorted((s1, s2) -> Integer.compare(s1.length(), s2.length()))
+                    .collect(Collectors.toList());
+            for (String span : sortedSpans) {
                 Set<ResolvedDependency> deps = headToSpanToDeps.get(i).get(span);
                 Set<Integer> parseIds = headToSpanToParses.get(i).get(span);
                 double score = parseIds.stream().mapToDouble(pid -> parses.get(pid).score).sum() / totalScore;
-                System.out.print("\t" + span + "\t" + score);
-                System.out.println("\t\t" + DebugPrinter.getShortListString(parseIds));
+                System.out.println(String.format("\t%s\t%.3f\t%s", span, score,
+                        DebugPrinter.getShortListString(parseIds)));
                // deps.forEach(dep -> System.out.println("\t\t\t" + dep.toString(words)));
             }
-            answerSpanConfusion.adjustOrPutValue(numSpans, 1, 1);
         }
+        */
     }
 
-    private static String punctuations = ".,:?!--";
+    private static String punctuations = "...,:?!---LRB-RRB-";
 
     // Answer span processing:
     // 1. remove the starting/trailing with punctuation
