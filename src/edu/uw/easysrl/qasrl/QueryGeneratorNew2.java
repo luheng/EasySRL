@@ -4,6 +4,7 @@ import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Table;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
+import edu.uw.easysrl.qasrl.annotation.InterAnnotatorAgreement;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.grammar.Category;
@@ -107,12 +108,30 @@ public class QueryGeneratorNew2 {
             Category category = Category.valueOf(info[1]);
             int argNum = Integer.parseInt(info[2]);
             String question = getBestSurfaceForm(questionPool.row(qkey), parses);
+
             Map<String, ImmutableList<Integer>> spanToArgList = new HashMap<>();
             Map<String, Set<Integer>> spanToParseIds = new HashMap<>();
+            Set<String> answers = new HashSet<>();
+
             for (ImmutableList<Integer> heads : questionToAnswer.row(qkey).keySet()) {
                 String answer = getBestSurfaceForm(answerPool.row(heads), parses);
-                spanToArgList.put(answer, heads);
-                spanToParseIds.put(answer, questionToAnswer.get(qkey, heads));
+                if (!answers.contains(answer)) {
+                    answers.add(answer);
+                    spanToParseIds.put(answer, new HashSet<>());
+                    spanToArgList.put(answer, heads);
+                }
+                spanToParseIds.get(answer).addAll(questionToAnswer.get(qkey, heads));
+            }
+            for (String answer : answers) {
+                if (answer.startsWith("to ")) {
+                    String answerSuffix = answer.substring(3);
+                    System.err.println(answer + "\t" + answerSuffix);
+                    if (answers.contains(answerSuffix)) {
+                        spanToParseIds.get(answerSuffix).addAll(spanToParseIds.get(answer));
+                        spanToParseIds.remove(answer);
+                        spanToArgList.remove(answer);
+                    }
+                }
             }
             GroupedQuery groupedQuery = new GroupedQuery(sentenceId, words, parses);
             groupedQuery.collapse(predId, category, argNum, question, spanToArgList, spanToParseIds);
