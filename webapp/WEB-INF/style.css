@@ -4,11 +4,11 @@ html {
 body {
   background: #FFFFFF;
   font-family: Segoe UI,Helvetica Neue,Open Sans,Helvetica,Tahoma,Arial,Verdana,sans-serif;
-  font-size: 14pt;
+  font-size: 13pt;
   font-weight: 300;
   color: #404040;
   line-height: 140%;
-  padding-top: 50px;
+  padding-top: 0px;
 }
 
 h1{

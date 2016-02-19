@@ -1,11 +1,8 @@
 package edu.uw.easysrl.qasrl.annotation;
 
-import edu.uw.easysrl.qasrl.ActiveLearningBySentence;
 import edu.uw.easysrl.qasrl.ActiveLearningHistory;
 import edu.uw.easysrl.qasrl.GroupedQuery;
 import edu.uw.easysrl.qasrl.Response;
-import edu.uw.easysrl.syntax.evaluation.Results;
-
 
 /**
  * Created by luheng on 2/1/16.
@@ -25,9 +22,11 @@ public class WebUIHelper {
                 + "<link rel=\"stylesheet\" href=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css\">"
                 + "<!-- Optional theme -->\n"
                 + "<link rel=\"stylesheet\" href=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap-theme.min.css\">\n"
-                + "<link rel=\"stylesheet\" href=\"webapp/WEB-INF/style.css\">\n"
+                + "<link rel=\"stylesheet\" href=\"WEB-INF/style.css\">\n"
                 + "<!-- Latest compiled and minified JavaScript -->\n"
                 + "<script src=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js\"></script>"
+                // Handles buttons and stuff
+                + "<script type='text/javascript' src=\"WEB-INF/webui.js\"></script>"
                 + "</head>";
     }
 

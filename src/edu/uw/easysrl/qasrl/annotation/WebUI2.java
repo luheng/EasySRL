@@ -13,7 +13,6 @@ import javax.servlet.http.HttpServletResponse;
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
-import edu.uw.easysrl.syntax.evaluation.Results;
 
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.handler.ContextHandler;
@@ -21,6 +20,8 @@ import org.eclipse.jetty.server.handler.HandlerCollection;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.handler.ResourceHandler;
 import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.eclipse.jetty.util.resource.Resource;
+import org.eclipse.jetty.util.resource.ResourceCollection;
 
 /**
  * Sentence-by-sentence annotation interface.
@@ -41,6 +42,7 @@ public class WebUI2 {
 
     private static final DateFormat dateFormat = new SimpleDateFormat("yyyyMMdd-HHmm");
     private static final String annotationPath  = "./webapp/annotation_files/";
+    private static final String webInfPath  = "./webapp/WEB-INF/";
 
     public static void main(final String[] args) throws Exception {
         final Server server = new Server(Integer.valueOf(args[0]));
@@ -63,12 +65,19 @@ public class WebUI2 {
         // Resource handler wrapped with context.
         ResourceHandler resourceHandler = new ResourceHandler();
         resourceHandler.setDirectoriesListed(true);
-        resourceHandler.setResourceBase(annotationPath);
+        //resourceHandler.setResourceBase(annotationPath);
+        resourceHandler.setBaseResource(Resource.newResource(annotationPath));
         ContextHandler resourceContextHandler = new ContextHandler("/annotation_files");
         resourceContextHandler.setHandler(resourceHandler);
 
+        ResourceHandler webInfResourceHandler = new ResourceHandler();
+        webInfResourceHandler.setDirectoriesListed(false);
+        webInfResourceHandler.setBaseResource(Resource.newResource(webInfPath));
+        ContextHandler webInfContextHandler = new ContextHandler("/WEB-INF");
+        webInfContextHandler.setHandler(webInfResourceHandler);
+
         HandlerCollection handlerCollection = new HandlerCollection();
-        handlerCollection.setHandlers(new Handler[] {servletHandler, resourceContextHandler});
+        handlerCollection.setHandlers(new Handler[] {servletHandler, resourceContextHandler, webInfContextHandler });
 
         server.setHandler(handlerCollection);
         server.start();
@@ -171,7 +180,7 @@ public class WebUI2 {
             httpWriter.println("<h1><font face=\"arial\">Annotation Demo</font></h1>\n");
 
             httpWriter.println("<body style=\"padding-left: 80px; padding-right=80px;\">");
-            httpWriter.println("<container>\n" + WebUIHelper.printInstructions() + "</container>\n");
+            //httpWriter.println("<container>\n" + WebUIHelper.printInstructions() + "</container>\n");
 
             // Print progress bar.
             int numTotal = learner.getNumSentences();
@@ -187,7 +196,6 @@ public class WebUI2 {
             final List<String> words = nextQuery.getSentence();
 
             httpWriter.println("<container><div class=\"row\">\n");
-            // httpWriter.println("<div class=\"col-md-2\"> </div>");
             httpWriter.println("<div class=\"col-md-12\">");
             // Annotation margin.
             httpWriter.println("<panel panel-default>\n");
@@ -232,7 +240,8 @@ public class WebUI2 {
             httpWriter.println("<br><span class=\"label label-primary\" for=\"Comment\">Comments (if any):</span> <br>");
             httpWriter.println("<input type=\"textarea\" name=\"Comment\" id=\"Comment\" class=\"form-control\" placeholder=\"Comments (if any)\"/> <br>");
 
-            httpWriter.println("<button class=\"btn btn-primary\" type=\"submit\" value=\"Submit!\">Submit!</button>");
+            httpWriter.println("<button class=\"btn btn-primary\" type=\"submit\" id=\"SubmitAnswer\" value=\"Submit!\" disabled>"
+                                    + "Submit!</button>");
             httpWriter.println("</form>");
 
             httpWriter.println("</panel>\n");
@@ -241,7 +250,8 @@ public class WebUI2 {
             httpWriter.println("<form class=\"form-group\" action=\"\" method=\"get\">");
             // Add user name parameter ..
             httpWriter.println(String.format("<input type=\"hidden\" input name=\"UserName\" value=\"%s\"/>", userName));
-            httpWriter.println("<button class=\"btn btn-primary\" input name=\"NextSentence\" type=\"submit\" value=\"Skip10\">Switch to Next Sentence</button>");
+            httpWriter.println("<button class=\"btn btn-primary\" input name=\"NextSentence\" type=\"submit\" value=\"SkipSent\">"
+                                    + "Switch to Next Sentence</button>");
             httpWriter.println("</form>");
 
             // Gold info and debugging info.

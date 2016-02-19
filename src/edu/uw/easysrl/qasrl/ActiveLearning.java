@@ -93,8 +93,8 @@ public class ActiveLearning {
         this.allResults = other.allResults;
         this.oracleParseIds = other.oracleParseIds;
 
-        //this.reranker = new RerankerExponentiated(allParses, rerankerStepSize);
-        this.reranker = new RerankerDependencyFactored(allParses);
+        this.reranker = new RerankerExponentiated(allParses, rerankerStepSize);
+        //this.reranker = new RerankerDependencyFactored(allParses);
         this.queryPool = other.queryPool;
         this.queryQueue = new PriorityQueue<>(queryComparator);
         queryQueue.addAll(queryPool);
@@ -146,7 +146,7 @@ public class ActiveLearning {
         for (int sentIdx : allParses.keySet()) {
             List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
             List<Parse> parses = allParses.get(sentIdx);
-            List<GroupedQuery> queries = QueryGeneratorNew.generateQueries(sentIdx, words, parses, questionGenerator);
+            List<GroupedQuery> queries = QueryGeneratorNew2.generateQueries(sentIdx, words, parses, questionGenerator);
             queries.forEach(query -> {
                 query.computeProbabilities(reranker.getParseScores(query.sentenceId));
                 if (query.answerEntropy > 1e-3) {

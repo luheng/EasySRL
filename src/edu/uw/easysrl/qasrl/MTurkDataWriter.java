@@ -190,8 +190,6 @@ public class MTurkDataWriter {
                     numQueriesPerSentence.get(sentId) + "\t" + bestK + "\t" + oracleK + "\t" + entropy + "\t" +
                     reranker.computeParsesEntropy(sentId));
 
-
-            //TODO: write query to csv
             // "query_id", "sent_id", "sentence", "pred_id", "pred_head","question",
             // "answer1", "answer2", "answer3", "answer4";
             List<String> csvRow = new ArrayList<>();

@@ -92,6 +92,8 @@ public class GroupedQuery {
         this.parses = parses;
         this.totalNumParses = parses.size();
         queries = new HashSet<>();
+        questionDependencies = new HashSet<>();
+        answerDependencies = new ArrayList<>();
     }
 
     public GroupedQuery(int sentenceId, final List<String> sentence, final List<Parse> parses, Query query) {
@@ -194,24 +196,19 @@ public class GroupedQuery {
         normalizedAnswerEntropy = answerEntropy / Math.log(answerOptions.size());
 
         // Question confidence and attachment ambiguity.
-        double allParsesMass = .0;
-        for (double p : parseDist) {
-            allParsesMass += p;
-        }
-        double nonNaMass = .0;
-        prob = new ArrayList<>();
+        questionConfidence = .0;
+        attachmentUncertainty = .0;
         for (AnswerOption option : answerOptions) {
             if (!GroupedQuery.BadQuestionOption.class.isInstance(option)) {
-                double score = option.parseIds.stream().mapToDouble(id -> parseDist[id]).sum();
-                prob.add(score);
-                nonNaMass += score;
+                questionConfidence += option.probability;
             }
         }
-        questionConfidence = nonNaMass / allParsesMass;
-        attachmentUncertainty = .0;
-        for (double d : prob) {
-            if (d > 0) {
-                attachmentUncertainty -= (d / nonNaMass) * Math.log(d / nonNaMass);
+        for (AnswerOption option : answerOptions) {
+            if (!GroupedQuery.BadQuestionOption.class.isInstance(option)) {
+                if (option.probability > 0 && questionConfidence > 0) {
+                    double p = option.probability / questionConfidence;
+                    attachmentUncertainty -= p * Math.log(p);
+                }
             }
         }
         //attachmentUncertainty /= Math.log(prob.size());
@@ -238,7 +235,8 @@ public class GroupedQuery {
     public String getDebuggingInfo(final Response response) {
         String result = String.format("SID=%d\t%s\n", sentenceId, sentence.stream().collect(Collectors.joining(" ")));
         result += String.format("%d:%s\t%s.%d\n", predicateIndex, sentence.get(predicateIndex), category, argumentNumber);
-        result += String.format("QID=%d\tent=%.2f\tmarg=%.2f\t%s\n", queryId, answerEntropy, answerMargin, question);
+        result += String.format("QID=%d\tconf=%.2f\tunc=%.2f\tent=%.2f\tmarg=%.2f\t%s\n", queryId, questionConfidence,
+                attachmentUncertainty, answerEntropy, answerMargin, question);
         for (int i = 0; i < answerOptions.size(); i++) {
             AnswerOption ao = answerOptions.get(i);
             String match = (response.chosenOptions.contains(i) ? "G" : " ");

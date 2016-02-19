@@ -17,7 +17,7 @@ public class SimulatedExperiment {
     static ActiveLearning learner;
     static final int nBest = 50;
     static final boolean regenerateQueries = false;
-    static final int reorderQueriesEvery = 10;
+    static final int reorderQueriesEvery = 100;
     static final int maxNumQueries = 20000;
     static final boolean verbose = true;
 
@@ -38,7 +38,7 @@ public class SimulatedExperiment {
             if (queryCounter % 200 == 0) {
                 budgetCurve.put(queryCounter, learner.getRerankedF1());
             }
-            if (verbose && queryCounter < 50) {
+            if (verbose && queryCounter < 1000) {
                 System.out.println(query.getSentence().stream().collect(Collectors.joining(" ")));
                 query.print(query.getSentence(), response);
                 System.out.println(response.debugInfo + "\n");

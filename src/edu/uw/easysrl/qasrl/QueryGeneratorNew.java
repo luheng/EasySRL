@@ -9,7 +9,6 @@ import edu.uw.easysrl.syntax.grammar.Category;
 import gnu.trove.map.hash.TObjectDoubleHashMap;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Query generator.
@@ -28,7 +27,7 @@ public class QueryGeneratorNew {
                                                      final QuestionGenerator questionGenerator) {
         List<GroupedQuery> groupedQueryList = new ArrayList<>();
         int numParses = parses.size();
-        double totalScores = parses.stream().mapToDouble(p -> p.score).sum();
+
         // Debugging
         // System.out.println(words.stream().collect(Collectors.joining(" ")));
         for (int i = 0; i < words.size(); i++) {
@@ -111,6 +110,13 @@ public class QueryGeneratorNew {
                     }
                     assert !bestQuestion.isEmpty();
                     groupedQuery.collapse(predId, category, argNum, bestQuestion, spanToArgList, spanToParseIds);
+                    for (Query query : groupedQuery.queries) {
+                        if (query.question.equals(bestQuestion)) {
+                            groupedQuery.questionDependencies = new HashSet<>();
+                            groupedQuery.questionDependencies.addAll(query.qaPair.questionDeps);
+                            break;
+                        }
+                    }
                     groupedQueryList.add(groupedQuery);
                 }
             }
