@@ -91,10 +91,6 @@ public class TextGenerationHelper {
             prevWord = Optional.of(word);
         }
         result.deleteCharAt(0);
-        while(result.length() > 0 &&
-                trimPunctuation.indexOf(result.charAt(result.length() - 1)) >= 0) {
-            result.deleteCharAt(result.length() - 1);
-        }
         return result.toString();
     }
 

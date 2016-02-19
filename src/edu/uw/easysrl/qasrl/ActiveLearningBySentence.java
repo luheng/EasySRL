@@ -137,7 +137,7 @@ public class ActiveLearningBySentence {
         for (int sentIdx : allParses.keySet()) {
             List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
             List<Parse> parses = allParses.get(sentIdx);
-            List<GroupedQuery> queries = QueryGeneratorNew.generateQueries(sentIdx, words, parses, questionGenerator);
+            List<GroupedQuery> queries = QueryGeneratorNew2.generateQueries(sentIdx, words, parses, questionGenerator);
             queries.stream().forEach(query -> {
                 query.computeProbabilities(reranker.expScores.get(query.sentenceId));
                 if (query.answerEntropy > minAnswerEntropy) {
@@ -222,6 +222,10 @@ public class ActiveLearningBySentence {
         }
     }
 
+    public List<GroupedQuery> getQueriesBySentenceId(int sentIdx) {
+        return queryPool.get(sentIdx);
+    }
+
     public List<String> getSentenceById(int sentenceId) {
         return sentences.get(sentenceId).stream().map(w -> w.word).collect(Collectors.toList());
     }
@@ -236,6 +240,10 @@ public class ActiveLearningBySentence {
 
     public int getNumSentences() {
         return sentenceScores.size();
+    }
+
+    public Set<Integer> getAllSentenceIds() {
+        return sentenceScores.keySet();
     }
 
     public int getNumRemainingSentences() {

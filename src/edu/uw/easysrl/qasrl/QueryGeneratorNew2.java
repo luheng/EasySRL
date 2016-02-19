@@ -69,12 +69,12 @@ public class QueryGeneratorNew2 {
                         final ImmutableList<Integer> heads = ImmutableList.copyOf(qa.targetDeps.stream()
                                 .map(ResolvedDependency::getArgument).sorted()
                                 .collect(Collectors.toList()));
-                        //String answer = qa.renderAnswer();
                         List<String> spans = new ArrayList<>();
                         for (int j = 0; j < heads.size(); j++) {
                             spans.add(getAnswerSpan(qa.answers.get(j), heads.get(j), words));
                         }
-                        String answer = spans.stream().collect(Collectors.joining(" # "));
+                        //String answer = spans.stream().collect(Collectors.joining(" # "));
+                        String answer = qa.renderAnswer();
 
                         // Register to question pool.
                         if (!questionPool.contains(qkey, question)) {
@@ -100,11 +100,9 @@ public class QueryGeneratorNew2 {
                 }
             }
         }
-        System.out.println("\n" + sentenceId + "\t" + words.stream().collect(Collectors.joining(" ")));
-
         List<GroupedQuery> groupedQueryList = new ArrayList<>();
         for (String qkey : questionToAnswer.rowKeySet()) {
-            String[] info = qkey.split(".");
+            String[] info = qkey.split("\\.");
             int predId = Integer.parseInt(info[0]);
             Category category = Category.valueOf(info[1]);
             int argNum = Integer.parseInt(info[2]);
@@ -114,9 +112,7 @@ public class QueryGeneratorNew2 {
             for (ImmutableList<Integer> heads : questionToAnswer.row(qkey).keySet()) {
                 String answer = getBestSurfaceForm(answerPool.row(heads), parses);
                 spanToArgList.put(answer, heads);
-                Set<Integer> parseIds = new HashSet<>();
-                answerPool.row(heads).values().forEach(parseIds::addAll);
-                spanToParseIds.put(answer, parseIds);
+                spanToParseIds.put(answer, questionToAnswer.get(qkey, heads));
             }
             GroupedQuery groupedQuery = new GroupedQuery(sentenceId, words, parses);
             groupedQuery.collapse(predId, category, argNum, question, spanToArgList, spanToParseIds);

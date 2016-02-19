@@ -93,8 +93,8 @@ public class ActiveLearning {
         this.allResults = other.allResults;
         this.oracleParseIds = other.oracleParseIds;
 
-        //this.reranker = new RerankerExponentiated(allParses, rerankerStepSize);
-        this.reranker = new RerankerDependencyFactored(allParses);
+        this.reranker = new RerankerExponentiated(allParses, rerankerStepSize);
+        //this.reranker = new RerankerDependencyFactored(allParses);
         this.queryPool = other.queryPool;
         this.queryQueue = new PriorityQueue<>(queryComparator);
         queryQueue.addAll(queryPool);
