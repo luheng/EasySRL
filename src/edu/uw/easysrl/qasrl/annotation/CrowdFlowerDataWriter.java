@@ -18,9 +18,9 @@ import java.util.stream.Collectors;
 public class CrowdFlowerDataWriter {
     static final int nBest = 100;
     static final int maxNumSentences = 100;
-    static final int maxNumQueries = 2000;
+    // static final int maxNumQueries = 2000;
 
-    // TODO
+    // TODO: hold out sentences we used in examples and test questions.
     static final int maxNumSentencesPerFile = 20;
 
     static final int numRandomSamples = 10;
@@ -31,14 +31,16 @@ public class CrowdFlowerDataWriter {
     private static final double minQuestionConfidence = 0.1;
     private static final double minAnswerEntropy = 0.1;
 
+    private static boolean highlightPredicate = false;
     private static boolean skipBinaryQueries = true;
 
-    private static final int maxNumOptionsPerQuestion = 6;
+    // private static final int maxNumOptionsPerQuestion = 6;
     private static final String[] csvHeader = {
-            "query_id", "confidence", "uncertainty", "sent_id", "sentence", "pred_id", "pred_head", "question", "answers"};
+            "query_id", "confidence", "uncertainty", "sent_id", "sentence", "pred_id", "pred_head", "question",
+            "answers"};
     private static final String answerDelimiter = " &&& ";
 
-    private static final String csvOutputFilePrefix = "crowdflower_test";
+    private static final String csvOutputFilePrefix = "crowdflower_test_100best";
 
     public static void main(String[] args) throws IOException {
         ActiveLearningBySentence baseLearner = new ActiveLearningBySentence(nBest);
@@ -88,8 +90,6 @@ public class CrowdFlowerDataWriter {
             }
             for (int sentenceId : sentenceIds) {
                 final List<String> sentence = learner.getSentenceById(sentenceId);
-                System.out.println("SID=" + sentenceId + "\t" + learner.getSentenceScore(sentenceId));
-                System.out.println(sentence.stream().collect(Collectors.joining(" ")));
                 List<GroupedQuery> queries = learner.getQueriesBySentenceId(sentenceId).stream()
                         .filter(query -> query.answerEntropy > minAnswerEntropy
                                             && query.questionConfidence > minQuestionConfidence
@@ -102,7 +102,8 @@ public class CrowdFlowerDataWriter {
                         // "query_id", "confidence, "uncertainty", "sent_id", "sentence", "pred_id", "pred_head",
                         // "question", "answers"
                         int predicateIndex = query.getPredicateIndex();
-                        String sentenceStr = TextGenerationHelper.renderHTMLString(sentence, predicateIndex);
+                        String sentenceStr = TextGenerationHelper.renderHTMLSentenceString(sentence, predicateIndex,
+                                highlightPredicate);
                         List<String> csvRow = new ArrayList<>();
                         csvRow.add(String.valueOf(lineCounter));
                         csvRow.add(String.format("%.3f", query.questionConfidence));
@@ -113,7 +114,7 @@ public class CrowdFlowerDataWriter {
                         csvRow.add(sentence.get(predicateIndex));
                         csvRow.add(query.getQuestion());
                         csvRow.add(query.getAnswerOptions().stream()
-                                .map(GroupedQuery.AnswerOption::getAnswer)
+                                .map(ao -> ao.getAnswer().replace(" # ", " <strong>#</strong> "))
                                 .collect(Collectors.joining(answerDelimiter)));
                         csvPrinter.printRecord(csvRow);
                         lineCounter ++;
@@ -132,7 +133,11 @@ public class CrowdFlowerDataWriter {
                 }
                 for (GroupedQuery query : queries) {
                     Response gold = responseSimulator.answerQuestion(query);
-                    System.out.println(query.getDebuggingInfo(gold));
+                    if (r == 0 && lineCounter < 50) {
+                        System.out.println("SID=" + sentenceId + "\t" + learner.getSentenceScore(sentenceId));
+                        System.out.println(sentence.stream().collect(Collectors.joining(" ")));
+                        System.out.println(query.getDebuggingInfo(gold));
+                    }
                     learner.respondToQuery(query, gold);
                     optionCounter += query.getAnswerOptions().size();
                     if (query.attachmentUncertainty < 1e-6) {
