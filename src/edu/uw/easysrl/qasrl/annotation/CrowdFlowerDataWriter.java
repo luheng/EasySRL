@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
  * Created by luheng on 2/9/16.
  */
 public class CrowdFlowerDataWriter {
-    static final int nBest = 50;
+    static final int nBest = 100;
     static final int maxNumSentences = 100;
     static final int maxNumQueries = 2000;
 
@@ -28,17 +28,23 @@ public class CrowdFlowerDataWriter {
 
     static final int countEvery = 100;
 
-    // TODO: keep track of avg. answer options per query.
+    private static final double minQuestionConfidence = 0.1;
+    private static final double minAnswerEntropy = 0.1;
+
+    private static boolean skipBinaryQueries = true;
+
     private static final int maxNumOptionsPerQuestion = 6;
     private static final String[] csvHeader = {
-            "query_id", "sent_id", "sentence", "pred_id", "pred_head", "question", "answers"};
+            "query_id", "confidence", "uncertainty", "sent_id", "sentence", "pred_id", "pred_head", "question", "answers"};
     private static final String answerDelimiter = " &&& ";
 
-    private static final String csvOutputFile = "test.csv";
+    private static final String csvOutputFilePrefix = "crowdflower_test";
 
     public static void main(String[] args) throws IOException {
         ActiveLearningBySentence baseLearner = new ActiveLearningBySentence(nBest);
         List<double[]>  avgNumQueries = new ArrayList<>(),
+                        avgOptionsPerQuery = new ArrayList<>(),
+                        avgNumBinaryQueries = new ArrayList<>(),
                         oneBestF1 = new ArrayList<>(),
                         rerankF1 = new ArrayList<>(),
                         oracleF1 = new ArrayList<>(),
@@ -49,7 +55,9 @@ public class CrowdFlowerDataWriter {
         List<Integer> sentenceIds = new ArrayList<>(baseLearner.getAllSentenceIds());
         for (int i = 1; i < sentenceIds.size(); i++) {
             if (i % countEvery == 0) {
+                avgOptionsPerQuery.add(new double[numRandomSamples]);
                 avgNumQueries.add(new double[numRandomSamples]);
+                avgNumBinaryQueries.add(new double[numRandomSamples]);
                 oneBestF1.add(new double[numRandomSamples]);
                 rerankF1.add(new double[numRandomSamples]);
                 oracleF1.add(new double[numRandomSamples]);
@@ -57,36 +65,48 @@ public class CrowdFlowerDataWriter {
             }
         }
 
-        // Initialize CSV printer.
-        CSVPrinter csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter(csvOutputFile)),
-                                               CSVFormat.EXCEL.withRecordSeparator("\n"));
-        csvPrinter.printRecord((Object[]) csvHeader);
+        assert maxNumSentences % maxNumSentencesPerFile == 0;
+        CSVPrinter csvPrinter = null;
 
         for (int r = 0; r < numRandomSamples; r++) {
             ActiveLearningBySentence learner = new ActiveLearningBySentence(baseLearner);
             Collections.shuffle(sentenceIds, random);
+            int lineCounter = 0;
+            int fileCounter = 0;
             int queryCounter = 0;
-
+            int optionCounter = 0;
+            // Queries that has only one option except for N/A.
+            int numBinaryQueries = 0;
             List<Integer> annotatedSentences = new ArrayList<>();
+
+            if (r == 0) {
+                // Initialize CSV printer.
+                csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter(
+                        String.format("%s_%03d.csv", csvOutputFilePrefix, fileCounter))),
+                        CSVFormat.EXCEL.withRecordSeparator("\n"));
+                csvPrinter.printRecord((Object[]) csvHeader);
+            }
             for (int sentenceId : sentenceIds) {
                 final List<String> sentence = learner.getSentenceById(sentenceId);
                 System.out.println("SID=" + sentenceId + "\t" + learner.getSentenceScore(sentenceId));
                 System.out.println(sentence.stream().collect(Collectors.joining(" ")));
                 List<GroupedQuery> queries = learner.getQueriesBySentenceId(sentenceId).stream()
-                        .filter(query -> query.answerEntropy > 1e-2 && query.questionConfidence > 0.1)
+                        .filter(query -> query.answerEntropy > minAnswerEntropy
+                                            && query.questionConfidence > minQuestionConfidence
+                                            && (!skipBinaryQueries || query.attachmentUncertainty > 1e-6))
                         .collect(Collectors.toList());
-                for (GroupedQuery query : queries) {
-                    Response gold = responseSimulator.answerQuestion(query);
-                    System.out.println(query.getDebuggingInfo(gold));
-                    learner.respondToQuery(query, gold);
-
-                    if (r == 0 && annotatedSentences.size() < maxNumSentences) {
+                // Print query to .csv file.
+                if (r == 0 && annotatedSentences.size() < maxNumSentences) {
+                    for (GroupedQuery query : queries) {
                         // Print to CSV files.
-                        // "query_id", "sent_id", "sentence", "pred_id", "pred_head","question", "answers"
+                        // "query_id", "confidence, "uncertainty", "sent_id", "sentence", "pred_id", "pred_head",
+                        // "question", "answers"
                         int predicateIndex = query.getPredicateIndex();
                         String sentenceStr = TextGenerationHelper.renderHTMLString(sentence, predicateIndex);
                         List<String> csvRow = new ArrayList<>();
-                        csvRow.add(String.valueOf(queryCounter));
+                        csvRow.add(String.valueOf(lineCounter));
+                        csvRow.add(String.format("%.3f", query.questionConfidence));
+                        csvRow.add(String.format("%.3f", query.attachmentUncertainty));
                         csvRow.add(String.valueOf(sentenceId));
                         csvRow.add(String.valueOf(sentenceStr));
                         csvRow.add(String.valueOf(predicateIndex));
@@ -96,6 +116,27 @@ public class CrowdFlowerDataWriter {
                                 .map(GroupedQuery.AnswerOption::getAnswer)
                                 .collect(Collectors.joining(answerDelimiter)));
                         csvPrinter.printRecord(csvRow);
+                        lineCounter ++;
+                    }
+                    int numSentences = annotatedSentences.size() + 1;
+                    if (numSentences <= maxNumSentences && numSentences % maxNumSentencesPerFile == 0) {
+                        csvPrinter.close();
+                        if (numSentences < maxNumSentences) {
+                            fileCounter++;
+                            csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter(
+                                    String.format("%s_%03d.csv", csvOutputFilePrefix, fileCounter))),
+                                    CSVFormat.EXCEL.withRecordSeparator("\n"));
+                            csvPrinter.printRecord((Object[]) csvHeader);
+                        }
+                    }
+                }
+                for (GroupedQuery query : queries) {
+                    Response gold = responseSimulator.answerQuestion(query);
+                    System.out.println(query.getDebuggingInfo(gold));
+                    learner.respondToQuery(query, gold);
+                    optionCounter += query.getAnswerOptions().size();
+                    if (query.attachmentUncertainty < 1e-6) {
+                        numBinaryQueries ++;
                     }
                 }
                 queryCounter += queries.size();
@@ -103,6 +144,8 @@ public class CrowdFlowerDataWriter {
                 if (annotatedSentences.size() % countEvery == 0) {
                     int k = annotatedSentences.size() / countEvery - 1;
                     avgNumQueries.get(k)[r] = queryCounter;
+                    avgNumBinaryQueries.get(k)[r] = numBinaryQueries;
+                    avgOptionsPerQuery.get(k)[r] = 1.0 * optionCounter / queryCounter;
                     oneBestF1.get(k)[r] = 100.0 * learner.getOneBestF1(annotatedSentences).getF1();
                     rerankF1.get(k)[r]  = 100.0 * learner.getRerankedF1(annotatedSentences).getF1();
                     oracleF1.get(k)[r]  = 100.0 * learner.getOracleF1(annotatedSentences).getF1();
@@ -110,14 +153,17 @@ public class CrowdFlowerDataWriter {
                 }
             }
         }
-
-        csvPrinter.close();
-
         for (int k = 0; k < avgNumQueries.size(); k++) {
             System.out.println(String.format("On %d sentences:", (k + 1) * 100));
             System.out.println(String.format("Avg. number of queries:\t%.3f (%.3f)",
                     getAverage(avgNumQueries.get(k)),
                     getStd(avgNumQueries.get(k))));
+            System.out.println(String.format("Avg. number of binary queries:\t%.3f (%.3f)",
+                    getAverage(avgNumBinaryQueries.get(k)),
+                    getStd(avgNumBinaryQueries.get(k))));
+            System.out.println(String.format("Avg. number of options per query:\t%.3f (%.3f)",
+                    getAverage(avgOptionsPerQuery.get(k)),
+                    getStd(avgOptionsPerQuery.get(k))));
             System.out.println(String.format("Avg. 1-best F1:\t%.3f%%\t%.3f%%",
                     getAverage(oneBestF1.get(k)),
                     getStd(oneBestF1.get(k))));

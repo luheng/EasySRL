@@ -330,7 +330,7 @@ public class TextGenerationHelper {
         }
         if(replacementWord.isPresent() && replaceIndexOpt.isPresent()) {
             int indexInWords = replaceIndexOpt.get() - node.getStartIndex();
-            if(indexInWords >= 0 && indexInWords <= words.size()) {
+            if(indexInWords >= 0 && indexInWords < words.size()) {
                 words.set(indexInWords, replacementWord.get());
             }
         }
