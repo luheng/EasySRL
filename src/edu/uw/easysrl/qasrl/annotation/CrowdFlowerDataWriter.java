@@ -38,7 +38,7 @@ public class CrowdFlowerDataWriter {
     private static final String[] csvHeader = {
             "query_id", "confidence", "uncertainty", "sent_id", "sentence", "pred_id", "pred_head", "question",
             "answers"};
-    private static final String answerDelimiter = " &&& ";
+    private static final String answerDelimiter = " ### ";
 
     private static final String csvOutputFilePrefix = "crowdflower_test_100best";
 
@@ -114,7 +114,7 @@ public class CrowdFlowerDataWriter {
                         csvRow.add(sentence.get(predicateIndex));
                         csvRow.add(query.getQuestion());
                         csvRow.add(query.getAnswerOptions().stream()
-                                .map(ao -> ao.getAnswer().replace(" # ", " <strong>#</strong> "))
+                                .map(ao -> ao.getAnswer().replace(" &&& ", " <strong> & </strong> "))
                                 .collect(Collectors.joining(answerDelimiter)));
                         csvPrinter.printRecord(csvRow);
                         lineCounter ++;

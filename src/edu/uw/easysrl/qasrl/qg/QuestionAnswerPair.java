@@ -21,7 +21,7 @@ public class QuestionAnswerPair {
     public final List<Set<ResolvedDependency>> answerDeps;
 ;
     public final List<Integer> answerWordIndices;
-    public static final String answerDelimiter = " # ";
+    public static final String answerDelimiter = " &&& ";
 
     public QuestionAnswerPair(int predicateIndex, Category predicateCategory,
                               List<ResolvedDependency> questionDeps, List<String> question,
