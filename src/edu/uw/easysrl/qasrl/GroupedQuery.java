@@ -45,7 +45,7 @@ public class GroupedQuery {
         }
 
         public ImmutableList<Integer> getArgumentIds() { return null; }
-        public String getAnswer() { return "Question is not understandable."; }
+        public String getAnswer() { return "Question is not valid."; }
         public boolean isNAOption() {
             return true;
         }

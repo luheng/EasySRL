@@ -77,7 +77,8 @@ public class TextGenerationHelper {
         return result.toString();
     }
 
-    public static String renderHTMLString(List<String> rawWords, int predicateIndex) {
+    public static String renderHTMLSentenceString(List<String> rawWords, int predicateIndex,
+                                                  boolean highlightPredicate) {
         StringBuilder result = new StringBuilder();
         if(rawWords.size() == 0) {
             return "";
@@ -92,7 +93,11 @@ public class TextGenerationHelper {
             if(!noSpace) {
                 result.append(" ");
             }
-            result.append(i == predicateIndex ? "<mark><strong>" + word + "</mark></strong>" : word);
+            if (i == predicateIndex && highlightPredicate) {
+                result.append("<mark><strong>" + word + "</mark></strong>");
+            } else {
+                result.append(word);
+            }
             prevWord = Optional.of(word);
         }
         result.deleteCharAt(0);

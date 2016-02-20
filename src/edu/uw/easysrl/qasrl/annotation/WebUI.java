@@ -191,7 +191,8 @@ public class WebUI {
             // Annotation margin.
             httpWriter.println("<panel panel-default>\n");
             httpWriter.println("<h5><span class=\"label label-primary\" for=\"Sentence\">Sentence:</span></h5>");
-            httpWriter.println("<div id=\"Sentence\"> " + TextGenerationHelper.renderHTMLString(words, nextQuery.getPredicateIndex()) + " </div>");
+            httpWriter.println("<div id=\"Sentence\"> " + TextGenerationHelper.renderHTMLSentenceString(words,
+                    nextQuery.getPredicateIndex(), true /* highlight predicate */) + " </div>");
             httpWriter.println("<h5><span class=\"label label-primary\" for=\"Question\">Question:</span><br></h5>");
             httpWriter.println("<div id=\"Question\"> " + nextQuery.getQuestion() + " </div>");
 
