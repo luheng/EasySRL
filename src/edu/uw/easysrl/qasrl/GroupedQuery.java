@@ -161,6 +161,10 @@ public class GroupedQuery {
         return queryId;
     }
 
+    public int getSentenceId() {
+        return sentenceId;
+    }
+
     public List<String> getSentence() {
         return sentence;
     }

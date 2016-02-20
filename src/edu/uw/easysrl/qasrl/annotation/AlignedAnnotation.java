@@ -93,6 +93,27 @@ public class AlignedAnnotation extends RecordedAnnotation {
         return result;
     }
 
+    public static List<AlignedAnnotation> getAllAlignedAnnotationsFromPilotStudy() {
+        Map<String, List<RecordedAnnotation>> annotations = new HashMap<>();
+        String[] pilotAnnotationFiles = new String[] {
+                "pilot_annotation/Julian_20160211-2216.txt",
+                "pilot_annotation/Luke_20160212-1257.txt",
+                "pilot_annotation/Mike_20160211-2125.txt",
+                "pilot_annotation/Luheng_20160213-1722.txt"
+        };
+        for (String fileName : pilotAnnotationFiles) {
+            String[] info = fileName.split("/");
+            String annotator = info[info.length - 1].split("_")[0];
+            System.out.println(annotator);
+            try {
+                annotations.put(annotator, RecordedAnnotation.loadAnnotationRecordsFromFile(fileName));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        return AlignedAnnotation.getAlignedAnnotations(annotations, null);
+    }
+
     public static void main(String[] args) {
         Map<String, List<RecordedAnnotation>> annotations = new HashMap<>();
         for (String fileName : args) {
@@ -107,6 +128,7 @@ public class AlignedAnnotation extends RecordedAnnotation {
         }
         List<AlignedAnnotation> alignedAnnotations = AlignedAnnotation.getAlignedAnnotations(annotations, null);
         alignedAnnotations.stream()
+                .filter(r -> r.answerDist[r.goldAnswerId] == 4)
                 .sorted((r1, r2) -> Integer.compare(r1.sentenceId, r2.sentenceId))
                 .forEach(System.out::print);
     }
