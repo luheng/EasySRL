@@ -102,6 +102,7 @@ public class QueryGeneratorNew2 {
             }
         }
         List<GroupedQuery> groupedQueryList = new ArrayList<>();
+
         for (String qkey : questionToAnswer.rowKeySet()) {
             String[] info = qkey.split("\\.");
             int predId = Integer.parseInt(info[0]);
@@ -125,7 +126,7 @@ public class QueryGeneratorNew2 {
             for (String answer : answers) {
                 if (answer.startsWith("to ")) {
                     String answerSuffix = answer.substring(3);
-                    System.err.println(answer + "\t" + answerSuffix);
+                    // System.err.println(answer + "\t" + answerSuffix);
                     if (answers.contains(answerSuffix)) {
                         spanToParseIds.get(answerSuffix).addAll(spanToParseIds.get(answer));
                         spanToParseIds.remove(answer);
@@ -180,7 +181,7 @@ public class QueryGeneratorNew2 {
             return "";
         }
         if (!sentStr.toLowerCase().contains(answerStr.toLowerCase())) {
-            //System.err.println(answerStr + ", " + sentStr);
+            System.err.println(answerStr + "\t ... \t " + sentStr);
             return "";
         }
         return answerStr;
