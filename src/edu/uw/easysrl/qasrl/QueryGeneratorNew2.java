@@ -70,11 +70,13 @@ public class QueryGeneratorNew2 {
                         final ImmutableList<Integer> heads = ImmutableList.copyOf(qa.targetDeps.stream()
                                 .map(ResolvedDependency::getArgument).sorted()
                                 .collect(Collectors.toList()));
+                        /*
                         List<String> spans = new ArrayList<>();
                         for (int j = 0; j < heads.size(); j++) {
                             spans.add(getAnswerSpan(qa.answers.get(j), heads.get(j), words));
                         }
-                        //String answer = spans.stream().collect(Collectors.joining(" # "));
+                        String answer = spans.stream().collect(Collectors.joining(QuestionAnswerPair.answerDelimiter));
+                        */
                         String answer = qa.renderAnswer();
 
                         // Register to question pool.
@@ -181,7 +183,7 @@ public class QueryGeneratorNew2 {
             return "";
         }
         if (!sentStr.toLowerCase().contains(answerStr.toLowerCase())) {
-            System.err.println(answerStr + "\t ... \t " + sentStr);
+            //System.err.println(answerStr + "\t ... \t " + sentStr);
             return "";
         }
         return answerStr;
