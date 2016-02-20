@@ -19,7 +19,7 @@ public class TextGenerationHelper {
     // and that we don't want at the end of the question or answer.
     // For now, those are the same.
     // Reference: https://www.cis.upenn.edu/~treebank/tokenization.html
-    private static final String trimPunctuation = " ,.:;!?";
+    private static final String trimPunctuation = " ,.:;!?-";
     private static Set<String> noSpaceBefore = new HashSet<String>();
     private static Set<String> noSpaceAfter = new HashSet<String>();
     static {

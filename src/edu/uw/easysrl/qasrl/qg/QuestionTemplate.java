@@ -16,10 +16,6 @@ import java.util.*;
  * The point of a QuestionTemplate is to abstract over all of the questions
  * that could be asked about the various arguments to a predicate.
  *
- * Philosophical arguments:
- *      A question template should be defined by and only by a given subset of ccg dependencies, which are the ones
- *      fanned out from the predicate to the set of arguments (slots).
- *      We might need SyntaxTreeNode dependencies to resolve constituents in the future.
  * Created by luheng on 12/10/15.
  */
 public class QuestionTemplate {
@@ -120,6 +116,17 @@ public class QuestionTemplate {
         "(((S\\NP)\\(S\\NP))\\((S\\NP)\\(S\\NP)))/(((S\\NP)\\(S\\NP))\\((S\\NP)\\(S\\NP)))",
     };
 
+    private static final Set<String> badPredicates = new HashSet<>();
+    static {
+        badPredicates.add("--");
+        badPredicates.add("-LRB-");
+        badPredicates.add("-RRB-");
+        badPredicates.add("-LCB-");
+        badPredicates.add("-RCB-");
+        badPredicates.add("-LSB-");
+        badPredicates.add("-RSB-");
+    }
+
 
     public Parse parse;
     public List<String> words;
@@ -191,6 +198,7 @@ public class QuestionTemplate {
         }
         int argIndex = argIndexOpt.get();
         boolean cantAsk = type == QuestionType.INVALID ||
+            (badPredicates.contains(words.get(predicateIndex))) ||
             (type == QuestionType.NOUN_ADJUNCT &&
              words.get(predicateIndex).equals("of")) || // "of" is just a doozy
             (type == QuestionType.VERB_ADJUNCT &&
