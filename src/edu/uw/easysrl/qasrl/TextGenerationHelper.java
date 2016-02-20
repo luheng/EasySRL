@@ -4,6 +4,7 @@ import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.Category.Slash;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
+import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeLeaf;
 
 
 import java.util.*;
@@ -336,7 +337,14 @@ public class TextGenerationHelper {
             .map(leaf -> leaf.getWord())
             .collect(Collectors.toList());
         if(node.getStartIndex() == 0) {
-            words.set(0, Character.toLowerCase(words.get(0).charAt(0)) + words.get(0).substring(1));
+            SyntaxTreeNodeLeaf firstLeaf = node.getLeaves().stream().findFirst().get(); // this should always be present
+            String firstWord = firstLeaf.getWord();
+            String firstPos = firstLeaf.getPos();
+            boolean isProper = firstPos.equals("NNP") || firstPos.equals("NNPS");
+            boolean isAllCaps = firstWord.matches("[A-Z]{2,}");
+            if(!isProper && !isAllCaps) {
+                words.set(0, Character.toLowerCase(words.get(0).charAt(0)) + words.get(0).substring(1));
+            }
         }
         if(replacementWord.isPresent() && replaceIndexOpt.isPresent()) {
             int indexInWords = replaceIndexOpt.get() - node.getStartIndex();
