@@ -24,7 +24,7 @@ public class CrowdFlowerDataWriter {
     static final int maxNumSentencesPerFile = 20;
 
     static final int numRandomSamples = 10;
-    static final int randomSeed = 12345;
+    static final int randomSeed = 104743;
 
     static final int countEvery = 100;
 
@@ -43,14 +43,14 @@ public class CrowdFlowerDataWriter {
     // Fields for Crowdflower test questions.
     private static final String[] csvHeader = {
             "query_id", "question_confidence", "question_uncertainty", "sent_id", "sentence", "pred_id", "pred_head",
-            "question", "answers", "_golden ", "choice_gold", "choice_gold_reason"};
+            "question_key", "question", "answers", "_golden ", "choice_gold", "choice_gold_reason"};
 
     private static final String answerDelimiter = " ### ";
 
     private static final String csvOutputFilePrefix = "crowdflower_dev_100best";
 
     // Sentences that happened to appear in instructions ...
-    private static final int[] otherHeldOutSentences = {1695, };
+    private static final int[] otherHeldOutSentences = { 1695, };
 
     public static void main(String[] args) throws IOException {
         List<AlignedAnnotation> pilotAnnotations = AlignedAnnotation.getAllAlignedAnnotationsFromPilotStudy();
@@ -124,7 +124,7 @@ public class CrowdFlowerDataWriter {
                     List<GroupedQuery> queries = learner.getQueriesBySentenceId(sentenceId);
                     for (GroupedQuery query : queries) {
                         // TODO: remove later
-                        System.err.println(query.getDebuggingInfo(responseSimulator.answerQuestion(query)));
+                        //System.err.println(query.getDebuggingInfo(responseSimulator.answerQuestion(query)));
 
                         if (query.getPredicateIndex() == test.predicateId &&
                                 query.getQuestion().equalsIgnoreCase(test.question)) {
@@ -139,7 +139,7 @@ public class CrowdFlowerDataWriter {
                                 }
                             }
                             if (goldAnswerId >= 0) {
-                                printQueryToCSVFile(query, goldAnswerId, 1000 + numTestQuestions /* lineCounter */,
+                                printQueryToCSVFile(query, goldAnswerId, 10000 + numTestQuestions /* lineCounter */,
                                         csvPrinter);
                                 numTestQuestions ++;
                             } else {
@@ -248,8 +248,8 @@ public class CrowdFlowerDataWriter {
     private static void printQueryToCSVFile(final GroupedQuery query, int goldAnswerId, int lineCounter,
                                             final CSVPrinter csvPrinter) throws IOException {
         // Print to CSV files.
-        // "query_id", "confidence, "uncertainty", "sent_id", "sentence", "pred_id", "pred_head",
-        // "question", "answers"
+        // "query_id", "question_confidence", "question_uncertainty", "sent_id", "sentence", "pred_id", "pred_head",
+        // "question_key", "question", "answers", "_golden ", "choice_gold", "choice_gold_reason"
         int predicateIndex = query.getPredicateIndex();
         int sentenceId = query.getSentenceId();
         final List<String> sentence = query.getSentence();
@@ -266,6 +266,7 @@ public class CrowdFlowerDataWriter {
         csvRow.add(String.valueOf(sentenceStr));
         csvRow.add(String.valueOf(predicateIndex));
         csvRow.add(sentence.get(predicateIndex));
+        csvRow.add(query.getQuestionKey());
         csvRow.add(query.getQuestion());
         csvRow.add(answerStrings.stream().collect(Collectors.joining(answerDelimiter)));
         if (goldAnswerId < 0) {

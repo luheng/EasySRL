@@ -185,6 +185,10 @@ public class GroupedQuery {
 
     public int getPredicateIndex() { return predicateIndex; }
 
+    public String getQuestionKey() {
+        return predicateIndex + "." + category + "." + argumentNumber;
+    }
+
     public String getQuestion() { return question; }
 
     public List<AnswerOption> getAnswerOptions() { return answerOptions; }
