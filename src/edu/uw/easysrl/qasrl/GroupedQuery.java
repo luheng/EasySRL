@@ -80,7 +80,7 @@ public class GroupedQuery {
     public static double rankDiscountFactor = 0.0;
     public static boolean estimateWithParseScores = true;
     // Not counting "question invalid" and "answer not listed" options.
-    public static int maxNumOptionsPerQuery = 8;
+    public static int maxNumNonNAOptionsPerQuery = 8;
 
     // Other dependencies
     Set<ResolvedDependency> questionDependencies;
@@ -149,8 +149,8 @@ public class GroupedQuery {
                 .map(parseIds -> parseIds.stream().mapToDouble(id -> parses.get(id).score).sum())
                 .sorted()
                 .collect(Collectors.toList());
-        double minOptionScore = (optionScores.size() <= maxNumOptionsPerQuery) ? -1e-6 :
-                optionScores.get(optionScores.size() - maxNumOptionsPerQuery) - 1e-6;
+        double minOptionScore = (optionScores.size() <= maxNumNonNAOptionsPerQuery) ? -1e-6 :
+                optionScores.get(optionScores.size() - maxNumNonNAOptionsPerQuery) - 1e-6;
 
         spanToParses.forEach((span, parseIds) -> {
             ImmutableList<Integer> argList = spanToArgList.get(span);
@@ -163,8 +163,8 @@ public class GroupedQuery {
             }
             invalidQuestionParseIds.removeAll(parseIds);
         });
-        answerOptions.add(new BadQuestionOption(invalidQuestionParseIds));
         answerOptions.add(new NoAnswerOption(unlistedAnswerParseIds));
+        answerOptions.add(new BadQuestionOption(invalidQuestionParseIds));
     }
 
     public void setQueryId(int id) {
