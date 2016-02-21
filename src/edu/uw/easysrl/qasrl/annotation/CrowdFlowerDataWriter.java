@@ -1,7 +1,6 @@
 package edu.uw.easysrl.qasrl.annotation;
 
 import edu.uw.easysrl.qasrl.*;
-import edu.uw.easysrl.qasrl.corpora.GreedyAnswerAligner;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
@@ -38,16 +37,16 @@ public class CrowdFlowerDataWriter {
     // private static final int maxNumOptionsPerQuestion = 6;
     // Fields for Crowdflower csv file.
     private static final String[] csvHeader = {
-            "query_id", "confidence", "uncertainty", "sent_id", "sentence", "pred_id", "pred_head", "question",
-            "answers"};
+            "query_id", "question_confidence", "question_uncertainty", "sent_id", "sentence", "pred_id", "pred_head",
+            "question", "answers"};
     // Fields for Crowdflower test questions.
     private static final String[] csvHeaderTestQuestions = {
-            "query_id", "confidence", "uncertainty", "sent_id", "sentence", "pred_id", "pred_head", "question",
-            "answers", "_gold", "choice_gold", "choice_gold_reason"};
+            "query_id", "question_confidence", "question_uncertainty", "sent_id", "sentence", "pred_id", "pred_head",
+            "question", "answers", "_golden ", "choice_gold", "choice_gold_reason"};
 
     private static final String answerDelimiter = " ### ";
 
-    private static final String csvOutputFilePrefix = "crowdflower_test_100best";
+    private static final String csvOutputFilePrefix = "crowdflower_dev_100best";
 
     private static void getHeldOutSentences() {
 
@@ -60,7 +59,7 @@ public class CrowdFlowerDataWriter {
                 .filter(annot -> {
                     int N = annot.getNumAnnotated();
                     int M = annot.answerDist.length;
-                    return M <= 6 && N >= 3 && annot.answerDist[annot.goldAnswerId] == N;
+                    return M > 3 && M < 7 && N >= 3 && annot.answerDist[annot.goldAnswerId] == N;
                 }).collect(Collectors.toList());
         System.out.println("Number of held-out sentences:\t" + heldOutSentences.size());
         System.out.println("Number of high-agreement annotations:\t" + agreedAnnotations.size());
@@ -109,7 +108,7 @@ public class CrowdFlowerDataWriter {
             if (r == 0) {
                 // Initialize CSV printer.
                 csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter(
-                        String.format("%s_%03d.csv", csvOutputFilePrefix, fileCounter))),
+                        String.format("%s_test.csv", csvOutputFilePrefix))),
                         CSVFormat.EXCEL.withRecordSeparator("\n"));
                 csvPrinter.printRecord((Object[]) csvHeaderTestQuestions);
 
@@ -117,7 +116,7 @@ public class CrowdFlowerDataWriter {
                 int numTestQuestions = 0;
                 for (AlignedAnnotation test : agreedAnnotations) {
                     int sentenceId = test.sentenceId;
-                    String goldAnswer = test.answerStrings.get(test.goldAnswerId);
+                    String goldAnswer = test.answerStrings.get(test.goldAnswerId).replace(" # ", " &&& ");
                     List<GroupedQuery> queries = learner.getQueriesBySentenceId(sentenceId);
                     for (GroupedQuery query : queries) {
                         if (query.getPredicateIndex() == test.predicateId &&
@@ -143,6 +142,7 @@ public class CrowdFlowerDataWriter {
                     }
                 }
                 System.out.println("Wrote " + numTestQuestions + " test questions to file.");
+                csvPrinter.close();
             }
 
             // Process other questions.
@@ -155,20 +155,22 @@ public class CrowdFlowerDataWriter {
                         .collect(Collectors.toList());
                 // Print query to .csv file.
                 if (r == 0 && annotatedSentences.size() < maxNumSentences) {
-                    for (GroupedQuery query : queries) {
-                        printQueryToCSVFile(query, -1 /* gold option id */, lineCounter, csvPrinter);
-                        lineCounter ++;
-                    }
-                    int numSentences = annotatedSentences.size() + 1;
+                    int numSentences = annotatedSentences.size();
                     if (numSentences <= maxNumSentences && numSentences % maxNumSentencesPerFile == 0) {
-                        csvPrinter.close();
+                        if (lineCounter > 0) {
+                            csvPrinter.close();
+                        }
                         if (numSentences < maxNumSentences) {
-                            fileCounter++;
                             csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter(
                                     String.format("%s_%03d.csv", csvOutputFilePrefix, fileCounter))),
                                     CSVFormat.EXCEL.withRecordSeparator("\n"));
                             csvPrinter.printRecord((Object[]) csvHeader);
+                            fileCounter ++;
                         }
+                    }
+                    for (GroupedQuery query : queries) {
+                        printQueryToCSVFile(query, -1 /* gold option id */, lineCounter, csvPrinter);
+                        lineCounter ++;
                     }
                 }
                 for (GroupedQuery query : queries) {
@@ -239,8 +241,11 @@ public class CrowdFlowerDataWriter {
         int predicateIndex = query.getPredicateIndex();
         int sentenceId = query.getSentenceId();
         final List<String> sentence = query.getSentence();
-        String sentenceStr = TextGenerationHelper.renderHTMLSentenceString(sentence, predicateIndex,
+        final String sentenceStr = TextGenerationHelper.renderHTMLSentenceString(sentence, predicateIndex,
                 highlightPredicate);
+        final List<String> answerStrings = query.getAnswerOptions().stream()
+                .map(ao -> ao.getAnswer().replace(" &&& ", " <strong> & </strong> "))
+                .collect(Collectors.toList());
         List<String> csvRow = new ArrayList<>();
         csvRow.add(String.valueOf(lineCounter));
         csvRow.add(String.format("%.3f", query.questionConfidence));
@@ -250,16 +255,14 @@ public class CrowdFlowerDataWriter {
         csvRow.add(String.valueOf(predicateIndex));
         csvRow.add(sentence.get(predicateIndex));
         csvRow.add(query.getQuestion());
-        csvRow.add(query.getAnswerOptions().stream()
-                .map(ao -> ao.getAnswer().replace(" &&& ", " <strong> & </strong> "))
-                .collect(Collectors.joining(answerDelimiter)));
+        csvRow.add(answerStrings.stream().collect(Collectors.joining(answerDelimiter)));
         if (goldAnswerId < 0) {
             csvRow.add(""); // _gold
             csvRow.add(""); // choice_gold
             csvRow.add(""); // choice_gold_reason
         } else {
             csvRow.add("TRUE");
-            csvRow.add(String.valueOf(goldAnswerId));
+            csvRow.add(answerStrings.get(goldAnswerId));
             csvRow.add("Based on high-agreement of workers.");
         }
         csvPrinter.printRecord(csvRow);
