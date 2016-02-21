@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
  * Created by luheng on 2/18/16.
  */
 public class QueryGeneratorNew2 {
+
     /**
      * @param words the sentence
      * @param parses the nbest list

@@ -34,7 +34,11 @@ public class CrowdFlowerDataWriter {
     private static boolean highlightPredicate = false;
     private static boolean skipBinaryQueries = true;
 
-    // private static final int maxNumOptionsPerQuestion = 6;
+    private static final int maxNumOptionsPerQuestion = 8;
+    static {
+        GroupedQuery.maxNumOptionsPerQuery = maxNumOptionsPerQuestion - 2;
+    }
+
     // Fields for Crowdflower csv file.
     private static final String[] csvHeader = {
             "query_id", "question_confidence", "question_uncertainty", "sent_id", "sentence", "pred_id", "pred_head",
@@ -48,18 +52,15 @@ public class CrowdFlowerDataWriter {
 
     private static final String csvOutputFilePrefix = "crowdflower_dev_100best";
 
-    private static void getHeldOutSentences() {
-
-    }
-
     public static void main(String[] args) throws IOException {
         List<AlignedAnnotation> pilotAnnotations = AlignedAnnotation.getAllAlignedAnnotationsFromPilotStudy();
         Set<Integer> heldOutSentences = pilotAnnotations.stream().map(a -> a.sentenceId).collect(Collectors.toSet());
         List<AlignedAnnotation> agreedAnnotations = pilotAnnotations.stream()
                 .filter(annot -> {
-                    int N = annot.getNumAnnotated();
-                    int M = annot.answerDist.length;
-                    return M > 3 && M < 7 && N >= 3 && annot.answerDist[annot.goldAnswerId] == N;
+                    int numJudgements = annot.getNumAnnotated();
+                    int numOptions = annot.answerDist.length;
+                    return numOptions > 3 && numOptions <= maxNumOptionsPerQuestion &&
+                            numJudgements >= 3 && annot.answerDist[annot.goldAnswerId] == numJudgements;
                 }).collect(Collectors.toList());
         System.out.println("Number of held-out sentences:\t" + heldOutSentences.size());
         System.out.println("Number of high-agreement annotations:\t" + agreedAnnotations.size());
@@ -175,7 +176,7 @@ public class CrowdFlowerDataWriter {
                 }
                 for (GroupedQuery query : queries) {
                     Response gold = responseSimulator.answerQuestion(query);
-                    if (r == 0 && lineCounter < 50) {
+                    if (r == 0 && lineCounter < 100) {
                         System.out.println("SID=" + sentenceId + "\t" + learner.getSentenceScore(sentenceId));
                         System.out.println(sentence.stream().collect(Collectors.joining(" ")));
                         System.out.println(query.getDebuggingInfo(gold));

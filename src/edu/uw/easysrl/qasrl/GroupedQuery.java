@@ -1,7 +1,6 @@
 package edu.uw.easysrl.qasrl;
 
 import com.google.common.collect.ImmutableList;
-import edu.stanford.nlp.util.ArrayMap;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
 
@@ -78,9 +77,10 @@ public class GroupedQuery {
     public double questionConfidence, attachmentUncertainty;
     public double answerMargin, answerEntropy, normalizedAnswerEntropy;
 
-    // TODO: move this to ActiveLearning ...
-    static final double rankDiscountFactor = 0.0;
-    static final boolean estimateWithParseScores = true;
+    public static double rankDiscountFactor = 0.0;
+    public static boolean estimateWithParseScores = true;
+    // Not counting "question invalid" and "answer not listed" options.
+    public static int maxNumOptionsPerQuery = 8;
 
     // Other dependencies
     Set<ResolvedDependency> questionDependencies;
@@ -143,14 +143,28 @@ public class GroupedQuery {
         this.argumentNumber = argumentNumber;
         this.question = question;
         this.answerOptions = new ArrayList<>();
-        Set<Integer> allParseIds = IntStream.range(0, totalNumParses).boxed().collect(Collectors.toSet());
+        Set<Integer> invalidQuestionParseIds = IntStream.range(0, totalNumParses).boxed().collect(Collectors.toSet());
+        Set<Integer> unlistedAnswerParseIds = new HashSet<>();
+        List<Double> optionScores = spanToParses.values().stream()
+                .map(parseIds -> parseIds.stream().mapToDouble(id -> parses.get(id).score).sum())
+                .sorted()
+                .collect(Collectors.toList());
+        double minOptionScore = (optionScores.size() <= maxNumOptionsPerQuery) ? -1e-6 :
+                optionScores.get(optionScores.size() - maxNumOptionsPerQuery) - 1e-6;
+
         spanToParses.forEach((span, parseIds) -> {
             ImmutableList<Integer> argList = spanToArgList.get(span);
-            answerOptions.add(new AnswerOption(argList, span, parseIds));
-            allParseIds.removeAll(parseIds);
+            AnswerOption newOption = new AnswerOption(argList, span, parseIds);
+            double optionScore = parseIds.stream().mapToDouble(id -> parses.get(id).score).sum();
+            if (optionScore > minOptionScore) {
+                answerOptions.add(newOption);
+            } else {
+                unlistedAnswerParseIds.addAll(parseIds);
+            }
+            invalidQuestionParseIds.removeAll(parseIds);
         });
-        answerOptions.add(new BadQuestionOption(allParseIds));
-        answerOptions.add(new NoAnswerOption(new HashSet<>()));
+        answerOptions.add(new BadQuestionOption(invalidQuestionParseIds));
+        answerOptions.add(new NoAnswerOption(unlistedAnswerParseIds));
     }
 
     public void setQueryId(int id) {
@@ -178,13 +192,7 @@ public class GroupedQuery {
     // TODO: clean this up.
     public void computeProbabilities(double[] parseDist) {
         // Compute p(a|q).
-        if (estimateWithParseScores) {
-            answerOptions.forEach(ao -> ao.probability = ao.parseIds.stream()
-                    .mapToDouble(i -> parseDist[i]).sum());
-        } else {
-            answerOptions.forEach(ao -> ao.probability = ao.parseIds.stream()
-                    .mapToDouble(i -> Math.exp(-rankDiscountFactor * i / totalNumParses)).sum());
-        }
+        answerOptions.forEach(ao -> ao.probability = ao.parseIds.stream().mapToDouble(i -> parseDist[i]).sum());
         double sum = answerOptions.stream().mapToDouble(ao -> ao.probability).sum();
         answerOptions.forEach(ao -> ao.probability /= sum);
 
