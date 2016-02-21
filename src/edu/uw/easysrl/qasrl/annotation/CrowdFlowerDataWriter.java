@@ -40,12 +40,8 @@ public class CrowdFlowerDataWriter {
         GroupedQuery.maxNumNonNAOptionsPerQuery = maxNumOptionsPerQuestion - 2;
     }
 
-    // Fields for Crowdflower csv file.
-    private static final String[] csvHeader = {
-            "query_id", "question_confidence", "question_uncertainty", "sent_id", "sentence", "pred_id", "pred_head",
-            "question", "answers"};
     // Fields for Crowdflower test questions.
-    private static final String[] csvHeaderTestQuestions = {
+    private static final String[] csvHeader = {
             "query_id", "question_confidence", "question_uncertainty", "sent_id", "sentence", "pred_id", "pred_head",
             "question", "answers", "_golden ", "choice_gold", "choice_gold_reason"};
 
@@ -118,7 +114,7 @@ public class CrowdFlowerDataWriter {
                 csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter(
                         String.format("%s_test.csv", csvOutputFilePrefix))),
                         CSVFormat.EXCEL.withRecordSeparator("\n"));
-                csvPrinter.printRecord((Object[]) csvHeaderTestQuestions);
+                csvPrinter.printRecord((Object[]) csvHeader);
 
                 // Write test questions.
                 int numTestQuestions = 0;
