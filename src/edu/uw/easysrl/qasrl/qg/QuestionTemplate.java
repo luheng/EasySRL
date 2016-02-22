@@ -205,6 +205,9 @@ public class QuestionTemplate {
              argIndices.values().stream()
              .filter(Optional::isPresent).map(Optional::get)
              .anyMatch(index -> verbHelper.isCopulaVerb(words.get(index)))) || // adverbs of copulas are wonky and not helpful
+            (type == QuestionType.VERB_ADJUNCT &&
+             words.get(predicateIndex).equalsIgnoreCase("when") &&
+             targetArgNum == 3) || // #what did I eat ice cream when? <-- bad question. but works for others: after, before, etc.
             (type == QuestionType.ADJECTIVE_ADJUNCT &&
              targetArgNum == 2) || // "full of promise" -> "something was _ of promise; what's _?" --- can't really ask it.
             categories.get(argIndex).matches(Category.valueOf("PR")) // don't ask about a particle; TODO where are all the PR arguments...?
@@ -483,9 +486,8 @@ public class QuestionTemplate {
                 .sorted(Integer::compare)
                 .map(index -> { // we need to un-tense verbs that appear as answers
                     Optional<String> replaceOpt = Optional.of(argCategories.get(targetArgNum))
-                            .filter(cat -> cat.isFunctionInto(Category.valueOf("S\\NP")))
-                            .flatMap(arg -> verbHelper.getAuxiliaryAndVerbStrings(words, categories, index))
-                            .map(arr -> arr[1]);
+                        .filter(cat -> cat.isFunctionInto(Category.valueOf("S\\NP")))
+                        .map(arg -> TextGenerationHelper.renderString(getBarePredVerb(index)));
                     return TextGenerationHelper.getRepresentativePhrase(Optional.of(index), argCategories.get(targetArgNum), parse, replaceOpt);
                 })
             .collect(Collectors.toList());
@@ -554,20 +556,24 @@ public class QuestionTemplate {
         if(type == QuestionType.NOUN_ADJUNCT) {
             return result;
         }
-        int argIndex = argIndices.get(argNum).get();
-        // category of actual arg as it appears in the sentence.
-        Category argCategory = categories.get(argIndex);
-        if (argCategory.isFunctionInto(Category.valueOf("S[to]\\NP"))) {
-            result.add("to do");
-        } else if (argCategory.isFunctionInto(Category.valueOf("S[ng]\\NP"))) {
-            result.add("doing");
-        } else if (argCategory.isFunctionInto(Category.valueOf("S[pt]\\NP"))) {
-            result.add("done");
-        } else if (argCategory.isFunctionInto(Category.valueOf("S[dcl]\\NP"))) {
-            result.add("do");
-        } else if (argCategory.isFunctionInto(Category.valueOf("S\\NP"))) { // catch-all for verbs
-            result.add("do");
+        // only add the placeholder if we expect something verbal.
+        if(argCategories.get(argNum).isFunctionInto(Category.valueOf("(S\\NP)"))) {
+            int argIndex = argIndices.get(argNum).get();
+            // category of actual arg as it appears in the sentence.
+            Category argCategory = categories.get(argIndex);
+            if (argCategory.isFunctionInto(Category.valueOf("S[to]\\NP"))) {
+                result.add("to do");
+            } else if (argCategory.isFunctionInto(Category.valueOf("S[ng]\\NP"))) {
+                result.add("doing");
+            } else if (argCategory.isFunctionInto(Category.valueOf("S[pt]\\NP"))) {
+                result.add("done");
+            } else if (argCategory.isFunctionInto(Category.valueOf("S[dcl]\\NP"))) {
+                result.add("do");
+            } else if (argCategory.isFunctionInto(Category.valueOf("S\\NP"))) { // catch-all for verbs
+                result.add("do");
+            }
         }
+        // otherwise maybe it's an S[dcl] or something, in which case we don't want a placeholder.
         // TODO maybe add preposition
         return result;
     }
