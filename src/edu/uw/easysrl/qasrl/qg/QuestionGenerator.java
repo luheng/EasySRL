@@ -44,5 +44,11 @@ public class QuestionGenerator {
         QuestionTemplate template = new QuestionTemplate(predicateIdx, words, parse, verbHelper);
         return template.instantiateForArgument(argumentNumber);
     }
+
+    public List<QuestionAnswerPair> generateAllQAPairs(int predicateIdx, int argumentNumber, List<String> words,
+                                                         Parse parse) {
+        QuestionTemplate template = new QuestionTemplate(predicateIdx, words, parse, verbHelper);
+        return template.getAllQAPairsForArgument(argumentNumber);
+    }
 }
 

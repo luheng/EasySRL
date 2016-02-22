@@ -213,6 +213,116 @@ public class QuestionTemplate {
     }
 
     /**
+     * Get all possible question--answer pairs identifying a particular argument.
+     * This will include a lot of QA pairs that don't make sense,
+     * because we will be trying all of the different preposition supersenses
+     * that could possibly be appropriate for a preposition in question.
+     */
+    public List<QuestionAnswerPair> getAllQAPairsForArgument(int targetArgNum) {
+        if (cantAskQuestion(targetArgNum)) {
+            return new ArrayList<QuestionAnswerPair>();
+        }
+        // add the basic question
+        final List<QuestionAnswerPair> qaPairs = new ArrayList<>();
+        instantiateForArgument(targetArgNum).ifPresent(qaPairs::add);
+        qaPairs.addAll(getBasicSupersenseQAPairs(targetArgNum));
+        return qaPairs;
+    }
+
+    private List<QuestionAnswerPair> getBasicSupersenseQAPairs(int targetArgNum) {
+        final List<QuestionAnswerPair> qaPairs = new ArrayList<>();
+
+        // for now, we will only try to do this with prepositional verb adjuncts,
+        // when asking about the verb.
+        final Optional<Integer> verbIndexOpt = argIndices.get(2);
+        if(!(Category.valueOf("((S\\NP)\\(S\\NP))/NP").matches(predicateCategory) &&
+             targetArgNum == 2 &&
+             verbIndexOpt.isPresent())) {
+            return qaPairs;
+        }
+        final int verbIndex = verbIndexOpt.get();
+        // at this point, we know we need to split the verb.
+
+        // first, basic adjunct questions: how, when, where.
+        return getSupersenseWhs().map(wh -> {
+            final List<ResolvedDependency> questionDeps = new ArrayList<>();
+            final List<String> auxiliaries = getAuxiliariesForPredVerb(verbIndex);
+            final String verbArgReplacement = TextGenerationHelper.renderString(getBarePredVerb(verbIndex));
+            final TextWithDependencies verbWithDeps = TextGenerationHelper.getRepresentativePhrase(Optional.of(verbIndex), argCategories.get(2), parse, verbArgReplacement);
+            questionDeps.addAll(verbWithDeps.dependencies);
+            final List<String> verb = verbWithDeps.tokens;
+            // first we add the deps to the list of deps we've touched
+            final Optional<ResolvedDependency> verbDepOpt = Optional.ofNullable(allArgDeps.get(2)).map(deps -> deps.get(0));
+            verbDepOpt.ifPresent(questionDeps::add);
+            final Optional<ResolvedDependency> subjDepOpt = parse.dependencies.stream()
+                .filter(dep -> dep.getHead() == verbIndex &&
+                        dep.getArgument() != dep.getHead() &&
+                        dep.getArgNumber() == 1)
+                .findFirst();
+            subjDepOpt.ifPresent(questionDeps::add);
+
+            // then we locate the subj in the sentence
+            final Optional<Integer> subjIndexOpt = subjDepOpt.map(ResolvedDependency::getArgument);
+            final Category subjCategory = argCategories.get(1); // this is always NP anyway
+
+            // then we generate the text, again logging the dependencies touched.
+
+            // first, the subject
+            List<String> subj = new ArrayList<>();
+            if(!subjIndexOpt.isPresent()) {
+                TextWithDependencies subjWithDeps = TextGenerationHelper.getRepresentativePhrase(subjIndexOpt, subjCategory, parse);
+                questionDeps.addAll(subjWithDeps.dependencies);
+                subj = subjWithDeps.tokens;
+            } else {
+                int subjIndex = subjIndexOpt.get();
+                // replace the word with a pronoun of the proper case, if necessary
+                Optional<Pronoun> pronounOpt = Pronoun.fromString(words.get(subjIndex));
+                Optional<String> fixedPronounString = pronounOpt.map(pron -> pron.withCase(Pronoun.Case.NOMINATIVE).toString());
+                TextWithDependencies subjWithDeps = TextGenerationHelper.getRepresentativePhrase(subjIndexOpt, subjCategory, parse, fixedPronounString);
+                questionDeps.addAll(subjWithDeps.dependencies);
+                subj = subjWithDeps.tokens;
+            }
+
+            // and now we construct the question
+            final List<String> questionWords = new ArrayList<>();
+            questionWords.addAll(wh);
+            questionWords.addAll(auxiliaries);
+            questionWords.addAll(subj);
+            questionWords.addAll(verb);
+            final List<String> question = questionWords
+                .stream()
+                .filter(s -> s != null && !s.isEmpty()) // to mitigate oversights. harmless anyway
+                .collect(Collectors.toList());
+            // and the answer is our PP.
+            final List<ResolvedDependency> targetDeps = allArgDeps.get(targetArgNum);
+            final TextWithDependencies answerWithDeps = TextGenerationHelper
+                .getRepresentativePhrase(Optional.of(predicateIndex), Category.valueOf("(S\\NP)\\(S\\NP)"), parse);
+            final List<TextWithDependencies> answers = new ArrayList<>();
+            answers.add(answerWithDeps);
+            return new QuestionAnswerPair(predicateIndex,
+                                          predicateCategory,
+                                          questionDeps,
+                                          question,
+                                          targetDeps,
+                                          answers);
+        }).collect(Collectors.toList());
+    }
+
+    public Stream<List<String>> getSupersenseWhs() {
+        // let's just start with "how" for now.
+        final List<String> how = new ArrayList<>(); how.add("How");
+        final List<String> howFar = new ArrayList<>(); howFar.add("How"); howFar.add("far");
+        final List<String> howLong = new ArrayList<>(); howFar.add("How"); howFar.add("long");
+        final List<String> when = new ArrayList<>(); when.add("When");
+        final List<String> where = new ArrayList<>(); when.add("Where");
+        final List<String> why = new ArrayList<>(); when.add("Why");
+
+        final List<List<String>> whs = new LinkedList<>();
+        whs.add(how);
+        return whs.stream();
+    }
+
+    /**
      * Instantiate into a question about a particular argument.
      * @param targetArgNum : the argument number under the predicate
      *                       associated with what's being asked about in the question
