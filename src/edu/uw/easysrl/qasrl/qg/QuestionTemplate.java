@@ -93,6 +93,95 @@ public class QuestionTemplate {
 
     }
 
+    public enum Supersense {
+        HOW("as", "with"
+            ),
+        FAR("for"
+            ),
+        LONG("for"
+                ),
+        WHEN("as", "in", "with"
+                ),
+        WHERE("among", "in", "to", "with"
+                ),
+        WHY("as", "to", "for"
+                ),
+        MANNER("as", "with"
+                ),
+        CAPACITY("as"
+                 ),
+        MEANS("in", "with"
+                  );
+
+        static {
+            HOW.setWhs("How");
+            FAR.setWhs("How", "far");
+            LONG.setWhs("How", "long");
+            WHEN.setWhs("When");
+            WHERE.setWhs("Where");
+            WHY.setWhs("Why");
+            MANNER.setWhs("In", "what", "manner");
+            CAPACITY.setWhs("In", "what", "capacity");
+            MEANS.setWhs("By", "what", "means");
+        }
+
+        public static final Set<String> knownPrepositions = new HashSet<>();
+        static {
+            for(Supersense wh : Supersense.values()) {
+                knownPrepositions.addAll(wh.prepositions);
+            }
+
+        }
+
+        public final List<String> whWords = new LinkedList<String>();
+        public final List<String> prepositions;
+        Supersense(String... prepositions) {
+            this.prepositions = Arrays.asList(prepositions);
+        }
+
+        private void setWhs(String... whWords) {
+            this.whWords.clear();
+            this.whWords.addAll(Arrays.asList(whWords));
+        }
+
+        public boolean admits(String preposition) {
+            for (String p : this.prepositions) {
+                if (p.equalsIgnoreCase(preposition)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public static List<List<String>> getWhsFor(String preposition) {
+            List<List<String>> whs = new LinkedList<>();
+            for(Supersense wh : Supersense.values()) {
+                whs.add(wh.whWords);
+            }
+            return whs;
+            /*
+            if(!knownPrepositions.contains(preposition)) {
+                System.err.println("Missing preposition supersenses: " + preposition);
+                for(Supersense wh : Supersense.values()) {
+                    whs.add(wh.whWords);
+                }
+                return whs;
+            } else {
+                for(Supersense wh : Supersense.values()) {
+                    if(wh.admits(preposition)) {
+                        whs.add(wh.whWords);
+                    }
+                }
+                return whs;
+            }
+            */
+        }
+
+
+    }
+
+    private static final Set<Integer> qaPairsPrinted = new HashSet<Integer>();
+
     // Categories to skip ..
     // private static final Category auxiliaries = Category.valueOf("(S[dcl]\\NP)/(S[b]\\NP)");
     // private static final Category controlParticles = Category.valueOf("(S[to]\\NP)/(S[b]\\NP)");
@@ -227,7 +316,7 @@ public class QuestionTemplate {
         }
         // add the basic question
         final List<QuestionAnswerPair> qaPairs = new ArrayList<>();
-        instantiateForArgument(targetArgNum).ifPresent(qaPairs::add);
+        // instantiateForArgument(targetArgNum).ifPresent(qaPairs::add);
         qaPairs.addAll(getBasicSupersenseQAPairs(targetArgNum));
         return qaPairs;
     }
@@ -247,7 +336,7 @@ public class QuestionTemplate {
         // at this point, we know we need to split the verb.
 
         // first, basic adjunct questions: how, when, where.
-        return getSupersenseWhs().map(wh -> {
+        List<QuestionAnswerPair> basicAdjunctPairs = getSupersenseWhs().stream().map(wh -> {
             final List<ResolvedDependency> questionDeps = new ArrayList<>();
             final List<String> auxiliaries = getAuxiliariesForPredVerb(verbIndex);
             final String verbArgReplacement = TextGenerationHelper.renderString(getBarePredVerb(verbIndex));
@@ -309,20 +398,22 @@ public class QuestionTemplate {
                                           targetDeps,
                                           answers);
         }).collect(Collectors.toList());
+        for(QuestionAnswerPair qaPair : basicAdjunctPairs) {
+            int code = (qaPair.renderQuestion() + qaPair.renderAnswer()).hashCode();
+            if(!qaPairsPrinted.contains(code)) {
+                // System.err.println(qaPair.renderQuestion());
+                // System.err.println("\t" + qaPair.renderAnswer());
+                qaPairsPrinted.add(code);
+            }
+        }
+        qaPairs.addAll(basicAdjunctPairs);
+        return qaPairs;
+
     }
 
-    public Stream<List<String>> getSupersenseWhs() {
-        // let's just start with "how" for now.
-        final List<String> how = new ArrayList<>(); how.add("How");
-        final List<String> howFar = new ArrayList<>(); howFar.add("How"); howFar.add("far");
-        final List<String> howLong = new ArrayList<>(); howFar.add("How"); howFar.add("long");
-        final List<String> when = new ArrayList<>(); when.add("When");
-        final List<String> where = new ArrayList<>(); when.add("Where");
-        final List<String> why = new ArrayList<>(); when.add("Why");
-
-        final List<List<String>> whs = new LinkedList<>();
-        whs.add(how);
-        return whs.stream();
+    public List<List<String>> getSupersenseWhs() {
+        String predWord = words.get(predicateIndex);
+        return Supersense.getWhsFor(predWord);
     }
 
     /**
