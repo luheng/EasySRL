@@ -10,7 +10,7 @@ import java.util.Map;
 public class RerankerExponentiated implements Reranker {
     Map<Integer, List<Parse>> allParses;
     Map<Integer, double[]> expScores;
-    double stepSize = 0.5;
+    double stepSize = 0.1;
 
     public RerankerExponentiated(final Map<Integer, List<Parse>> allParses, double stepSize) {
         expScores = new HashMap<>();

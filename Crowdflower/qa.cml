@@ -12,7 +12,7 @@
 <cml:radios name="choice" label="Please choose the best answer:" validates="required" gold="true">
   {% for answer in answers %}
   
-  <cml:radio value="{{ forloop.index0 }}" label="{{ answer }}"></cml:radio>
+  <cml:radio value="{{ answer }}" label="{{ answer }}"></cml:radio>
   {% endfor %}
 
 </cml:radios>

@@ -47,7 +47,7 @@ public class CrowdFlowerDataWriter {
 
     private static final String answerDelimiter = " ### ";
 
-    private static final String csvOutputFilePrefix = "crowdflower_dev_100best";
+    private static final String csvOutputFilePrefix = "_temp_crowdflower_dev_100best";
 
     // Sentences that happened to appear in instructions ...
     private static final int[] otherHeldOutSentences = { 1695, };
@@ -59,7 +59,7 @@ public class CrowdFlowerDataWriter {
                 .filter(annot -> {
                     int numJudgements = annot.getNumAnnotated();
                     int numOptions = annot.answerDist.length;
-                    return numOptions > 3 && numOptions <= maxNumOptionsPerTestQuestion &&
+                    return numOptions > 3 && /* numOptions <= maxNumOptionsPerTestQuestion && */
                             numJudgements >= 3 && annot.answerDist[annot.goldAnswerId] == numJudgements;
                 }).collect(Collectors.toList());
         for (int sid : otherHeldOutSentences) {
@@ -120,12 +120,13 @@ public class CrowdFlowerDataWriter {
                 int numTestQuestions = 0;
                 for (AlignedAnnotation test : agreedAnnotations) {
                     int sentenceId = test.sentenceId;
-                    String goldAnswer = test.answerStrings.get(test.goldAnswerId).replace(" # ", " &&& ");
+                    String goldAnswer = test.answerStrings.get(test.goldAnswerId).replace(" # ", " _AND_ ");
                     List<GroupedQuery> queries = learner.getQueriesBySentenceId(sentenceId);
                     for (GroupedQuery query : queries) {
                         // TODO: remove later
                         //System.err.println(query.getDebuggingInfo(responseSimulator.answerQuestion(query)));
 
+                        // Match predicate ID, question key and gold answer span.
                         if (query.getPredicateIndex() == test.predicateId &&
                                 query.getQuestion().equalsIgnoreCase(test.question)) {
                             int goldAnswerId = -1;
@@ -143,7 +144,8 @@ public class CrowdFlowerDataWriter {
                                         csvPrinter);
                                 numTestQuestions ++;
                             } else {
-                                System.err.println(test.toString() + "\n---\n" + query.toString());
+                                System.err.println(test.toString() + "\n---\n"
+                                        + query.getDebuggingInfo(responseSimulator.answerQuestion(query)));
                             }
                         }
                     }
@@ -160,11 +162,6 @@ public class CrowdFlowerDataWriter {
                                             && query.questionConfidence > minQuestionConfidence
                                             && (!skipBinaryQueries || query.attachmentUncertainty > 1e-6))
                         .collect(Collectors.toList());
-
-                if (sentence.get(0).equals("Stockholders")) {
-                    System.err.println(sentenceId + ", " + sentence.stream().collect(Collectors.joining(" ")));
-                }
-
                 // Print query to .csv file.
                 if (r == 0 && annotatedSentences.size() < maxNumSentences) {
                     int numSentences = annotatedSentences.size();
@@ -256,7 +253,7 @@ public class CrowdFlowerDataWriter {
         final String sentenceStr = TextGenerationHelper.renderHTMLSentenceString(sentence, predicateIndex,
                 highlightPredicate);
         final List<String> answerStrings = query.getAnswerOptions().stream()
-                .map(ao -> ao.getAnswer().replace(" &&& ", " <strong> & </strong> "))
+                .map(ao -> ao.getAnswer()) //.replace(" &&& ", " <strong> & </strong> "))
                 .collect(Collectors.toList());
         List<String> csvRow = new ArrayList<>();
         csvRow.add(String.valueOf(lineCounter));

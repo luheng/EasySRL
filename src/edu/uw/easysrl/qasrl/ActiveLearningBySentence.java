@@ -58,6 +58,7 @@ public class ActiveLearningBySentence {
             Category.valueOf("S[b]\\NP"), Category.valueOf("NP"));
 
     public ActiveLearningBySentence(int nBest) {
+        System.err.println("Initializing active learner ... nbest=" + nBest);
         this.nBest = nBest;
         sentences = new ArrayList<>();
         goldParses = new ArrayList<>();
@@ -76,7 +77,10 @@ public class ActiveLearningBySentence {
         parser = preparsedFile.isEmpty() ?
                 new BaseCcgParser.AStarParser(modelFolder, rootCategories, nBest) :
                 new BaseCcgParser.MockParser(preparsedFile, nBest);
-        initialize();
+        System.err.println("Parse initialized.");
+        initializeParses();
+        // initializeQueryPool();
+        // initializeQueryQueue();
     }
 
     public ActiveLearningBySentence(ActiveLearningBySentence other) {
@@ -91,18 +95,13 @@ public class ActiveLearningBySentence {
         this.reranker = new RerankerExponentiated(allParses, rerankerStepSize);
         this.queryPool = other.queryPool;
         this.sentenceScores = other.sentenceScores;
-        this.sentenceQueue = new PriorityQueue<>(sentenceComparator);
-        sentenceQueue.addAll(sentenceScores.keySet());
-        initializeQueryQueue();
-    }
-
-    private void initialize() {
-        initializeParses();
-        initializeQueryPool();
-        initializeQueryQueue();
+        // this.sentenceQueue = new PriorityQueue<>(sentenceComparator);
+        // sentenceQueue.addAll(sentenceScores.keySet());
+        // initializeQueryQueue();
     }
 
     private void initializeParses() {
+        System.err.println("Initializing parses ... ");
         allParses = new HashMap<>();
         allResults = new HashMap<>();
         oracleParseIds = new HashMap<>();
@@ -129,12 +128,13 @@ public class ActiveLearningBySentence {
         }
     }
 
-    private void initializeQueryPool() {
+    public void initializeQueryPool(List<Integer> sentenceIds) {
+        System.err.println("Initializing query pool ... ");
         reranker = new RerankerExponentiated(allParses, rerankerStepSize);
         queryPool = new HashMap<>();
         sentenceScores = new HashMap<>();
-        sentenceQueue = new PriorityQueue<>(sentenceComparator);
-        for (int sentIdx : allParses.keySet()) {
+        //sentenceQueue = new PriorityQueue<>(sentenceComparator);
+        for (int sentIdx : sentenceIds) {
             List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
             List<Parse> parses = allParses.get(sentIdx);
             List<GroupedQuery> queries = QueryGeneratorNew2.generateQueries(sentIdx, words, parses, questionGenerator);
@@ -162,7 +162,7 @@ public class ActiveLearningBySentence {
             sentenceScores.put(sentIdx, sentScore / Math.sqrt(numQueriesInSentence));
             totalNumQueries += numQueriesInSentence;
         }
-        sentenceQueue.addAll(sentenceScores.keySet());
+        //sentenceQueue.addAll(sentenceScores.keySet());
         System.out.println("Total number of queries:\t" + totalNumQueries);
     }
 
@@ -185,6 +185,7 @@ public class ActiveLearningBySentence {
      * Initialize query queue for the current sentence.
      */
     private void initializeQueryQueue() {
+        System.out.println("Initializing query queue ... ");
         int sentenceId = sentenceQueue.peek();
         queryQueue = new PriorityQueue<>(queryComparator);
         queryQueue.addAll(queryPool.get(sentenceId));

@@ -9,7 +9,9 @@ import java.util.*;
 public class AlignedAnnotation extends RecordedAnnotation {
     Map<String, Integer> annotatorToAnswerId;
     Map<String, String> annotatorToComment;
-    int[] answerDist;
+    public List<String> answerOptions;
+    public int[] answerDist;
+    public double[] answerTrust;
 
     AlignedAnnotation(RecordedAnnotation annotation) {
         super();
@@ -28,14 +30,21 @@ public class AlignedAnnotation extends RecordedAnnotation {
         annotatorToAnswerId = new HashMap<>();
         annotatorToComment = new HashMap<>();
         answerDist = new int[answerStrings.size()];
+        answerTrust = new double[answerStrings.size()];
         Arrays.fill(answerDist, 0);
+        Arrays.fill(answerTrust, 0.0);
     }
 
     boolean addAnnotation(String annotator, RecordedAnnotation annotation) {
+        // TODO: check options are the same.
+        if (answerOptions == null) {
+            answerOptions = annotation.answerStrings;
+        }
         // Some annotation records may contain duplicates.
         if (this.isSameQuestionAs(annotation) && !annotatorToAnswerId.containsKey(annotator)) {
             annotatorToAnswerId.put(annotator, annotation.answerId);
             answerDist[annotation.answerId] ++;
+            answerTrust[annotation.answerId] += annotation.trust;
             if (annotation.comment != null && !annotation.comment.isEmpty()) {
                 annotatorToComment.put(annotator, annotation.comment);
             }
@@ -66,6 +75,22 @@ public class AlignedAnnotation extends RecordedAnnotation {
                 alignedAnnotation.addAnnotation(annotator, annotation);
             });
         }
+        return new ArrayList<>(alignedAnnotations.values());
+    }
+
+    public static List<AlignedAnnotation> getAlignedAnnotations(List<RecordedAnnotation> annotations) {
+        Map<String, AlignedAnnotation> alignedAnnotations = new HashMap<>();
+
+        annotations.forEach(annotation -> {
+            String queryKey = "SID=" + annotation.sentenceId + "_PRED=" + annotation.predicateId + "_ARGNUM=" +
+                    annotation.argumentNumber + "_Q=" + annotation.question;
+            if (!alignedAnnotations.containsKey(queryKey)) {
+                alignedAnnotations.put(queryKey, new AlignedAnnotation(annotation));
+            }
+            AlignedAnnotation alignedAnnotation = alignedAnnotations.get(queryKey);
+            assert alignedAnnotation.isSameQuestionAs(annotation);
+            alignedAnnotation.addAnnotation(annotation.annotatorId, annotation);
+        });
         return new ArrayList<>(alignedAnnotations.values());
     }
 
