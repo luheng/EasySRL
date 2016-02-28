@@ -26,6 +26,8 @@ public class POMDP {
 
     private BeliefModel beliefModel;
     private ObservationModel observationModel;
+    private History history;
+    private Policy policy;
 
     private Map<Integer, List<Parse>> allParses;
     private Map<Integer, List<Results>> allResults;
@@ -102,6 +104,8 @@ public class POMDP {
         queryPool = new ArrayList<>();
         beliefModel = new BeliefModel(allParses.get(sentIdx));
         observationModel = new ObservationModel();
+        history = new History();
+        policy = new Policy(queryPool, history, beliefModel);
 
         List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
         List<Parse> parses = allParses.get(sentIdx);
@@ -113,16 +117,21 @@ public class POMDP {
         System.err.println("Total number of queries:\t" + queryPool.size());
     }
 
-    public List<GroupedQuery> getQueries() {
-        return queryPool;
+    public Optional<GroupedQuery> generateAction() {
+        Optional<GroupedQuery> action = policy.getAction();
+        if (action.isPresent()) {
+            history.addAction(action.get());
+        }
+        return action;
+    }
+
+    public void receiveObservation(Response response) {
+        beliefModel.update(observationModel, history.getLastAction(), response);
+        history.addObservation(response);
     }
 
     public List<String> getSentenceById(int sentenceId) {
         return sentences.get(sentenceId).stream().map(w -> w.word).collect(Collectors.toList());
-    }
-
-    public void updateBelief(GroupedQuery query, Response response) {
-        beliefModel.update(observationModel, query, response);
     }
 
     public Results getRerankedF1(int sid) {

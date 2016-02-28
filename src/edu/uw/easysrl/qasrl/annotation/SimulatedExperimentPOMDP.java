@@ -7,6 +7,7 @@ import edu.uw.easysrl.syntax.evaluation.Results;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -64,10 +65,10 @@ public class SimulatedExperimentPOMDP {
                             && (!skipBinaryQueries || query.attachmentUncertainty > 1e-6))
                     .collect(Collectors.toList()); */
 
-            for (GroupedQuery query : learner.getQueries()) {
-                // TODO: put trust info in debugging string.
-                Response userResponse = responseSimulator.answerQuestion(query);
-                Response goldResponse = responseSimulatorGold.answerQuestion(query);
+            Optional<GroupedQuery> action;
+            while ((action = learner.generateAction()).isPresent()) {
+                Response userResponse = responseSimulator.answerQuestion(action.get());
+                Response goldResponse = responseSimulatorGold.answerQuestion(action.get());
 
                 boolean matchesGold = userResponse.chosenOptions.size() > 0 &&
                         (userResponse.chosenOptions.get(0).intValue() == goldResponse.chosenOptions.get(0).intValue());
@@ -76,25 +77,23 @@ public class SimulatedExperimentPOMDP {
                 } else {
                     numMatchedQuestions ++;
                     answerAcc.add(matchesGold);
-
-                    learner.updateBelief(query, userResponse);
-                    goldLearner.updateBelief(query, goldResponse);
-
+                    learner.receiveObservation(userResponse);
+                    /*goldLearner.updateBelief(query, goldResponse);
                     if (!matchesGold) {
                         System.out.println(query.getDebuggingInfo(userResponse, goldResponse) + "\n");
-                    }
+                    }*/
                 }
             }
 
             rerank.add(learner.getRerankedF1(sentenceId));
             oracle.add(learner.getOracleF1(sentenceId));
             onebest.add(learner.getOneBestF1(sentenceId));
-            goldRerank.add(goldLearner.getRerankedF1(sentenceId));
+            //goldRerank.add(goldLearner.getRerankedF1(sentenceId));
         }
 
         System.out.println("onebest:\t" + onebest);
         System.out.println("rerank:\t" + rerank);
-        System.out.println("gold rerank:\t" + goldRerank);
+        // System.out.println("gold rerank:\t" + goldRerank);
         System.out.println("oracle:\t" + oracle);
 
         System.out.println("answer accuracy:\t" + answerAcc);
