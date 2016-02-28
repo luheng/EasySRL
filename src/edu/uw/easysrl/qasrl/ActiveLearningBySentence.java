@@ -19,7 +19,7 @@ public class ActiveLearningBySentence {
     final BaseCcgParser parser;
     final QuestionGenerator questionGenerator;
     // Reranker needs to be initialized after we parse all the sentences .. maybe not?
-    RerankerExponentiated reranker;
+    Reranker reranker;
 
     // All queries for each sentence id.
     private Map<Integer, List<GroupedQuery>> queryPool;
@@ -93,6 +93,7 @@ public class ActiveLearningBySentence {
         this.allResults = other.allResults;
         this.oracleParseIds = other.oracleParseIds;
         this.reranker = new RerankerExponentiated(allParses, rerankerStepSize);
+        //this.reranker = new RerankerDependencyFactored(allParses);
         this.queryPool = other.queryPool;
         this.sentenceScores = other.sentenceScores;
         // this.sentenceQueue = new PriorityQueue<>(sentenceComparator);
@@ -131,6 +132,7 @@ public class ActiveLearningBySentence {
     public void initializeQueryPool(List<Integer> sentenceIds) {
         System.err.println("Initializing query pool ... ");
         reranker = new RerankerExponentiated(allParses, rerankerStepSize);
+        // reranker = new RerankerDependencyFactored(allParses);
         queryPool = new HashMap<>();
         sentenceScores = new HashMap<>();
         //sentenceQueue = new PriorityQueue<>(sentenceComparator);
@@ -139,7 +141,8 @@ public class ActiveLearningBySentence {
             List<Parse> parses = allParses.get(sentIdx);
             List<GroupedQuery> queries = QueryGeneratorNew2.generateQueries(sentIdx, words, parses, questionGenerator);
             queries.stream().forEach(query -> {
-                query.computeProbabilities(reranker.expScores.get(query.sentenceId));
+                // query.computeProbabilities(reranker.expScores.get(query.sentenceId));
+                query.computeProbabilities(reranker.getParseScores(query.sentenceId));
                 if (query.answerEntropy > minAnswerEntropy) {
                     if (!queryPool.containsKey(sentIdx)) {
                         queryPool.put(sentIdx, new ArrayList<>());

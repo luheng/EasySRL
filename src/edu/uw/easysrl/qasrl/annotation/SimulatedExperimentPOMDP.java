@@ -1,27 +1,19 @@
 package edu.uw.easysrl.qasrl.annotation;
 
 import edu.uw.easysrl.qasrl.*;
+import edu.uw.easysrl.qasrl.pomdp.POMDP;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * 1. Read AlignedAnnotations.
- * 2. Run simulated experiment - unsorted - read queries by sentence ID and answer those queries.
- * 3. Get averaged results.
- * Created by luheng on 2/24/16.
+ * Created by luheng on 2/27/16.
  */
-public class SimulatedExperimentsCrowdflower {
-
+public class SimulatedExperimentPOMDP {
     static final int nBest = 100;
-    private static final double minQuestionConfidence = 0.1;
-    private static final double minAnswerEntropy = 0.1;
-
-    private static boolean skipBinaryQueries = true;
-
     private static final int maxNumOptionsPerQuestion = 6;
     static {
         GroupedQuery.maxNumNonNAOptionsPerQuery = maxNumOptionsPerQuestion - 2;
@@ -47,9 +39,8 @@ public class SimulatedExperimentsCrowdflower {
                 .collect(Collectors.toList());
         System.out.println(sentenceIds.stream().map(String::valueOf).collect(Collectors.joining(", ")));
 
-        ActiveLearningBySentence learner = new ActiveLearningBySentence(nBest);
-        learner.initializeQueryPool(sentenceIds);
-        ActiveLearningBySentence goldLearner = new ActiveLearningBySentence(learner);
+        POMDP learner = new POMDP(nBest);
+        POMDP goldLearner = new POMDP(learner);
 
         assert annotations != null;
         ResponseSimulator responseSimulator = new ResponseSimulatorRecorded(annotations);
@@ -63,14 +54,17 @@ public class SimulatedExperimentsCrowdflower {
 
         // Process other questions.
         for (int sentenceId : sentenceIds) {
-            //final List<String> sentence = learner.getSentenceById(sentenceId);
-            List<GroupedQuery> queries = learner.getQueriesBySentenceId(sentenceId).stream()
+            learner.initializeForSentence(sentenceId);
+            goldLearner.initializeForSentence(sentenceId);
+
+            /*
+            List<GroupedQuery> queries = learner.getQueries().stream()
                     .filter(query -> query.answerEntropy > minAnswerEntropy
                             && query.questionConfidence > minQuestionConfidence
                             && (!skipBinaryQueries || query.attachmentUncertainty > 1e-6))
-                    .collect(Collectors.toList());
+                    .collect(Collectors.toList()); */
 
-            for (GroupedQuery query : queries) {
+            for (GroupedQuery query : learner.getQueries()) {
                 // TODO: put trust info in debugging string.
                 Response userResponse = responseSimulator.answerQuestion(query);
                 Response goldResponse = responseSimulatorGold.answerQuestion(query);
@@ -83,14 +77,13 @@ public class SimulatedExperimentsCrowdflower {
                     numMatchedQuestions ++;
                     answerAcc.add(matchesGold);
 
-                    //if (matchesGold) {
-                    learner.respondToQuery(query, userResponse);
-                    //  }
+                    learner.updateBelief(query, userResponse);
+                    goldLearner.updateBelief(query, goldResponse);
+
                     if (!matchesGold) {
                         System.out.println(query.getDebuggingInfo(userResponse, goldResponse) + "\n");
                     }
                 }
-                goldLearner.respondToQuery(query, goldResponse);
             }
 
             rerank.add(learner.getRerankedF1(sentenceId));
@@ -109,4 +102,3 @@ public class SimulatedExperimentsCrowdflower {
         System.out.println("number of matched:\t" + numMatchedQuestions);
     }
 }
-

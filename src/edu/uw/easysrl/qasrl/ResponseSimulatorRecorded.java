@@ -1,6 +1,7 @@
 package edu.uw.easysrl.qasrl;
 
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
+import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.*;
 
@@ -23,7 +24,6 @@ public class ResponseSimulatorRecorded extends ResponseSimulator {
         alignedAnnotationList.forEach(annotation -> {
             String qkey = annotation.sentenceId + "\t" + annotation.predicateId + "\t" + annotation.predicateCategory
                     + "\t" + annotation.argumentNumber + "\t" + annotation.question;
-            System.out.println(qkey);
             alignedAnnotations.put(qkey, annotation);
         });
     }
@@ -41,37 +41,56 @@ public class ResponseSimulatorRecorded extends ResponseSimulator {
         Response response = new Response();
         String qkey = query.sentenceId + "\t" + query.predicateIndex + "\t" + query.category + "\t"
                 + query.argumentNumber + "\t" + query.question;
-        System.out.println(qkey);
+        // System.out.println(qkey);
         if (!alignedAnnotations.containsKey(qkey)) {
-            System.err.println("No annotation matched.");
+            // System.err.println("No annotation matched.");
             return response;
         }
+        // Filter adjuncts
+        /*
+        if (query.category == Category.valueOf("((S\\NP)\\(S\\NP))/NP") ||
+                query.category == Category.valueOf("(NP\\NP)/NP")) {
+            return response;
+        }
+        */
         AlignedAnnotation annotation = alignedAnnotations.get(qkey);
-
+        int majorityAnswerIndex = -1;
         String majorityAnswer = "";
         double maxTrust = -1.0;
         for (int i = 0; i < annotation.answerDist.length; i++) {
            // if (annotation.answerDist[i] == 5) {
             // Tie-breaking by worker trust.
             if (annotation.answerTrust[i] > maxTrust) {
+                majorityAnswerIndex = i;
                 majorityAnswer = annotation.answerOptions.get(i);
                 maxTrust = annotation.answerTrust[i];
             }
         }
+        int badQuestionOptionId = -1, noAnswerOptionId = -1;
         for (int i = 0; i < query.answerOptions.size(); i++) {
             GroupedQuery.AnswerOption option = query.answerOptions.get(i);
-            if (option.getAnswer().equals(majorityAnswer) && maxTrust > 3.5) {
+            if (option.getAnswer().equals(majorityAnswer) /* && annotation.answerDist[majorityAnswerIndex] >= 3 */) {
                 response.add(i);
+            }
+            // TODO: move this to GroupedQuery.
+            if (GroupedQuery.BadQuestionOption.class.isInstance(option)) {
+                badQuestionOptionId = i;
+                continue;
+            } else if (GroupedQuery.NoAnswerOption.class.isInstance(option)) {
+                noAnswerOptionId = i;
+                continue;
             }
         }
         response.debugInfo = "max trust:\t" + maxTrust;
         response.trust = maxTrust;
-        /*
+        // There's always a chance of question not being valid.
+
         if (response.chosenOptions.size() == 0) {
-            System.err.println(query.getDebuggingInfo(new Response()));
-            response.add(-1);
+            return response;
+        } else {
+           // response.add(badQuestionOptionId);
         }
-        */
+
         return response;
     }
 }

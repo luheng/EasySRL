@@ -33,6 +33,8 @@ public class GroupedQuery {
 
         public ImmutableList<Integer> getArgumentIds() { return argumentIds; }
 
+        public Set<Integer> getParseIds() { return parseIds; }
+
         public boolean isNAOption() {
             return BadQuestionOption.class.isInstance(this) || NoAnswerOption.class.isInstance(this);
         }

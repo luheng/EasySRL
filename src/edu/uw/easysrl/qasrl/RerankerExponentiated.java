@@ -10,7 +10,7 @@ import java.util.Map;
 public class RerankerExponentiated implements Reranker {
     Map<Integer, List<Parse>> allParses;
     Map<Integer, double[]> expScores;
-    double stepSize = 0.1;
+    double stepSize = 0.5;
 
     public RerankerExponentiated(final Map<Integer, List<Parse>> allParses, double stepSize) {
         expScores = new HashMap<>();
@@ -33,7 +33,12 @@ public class RerankerExponentiated implements Reranker {
         for (int k = 0; k < parses.size(); k++) {
             for (int r : response.chosenOptions) {
                 // Multiplicative weight update: exp(score'(t)) = exp(score(t)) exp(R(q,a,t))
-                scores[k] = scores[k] * Math.exp(computeDelta(query, query.answerOptions.get(r), k));
+                /*
+                if (GroupedQuery.BadQuestionOption.class.isInstance(query.answerOptions.get(r))) {
+                    scores[k] = scores[k] * Math.exp(stepSize / 5 * computeDelta(query, query.answerOptions.get(r), k));
+                } else {
+                */
+                scores[k] = scores[k] * Math.exp(stepSize * computeDelta(query, query.answerOptions.get(r), k));
             }
         }
         // Re-normalize parse distribution.
@@ -87,6 +92,6 @@ public class RerankerExponentiated implements Reranker {
 
     // R(q, a, t)
     private double computeDelta(final GroupedQuery query, GroupedQuery.AnswerOption option, int parseId) {
-        return option.parseIds.contains(parseId) ? stepSize : -stepSize;
+        return option.parseIds.contains(parseId) ? 1.0 : -1.0;
     }
 }

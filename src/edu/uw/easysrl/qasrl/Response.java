@@ -25,7 +25,9 @@ public class Response {
     }
 
     public void add(int option) {
-        this.chosenOptions.add(option);
+        if (!chosenOptions.contains(option)) {
+            chosenOptions.add(option);
+        }
     }
 
     public Response(Collection<Integer> options) {
