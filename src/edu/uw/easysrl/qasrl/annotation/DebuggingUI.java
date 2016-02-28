@@ -43,7 +43,10 @@ public class DebuggingUI extends AbstractHandler {
     @Override
     public void handle(final String target, final Request baseRequest, final HttpServletRequest request,
                        final HttpServletResponse response) throws IOException, ServletException {
-        final int sentenceId = Integer.parseInt(baseRequest.getParameter("sentenceId"));
+        int sentenceId = 0;
+        if (baseRequest.getParameter("sentenceId") != null) {
+            sentenceId = Integer.parseInt(baseRequest.getParameter("sentenceId"));
+        }
         response.setContentType("text/html; charset=utf-8");
         response.setStatus(HttpServletResponse.SC_OK);
         doParse(sentenceId, response.getWriter());
@@ -80,10 +83,11 @@ public class DebuggingUI extends AbstractHandler {
         response.println("<h1><font face=\"arial\">EasySRL Parser Demo</font></h1>");
         response.println("      <div><a href=https://github.com/mikelewis0/EasySRL>Download here!</a></div>      \n"
                 + "        <br><form action=\"\" method=\"get\">\n"
-                + "      <input type=\"text\"  size=\"40\" name=\"sentence\" value=\"" + sentence + "\"> \n"
+                + "      <input type=\"text\"  size=\"40\" name=\"sentenceId\" value=\"" + sentenceId + "\"> \n"
                 + "      <input type=\"submit\" value=\"Parse!\">" + "    </form>");
 
         System.out.println(sentence);
+        response.println("<p>" + sentence + "</p>");
         response.println(printer.print(parse.syntaxTree, 0));
     }
 }
