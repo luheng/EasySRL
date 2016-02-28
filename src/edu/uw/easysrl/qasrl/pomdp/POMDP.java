@@ -2,6 +2,7 @@ package edu.uw.easysrl.qasrl.pomdp;
 
 import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.*;
+import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
 import edu.uw.easysrl.qasrl.pomdp.BeliefModel;
 import edu.uw.easysrl.qasrl.pomdp.ObservationModel;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
@@ -115,6 +116,31 @@ public class POMDP {
             queryPool.add(query);
         });
         System.err.println("Total number of queries:\t" + queryPool.size());
+    }
+
+    /**
+     * Restrict the action space to be annotated queries.
+     * @param sentIdx
+     * @param annotations
+     */
+    public void initializeForSentence(int sentIdx, List<AlignedAnnotation> annotations) {
+        queryPool = new ArrayList<>();
+        beliefModel = new BeliefModel(allParses.get(sentIdx));
+        observationModel = new ObservationModel();
+        history = new History();
+        policy = new Policy(queryPool, history, beliefModel);
+
+        List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
+        List<Parse> parses = allParses.get(sentIdx);
+        List<GroupedQuery> queries = QueryGeneratorNew2.generateQueries(sentIdx, words, parses, questionGenerator);
+        queries.stream().forEach(query -> {
+            if (annotations.stream().anyMatch(annotation -> annotation.sentenceId == sentIdx
+                    && annotation.question.equals(query.getQuestion()))) {
+                query.setQueryId(queryPool.size());
+                queryPool.add(query);
+            }
+        });
+        System.out.println("Total number of queries:\t" + queryPool.size());
     }
 
     public Optional<GroupedQuery> generateAction() {

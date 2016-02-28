@@ -55,16 +55,8 @@ public class SimulatedExperimentPOMDP {
 
         // Process other questions.
         for (int sentenceId : sentenceIds) {
-            learner.initializeForSentence(sentenceId);
-            goldLearner.initializeForSentence(sentenceId);
-
-            /*
-            List<GroupedQuery> queries = learner.getQueries().stream()
-                    .filter(query -> query.answerEntropy > minAnswerEntropy
-                            && query.questionConfidence > minQuestionConfidence
-                            && (!skipBinaryQueries || query.attachmentUncertainty > 1e-6))
-                    .collect(Collectors.toList()); */
-
+            learner.initializeForSentence(sentenceId, annotations);
+            //goldLearner.initializeForSentence(sentenceId);
             Optional<GroupedQuery> action;
             while ((action = learner.generateAction()).isPresent()) {
                 Response userResponse = responseSimulator.answerQuestion(action.get());
