@@ -103,8 +103,9 @@ public class ObservationModel {
         if (counts == null) {
             return userCorrect ? 1.0 - fixedErrorRate : fixedErrorRate / K;
         } else {
-            boolean isAdjunct = query.getCategory().equals("((S\\NP)\\(S\\NP))/NP")
-                    || query.getCategory().equals(("(NP\\NP)/NP"));
+            boolean isAdjunct = query.getCategory().equals(Category.valueOf("((S\\NP)\\(S\\NP))/NP"))
+                    || query.getCategory().equals(Category.valueOf("(NP\\NP)/NP"));
+            boolean parseIsNA = false;
             int maxOverlapOption = -1;
             int questionNAOption = -1;
             int maxOverlap = -1;
@@ -112,6 +113,9 @@ public class ObservationModel {
                 GroupedQuery.AnswerOption option = query.getAnswerOptions().get(i);
                 if (GroupedQuery.BadQuestionOption.class.isInstance(option)) {
                     questionNAOption = i;
+                    if (option.getParseIds().contains(parseId)) {
+                        parseIsNA = true;
+                    }
                 } else {
                     int depOverlap = computeDependencyOverlap(query, option, parse);
                     if (depOverlap > maxOverlap) {
@@ -121,9 +125,7 @@ public class ObservationModel {
                 }
             }
             int questionType = isAdjunct ? 0 : 1;
-            int parseType = query.getAnswerOptions().get(questionNAOption).getParseIds().contains(parseId) ? 0 : 1;
-            int userType = user == questionNAOption ? 0 : (user == maxOverlapOption ? 1 : 2);
-
+            int parseType = parseIsNA ? 0 : 1;
             if (user == questionNAOption) {
                 return counts[questionType][parseType][0];
             } else if (user == maxOverlapOption) {
@@ -142,6 +144,9 @@ public class ObservationModel {
      * @return
      */
     private int computeDependencyOverlap(GroupedQuery query, GroupedQuery.AnswerOption option, Parse parse) {
+        if (option.isNAOption()) {
+            return 0;
+        }
         return (int) parse.dependencies.stream().filter(dep -> dep.getHead() == query.getPredicateIndex()
                 && option.getArgumentIds().contains(dep.getArgument())).count();
     }
