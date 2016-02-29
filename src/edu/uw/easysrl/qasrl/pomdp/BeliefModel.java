@@ -18,7 +18,8 @@ public class BeliefModel {
         this.parses = parses;
         belief = new double[parses.size()];
         for (int i = 0; i < parses.size(); i++) {
-            belief[i] = Math.pow(parses.get(i).score, 1);
+            //belief[i] = 100.0 - i;  //
+            belief[i] = parses.get(i).score;
         }
         normalize();
     }
@@ -35,7 +36,10 @@ public class BeliefModel {
 
     public void update(ObservationModel obs, GroupedQuery query, Response response) {
         for (int i = 0; i < parses.size(); i++) {
-            belief[i] *= obs.getObservationProbability(query, response, i, parses.get(i));
+            double p = obs.getObservationProbability(query, response, i, parses.get(i));
+            if (!Double.isNaN(p)) {
+                belief[i] *= p;
+            }
         }
         normalize();
     }

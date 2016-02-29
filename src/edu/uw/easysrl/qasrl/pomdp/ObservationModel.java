@@ -151,7 +151,7 @@ public class ObservationModel {
                 return observation[questionType][parseType][2];
             } else if (maxOverlapOptions.contains(user)) {
                 int K = maxOverlapOptions.size() - (perfectMatchHasMaxOverlap ? 1 : 0);
-                System.out.println("Num. max overlap:\t" + K);
+                // System.out.println("Num. max overlap:\t" + K);
                 return observation[questionType][parseType][3] / K;
             } else {
                 int numOtherOptions = query.getAnswerOptions().size() - maxOverlapOptions.size()
@@ -161,7 +161,7 @@ public class ObservationModel {
                     System.out.println(query.getDebuggingInfo(response));
                 }
                 */
-                System.out.println("Num other:\t" + numOtherOptions);
+                //System.out.println("Num other:\t" + numOtherOptions);
                 return observation[questionType][parseType][4] / numOtherOptions;
             }
         }
