@@ -49,4 +49,29 @@ public class BeliefModel {
         }
         return bestState;
     }
+
+    public double getEntropy() {
+        // Distribution is normalized.
+        double entropy = .0;
+        for (int i = 0; i < belief.length; i++) {
+            if (belief[i] > 0) {
+                entropy -= belief[i] * Math.log(belief[i]);
+            }
+        }
+        return entropy;
+    }
+
+    public double getMargin() {
+        double first = Math.max(belief[0], belief[1]),
+               second = Math.min(belief[0], belief[1]);
+        for (int i = 2; i < belief.length; i++) {
+            if (belief[i] > first) {
+                second = first;
+                first = belief[i];
+            } else if (belief[i] > second) {
+                second = belief[i];
+            }
+        }
+        return first - second;
+    }
 }

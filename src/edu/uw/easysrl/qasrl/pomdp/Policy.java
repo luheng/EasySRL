@@ -12,18 +12,20 @@ public class Policy {
     List<GroupedQuery> queryList;
     History history;
     BeliefModel beliefModel;
+    int horizon;
     int nextQueryId;
 
-    public Policy(List<GroupedQuery> queryList, History history, BeliefModel beliefModel) {
+    public Policy(List<GroupedQuery> queryList, History history, BeliefModel beliefModel, int horizon) {
         this.queryList = queryList;
         this.history = history;
         this.beliefModel = beliefModel;
+        this.horizon = horizon;
         this.nextQueryId = 0;
     }
 
     // Play next.
     public Optional<GroupedQuery> getAction() {
-        if (history.length() > 10 || nextQueryId >= queryList.size()) {
+        if (history.length() >= horizon - 1 || nextQueryId >= queryList.size()) {
             // Submit.
             return Optional.empty();
         }

@@ -1,13 +1,13 @@
 package edu.uw.easysrl.qasrl.annotation;
 
 import edu.uw.easysrl.qasrl.*;
+import edu.uw.easysrl.qasrl.pomdp.ObservationModel;
 import edu.uw.easysrl.qasrl.pomdp.POMDP;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -15,6 +15,11 @@ import java.util.stream.Collectors;
  */
 public class SimulatedExperimentPOMDP {
     static final int nBest = 100;
+    static final int horizon = 5;
+    static final double moneyPenalty = 0.1;
+
+    static final int numTrainingSentences = 30;
+
     private static final int maxNumOptionsPerQuestion = 6;
     static {
         GroupedQuery.maxNumNonNAOptionsPerQuery = maxNumOptionsPerQuestion - 2;
@@ -40,28 +45,45 @@ public class SimulatedExperimentPOMDP {
                 .collect(Collectors.toList());
         System.out.println(sentenceIds.stream().map(String::valueOf).collect(Collectors.joining(", ")));
 
-        POMDP learner = new POMDP(nBest);
-        POMDP goldLearner = new POMDP(learner);
-
-        assert annotations != null;
-        ResponseSimulator responseSimulator = new ResponseSimulatorRecorded(annotations);
-        ResponseSimulator responseSimulatorGold = new ResponseSimulatorGold(learner.goldParses, new QuestionGenerator(),
+        // Learn a observation model.
+        POMDP qgen = new POMDP(nBest, 1000, 0.0);
+        ResponseSimulator userModel = new ResponseSimulatorRecorded(annotations);
+        ResponseSimulator goldModel = new ResponseSimulatorGold(qgen.goldParses, new QuestionGenerator(),
                 false /* allow label match */);
 
+        System.err.println("Training sentences:\t" + numTrainingSentences + "\ttest sentences:\t"
+                + (sentenceIds.size() - numTrainingSentences));
+        Collections.shuffle(sentenceIds, new Random(12345));
+        List<Integer> trainingSentIds = sentenceIds.subList(0, numTrainingSentences);
+        List<GroupedQuery> trainingQueries = new ArrayList<>();
+        for (int sentenceId : trainingSentIds) {
+            qgen.initializeForSentence(sentenceId);
+            Optional<GroupedQuery> action;
+            while ((action = qgen.generateAction()).isPresent()) {
+                Response userResponse = userModel.answerQuestion(action.get());
+                if (userResponse.chosenOptions.size() > 0) {
+                    trainingQueries.add(action.get());
+                }
+            }
+        }
+
+        ObservationModel observationModel = new ObservationModel(trainingQueries, qgen.goldParses, userModel, goldModel);
+        POMDP learner = new POMDP(nBest, horizon, moneyPenalty);
+        learner.setBaseObservationModel(observationModel);
+
+        assert annotations != null;
         Results rerank = new Results(),
                 oracle = new Results(),
-                goldRerank = new Results(),
                 onebest = new Results();
 
         // Process other questions.
-        for (int sentenceId : sentenceIds) {
+        List<Integer> testSentIds = sentenceIds.subList(numTrainingSentences, sentenceIds.size());
+        for (int sentenceId : testSentIds) {
             learner.initializeForSentence(sentenceId, annotations);
-            //goldLearner.initializeForSentence(sentenceId);
             Optional<GroupedQuery> action;
             while ((action = learner.generateAction()).isPresent()) {
-                Response userResponse = responseSimulator.answerQuestion(action.get());
-                Response goldResponse = responseSimulatorGold.answerQuestion(action.get());
-
+                Response userResponse = userModel.answerQuestion(action.get());
+                Response goldResponse = goldModel.answerQuestion(action.get());
                 boolean matchesGold = userResponse.chosenOptions.size() > 0 &&
                         (userResponse.chosenOptions.get(0).intValue() == goldResponse.chosenOptions.get(0).intValue());
                 if (userResponse.chosenOptions.size() == 0) {
@@ -70,22 +92,18 @@ public class SimulatedExperimentPOMDP {
                     numMatchedQuestions ++;
                     answerAcc.add(matchesGold);
                     learner.receiveObservation(userResponse);
-                    /*goldLearner.updateBelief(query, goldResponse);
-                    if (!matchesGold) {
+                    /* if (!matchesGold) {
                         System.out.println(query.getDebuggingInfo(userResponse, goldResponse) + "\n");
                     }*/
                 }
             }
-
             rerank.add(learner.getRerankedF1(sentenceId));
             oracle.add(learner.getOracleF1(sentenceId));
             onebest.add(learner.getOneBestF1(sentenceId));
-            //goldRerank.add(goldLearner.getRerankedF1(sentenceId));
         }
 
         System.out.println("onebest:\t" + onebest);
         System.out.println("rerank:\t" + rerank);
-        // System.out.println("gold rerank:\t" + goldRerank);
         System.out.println("oracle:\t" + oracle);
 
         System.out.println("answer accuracy:\t" + answerAcc);

@@ -26,24 +26,33 @@ public class POMDP {
     private List<GroupedQuery> queryPool;
 
     private BeliefModel beliefModel;
-    private ObservationModel observationModel;
+    private ObservationModel observationModel, baseObservationModel;
     private History history;
     private Policy policy;
+    private RewardFunction rewardFunction;
+    private int timeStep;
 
+    // The state space.
     private Map<Integer, List<Parse>> allParses;
     private Map<Integer, List<Results>> allResults;
     private Map<Integer, Integer> oracleParseIds;
 
     String preparsedFile = "";
-    int nBest;
     final static String modelFolder = "./model_tritrain_big/";
     final static List<Category> rootCategories =  Arrays.asList(
             Category.valueOf("S[dcl]"), Category.valueOf("S[wq]"), Category.valueOf("S[q]"),
             Category.valueOf("S[b]\\NP"), Category.valueOf("NP"));
 
-    public POMDP(int nBest) {
-        System.err.println("Initializing active learner ... nbest=" + nBest);
+    // Other parameters.
+    int nBest;
+    int horizon;
+    double moneyPenalty;
+
+    public POMDP(int nBest, int horizon, double moneyPenalty) {
+        System.err.println("Initializing POMDP ... nbest=" + nBest);
         this.nBest = nBest;
+        this.horizon = horizon;
+        this.moneyPenalty = moneyPenalty;
         sentences = new ArrayList<>();
         goldParses = new ArrayList<>();
         DataLoader.readDevPool(sentences, goldParses);
@@ -57,7 +66,6 @@ public class POMDP {
         } else if (nBest <= 1000) {
             preparsedFile = "parses.1000best.out";
         }
-        // TODO: check existence of parse files.
         parser = preparsedFile.isEmpty() ?
                 new BaseCcgParser.AStarParser(modelFolder, rootCategories, nBest) :
                 new BaseCcgParser.MockParser(preparsedFile, nBest);
@@ -71,9 +79,15 @@ public class POMDP {
         this.questionGenerator = other.questionGenerator;
         this.parser = other.parser;
         this.nBest = other.nBest;
+        this.horizon = other.horizon;
+        this.moneyPenalty = other.moneyPenalty;
         this.allParses = other.allParses;
         this.allResults = other.allResults;
         this.oracleParseIds = other.oracleParseIds;
+    }
+
+    public void setBaseObservationModel(ObservationModel baseObservationModel) {
+        this.baseObservationModel = baseObservationModel;
     }
 
     private void initializeParses() {
@@ -104,10 +118,12 @@ public class POMDP {
     public void initializeForSentence(int sentIdx) {
         queryPool = new ArrayList<>();
         beliefModel = new BeliefModel(allParses.get(sentIdx));
-        observationModel = new ObservationModel();
+        observationModel = baseObservationModel == null ? new ObservationModel() :
+                                                          new ObservationModel(baseObservationModel);
         history = new History();
-        policy = new Policy(queryPool, history, beliefModel);
-
+        policy = new Policy(queryPool, history, beliefModel, horizon);
+        rewardFunction = new RewardFunction(allParses.get(sentIdx), allResults.get(sentIdx), moneyPenalty);
+        timeStep = 0;
         List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
         List<Parse> parses = allParses.get(sentIdx);
         List<GroupedQuery> queries = QueryGeneratorNew2.generateQueries(sentIdx, words, parses, questionGenerator);
@@ -126,10 +142,12 @@ public class POMDP {
     public void initializeForSentence(int sentIdx, List<AlignedAnnotation> annotations) {
         queryPool = new ArrayList<>();
         beliefModel = new BeliefModel(allParses.get(sentIdx));
-        observationModel = new ObservationModel();
+        observationModel = baseObservationModel == null ? new ObservationModel() :
+                                                          new ObservationModel(baseObservationModel);
         history = new History();
-        policy = new Policy(queryPool, history, beliefModel);
-
+        policy = new Policy(queryPool, history, beliefModel, horizon);
+        rewardFunction = new RewardFunction(allParses.get(sentIdx), allResults.get(sentIdx), moneyPenalty);
+        timeStep = 0;
         List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
         List<Parse> parses = allParses.get(sentIdx);
         List<GroupedQuery> queries = QueryGeneratorNew2.generateQueries(sentIdx, words, parses, questionGenerator);
@@ -148,6 +166,10 @@ public class POMDP {
         if (action.isPresent()) {
             history.addAction(action.get());
         }
+        timeStep ++;
+        double reward = rewardFunction.getReward(action, beliefModel, history);
+        System.out.println("Receiving reward:\t" + reward + " at time:\t" + timeStep + "\tbelief entropy:\t" +
+                beliefModel.getEntropy() + "\tmargin:\t" + beliefModel.getMargin());
         return action;
     }
 
