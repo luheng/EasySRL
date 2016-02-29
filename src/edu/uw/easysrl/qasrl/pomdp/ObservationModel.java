@@ -3,7 +3,9 @@ package edu.uw.easysrl.qasrl.pomdp;
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.syntax.grammar.Category;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Created by luheng on 2/27/16.
@@ -11,7 +13,8 @@ import java.util.List;
 public class ObservationModel {
     final double fixedErrorRate = 0.0;
 
-    double[][][] counts;
+    double[][][] observation;
+    double[][] counts;
 
     public ObservationModel() {
     }
@@ -21,70 +24,75 @@ public class ObservationModel {
      */
     public ObservationModel(List<GroupedQuery> queries, List<Parse> goldParses, ResponseSimulator userModel,
                             ResponseSimulator goldModel) {
-        // (0, 0, 0) adjunct questions, gold is NA and answer is NA
-        // (0, 0, 1) adjunct questions, gold is NA and answer is max. dependency overlap.
-        // (0, 0, 2) adjunct questions, gold is NA and answer is something else.
+        // (0, 0, 0) adjunct questions, gold is NA and answer is "question not valid".
+        // (0, 0, 1) adjunct questions, gold is NA and answer is "answer not listed".
+        // (0, 0, 2) adjunct questions, gold is NA and answer is max. dependency overlap.
+        // (0, 0, 3) adjunct questions, gold is NA and answer is something else.
         // (1, 1, 0-2) core questions, gold is not NA.
-        counts = new double[2][2][3];
+        observation = new double[2][2][5];
+        counts = new double[2][2];
 
         for (GroupedQuery query : queries) {
-            if (userModel.answerQuestion(query).chosenOptions.size() == 0) {
+            Response userResponse = userModel.answerQuestion(query);
+            if (userResponse.chosenOptions.size() == 0) {
                 continue;
             }
-            int user = userModel.answerQuestion(query).chosenOptions.get(0);
+            int user = userResponse.chosenOptions.get(0);
             int gold = goldModel.answerQuestion(query).chosenOptions.get(0);
             Parse goldParse = goldParses.get(query.getSentenceId());
             boolean isAdjunct = query.getCategory().equals(Category.valueOf("((S\\NP)\\(S\\NP))/NP"))
                     || query.getCategory().equals(Category.valueOf("(NP\\NP)/NP"));
             boolean goldIsNA = GroupedQuery.BadQuestionOption.class.isInstance(query.getAnswerOptions().get(gold));
-            boolean userIsNA = GroupedQuery.BadQuestionOption.class.isInstance(query.getAnswerOptions().get(user));
-            int maxOverlapOption = -1;
+            GroupedQuery.AnswerOption userOption = query.getAnswerOptions().get(user);
+            Set<Integer> maxOverlapOptions = new HashSet<>();
             int maxOverlap = -1;
             for (int i = 0; i < query.getAnswerOptions().size(); i++) {
                 GroupedQuery.AnswerOption option = query.getAnswerOptions().get(i);
                 int depOverlap = computeDependencyOverlap(query, option, goldParse);
                 if (depOverlap > maxOverlap) {
-                    maxOverlapOption = i;
+                    maxOverlapOptions = new HashSet<>();
                     maxOverlap = depOverlap;
+                }
+                if (depOverlap == maxOverlap) {
+                    maxOverlapOptions.add(i);
                 }
             }
             int questionType = isAdjunct ? 0 : 1;
             int goldType = goldIsNA ? 0 : 1;
-            int userResponseType = userIsNA ? 0 : (user == maxOverlapOption ? 1 : 2);
-            counts[questionType][goldType][userResponseType] ++;
+            int userResponseType;
+            if (GroupedQuery.BadQuestionOption.class.isInstance(userOption)) {
+                userResponseType = 0;
+            } else if (GroupedQuery.NoAnswerOption.class.isInstance(userOption)) {
+                userResponseType = 1;
+            } else if (user == gold) {
+                userResponseType = 2;
+            } else {
+                userResponseType = maxOverlapOptions.contains(user) ? 3 : 4;
+            }
+            observation[questionType][goldType][userResponseType] += userResponse.trust;
+            counts[questionType][goldType] ++;
         }
-
         // Normalize.
         for (int i = 0; i < 2; i++) {
             for (int j = 0; j < 2; j++) {
-                normalizeCounts(counts[i][j]);
+                normalizeCounts(observation[i][j]);
             }
         }
-
-        System.out.println("Adjunct, gold NA:\t" + counts[0][0][0] + "\t" + counts[0][0][1]);
-        System.out.println("Adjunct, gold valid:\t" + counts[0][1][0] + "\t" + counts[0][1][1]);
-        System.out.println("Core, gold NA:\t" + counts[1][0][0] + "\t" + counts[1][0][1]);
-        System.out.println("Core, gold valid:\t" + counts[1][1][0] + "\t" + counts[1][1][1]);
+        // Print.
+        System.out.println("Adjunct, gold NA:\t"    + counts[0][0] + "\t" + observation[0][0][0] + "\t" + observation[0][0][1] + "\t" + observation[0][0][2] + "\t" + observation[0][0][3]);
+        System.out.println("Adjunct, gold valid:\t" + counts[0][1] + "\t" + observation[0][1][0] + "\t" + observation[0][1][1] + "\t" + observation[0][1][2] + "\t" + observation[0][1][3]);
+        System.out.println("Core, gold NA:\t"       + counts[1][0] + "\t" + observation[1][0][0] + "\t" + observation[1][0][1] + "\t" + observation[1][0][2] + "\t" + observation[1][0][3]);
+        System.out.println("Core, gold valid:\t"    + counts[1][1] + "\t" + observation[1][1][0] + "\t" + observation[1][1][1] + "\t" + observation[1][1][2] + "\t" + observation[1][1][3]);
     }
 
     public ObservationModel(ObservationModel baseModel) {
-        counts = new double[2][2][3];
+        observation = new double[2][2][5];
         for (int i = 0; i < 2; i++) {
             for (int j = 0; j < 2; j++) {
-                for (int k = 0; k < 3; k++) {
-                    counts[i][j][k] = baseModel.counts[i][j][k];
+                for (int k = 0; k < 5; k++) {
+                    observation[i][j][k] = baseModel.observation[i][j][k];
                 }
             }
-        }
-    }
-
-    private static void normalizeCounts(double[] counts) {
-        double sum = .0;
-        for (int i  = 0; i < counts.length; i++) {
-            sum += counts[i];
-        }
-        for (int i  = 0; i < counts.length; i++) {
-            counts[i] /= sum;
         }
     }
 
@@ -98,40 +106,50 @@ public class ObservationModel {
      */
     public double getObservationProbability(GroupedQuery query, Response response, int parseId, Parse parse) {
         int user = response.chosenOptions.get(0);
-        boolean userCorrect = query.getAnswerOptions().get(user).getParseIds().contains(parseId);
-        int K = query.getAnswerOptions().size() - 1;
-        if (counts == null) {
+        GroupedQuery.AnswerOption userOption = query.getAnswerOptions().get(user);
+        if (observation == null) {
+            boolean userCorrect = query.getAnswerOptions().get(user).getParseIds().contains(parseId);
+            int K = query.getAnswerOptions().size() - 1;
             return userCorrect ? 1.0 - fixedErrorRate : fixedErrorRate / K;
         } else {
             boolean isAdjunct = query.getCategory().equals(Category.valueOf("((S\\NP)\\(S\\NP))/NP"))
                     || query.getCategory().equals(Category.valueOf("(NP\\NP)/NP"));
             boolean parseIsNA = false;
-            int maxOverlapOption = -1;
-            int questionNAOption = -1;
             int maxOverlap = -1;
+            Set<Integer> maxOverlapOptions = new HashSet<>();
             for (int i = 0; i < query.getAnswerOptions().size(); i++) {
                 GroupedQuery.AnswerOption option = query.getAnswerOptions().get(i);
-                if (GroupedQuery.BadQuestionOption.class.isInstance(option)) {
-                    questionNAOption = i;
-                    if (option.getParseIds().contains(parseId)) {
-                        parseIsNA = true;
-                    }
+                if (GroupedQuery.BadQuestionOption.class.isInstance(option) && option.getParseIds().contains(parseId)) {
+                    parseIsNA = true;
                 } else {
                     int depOverlap = computeDependencyOverlap(query, option, parse);
                     if (depOverlap > maxOverlap) {
-                        maxOverlapOption = i;
+                        maxOverlapOptions = new HashSet<>();
                         maxOverlap = depOverlap;
+                    }
+                    if (depOverlap == maxOverlap) {
+                        maxOverlapOptions.add(i);
                     }
                 }
             }
             int questionType = isAdjunct ? 0 : 1;
             int parseType = parseIsNA ? 0 : 1;
-            if (user == questionNAOption) {
-                return counts[questionType][parseType][0];
-            } else if (user == maxOverlapOption) {
-                return counts[questionType][parseType][1];
+            if (GroupedQuery.BadQuestionOption.class.isInstance(userOption)) {
+                return observation[questionType][parseType][0];
+            } else if (GroupedQuery.NoAnswerOption.class.isInstance(userOption)) {
+                return observation[questionType][parseType][1];
+            } else if (userOption.getParseIds().contains(parseId)) {
+                return observation[questionType][parseType][2];
+            } else if (maxOverlapOptions.contains(user)) {
+                return observation[questionType][parseType][3];
             } else {
-                return counts[questionType][parseType][2] / (query.getAnswerOptions().size() - 2);
+                int numOtherOptions = Math.max(1, query.getAnswerOptions().size() - maxOverlapOptions.size() - 3);
+                //System.out.println("Other number of options:\t" + numOtherOptions);
+                /* if (numOtherOptions > 2) {
+                    System.out.println(query.getDebuggingInfo(response));
+                }
+                */
+                return observation[questionType][parseType][4] / numOtherOptions;
             }
         }
     }
@@ -149,5 +167,15 @@ public class ObservationModel {
         }
         return (int) parse.dependencies.stream().filter(dep -> dep.getHead() == query.getPredicateIndex()
                 && option.getArgumentIds().contains(dep.getArgument())).count();
+    }
+
+    private static void normalizeCounts(double[] counts) {
+        double sum = .0;
+        for (int i  = 0; i < counts.length; i++) {
+            sum += counts[i];
+        }
+        for (int i  = 0; i < counts.length; i++) {
+            counts[i] /= sum;
+        }
     }
 }

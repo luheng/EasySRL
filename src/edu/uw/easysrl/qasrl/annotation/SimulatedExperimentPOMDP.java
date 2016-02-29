@@ -5,6 +5,7 @@ import edu.uw.easysrl.qasrl.pomdp.ObservationModel;
 import edu.uw.easysrl.qasrl.pomdp.POMDP;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
+import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.io.IOException;
 import java.util.*;
@@ -15,7 +16,7 @@ import java.util.stream.Collectors;
  */
 public class SimulatedExperimentPOMDP {
     static final int nBest = 100;
-    static final int horizon = 5;
+    static final int horizon = 1000;
     static final double moneyPenalty = 0.1;
 
     static final int numTrainingSentences = 30;
@@ -84,6 +85,14 @@ public class SimulatedExperimentPOMDP {
             while ((action = learner.generateAction()).isPresent()) {
                 Response userResponse = userModel.answerQuestion(action.get());
                 Response goldResponse = goldModel.answerQuestion(action.get());
+                // Hack.
+                /*
+                if (userResponse.trust < 3
+                        || action.get().getCategory().equals(Category.valueOf("((S\\NP)\\(S\\NP))/NP"))
+                        || action.get().getCategory().equals(Category.valueOf("(NP\\NP)/NP"))) {
+                    continue;
+                }
+                */
                 boolean matchesGold = userResponse.chosenOptions.size() > 0 &&
                         (userResponse.chosenOptions.get(0).intValue() == goldResponse.chosenOptions.get(0).intValue());
                 if (userResponse.chosenOptions.size() == 0) {

@@ -18,7 +18,7 @@ public class BeliefModel {
         this.parses = parses;
         belief = new double[parses.size()];
         for (int i = 0; i < parses.size(); i++) {
-            belief[i] = parses.get(i).score;
+            belief[i] = Math.pow(parses.get(i).score, 1);
         }
         normalize();
     }
