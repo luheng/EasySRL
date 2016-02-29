@@ -86,13 +86,11 @@ public class SimulatedExperimentPOMDP {
                 Response userResponse = userModel.answerQuestion(action.get());
                 Response goldResponse = goldModel.answerQuestion(action.get());
                 // Hack.
-                /*
-                if (userResponse.trust < 3
+                /* if (userResponse.trust < 3
                         || action.get().getCategory().equals(Category.valueOf("((S\\NP)\\(S\\NP))/NP"))
                         || action.get().getCategory().equals(Category.valueOf("(NP\\NP)/NP"))) {
                     continue;
-                }
-                */
+                }*/
                 boolean matchesGold = userResponse.chosenOptions.size() > 0 &&
                         (userResponse.chosenOptions.get(0).intValue() == goldResponse.chosenOptions.get(0).intValue());
                 if (userResponse.chosenOptions.size() == 0) {

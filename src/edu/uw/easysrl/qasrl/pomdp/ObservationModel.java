@@ -48,13 +48,15 @@ public class ObservationModel {
             int maxOverlap = -1;
             for (int i = 0; i < query.getAnswerOptions().size(); i++) {
                 GroupedQuery.AnswerOption option = query.getAnswerOptions().get(i);
-                int depOverlap = computeDependencyOverlap(query, option, goldParse);
-                if (depOverlap > maxOverlap) {
-                    maxOverlapOptions = new HashSet<>();
-                    maxOverlap = depOverlap;
-                }
-                if (depOverlap == maxOverlap) {
-                    maxOverlapOptions.add(i);
+                if (!option.isNAOption()) {
+                    int depOverlap = computeDependencyOverlap(query, option, goldParse);
+                    if (depOverlap > maxOverlap) {
+                        maxOverlapOptions = new HashSet<>();
+                        maxOverlap = depOverlap;
+                    }
+                    if (depOverlap == maxOverlap) {
+                        maxOverlapOptions.add(i);
+                    }
                 }
             }
             int questionType = isAdjunct ? 0 : 1;
@@ -121,7 +123,7 @@ public class ObservationModel {
                 GroupedQuery.AnswerOption option = query.getAnswerOptions().get(i);
                 if (GroupedQuery.BadQuestionOption.class.isInstance(option) && option.getParseIds().contains(parseId)) {
                     parseIsNA = true;
-                } else {
+                } else if (!option.isNAOption()){
                     int depOverlap = computeDependencyOverlap(query, option, parse);
                     if (depOverlap > maxOverlap) {
                         maxOverlapOptions = new HashSet<>();
@@ -134,6 +136,13 @@ public class ObservationModel {
             }
             int questionType = isAdjunct ? 0 : 1;
             int parseType = parseIsNA ? 0 : 1;
+            boolean perfectMatchHasMaxOverlap = false;
+            for (int i : maxOverlapOptions) {
+                if (query.getAnswerOptions().get(i).getParseIds().contains(parseId)) {
+                    perfectMatchHasMaxOverlap = true;
+                    break;
+                }
+            }
             if (GroupedQuery.BadQuestionOption.class.isInstance(userOption)) {
                 return observation[questionType][parseType][0];
             } else if (GroupedQuery.NoAnswerOption.class.isInstance(userOption)) {
@@ -141,14 +150,18 @@ public class ObservationModel {
             } else if (userOption.getParseIds().contains(parseId)) {
                 return observation[questionType][parseType][2];
             } else if (maxOverlapOptions.contains(user)) {
-                return observation[questionType][parseType][3];
+                int K = maxOverlapOptions.size() - (perfectMatchHasMaxOverlap ? 1 : 0);
+                System.out.println("Num. max overlap:\t" + K);
+                return observation[questionType][parseType][3] / K;
             } else {
-                int numOtherOptions = Math.max(1, query.getAnswerOptions().size() - maxOverlapOptions.size() - 3);
+                int numOtherOptions = query.getAnswerOptions().size() - maxOverlapOptions.size()
+                        - (perfectMatchHasMaxOverlap ? 0 : 1) - 2;
                 //System.out.println("Other number of options:\t" + numOtherOptions);
                 /* if (numOtherOptions > 2) {
                     System.out.println(query.getDebuggingInfo(response));
                 }
                 */
+                System.out.println("Num other:\t" + numOtherOptions);
                 return observation[questionType][parseType][4] / numOtherOptions;
             }
         }
