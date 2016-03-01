@@ -50,6 +50,27 @@ public class TextGenerationHelper {
         noSpaceAfter.add("{");
     }
 
+    // the result here is ALL POSSIBLE EXPANSIONS
+    public static List<String> expandContraction(String contraction) {
+        List<String> res = new LinkedList<>();
+        if(contraction.equals("'s")) {
+            res.add("has"); res.add("is");
+        } else if(contraction.equals("'ve")) {
+            res.add("have");
+        } else if(contraction.equals("n't")) {
+            res.add("not");
+        } else if(contraction.equals("'re")) {
+            res.add("are");
+        } else if(contraction.equals("'ll")) {
+            res.add("will");
+        } else if(contraction.equals("'m")) {
+            res.add("am");
+        } else if(contraction.equals("'d")) {
+            res.add("would"); res.add("had");
+        }
+        return res;
+    }
+
     /**
      * Turns a list of tokens into a nicely rendered string, spacing everything appropriately.
      * Trims extra punctuation at the end though. (Useful feature for now; might want to change later.)
@@ -206,23 +227,25 @@ public class TextGenerationHelper {
     }
 
     // Could be improved for PPs and such if necessary.
-    public static TextWithDependencies getRepresentativePhraseForUnrealized(Category category) {
+    public static List<TextWithDependencies> getRepresentativePhrasesForUnrealized(Category category) {
         List<String> words = new ArrayList<>();
         Set<ResolvedDependency> deps = new HashSet<>();
         words.add("something");
-        return new TextWithDependencies(words, deps);
+        List<TextWithDependencies> result = new LinkedList<>();
+        result.add(new TextWithDependencies(words, deps));
+        return result;
     }
 
-    public static TextWithDependencies getRepresentativePhrase(Optional<Integer> headIndexOpt, Category neededCategory, Parse parse) {
-        return getRepresentativePhrase(headIndexOpt, neededCategory, parse, Optional.empty());
+    public static List<TextWithDependencies> getRepresentativePhrases(Optional<Integer> headIndexOpt, Category neededCategory, Parse parse) {
+        return getRepresentativePhrases(headIndexOpt, neededCategory, parse, Optional.empty());
     }
 
-    public static TextWithDependencies getRepresentativePhrase(Optional<Integer> headIndexOpt, Category neededCategory, Parse parse, String replacementWord) {
-        return getRepresentativePhrase(headIndexOpt, neededCategory, parse, Optional.of(replacementWord));
+    public static List<TextWithDependencies> getRepresentativePhrases(Optional<Integer> headIndexOpt, Category neededCategory, Parse parse, String replacementWord) {
+        return getRepresentativePhrases(headIndexOpt, neededCategory, parse, Optional.of(replacementWord));
     }
 
-    public static TextWithDependencies getRepresentativePhrase(Optional<Integer> headIndexOpt, Category neededCategory, Parse parse, Optional<String> replacementWord) {
-        return getRepresentativePhrase(headIndexOpt, neededCategory, parse, headIndexOpt, replacementWord, true);
+    public static List<TextWithDependencies> getRepresentativePhrases(Optional<Integer> headIndexOpt, Category neededCategory, Parse parse, Optional<String> replacementWord) {
+        return getRepresentativePhrases(headIndexOpt, neededCategory, parse, headIndexOpt, replacementWord, true);
     }
 
     /**
@@ -234,12 +257,12 @@ public class TextGenerationHelper {
      * For multiple answers to the same question, we just call this multiple times. (it should only get one of multiple
      * constituents together in a coordination construction.)
      */
-    private static TextWithDependencies getRepresentativePhrase(Optional<Integer> headIndexOpt, Category neededCategory,
+    private static List<TextWithDependencies> getRepresentativePhrases(Optional<Integer> headIndexOpt, Category neededCategory,
                                                         Parse parse, Optional<Integer> replacementIndexOpt,
                                                         Optional<String> replacementWord, boolean lookForOf) {
         SyntaxTreeNode tree = parse.syntaxTree;
         if(!headIndexOpt.isPresent()) {
-            return getRepresentativePhraseForUnrealized(neededCategory);
+            return getRepresentativePhrasesForUnrealized(neededCategory);
         }
         int headIndex = headIndexOpt.get();
         SyntaxTreeNode headLeaf = tree.getLeaves().get(headIndex);
@@ -248,9 +271,11 @@ public class TextGenerationHelper {
         Optional<SyntaxTreeNode> nodeOpt = getLowestAncestorFunctionIntoCategory(headLeaf, neededCategory, tree);
         if(!nodeOpt.isPresent()) {
             // fall back to just the original leaf. this failure case is very rare.
-            List<String> result = new ArrayList<>();
-            result.addAll(getNodeWords(headLeaf, replacementIndexOpt, replacementWord));
-            return new TextWithDependencies(result, touchedDeps);
+            List<String> resultWords = new ArrayList<>();
+            resultWords.addAll(getNodeWords(headLeaf, replacementIndexOpt, replacementWord));
+            List<TextWithDependencies> result = new LinkedList<>();
+            result.add(new TextWithDependencies(resultWords, touchedDeps));
+            return result;
         }
 
         // get all of the dependencies that were (presumably) touched in the course of getting the lowest good ancestor
@@ -271,55 +296,129 @@ public class TextGenerationHelper {
                node.getEndIndex() < tree.getEndIndex() &&
                tree.getLeaves().get(node.getEndIndex()).getWord().equals("of") // if the next word is "of",
                ) {
-                return getRepresentativePhrase(Optional.of(node.getEndIndex()), neededCategory, parse, replacementIndexOpt, replacementWord, false);
-            } else {
-                return new TextWithDependencies(getNodeWords(node, replacementIndexOpt, replacementWord), touchedDeps);
-            }
-        } else {
-            List<String> left = new ArrayList<>();
-            List<String> center = getNodeWords(node, replacementIndexOpt, replacementWord);
-            List<String> right = new ArrayList<>();
-
-            for(int currentArgNum = currentCategory.getNumberOfArguments();
-                currentArgNum > neededCategory.getNumberOfArguments();
-                currentArgNum--) {
-                // otherwise, add arguments on either side until done, according to CCG category.
-                Category argCat = currentCategory.getRight();
-                // recover arg index using the fact that we know the head leaf and the arg num.
-                Set<ResolvedDependency> deps = parse.dependencies;
-                final int curArg = currentArgNum; // just so we can use it in the lambda below
-                Optional<ResolvedDependency> depOpt = deps.stream().filter(dep -> {
-                        return dep.getHead() == headIndex && dep.getArgNumber() == curArg;
-                    }).findFirst();
-                // if we can't find the argument, we put index -1 so the recursive call considers it "unrealized"
-                // and says, e.g., "something"
-                depOpt.map(dep -> touchedDeps.add(dep));
-                Optional<Integer> argIndexOpt = depOpt.map(dep -> dep.getArgument());
-                TextWithDependencies argTextWithDeps = getRepresentativePhrase(argIndexOpt, argCat, parse, replacementIndexOpt, replacementWord, lookForOf);
-                List<String> argPhrase = argTextWithDeps.tokens;
-                touchedDeps.addAll(argTextWithDeps.dependencies);
-                // add the argument on the left or right side, depending on the slash
-                Slash slash = currentCategory.getSlash();
-                switch(slash) {
-                case FWD:
-                    right.addAll(argPhrase);
-                    break;
-                case BWD:
-                    argPhrase.addAll(left);
-                    left = argPhrase;
-                    break;
-                case EITHER:
-                    System.err.println("Undirected slash appeared in supertagged data :(");
-                    break;
+                // Optional<SyntaxTreeNode> ancestorWithOfOpt = Optional.of(node);
+                // while(ancestorWithOfOpt.isPresent() && ancestorWithOfOpt.get().getEndIndex() <= node.getEndIndex()) {
+                //     ancestorWithOfOpt = getParent(ancestorWithOfOpt.get(), tree);
+                // }
+                // if(ancestorWithOfOpt.isPresent()) {
+                //     SyntaxTreeNode ancestorWithOf = ancestorWithOfOpt.get();
+                //     assert ancestorWithOf instanceof SyntaxTreeNode.SyntaxTreeNodeBinary
+                //         : "Lowest node to contain of-phrase as well must be a binary node";
+                //     SyntaxTreeNode ofSubtree = ((SyntaxTreeNode.SyntaxTreeNodeBinary)ancestorWithOf).getRightChild();
+                //     assert ofSubtree.getStartIndex() == node.getEndIndex()
+                //         : "of phrase should begin where original phrase ends";
+                //     touchedDeps.addAll(getContainedDependencies(ofSubtree, parse));
+                //     List<String> words = getNodeWords(node, replacementIndexOpt, replacementWord);
+                //     words.addAll(getNodeWords(ofSubtree, Optional.empty(), Optional.empty()));
+                //     List<TextWithDependencies> result = new LinkedList<>();
+                //     result.add(new TextWithDependencies(words, touchedDeps));
+                //     return result;
+                // }
+                List<TextWithDependencies> phrasesWithOf =
+                    getRepresentativePhrases(Optional.of(node.getEndIndex()),
+                                            neededCategory,
+                                            parse,
+                                            replacementIndexOpt,
+                                            replacementWord,
+                                            false);
+                List<TextWithDependencies> goodOfPhrases = phrasesWithOf
+                    .stream()
+                    .filter(phrase -> phrase.tokens
+                            .stream()
+                            .collect(Collectors.joining(" "))
+                            .toLowerCase()
+                            .contains(headLeaf.getWord().toLowerCase()))
+                    .collect(Collectors.toList());
+                if(goodOfPhrases.size() > 0) {
+                    return goodOfPhrases;
                 }
-                // proceed to the next argument
-                currentCategory = currentCategory.getLeft();
             }
-            List<String> result = new ArrayList<>();
-            result.addAll(left);
-            result.addAll(center);
-            result.addAll(right);
-            return new TextWithDependencies(result, touchedDeps);
+            List<TextWithDependencies> result = new LinkedList<>();
+            result.add(new TextWithDependencies(getNodeWords(node, replacementIndexOpt, replacementWord), touchedDeps));
+            return result;
+        } else {
+            assert currentCategory.isFunctionInto(neededCategory)
+                : "Current category should be a function into the needed category";
+            assert neededCategory.getNumberOfArguments() < currentCategory.getNumberOfArguments()
+                : "Current category should have fewer args than needed category, since they don't match";
+            List<String> center = getNodeWords(node, replacementIndexOpt, replacementWord);
+
+            // choose argument list
+            List<Set<Integer>> argIndices = new LinkedList<Set<Integer>>();
+            argIndices.add(new HashSet<Integer>());
+            for (int i = 1; i <= currentCategory.getNumberOfArguments(); i++) {
+                argIndices.add(new HashSet<Integer>());
+            }
+            assert argIndices.size() == currentCategory.getNumberOfArguments() + 1
+                : "Arg indices should be indexed properly";
+            // System.err.println("needed category: " + neededCategory);
+            // System.err.println("current category: " + currentCategory);
+            final Category curCat = currentCategory; // for lambda below
+            parse.dependencies
+                .stream()
+                .filter(dep -> dep.getHead() == headIndex)
+                .filter(dep -> dep.getArgNumber() > neededCategory.getNumberOfArguments())
+                .filter(dep -> dep.getArgNumber() <= curCat.getNumberOfArguments())
+                .forEach(dep -> argIndices.get(dep.getArgNumber()).add(dep.getArgument()));
+            List<List<Optional<Integer>>> argumentChoicePaths = getAllArgumentChoicePaths(argIndices);
+
+            List<TextWithDependencies> phrases = new LinkedList<>();
+
+            for(List<Optional<Integer>> chosenArgs : argumentChoicePaths) {
+                List<String> left = new ArrayList<>();
+                List<String> right = new ArrayList<>();
+                Set<ResolvedDependency> localDeps = new HashSet<>();
+                for(int currentArgNum = currentCategory.getNumberOfArguments();
+                    currentArgNum > neededCategory.getNumberOfArguments();
+                    currentArgNum--) {
+                    // otherwise, add arguments on either side until done, according to CCG category.
+                    Category argCat = currentCategory.getRight();
+                    Optional<Integer> argIndexOpt = chosenArgs.get(currentArgNum);
+                    // recover dep using the fact that we know the head leaf, arg num, and arg index.
+                    final int curArg = currentArgNum; // just so we can use it in the lambda below
+                    Optional<ResolvedDependency> depOpt = argIndexOpt
+                        .flatMap(argIndex -> parse.dependencies
+                                 .stream()
+                                 .filter(dep -> (dep.getHead() == headIndex) &&
+                                         (dep.getArgNumber() == curArg) &&
+                                         (dep.getArgument() == argIndex))
+                                 .findFirst());
+                    depOpt.map(localDeps::add);
+                    // XXX TODO do it for all arrangements of sub-phrases
+                    TextWithDependencies argTextWithDeps =
+                        getRepresentativePhrases(argIndexOpt,
+                                                argCat,
+                                                parse,
+                                                replacementIndexOpt,
+                                                replacementWord,
+                                                lookForOf).get(0);
+                    List<String> argPhrase = argTextWithDeps.tokens;
+                    localDeps.addAll(argTextWithDeps.dependencies);
+                    // add the argument on the left or right side, depending on the slash
+                    Slash slash = currentCategory.getSlash();
+                    switch(slash) {
+                    case FWD:
+                        right.addAll(argPhrase);
+                        break;
+                    case BWD:
+                        argPhrase.addAll(left);
+                        left = argPhrase;
+                        break;
+                    case EITHER:
+                        System.err.println("Undirected slash appeared in supertagged data :(");
+                        break;
+                    }
+                    // proceed to the next argument
+                    currentCategory = currentCategory.getLeft();
+                }
+                List<String> result = new ArrayList<>();
+                result.addAll(left);
+                result.addAll(center);
+                result.addAll(right);
+                localDeps.addAll(touchedDeps);
+                phrases.add(new TextWithDependencies(result, localDeps));
+            }
+            return phrases;
         }
 
     }
@@ -365,6 +464,88 @@ public class TextGenerationHelper {
         }
         return deps;
     }
+
+    // this is so stupid.
+    public static List<List<Optional<Integer>>> getAllArgumentChoicePaths(List<Set<Integer>> choices) {
+        List<List<Optional<Integer>>> pastPaths = new LinkedList<>();
+        pastPaths.add(new LinkedList<Optional<Integer>>());
+        for(Set<Integer> choiceList : choices) {
+            List<List<Optional<Integer>>> currentPaths;
+            if(choiceList.isEmpty()) {
+                currentPaths = pastPaths
+                    .stream()
+                    .map(path -> {
+                            List<Optional<Integer>> newPath = new LinkedList<>();
+                            newPath.addAll(path);
+                            newPath.add(Optional.empty());
+                            return newPath;
+                        })
+                    .collect(Collectors.toList());
+            } else {
+                currentPaths = pastPaths
+                    .stream()
+                    .flatMap(path -> choiceList
+                             .stream()
+                             .map(choice -> {
+                                     List<Optional<Integer>> newPath = new LinkedList<>();
+                                     newPath.addAll(path);
+                                     newPath.add(Optional.of(choice));
+                                     return newPath;
+                                 }))
+                    .collect(Collectors.toList());
+            }
+            pastPaths = currentPaths;
+        }
+        return pastPaths;
+    }
+
+    // this is also stupid.
+    /*
+    public static List<Map<Integer, Optional<ResolvedDependency>>> getAllArgumentChoicePaths(Map<Integer, Set<ResolvedDependency>> choices) {
+        List<Map<Integer, Optional<ResolvedDependency>>> pastPaths = new LinkedList<>();
+        pastPaths.add(new TreeMap<Integer, Optional<ResolvedDependency>>());
+        // TODO iterate correctly over stuff
+        List<Map.Entry<Integer, Set<ResolvedDependency>> choicesList = choices
+            .entrySet()
+            .stream()
+            .sortBy((k, v) -> k)
+            .collect(Collectors.toList());
+        for(Map.Entry<Integer, Set<ResolvedDependency>> argAndChoiceSet : choicesList) {
+            final int argNum = argAndChoiceSet.getKey();
+            final Set<ResolvedDependency> choiceSet = argAndChoiceSet.getValue();
+            final List<Map<Integer, Optional<ResolvedDependency>>> currentPaths;
+            if(choiceList.isEmpty()) {
+                currentPaths = pastPaths
+                    .stream()
+                    .map(path -> {
+                            Map<Integer, Optional<ResolvedDependency>> newPath = new HashMap<>();
+                            newPath.addAll(path);
+                            newPath.put(argNum, Optional.empty());
+                            return newPath;
+                        })
+                    .collect(Collectors.toList());
+            } else {
+                currentPaths = pastPaths
+                    .stream()
+                    .flatMap(path -> choiceSet
+                             .stream()
+                             .map(choice -> {
+                                     // List<Optional<Integer>> newPath = new LinkedList<>();
+                                     // newPath.addAll(path);
+                                     // newPath.add(Optional.of(choice));
+                                     // return newPath;
+                                 }))
+                    .collect(Collectors.toList());
+            }
+            pastPaths = currentPaths;
+        }
+
+        for(Set<ResolvedDependency> choiceList : choices.keySet().sorted()) {
+            List<Map<Integer, Optional<ResolvedDependency>>> currentPaths;
+        }
+        return pastPaths;
+    }
+    */
 
     /**
      * Data structure used to return text generated from a parsed sentence.

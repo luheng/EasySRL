@@ -14,12 +14,7 @@ import java.util.*;
  */
 public class QuestionGenerator {
 
-    public VerbHelper verbHelper;
-
-    public QuestionGenerator() {
-        // FIXME: build from unlabeled corpora.
-        verbHelper = new VerbHelper(VerbInflectionDictionary.buildFromPropBankTraining());
-    }
+    public static final VerbHelper verbHelper = new VerbHelper(VerbInflectionDictionary.buildFromPropBankTraining());
 
     /**
      * Generates a question given a supertagged sentence, a dependency in question,
@@ -31,23 +26,33 @@ public class QuestionGenerator {
      * @param parse               : parse information containing categories and dependencies
      * @return a QuestionAnswerPair if we could construct an answer successfully
      */
-    public Optional<QuestionAnswerPair> generateQuestion(ResolvedDependency targetDependency, List<String> words,
+    public static Optional<QuestionAnswerPair> generateQuestion(ResolvedDependency targetDependency, List<String> words,
                                                          Parse parse) {
         int predicateIdx = targetDependency.getHead();
         QuestionTemplate template = new QuestionTemplate(predicateIdx, words, parse, verbHelper);
-        return template.instantiateForArgument(targetDependency.getArgNumber());
+        // List<QuestionAnswerPair> qaPairs = template.instantiateForArgument(targetDependency.getArgNumber());
+        // XXX for a given dependency we only want the specific question.
+        assert false;
+        return null;
     }
 
 
-    public Optional<QuestionAnswerPair> generateQuestion(int predicateIdx, int argumentNumber, List<String> words,
+    public static Optional<QuestionAnswerPair> generateQuestion(int predicateIdx, int argumentNumber, List<String> words,
                                                          Parse parse) {
         QuestionTemplate template = new QuestionTemplate(predicateIdx, words, parse, verbHelper);
-        return template.instantiateForArgument(argumentNumber);
+        // List<QuestionAnswerPair> qaPairs = template.instantiateForArgument(argumentNumber);
+        // if(qaPairs.size() == 0) {
+        //     return Optional.empty();
+        // } else {
+        //     return Optional.of(qaPairs.get(0));
+        // }
+        assert false;
+        return null;
     }
 
-    public List<QuestionAnswerPair> generateAllQAPairs(int predicateIdx, int argumentNumber, List<String> words,
+    public static List<QuestionAnswerPairReduced> generateAllQAPairs(int predicateIdx, int argumentNumber, List<String> words,
                                                          Parse parse) {
-        QuestionTemplate template = new QuestionTemplate(predicateIdx, words, parse, verbHelper);
+        MultiQuestionTemplate template = new MultiQuestionTemplate(predicateIdx, words, parse, verbHelper);
         return template.getAllQAPairsForArgument(argumentNumber);
     }
 }
