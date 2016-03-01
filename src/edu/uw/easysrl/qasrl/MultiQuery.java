@@ -28,9 +28,12 @@ public abstract class MultiQuery {
         this.options = options;
         this.qaStringsToQAPairs = qaStringsToQAPairs;
         this.qaStringsToParses = qaStringsToParses;
+
+        assert this.options.size() > 0
+            : "cannot have a MultiQuery with no answer options";
     }
 
-    public abstract String toStringWithResponse(MultiResponseSimulator responseSimulator);
+    public abstract Set<String> getResponse(MultiResponseSimulator responseSimulator);
 
     // prompt is a question, choices are answers
     public static class Forward extends MultiQuery {
@@ -40,9 +43,8 @@ public abstract class MultiQuery {
             super(sentenceId, prompt, options, qaStringsToQAPairs, qaStringsToParses);
         }
 
-        public String toStringWithResponse(MultiResponseSimulator responseSimulator) {
-            Set<String> answers = responseSimulator.answersForQuestion(this);
-            return toStringWithChecks(answers);
+        public Set<String> getResponse(MultiResponseSimulator responseSimulator) {
+            return responseSimulator.answersForQuestion(this);
         }
     }
 
@@ -54,13 +56,13 @@ public abstract class MultiQuery {
             super(sentenceId, prompt, options, qaStringsToQAPairs, qaStringsToParses);
         }
 
-        public String toStringWithResponse(MultiResponseSimulator responseSimulator) {
-            Set<String> questions = responseSimulator.questionsForAnswer(this);
-            return toStringWithChecks(questions);
+        public Set<String> getResponse(MultiResponseSimulator responseSimulator) {
+            return responseSimulator.questionsForAnswer(this);
         }
     }
 
-    protected String toStringWithChecks(Set<String> checks) {
+    public String toStringWithResponse(MultiResponseSimulator responseSimulator) {
+        Set<String> checks = getResponse(responseSimulator);
         StringBuilder sb = new StringBuilder();
         sb.append(prompt + "\n");
         for(String option : options) {

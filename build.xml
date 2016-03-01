@@ -41,6 +41,7 @@
             <zipfileset excludes="META-INF/*.SF" src="lib/mtj-1.0-snapshot.jar"/>
             <zipfileset excludes="META-INF/*.SF" src="lib/hppc-0.7.1.jar"/>
             <zipfileset excludes="META-INF/*.SF" src="lib/stanford-postagger.jar"/>
+            <zipfileset excludes="META-INF/*.SF" src="lib/commons-csv-1.2.jar"/>
         </jar>
     </target>
 </project>

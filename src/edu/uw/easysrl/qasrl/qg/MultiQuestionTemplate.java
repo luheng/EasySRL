@@ -224,7 +224,7 @@ public class MultiQuestionTemplate {
     // for each arg num, lists all of the deps ending in arguments
     public Map<Integer, Set<ResolvedDependency>> allArgDeps;
     // returns a list of all indices of arguments for each arg num
-    public List<Set<Integer>> argIndices;
+    // public List<Set<Integer>> argIndices;
 
     public VerbHelper verbHelper;
 
@@ -238,27 +238,20 @@ public class MultiQuestionTemplate {
         this.tree = parse.syntaxTree;
         this.verbHelper = verbHelper;
         this.words = words;
+        final int numArguments = predicateCategory.getNumberOfArguments();
+        this.argCategories = new HashMap<Integer, Category>();
         this.allArgDeps = new HashMap<Integer, Set<ResolvedDependency>>();
+        for (int i = 1; i <= numArguments; i++) {
+            allArgDeps.put(i, new HashSet<ResolvedDependency>());
+            argCategories.put(i, predicateCategory.getArgument(i));
+        }
         for (ResolvedDependency dep : parse.dependencies) {
             if (dep.getHead() == predicateIndex && dep.getArgument() != dep.getHead()) {
-                if(!allArgDeps.containsKey(dep.getArgNumber())) {
-                    allArgDeps.put(dep.getArgNumber(), new HashSet<ResolvedDependency>());
-                }
+                assert allArgDeps.containsKey(dep.getArgNumber())
+                    : "Arg number on dependency should be > 0 and not exceed the number of arguments to the head";
                 allArgDeps.get(dep.getArgNumber()).add(dep);
             }
         }
-        int numArguments = predicateCategory.getNumberOfArguments();
-        this.argIndices = new LinkedList<Set<Integer>>();
-        argIndices.add(new HashSet<Integer>());
-        this.argCategories = new HashMap<Integer, Category>();
-        for (int i = 1; i <= numArguments; i++) {
-            argIndices.add(new HashSet<Integer>());
-            argCategories.put(i, predicateCategory.getArgument(i));
-        }
-        allArgDeps.forEach((k, v) -> argIndices.set(k, v.stream()
-                                                    .map(ResolvedDependency::getArgument)
-                                                    .collect(Collectors.toSet())));
-
         this.type = QuestionType.getTypeFor(predicateCategory);
 
         /*
@@ -276,8 +269,9 @@ public class MultiQuestionTemplate {
         */
     }
 
-    private boolean cantAskQuestion(int argNumber, List<Optional<Integer>> chosenArgs) {
-        Optional<Integer> argIndexOpt = chosenArgs.get(argNumber);
+    private boolean cantAskQuestion(int argNumber, Map<Integer, Optional<ResolvedDependency>> chosenArgDeps) {
+        Optional<ResolvedDependency> argDepOpt = chosenArgDeps.get(argNumber);
+        Optional<Integer> argIndexOpt = argDepOpt.map(ResolvedDependency::getArgument);
         if(!argIndexOpt.isPresent()) {
             return true;
         }
@@ -292,8 +286,10 @@ public class MultiQuestionTemplate {
              Category.valueOf("NP[expl]").matches(observedArgCategory)) ||
             words.get(predicateIndex).equalsIgnoreCase("of") || // "of" is just a doozy
             (type == QuestionType.VERB_ADJUNCT &&
-             chosenArgs.stream()
+             chosenArgDeps.values()
+             .stream()
              .filter(Optional::isPresent).map(Optional::get)
+             .map(ResolvedDependency::getArgument)
              .map(words::get)
              .anyMatch(VerbHelper::isCopulaVerb)) || // adverbs of copulas are wonky and not helpful
             (type == QuestionType.VERB_ADJUNCT &&
@@ -316,32 +312,33 @@ public class MultiQuestionTemplate {
      * that could possibly be appropriate for a preposition in question.
      */
     public List<QuestionAnswerPairReduced> getAllQAPairsForArgument(int targetArgNum) {
-        List<List<Optional<Integer>>> argPaths = TextGenerationHelper.getAllArgumentChoicePaths(argIndices);
+        List<Map<Integer, Optional<ResolvedDependency>>> argPaths = TextGenerationHelper.getAllArgumentChoicePaths(allArgDeps);
         final List<QuestionAnswerPairReduced> qaPairs = new ArrayList<>();
-        for(List<Optional<Integer>> chosenArgs : argPaths) {
-            instantiateForArgument(targetArgNum, chosenArgs).ifPresent(qaPairs::add);
-            getBasicSupersenseQAPairs(targetArgNum, chosenArgs).forEach(qaPairs::add);
+        for(Map<Integer, Optional<ResolvedDependency>> chosenArgDeps : argPaths) {
+            instantiateForArgument(targetArgNum, chosenArgDeps).ifPresent(qaPairs::add);
+            getBasicSupersenseQAPairs(targetArgNum, chosenArgDeps).forEach(qaPairs::add);
         }
         return qaPairs;
     }
 
-    private List<QuestionAnswerPairReduced> getBasicSupersenseQAPairs(int targetArgNum, List<Optional<Integer>> chosenArgs) {
-        if (cantAskQuestion(targetArgNum, chosenArgs)) {
+    private List<QuestionAnswerPairReduced> getBasicSupersenseQAPairs(int targetArgNum, Map<Integer, Optional<ResolvedDependency>> chosenArgDeps) {
+        if (cantAskQuestion(targetArgNum, chosenArgDeps)) {
             return new LinkedList<QuestionAnswerPairReduced>();
         }
         // for now, we will only try to do this with prepositional verb adjuncts,
         // when asking about the verb.
         List<QuestionAnswerPairReduced> qaPairs = new LinkedList<>();
-        if(Category.valueOf("((S\\NP)\\(S\\NP))/NP").matches(predicateCategory) && targetArgNum == 2 && chosenArgs.get(2).isPresent()) {
+        if(Category.valueOf("((S\\NP)\\(S\\NP))/NP").matches(predicateCategory) && targetArgNum == 2 && chosenArgDeps.get(2).isPresent()) {
             for(Supersense supersense : Supersense.getSupersensesFor(words.get(predicateIndex))) {
-                qaPairs.add(getBasicSupersenseQAPair(targetArgNum, chosenArgs, supersense));
+                qaPairs.add(getBasicSupersenseQAPair(targetArgNum, chosenArgDeps, supersense));
             }
         }
         return qaPairs;
     }
 
-    private QuestionAnswerPairReduced getBasicSupersenseQAPair(int targetArgNum, List<Optional<Integer>> chosenArgs, Supersense supersense) {
-        final int verbIndex = chosenArgs.get(2).get();
+    private QuestionAnswerPairReduced getBasicSupersenseQAPair(int targetArgNum, Map<Integer, Optional<ResolvedDependency>> chosenArgDeps, Supersense supersense) {
+        final ResolvedDependency verbDep = chosenArgDeps.get(2).get();
+        final int verbIndex = verbDep.getArgument();
         final List<String> wh = supersense.getWhWords();
         final Set<ResolvedDependency> questionDeps = new HashSet<>();
         final List<String> auxiliaries = getAuxiliariesForPredVerb(verbIndex);
@@ -351,19 +348,13 @@ public class MultiQuestionTemplate {
         questionDeps.addAll(verbWithDeps.dependencies);
         final List<String> verb = verbWithDeps.tokens;
         // first we add the deps to the list of deps we've touched
-        // XXX TODO get the right deps for args
-        final Optional<ResolvedDependency> verbDepOpt = Optional.empty();
-        // final Optional<ResolvedDependency> verbDepOpt = Optional.ofNullable(allArgDeps.get(2)).map(deps -> deps.get(0));
-        verbDepOpt.ifPresent(questionDeps::add);
-        final Optional<ResolvedDependency> subjDepOpt = parse.dependencies.stream()
-            .filter(dep -> dep.getHead() == verbIndex &&
-                    dep.getArgument() != dep.getHead() &&
-                    dep.getArgNumber() == 1)
-            .findFirst();
+        // NOTE: verbDep is actually the target dep. so, we're not including it in questionDeps.
+        // questionDeps.add(verbDep);
+        final Optional<ResolvedDependency> subjDepOpt = chosenArgDeps.get(1);
         subjDepOpt.ifPresent(questionDeps::add);
 
         // then we locate the subj in the sentence
-        final Optional<Integer> subjIndexOpt = chosenArgs.get(1);
+        final Optional<Integer> subjIndexOpt = subjDepOpt.map(ResolvedDependency::getArgument);
         final Category subjCategory = argCategories.get(1); // this is always NP anyway
 
         // then we generate the text, again logging the dependencies touched.
@@ -397,8 +388,7 @@ public class MultiQuestionTemplate {
             .filter(s -> s != null && !s.isEmpty()) // to mitigate oversights. harmless anyway
             .collect(Collectors.toList());
         // and the answer is our PP.
-        // XXX get the right one
-        final ResolvedDependency targetDep = null;
+        final ResolvedDependency targetDep = verbDep;
         // TODO get all of them
         final TextWithDependencies answer = TextGenerationHelper
             .getRepresentativePhrases(Optional.of(predicateIndex), Category.valueOf("(S\\NP)\\(S\\NP)"), parse).get(0);
@@ -410,29 +400,18 @@ public class MultiQuestionTemplate {
                                       question,
                                       targetDep,
                                       answer);
-        // for(QuestionAnswerPair qaPair : basicAdjunctPairs) {
-        //     int code = (qaPair.renderQuestion() + qaPair.renderAnswer()).hashCode();
-        //     if(!qaPairsPrinted.contains(code)) {
-        //         if(logging) {
-        //             System.err.println(qaPair.renderQuestion());
-        //             System.err.println("\t" + qaPair.renderAnswer());
-        //         }
-        //         qaPairsPrinted.add(code);
-        //     }
-        // }
-
     }
 
-    public Optional<QuestionAnswerPairReduced> instantiateForArgument(int targetArgNum, List<Optional<Integer>> chosenArgs) {
-        if(cantAskQuestion(targetArgNum, chosenArgs)) {
+    public Optional<QuestionAnswerPairReduced> instantiateForArgument(int targetArgNum, Map<Integer, Optional<ResolvedDependency>> chosenArgDeps) {
+        if(cantAskQuestion(targetArgNum, chosenArgDeps)) {
             return Optional.empty();
         }
         final Set<ResolvedDependency> questionDeps = new HashSet<>();
 
-        final Optional<Integer> targetIndexOpt = chosenArgs.get(targetArgNum);
-        assert targetIndexOpt.isPresent() : "Should not ask questions about unrealized arguments";
-        final int targetIndex = targetIndexOpt.get();
-        final String wh = getWhWordByArgNum(targetIndex);
+        // we should never ask about unrealized arguments
+        final ResolvedDependency targetDep = chosenArgDeps.get(targetArgNum).get();
+        final int targetIndex = targetDep.getArgument();
+        final String wh = getWhWordByIndex(targetIndex);
         final List<String> auxiliaries = new ArrayList<>();
         // we need the verb of the clause our predicate appears in,
         // which we will use to determine the auxiliaries we'll be using
@@ -440,9 +419,9 @@ public class MultiQuestionTemplate {
         if(type == QuestionType.VERB) {
             verbIndexOpt = Optional.of(predicateIndex);
         } else if(type == QuestionType.VERB_ADJUNCT) {
-            verbIndexOpt = chosenArgs.get(2);
+            verbIndexOpt = chosenArgDeps.get(2).map(ResolvedDependency::getArgument);
         } else if(type == QuestionType.RELATIVIZER) {
-            verbIndexOpt = chosenArgs.get(2);
+            verbIndexOpt = chosenArgDeps.get(2).map(ResolvedDependency::getArgument);
         } else {
             verbIndexOpt = Optional.empty();
         }
@@ -484,43 +463,34 @@ public class MultiQuestionTemplate {
             List<String> argWords = new ArrayList<>();
             // TODO: restructure/simplify this, we have lots of things only working because of guarantees established earlier in the code...
             if(currentArgNum == targetArgNum) { // if we're asking about the target, we have to put in placeholder words
-                // we won't ask about the target if it's unrealized, so this should be safe
-                Optional<Integer> argIndexOpt = chosenArgs.get(currentArgNum);
-                assert argIndexOpt.isPresent();
-                int argIndex = argIndexOpt.get();
-                if(verbIndexOpt.isPresent() && (argIndex == verbIndexOpt.get())) {
-                    // this can only happen when we're asking about the verb,
-                    // which means we're not asking about the subject,
-                    // which means the verb must be split.
-                    // in any such situation the result should be "do" anyway.
-                    argWords.addAll(getTargetMainVerbPlaceholder(argIndex));
+                // here we know target dep and target index will be the arg dep and index.
+                if(verbIndexOpt.isPresent() && (targetIndex == verbIndexOpt.get())) {
+                    // since we're asking about the verb, we're going to include the subject, so we'll split the verb.
+                    argWords.addAll(getTargetMainVerbPlaceholder(targetIndex));
                 } else {
-                    argWords.addAll(getTargetArgumentPlaceholder(currentArgNum, argIndex));
+                    argWords.addAll(getTargetArgumentPlaceholder(currentArgNum, targetIndex));
                 }
             } else {
                 // this is complicated... consider simplifying.
-                // TODO XXX we add the dependency to the list of deps we've touched
-                // Optional<ResolvedDependency> firstArgDepOpt = Optional.ofNullable(allArgDeps.get(currentArgNum)).map(deps -> deps.get(0));
-                // firstArgDepOpt.ifPresent(dep -> questionDeps.add(dep));
-
-                final Optional<Integer> argIndexOpt;
+                final Category argCategory = argCategories.get(currentArgNum);
+                Optional<ResolvedDependency> argDepOpt = chosenArgDeps.get(currentArgNum);
                 // and now, we have an XXX HACK workaround to get subjects to show up when using adverbs!
-                if(type == QuestionType.VERB_ADJUNCT && currentArgNum == 1) {
-                    argIndexOpt = parse.dependencies.stream()
+                if(!argDepOpt.isPresent() && type == QuestionType.VERB_ADJUNCT && currentArgNum == 1) {
+                    argDepOpt = parse.dependencies
+                        .stream()
                         .filter(dep -> dep.getHead() == verbIndexOpt.get() &&
                                 dep.getArgument() != dep.getHead() &&
                                 dep.getArgNumber() == 1)
-                        .findFirst()
-                        .map(ResolvedDependency::getArgumentIndex);
-                } else {
-                    argIndexOpt = chosenArgs.get(currentArgNum);
+                        .findFirst();
                 }
-                final Category argCategory = argCategories.get(currentArgNum);
-                // then we generate the text for that argument, again logging the dependencies touched.
+                argDepOpt.ifPresent(dep -> questionDeps.add(dep));
+                final Optional<Integer> argIndexOpt = argDepOpt.map(ResolvedDependency::getArgument);
 
+                // then we generate the text for that argument, again logging the dependencies touched.
                 if(!argIndexOpt.isPresent()) {
                     TextWithDependencies argWithDeps = TextGenerationHelper
-                        .getRepresentativePhrases(argIndexOpt, argCategory, parse).get(0);
+                        .getRepresentativePhrases(argIndexOpt, argCategory, parse)
+                        .get(0);
                     questionDeps.addAll(argWithDeps.dependencies);
                     argWords = argWithDeps.tokens;
                 } else {
@@ -535,7 +505,8 @@ public class MultiQuestionTemplate {
                             fixedPronounString = pronounOpt.map(pron -> pron.withCase(Pronoun.Case.ACCUSATIVE).toString());
                         }
                         TextWithDependencies argWithDeps = TextGenerationHelper
-                            .getRepresentativePhrases(argIndexOpt, argCategory, parse, fixedPronounString).get(0);
+                            .getRepresentativePhrases(argIndexOpt, argCategory, parse, fixedPronounString)
+                            .get(0);
                         questionDeps.addAll(argWithDeps.dependencies);
                         argWords = argWithDeps.tokens;
                     } else if(verbIndexOpt.isPresent() && argIndex == verbIndexOpt.get()) {
@@ -584,17 +555,12 @@ public class MultiQuestionTemplate {
             .filter(s -> s != null && !s.isEmpty()) // to mitigate oversights. harmless anyway
             .collect(Collectors.toList());
 
-        // XXX TODO get correct dependencies
-        final ResolvedDependency targetDep = null;
-        assert chosenArgs.get(targetArgNum).isPresent()
-            : "We should not be asking about an unrealized argument";
-        final int answerIndex = chosenArgs.get(targetArgNum).get();
-        final Category answerCategory = argCategories.get(targetArgNum);
-        Optional<String> replaceOpt = Optional.of(answerCategory)
+        final Category targetCategory = argCategories.get(targetArgNum);
+        Optional<String> replaceOpt = Optional.of(targetCategory)
             .filter(cat -> cat.isFunctionInto(Category.valueOf("S\\NP")))
-            .map(arg -> TextGenerationHelper.renderString(getBarePredVerb(answerIndex)));
+            .map(arg -> TextGenerationHelper.renderString(getBarePredVerb(targetIndex)));
         final TextWithDependencies answer = TextGenerationHelper
-            .getRepresentativePhrases(Optional.of(answerIndex), answerCategory, parse, replaceOpt)
+            .getRepresentativePhrases(Optional.of(targetIndex), targetCategory, parse, replaceOpt)
             .get(0);
 
         final QuestionAnswerPairReduced qaPair = new QuestionAnswerPairReduced(predicateIndex,
@@ -615,7 +581,7 @@ public class MultiQuestionTemplate {
      * @param argNum the argument number of the word we're abstracting away
      * @return a 2-element array of { "wh-word", "extra words" } where extra words may be empty
      */
-    public String getWhWordByArgNum(int index) {
+    public String getWhWordByIndex(int index) {
         return Optional.of(index)
             .map(words::get)
             .flatMap(Pronoun::fromString)
