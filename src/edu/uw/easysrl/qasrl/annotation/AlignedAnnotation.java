@@ -9,7 +9,9 @@ import java.util.*;
 public class AlignedAnnotation extends RecordedAnnotation {
     Map<String, Integer> annotatorToAnswerId;
     Map<String, String> annotatorToComment;
-    int[] answerDist;
+    public List<String> answerOptions;
+    public int[] answerDist;
+    public double[] answerTrust;
 
     AlignedAnnotation(RecordedAnnotation annotation) {
         super();
@@ -28,14 +30,21 @@ public class AlignedAnnotation extends RecordedAnnotation {
         annotatorToAnswerId = new HashMap<>();
         annotatorToComment = new HashMap<>();
         answerDist = new int[answerStrings.size()];
+        answerTrust = new double[answerStrings.size()];
         Arrays.fill(answerDist, 0);
+        Arrays.fill(answerTrust, 0.0);
     }
 
     boolean addAnnotation(String annotator, RecordedAnnotation annotation) {
+        // TODO: check options are the same.
+        if (answerOptions == null) {
+            answerOptions = annotation.answerStrings;
+        }
         // Some annotation records may contain duplicates.
         if (this.isSameQuestionAs(annotation) && !annotatorToAnswerId.containsKey(annotator)) {
             annotatorToAnswerId.put(annotator, annotation.answerId);
             answerDist[annotation.answerId] ++;
+            answerTrust[annotation.answerId] += annotation.trust;
             if (annotation.comment != null && !annotation.comment.isEmpty()) {
                 annotatorToComment.put(annotator, annotation.comment);
             }
@@ -69,6 +78,22 @@ public class AlignedAnnotation extends RecordedAnnotation {
         return new ArrayList<>(alignedAnnotations.values());
     }
 
+    public static List<AlignedAnnotation> getAlignedAnnotations(List<RecordedAnnotation> annotations) {
+        Map<String, AlignedAnnotation> alignedAnnotations = new HashMap<>();
+
+        annotations.forEach(annotation -> {
+            String queryKey = "SID=" + annotation.sentenceId + "_PRED=" + annotation.predicateId + "_ARGNUM=" +
+                    annotation.argumentNumber + "_Q=" + annotation.question;
+            if (!alignedAnnotations.containsKey(queryKey)) {
+                alignedAnnotations.put(queryKey, new AlignedAnnotation(annotation));
+            }
+            AlignedAnnotation alignedAnnotation = alignedAnnotations.get(queryKey);
+            assert alignedAnnotation.isSameQuestionAs(annotation);
+            alignedAnnotation.addAnnotation(annotation.annotatorId, annotation);
+        });
+        return new ArrayList<>(alignedAnnotations.values());
+    }
+
     @Override
     public String toString() {
         // Number of iteration in user session.
@@ -93,6 +118,27 @@ public class AlignedAnnotation extends RecordedAnnotation {
         return result;
     }
 
+    public static List<AlignedAnnotation> getAllAlignedAnnotationsFromPilotStudy() {
+        Map<String, List<RecordedAnnotation>> annotations = new HashMap<>();
+        String[] pilotAnnotationFiles = new String[] {
+                "pilot_annotation/Julian_20160211-2216.txt",
+                "pilot_annotation/Luke_20160212-1257.txt",
+                "pilot_annotation/Mike_20160211-2125.txt",
+                "pilot_annotation/Luheng_20160213-1722.txt"
+        };
+        for (String fileName : pilotAnnotationFiles) {
+            String[] info = fileName.split("/");
+            String annotator = info[info.length - 1].split("_")[0];
+            System.out.println(annotator);
+            try {
+                annotations.put(annotator, RecordedAnnotation.loadAnnotationRecordsFromFile(fileName));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        return AlignedAnnotation.getAlignedAnnotations(annotations, null);
+    }
+
     public static void main(String[] args) {
         Map<String, List<RecordedAnnotation>> annotations = new HashMap<>();
         for (String fileName : args) {
@@ -107,6 +153,7 @@ public class AlignedAnnotation extends RecordedAnnotation {
         }
         List<AlignedAnnotation> alignedAnnotations = AlignedAnnotation.getAlignedAnnotations(annotations, null);
         alignedAnnotations.stream()
+                .filter(r -> r.answerDist[r.goldAnswerId] == 4)
                 .sorted((r1, r2) -> Integer.compare(r1.sentenceId, r2.sentenceId))
                 .forEach(System.out::print);
     }

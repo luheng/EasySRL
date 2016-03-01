@@ -58,8 +58,8 @@ public class MultiQuestionTemplate {
                  /* ,Category.valueOf("(S\\NP)\\(S\\NP)")
                     ,Category.valueOf("((S\\NP)\\(S\\NP))/S")
                     ,Category.valueOf("((S\\NP)\\(S\\NP))/(S[ng]\\NP)") // ``by'' as in ``by doing something''.
-                    ,Category.valueOf("((S\NP)\(S\NP))/PP") // according (to): 
-                    ,Category.valueOf("((S\NP)\(S\NP))/PP") // down (from): 
+                    ,Category.valueOf("((S\NP)\(S\NP))/PP") // according (to):
+                    ,Category.valueOf("((S\NP)\(S\NP))/PP") // down (from):
                  */
             ),
         CLAUSE_ADJUNCT(

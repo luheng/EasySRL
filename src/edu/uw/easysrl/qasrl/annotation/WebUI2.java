@@ -21,7 +21,6 @@ import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.handler.ResourceHandler;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.util.resource.Resource;
-import org.eclipse.jetty.util.resource.ResourceCollection;
 
 /**
  * Sentence-by-sentence annotation interface.
@@ -200,7 +199,8 @@ public class WebUI2 {
             // Annotation margin.
             httpWriter.println("<panel panel-default>\n");
             httpWriter.println("<h5><span class=\"label label-primary\" for=\"Sentence\">Sentence:</span></h5>");
-            httpWriter.println("<div id=\"Sentence\"> " + TextGenerationHelper.renderHTMLString(words, nextQuery.getPredicateIndex()) + " </div>");
+            httpWriter.println("<div id=\"Sentence\"> " + TextGenerationHelper.renderHTMLSentenceString(words,
+                    nextQuery.getPredicateIndex(), true /* highlight predicate */) + " </div>");
             httpWriter.println("<h5><span class=\"label label-primary\" for=\"Question\">Question:</span><br></h5>");
             httpWriter.println("<div id=\"Question\"> " + nextQuery.getQuestion() + " </div>");
 
