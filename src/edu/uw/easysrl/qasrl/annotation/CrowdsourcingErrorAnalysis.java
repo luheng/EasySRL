@@ -1,8 +1,7 @@
 package edu.uw.easysrl.qasrl.annotation;
 
+import edu.uw.easysrl.corpora.ParallelCorpusReader;
 import edu.uw.easysrl.qasrl.*;
-import edu.uw.easysrl.qasrl.corpora.GreedyAnswerAligner;
-import edu.uw.easysrl.qasrl.pomdp.ObservationModel;
 import edu.uw.easysrl.qasrl.pomdp.POMDP;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
@@ -29,7 +28,8 @@ public class CrowdsourcingErrorAnalysis {
         Map<Integer, List<AlignedAnnotation>> annotations = loadData(annotationFilePath);
         assert annotations != null;
 
-        printOneStepAnalysis(annotations);
+        //printOneStepAnalysis(annotations);
+        printSequentialAnalysis(annotations);
     }
 
     private static Map<Integer, List<AlignedAnnotation>> loadData(String fileName) {
@@ -63,27 +63,38 @@ public class CrowdsourcingErrorAnalysis {
             learner.initializeForSentence(sentenceId, annotations.get(sentenceId));
             final List<GroupedQuery> queries = learner.getQueryPool();
             for (GroupedQuery query : queries) {
-                int[] optionDist = getUserResponses(query, annotations.get(sentenceId));
-                if (optionDist == null) {
+                AlignedAnnotation annotation = getAlignedAnnotation(query, annotations.get(sentenceId));
+                if (annotation == null) {
                     continue;
                 }
+                int[] optionDist = getUserResponses(query, annotation);
+                Set<Integer> unmatched = getUnmatchedAnnotationOptions(query, annotation);
                 int goldOption  = goldSimulator.answerQuestion(query).chosenOptions.get(0);
                 Results baselineF1 = learner.getOneBestF1(sentenceId);
                 Results oracleF1 = learner.getOracleF1(sentenceId);
                 Results[] rerankedF1 = new Results[optionDist.length];
+                int oracleParseId = learner.getOracleParseId(sentenceId);
+                int oracleOption = -1;
+                int oneBestOption = -1;
                 for (int j = 0; j < optionDist.length; j++) {
                     learner.resetBeliefModel();
                     query.computeProbabilities(learner.beliefModel.belief);
                     learner.receiveObservationForQuery(query, new Response(j));
                     rerankedF1[j] = learner.getRerankedF1(sentenceId);
+                    if (query.getAnswerOptions().get(j).getParseIds().contains(oracleParseId)) {
+                        oracleOption = j;
+                    }
+                    if (query.getAnswerOptions().get(j).getParseIds().contains(0)) {
+                        oneBestOption = j;
+                    }
                 }
                 // Print.
                 String sentenceStr = query.getSentence().stream().collect(Collectors.joining(" "));
                 int predId = query.getPredicateIndex();
-                String result =  "SID=" + sentenceId + "\t" + sentenceStr + "\n" + "PRED=" + predId+ "\t"
-                        + query.getQuestionKey() + "\n" + query.getQuestion() + "\n";
-                result += String.format("Baseline:\t%.3f%%\tOracle:%.3f%%\n", 100.0 * baselineF1.getF1(),
-                        100.0 * oracleF1.getF1());
+                String result =  "SID=" + sentenceId + "\t" + sentenceStr + "\n" + "PRED=" + predId+ "\t \t"
+                        + query.getQuestion() + "\t" + query.getQuestionKey() + "\t"
+                        + String.format("Baseline:: %.3f%%\tOracle:: %.3f%%\tOracle ParseId::%d\n",
+                                100.0 * baselineF1.getF1(), 100.0 * oracleF1.getF1(), oracleParseId);
                 for (int j = 0; j < optionDist.length; j++) {
                     String match = "";
                     for (int k = 0; k < optionDist[j]; k++) {
@@ -92,19 +103,41 @@ public class CrowdsourcingErrorAnalysis {
                     if (j == goldOption) {
                         match += "G";
                     }
+                    if (j == oracleOption) {
+                        match += "O";
+                    }
+                    if (j == oneBestOption) {
+                        match += "B";
+                    }
                     String improvement = " ";
                     if (rerankedF1[j].getF1() < baselineF1.getF1() - 1e-8) {
-                        improvement = "-";
+                        improvement = "[-]";
                     } else if (rerankedF1[j].getF1() > baselineF1.getF1() + 1e-8) {
-                        improvement = "+";
+                        improvement = "[+]";
                     }
                     GroupedQuery.AnswerOption option = query.getAnswerOptions().get(j);
-                    result += String.format("%-8s\t%d\t%.3f\t%-40s\t%.3f%%\t%s\n", match, j,
-                            option.getProbability(), option.getAnswer(), 100.0 * rerankedF1[j].getF1(),
-                            improvement);
+                    result += String.format("%-8s\t%.3f\t%-40s\t%.3f%%\t%s\n", match, option.getProbability(),
+                            option.getAnswer(), 100.0 * rerankedF1[j].getF1(), improvement);
+                }
+                int cnt = optionDist.length;
+                for (int j : unmatched) {
+                    String match = "";
+                    for (int k = 0; k < annotation.answerDist[j]; k++) {
+                        match += "*";
+                    }
+                    result += String.format("%-8s\t---\t%-40s\n", match, annotation.answerOptions.get(j));
                 }
                 System.out.println(result);
             }
+        }
+    }
+
+    static class DebugBlock {
+        double F1;
+        String block;
+        DebugBlock(double F1, String block) {
+            this.F1 = F1;
+            this.block = block;
         }
     }
 
@@ -112,34 +145,74 @@ public class CrowdsourcingErrorAnalysis {
         List<Integer> sentenceIds = annotations.keySet().stream().sorted().collect(Collectors.toList());
         System.out.println(sentenceIds.stream().map(String::valueOf).collect(Collectors.joining(", ")));
 
+        Results avgBaseline = new Results(),
+                avgRerank = new Results();
+
         // Learn a observation model.
         POMDP learner = new POMDP(nBest, 1000, 0.0);
         ResponseSimulator goldSimulator = new ResponseSimulatorGold(learner.goldParses, new QuestionGenerator());
+        List<DebugBlock> debugging = new ArrayList<>();
         for (int sentenceId : sentenceIds) {
             learner.initializeForSentence(sentenceId, annotations.get(sentenceId));
+            Results oracleF1 = learner.getOracleF1(sentenceId);
+            Results baselineF1 = learner.getOneBestF1(sentenceId);
+            Results currentF1 = learner.getRerankedF1(sentenceId);
             final List<GroupedQuery> queries = learner.getQueryPool();
+            int queryCount = 0;
+            String sentenceDebuggingString = "";
             for (GroupedQuery query : queries) {
-                int[] optionDist = getUserResponses(query, annotations.get(sentenceId));
-                if (optionDist == null) {
+                AlignedAnnotation annotation = getAlignedAnnotation(query, annotations.get(sentenceId));
+                if (annotation == null) {
                     continue;
                 }
-                int goldOption  = goldSimulator.answerQuestion(query).chosenOptions.get(0);
-                Results baselineF1 = learner.getOneBestF1(sentenceId);
-                Results oracleF1 = learner.getOracleF1(sentenceId);
-                Results[] rerankedF1 = new Results[optionDist.length];
 
-                // Get best option.
-                int bestOption = 0;
-                for (int j = 1; j < optionDist.length; j++) {
-                    if (optionDist[j] > optionDist[bestOption]) {
-                        bestOption = j;
+                if (queryCount == 0) {
+                    /*
+                    for (int i = 0; i < learner.beliefModel.belief.length; i++) {
+                        System.out.print(learner.beliefModel.belief[i] * 100 + "\t");
+                    }
+                    System.out.println("\n");
+                    */
+                    queryCount ++;
+                }
+
+                int[] optionDist = getUserResponses(query, annotation);
+                Set<Integer> unmatched = getUnmatchedAnnotationOptions(query, annotation);
+                int goldOption  = goldSimulator.answerQuestion(query).chosenOptions.get(0);
+
+                Results[] rerankedF1 = new Results[optionDist.length];
+                int oracleParseId = learner.getOracleParseId(sentenceId);
+                int oracleOption = -1;
+                int oneBestOption = -1;
+                int userOption = -1;
+                for (int j = 0; j < optionDist.length; j++) {
+                    if (query.getAnswerOptions().get(j).getParseIds().contains(oracleParseId)) {
+                        oracleOption = j;
+                    }
+                    if (query.getAnswerOptions().get(j).getParseIds().contains(0)) {
+                        oneBestOption = j;
+                    }
+                    if (userOption < 0 || optionDist[j] > optionDist[userOption]) {
+                        userOption = j;
                     }
                 }
+
+                if (userOption < 0) {
+                    userOption = oneBestOption;
+                }
+                // Take majority vote;
+                query.computeProbabilities(learner.beliefModel.belief);
+                learner.receiveObservationForQuery(query, new Response(userOption));
+                rerankedF1[userOption] = learner.getRerankedF1(sentenceId);
+
                 // Print.
                 String sentenceStr = query.getSentence().stream().collect(Collectors.joining(" "));
                 int predId = query.getPredicateIndex();
-                String result =  "SID=" + sentenceId + "\t" + sentenceStr + "\n" + "PRED=" + predId+ "\t"
-                        + query.getQuestionKey() + "\n" + query.getQuestion() + "\n";
+                int rerankParseId = learner.getRerankParseId(sentenceId);
+                String result =  "SID=" + sentenceId + "\t" + sentenceStr + "\n" + "PRED=" + predId+ "\t \t"
+                        + query.getQuestion() + "\t" + query.getQuestionKey() + "\t"
+                        + String.format("Baseline:: %.3f%%\tOracle:: %.3f%%\tOracle ParseId::%d\tRerank ParseId::%d\n",
+                        100.0 * baselineF1.getF1(), 100.0 * oracleF1.getF1(), oracleParseId, rerankParseId);
                 for (int j = 0; j < optionDist.length; j++) {
                     String match = "";
                     for (int k = 0; k < optionDist[j]; k++) {
@@ -148,45 +221,114 @@ public class CrowdsourcingErrorAnalysis {
                     if (j == goldOption) {
                         match += "G";
                     }
-                    String improvement = "";
-                    if (rerankedF1[j].getF1() < baselineF1.getF1() - 1e-8) {
-                        improvement = "-";
-                    } else if (rerankedF1[j].getF1() > baselineF1.getF1() + 1e-8) {
-                        improvement = "+";
+                    if (j == oracleOption) {
+                        match += "O";
+                    }
+                    if (j == oneBestOption) {
+                        match += "B";
+                    }
+                    if (j == userOption) {
+                        match += "U";
+                    }
+                    String improvement = " ";
+                    if (rerankedF1[j] != null) {
+                        if (rerankedF1[j].getF1() < currentF1.getF1() - 1e-8) {
+                            improvement = "[-]";
+                        } else if (rerankedF1[j].getF1() > currentF1.getF1() + 1e-8) {
+                            improvement = "[+]";
+                        }
                     }
                     GroupedQuery.AnswerOption option = query.getAnswerOptions().get(j);
-                    result += String.format("%-8s\t%d\t%.3f\t%-40s\t%.3f%%\t%s\n", match, j,
-                            option.getProbability(), option.getAnswer(), 100.0 * rerankedF1[j].getF1(),
-                            improvement);
+                    if (j == userOption) {
+                        Results debuggingF1 = CcgEvaluation.evaluate(
+                                learner.allParses.get(sentenceId).get(rerankParseId).dependencies,
+                                learner.goldParses.get(sentenceId).dependencies);
+                        assert Math.abs(debuggingF1.getF1() - rerankedF1[j].getF1()) < 1e-6;
+                        result += String.format("%-8s\t%.3f\t%-40s\t%.3f%%\t%s\t%s\n", match, option.getProbability(),
+                                option.getAnswer(), 100.0 * rerankedF1[j].getF1(), improvement,
+                                DebugPrinter.getShortListString(option.getParseIds()));
+                        currentF1 = rerankedF1[j];
+                    } else {
+                        result += String.format("%-8s\t%.3f\t%-40s\t-\t-\t%s\n", match, option.getProbability(),
+                                option.getAnswer(), DebugPrinter.getShortListString(option.getParseIds()));
+                    }
                 }
-                result += String.format("Baseline:\t%.3f%%\tOracle:%.3f%%", 100.0 * baselineF1.getF1(),
-                        100.0 * oracleF1.getF1());
-                System.out.println(result);
+                int cnt = optionDist.length;
+                for (int j : unmatched) {
+                    String match = "";
+                    for (int k = 0; k < annotation.answerDist[j]; k++) {
+                        match += "*";
+                    }
+                    result += String.format("%-8s\t---\t%-40s\n", match, annotation.answerOptions.get(j));
+                }
+                sentenceDebuggingString += result + "\n";
+                //System.out.println(result);
+                /*
+                for (int i = 0; i < learner.beliefModel.belief.length; i++) {
+                    System.out.print(learner.beliefModel.belief[i] * 100 + "\t");
+                }
+                System.out.println("\n");
+                */
+            }
+            if (queryCount > 0) {
+                sentenceDebuggingString += String.format("Final F1: %.3f%% over %.3f%% baseline.\t", 100.0 * currentF1.getF1(),
+                        100.0 * baselineF1.getF1()) + (currentF1.getF1() > baselineF1.getF1() ? "Improved." :
+                        (currentF1.getF1() < baselineF1.getF1() ? "Worsened." : "Unchanged")) + "\n";
+                avgBaseline.add(baselineF1);
+                avgRerank.add(currentF1);
+                debugging.add(new DebugBlock(currentF1.getF1() - baselineF1.getF1(), sentenceDebuggingString));
             }
         }
+        System.out.println("Baseline:\n" + avgBaseline + "\nRerank:\n" + avgRerank);
+        debugging.stream().sorted((b1, b2) ->
+            Double.compare(b1.F1, b2.F1)
+        ).forEach(b -> System.out.println(b.block));
     }
 
-    private static int[] getUserResponses(GroupedQuery query, List<AlignedAnnotation> annotations) {
+    private static int[] getUserResponses(GroupedQuery query, AlignedAnnotation annotation) {
         String qkey =query.getPredicateIndex() + "\t" + query.getQuestion();
         int numOptions = query.getAnswerOptions().size();
         int[] optionDist = new int[numOptions];
         Arrays.fill(optionDist, 0);
-        boolean matchedAnnotation = false;
+        String qkey2 = annotation.predicateId + "\t" + annotation.question;
+        if (qkey.equals(qkey2)) {
+            for (int i = 0; i < numOptions; i++) {
+                for (int j = 0; j < annotation.answerOptions.size(); j++) {
+                    if (query.getAnswerOptions().get(i).getAnswer().equals(annotation.answerStrings.get(j))) {
+                        optionDist[i] += annotation.answerDist[j];
+                        break;
+                    }
+                }
+            }
+        }
+        return optionDist;
+    }
+
+    private static AlignedAnnotation getAlignedAnnotation(GroupedQuery query, List<AlignedAnnotation> annotations) {
+        String qkey =query.getPredicateIndex() + "\t" + query.getQuestion();
         for (AlignedAnnotation annotation : annotations) {
             String qkey2 = annotation.predicateId + "\t" + annotation.question;
             if (qkey.equals(qkey2)) {
-                for (int i = 0; i < numOptions; i++) {
-                    for (int j = 0; j < annotation.answerStrings.size(); j++) {
-                        if (query.getAnswerOptions().get(i).getAnswer().equals(annotation.answerStrings.get(j))) {
-                            optionDist[i] += annotation.answerDist[j];
-                            break;
-                        }
-                    }
-                }
-                matchedAnnotation = true;
-                break;
+                return annotation;
             }
         }
-        return matchedAnnotation ? optionDist : null;
+        return null;
+    }
+
+    private static Set<Integer> getUnmatchedAnnotationOptions(GroupedQuery query, AlignedAnnotation annotation) {
+        Set<Integer> unmatched = new HashSet<>();
+        for (int i = 0; i < annotation.answerStrings.size(); i++) {
+            boolean matched = false;
+            for (int j = 0; j < query.getAnswerOptions().size(); j++) {
+                if (query.getAnswerOptions().get(j).getAnswer().equals(annotation.answerStrings.get(i))) {
+                    matched = true;
+                    break;
+                }
+            }
+            if (!matched) {
+                unmatched.add(i);
+            }
+        }
+        return unmatched;
     }
 }
