@@ -139,7 +139,7 @@ public class ActiveLearningBySentence {
         for (int sentIdx : sentenceIds) {
             List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
             List<Parse> parses = allParses.get(sentIdx);
-            List<GroupedQuery> queries = QueryGeneratorNew2.generateQueries(sentIdx, words, parses, questionGenerator);
+            List<GroupedQuery> queries = QueryGeneratorNew2.generateQueries(sentIdx, words, parses);
             queries.stream().forEach(query -> {
                 // query.computeProbabilities(reranker.expScores.get(query.sentenceId));
                 query.computeProbabilities(reranker.getParseScores(query.sentenceId));

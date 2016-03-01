@@ -146,7 +146,7 @@ public class ActiveLearning {
         for (int sentIdx : allParses.keySet()) {
             List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
             List<Parse> parses = allParses.get(sentIdx);
-            List<GroupedQuery> queries = QueryGeneratorNew2.generateQueries(sentIdx, words, parses, questionGenerator);
+            List<GroupedQuery> queries = QueryGeneratorNew2.generateQueries(sentIdx, words, parses);
             queries.forEach(query -> {
                 query.computeProbabilities(reranker.getParseScores(query.sentenceId));
                 if (query.answerEntropy > 1e-3) {

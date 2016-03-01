@@ -126,7 +126,7 @@ public class POMDP {
         timeStep = 0;
         List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
         List<Parse> parses = allParses.get(sentIdx);
-        List<GroupedQuery> queries = QueryGeneratorNew2.generateQueries(sentIdx, words, parses, questionGenerator);
+        List<GroupedQuery> queries = QueryGeneratorNew2.generateQueries(sentIdx, words, parses);
         queries.stream().forEach(query -> {
             query.setQueryId(queryPool.size());
             queryPool.add(query);
@@ -150,7 +150,7 @@ public class POMDP {
         timeStep = 0;
         List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
         List<Parse> parses = allParses.get(sentIdx);
-        List<GroupedQuery> queries = QueryGeneratorNew2.generateQueries(sentIdx, words, parses, questionGenerator);
+        List<GroupedQuery> queries = QueryGeneratorNew2.generateQueries(sentIdx, words, parses);
         queries.stream().forEach(query -> {
             if (annotations.stream().anyMatch(annotation -> annotation.sentenceId == sentIdx
                     && annotation.question.equals(query.getQuestion()))) {
