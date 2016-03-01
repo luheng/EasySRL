@@ -59,6 +59,26 @@ public class QueryGeneratorBothWays {
         }
     }
 
+    public List<MultiQuery> getAllMaximalQueries() {
+        List<MultiQuery> queries = new LinkedList<MultiQuery>();
+        for(String question : questionToPairs.keySet()) {
+            List<QuestionAnswerPairReduced> qaPairs = questionToPairs.get(question);
+            Set<String> answers = qaPairs.stream()
+                .map(QuestionAnswerPairReduced::renderAnswer)
+                .collect(Collectors.toSet());
+            queries.add(new MultiQuery.Forward(sentenceId, question, answers, qaStringsToQAPairs, qaStringsToParses));
+        }
+        for(String answer : answerToPairs.keySet()) {
+            List<QuestionAnswerPairReduced> qaPairs = answerToPairs.get(answer);
+            Set<String> questions = qaPairs.stream()
+                .map(QuestionAnswerPairReduced::renderQuestion)
+                .collect(Collectors.toSet());
+            queries.add(new MultiQuery.Backward(sentenceId, answer, questions, qaStringsToQAPairs, qaStringsToParses));
+        }
+        return queries;
+    }
+
+
     private double parseLogProbability(Parse p) {
         return p.score - logNormalizer;
     }
@@ -120,25 +140,6 @@ public class QueryGeneratorBothWays {
             assert false : "qaStringsToParses missing qa pair: " + question + " --- " + answer;
             return false;
         }
-    }
-
-    public List<MultiQuery> generateQueries() {
-        List<MultiQuery> queries = new LinkedList<MultiQuery>();
-        for(String question : questionToPairs.keySet()) {
-            List<QuestionAnswerPairReduced> qaPairs = questionToPairs.get(question);
-            Set<String> answers = qaPairs.stream()
-                .map(QuestionAnswerPairReduced::renderAnswer)
-                .collect(Collectors.toSet());
-            queries.add(new MultiQuery.Forward(sentenceId, question, answers, qaStringsToQAPairs, qaStringsToParses));
-        }
-        for(String answer : answerToPairs.keySet()) {
-            List<QuestionAnswerPairReduced> qaPairs = answerToPairs.get(answer);
-            Set<String> questions = qaPairs.stream()
-                .map(QuestionAnswerPairReduced::renderQuestion)
-                .collect(Collectors.toSet());
-            queries.add(new MultiQuery.Backward(sentenceId, answer, questions, qaStringsToQAPairs, qaStringsToParses));
-        }
-        return queries;
     }
 
     private void registerQAPair(QuestionAnswerPairReduced qaPair, Parse parse) {

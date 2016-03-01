@@ -142,7 +142,7 @@ public class ActiveLearningReranker {
             List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
             List<Parse> parses = allParses.get(sentIdx);
             QueryGeneratorBothWays queryGenerator = new QueryGeneratorBothWays(sentIdx, words, parses);
-            List<MultiQuery> queries = queryGenerator.generateQueries();
+            List<MultiQuery> queries = queryGenerator.getAllMaximalQueries();
             queryList.addAll(queries);
         }
 

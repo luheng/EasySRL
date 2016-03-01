@@ -40,7 +40,7 @@ public class MultiResponseSimulator {
         }
     }
 
-    public Set<String> answersForQuestion(MultiQuery query) {
+    protected Set<String> answersForQuestion(MultiQuery query) {
         final int sentenceId = query.sentenceId;
         Set<String> answers = getQAPairs(sentenceId)
             .stream()
@@ -58,7 +58,7 @@ public class MultiResponseSimulator {
         return checks;
     }
 
-    public Set<String> questionsForAnswer(MultiQuery query) {
+    protected Set<String> questionsForAnswer(MultiQuery query) {
         final int sentenceId = query.sentenceId;
         Set<String> questions = getQAPairs(sentenceId)
             .stream()
@@ -74,6 +74,10 @@ public class MultiResponseSimulator {
             .filter(question -> !checks.contains(question))
             .forEach(question -> System.out.println("GG: " + question));
         return checks;
+    }
+
+    public Set<String> respondToQuery(MultiQuery query) {
+        return query.getResponse(this);
     }
 
     private List<QuestionAnswerPairReduced> getQAPairs(int sentenceId) {

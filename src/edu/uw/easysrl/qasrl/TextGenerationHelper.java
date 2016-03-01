@@ -103,13 +103,15 @@ public class TextGenerationHelper {
             if(!noSpace) {
                 result.append(" ");
             }
-            if(word.equalsIgnoreCase("a") && nextWord.isPresent() && startsWithVowel(nextWord.get())) {
-                result.append("an");
-            } else if(word.equalsIgnoreCase("an") && nextWord.isPresent() && !startsWithVowel(nextWord.get())) {
-                result.append("a");
-            } else {
-                result.append(word);
-            }
+            // only for use with NP shortcut
+            // if(word.equalsIgnoreCase("a") && nextWord.isPresent() && startsWithVowel(nextWord.get())) {
+            //     result.append("an");
+            // } else if(word.equalsIgnoreCase("an") && nextWord.isPresent() && !startsWithVowel(nextWord.get())) {
+            //     result.append("a");
+            // } else {
+            //     result.append(word);
+            // }
+            result.append(word);
             prevWord = Optional.of(prevIterator.next());
             if(nextIterator.hasNext()) {
                 nextWord = Optional.of(nextIterator.next());
@@ -392,31 +394,24 @@ public class TextGenerationHelper {
             List<String> center = getNodeWords(node, replacementIndexOpt, replacementWord);
 
             // choose argument list
-            // Map<Integer, Set<ResolvedDependency>> argDeps = new HashMap<>();
-            // for (int i = 1; i <= currentCategory.getNumberOfArguments(); i++) {
-            //     argDeps.put(i, new HashSet<Integer>());
-            // }
-            List<Set<Integer>> argIndices = new LinkedList<Set<Integer>>();
-            argIndices.add(new HashSet<Integer>());
-            for (int i = 1; i <= currentCategory.getNumberOfArguments(); i++) {
-                argIndices.add(new HashSet<Integer>());
+            Map<Integer, Set<ResolvedDependency>> allArgDeps = new HashMap<>();
+            for (int i = neededCategory.getNumberOfArguments() + 1;
+                 i <= currentCategory.getNumberOfArguments();
+                 i++) {
+                allArgDeps.put(i, new HashSet<ResolvedDependency>());
             }
-            assert argIndices.size() == currentCategory.getNumberOfArguments() + 1
-                : "Arg indices should be indexed properly";
-            // System.err.println("needed category: " + neededCategory);
-            // System.err.println("current category: " + currentCategory);
             final Category curCat = currentCategory; // for lambda below
             parse.dependencies
                 .stream()
                 .filter(dep -> dep.getHead() == headIndex)
                 .filter(dep -> dep.getArgNumber() > neededCategory.getNumberOfArguments())
                 .filter(dep -> dep.getArgNumber() <= curCat.getNumberOfArguments())
-                .forEach(dep -> argIndices.get(dep.getArgNumber()).add(dep.getArgument()));
-            List<List<Optional<Integer>>> argumentChoicePaths = getAllArgumentChoicePaths(argIndices);
+                .forEach(dep -> allArgDeps.get(dep.getArgNumber()).add(dep));
+            List<Map<Integer, Optional<ResolvedDependency>>> argumentChoicePaths = getAllArgumentChoicePaths(allArgDeps);
 
             List<TextWithDependencies> phrases = new LinkedList<>();
 
-            for(List<Optional<Integer>> chosenArgs : argumentChoicePaths) {
+            for(Map<Integer, Optional<ResolvedDependency>> chosenArgDeps : argumentChoicePaths) {
                 List<String> left = new ArrayList<>();
                 List<String> right = new ArrayList<>();
                 Set<ResolvedDependency> localDeps = new HashSet<>();
@@ -425,25 +420,15 @@ public class TextGenerationHelper {
                     currentArgNum--) {
                     // otherwise, add arguments on either side until done, according to CCG category.
                     Category argCat = currentCategory.getRight();
-                    Optional<Integer> argIndexOpt = chosenArgs.get(currentArgNum);
+                    Optional<ResolvedDependency> argDepOpt = chosenArgDeps.get(currentArgNum);
+                    Optional<Integer> argIndexOpt = argDepOpt.map(ResolvedDependency::getArgument);
                     // recover dep using the fact that we know the head leaf, arg num, and arg index.
+                    argDepOpt.map(localDeps::add);
                     final int curArg = currentArgNum; // just so we can use it in the lambda below
-                    Optional<ResolvedDependency> depOpt = argIndexOpt
-                        .flatMap(argIndex -> parse.dependencies
-                                 .stream()
-                                 .filter(dep -> (dep.getHead() == headIndex) &&
-                                         (dep.getArgNumber() == curArg) &&
-                                         (dep.getArgument() == argIndex))
-                                 .findFirst());
-                    depOpt.map(localDeps::add);
-                    // XXX TODO do it for all arrangements of sub-phrases
+                    // TODO do it for all arrangements of sub-phrases
                     TextWithDependencies argTextWithDeps =
-                        getRepresentativePhrases(argIndexOpt,
-                                                argCat,
-                                                parse,
-                                                replacementIndexOpt,
-                                                replacementWord,
-                                                lookForOf).get(0);
+                        getRepresentativePhrases(argIndexOpt, argCat, parse, replacementIndexOpt, replacementWord, lookForOf)
+                        .get(0);
                     List<String> argPhrase = argTextWithDeps.tokens;
                     localDeps.addAll(argTextWithDeps.dependencies);
                     // add the argument on the left or right side, depending on the slash
@@ -517,41 +502,7 @@ public class TextGenerationHelper {
         return deps;
     }
 
-    // this is so stupid.
-    public static List<List<Optional<Integer>>> getAllArgumentChoicePaths(List<Set<Integer>> choices) {
-        List<List<Optional<Integer>>> pastPaths = new LinkedList<>();
-        pastPaths.add(new LinkedList<Optional<Integer>>());
-        for(Set<Integer> choiceList : choices) {
-            List<List<Optional<Integer>>> currentPaths;
-            if(choiceList.isEmpty()) {
-                currentPaths = pastPaths
-                    .stream()
-                    .map(path -> {
-                            List<Optional<Integer>> newPath = new LinkedList<>();
-                            newPath.addAll(path);
-                            newPath.add(Optional.empty());
-                            return newPath;
-                        })
-                    .collect(Collectors.toList());
-            } else {
-                currentPaths = pastPaths
-                    .stream()
-                    .flatMap(path -> choiceList
-                             .stream()
-                             .map(choice -> {
-                                     List<Optional<Integer>> newPath = new LinkedList<>();
-                                     newPath.addAll(path);
-                                     newPath.add(Optional.of(choice));
-                                     return newPath;
-                                 }))
-                    .collect(Collectors.toList());
-            }
-            pastPaths = currentPaths;
-        }
-        return pastPaths;
-    }
-
-    // this is also stupid.
+    // this is somewhat stupid.
     public static List<Map<Integer, Optional<ResolvedDependency>>> getAllArgumentChoicePaths(Map<Integer, Set<ResolvedDependency>> choices) {
         List<Map<Integer, Optional<ResolvedDependency>>> pastPaths = new LinkedList<>();
         pastPaths.add(new TreeMap<Integer, Optional<ResolvedDependency>>());
@@ -564,7 +515,7 @@ public class TextGenerationHelper {
             final int argNum = argAndChoiceSet.getKey();
             final Set<ResolvedDependency> choiceSet = argAndChoiceSet.getValue();
             final List<Map<Integer, Optional<ResolvedDependency>>> currentPaths;
-            if(choicesList.isEmpty()) {
+            if(choiceSet.isEmpty()) {
                 currentPaths = pastPaths
                     .stream()
                     .map(path -> {
