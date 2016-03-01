@@ -5,6 +5,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Table;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
+import edu.uw.easysrl.qasrl.qg.QuestionAnswerPairReduced;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.grammar.Category;
 
@@ -25,92 +26,64 @@ public class QueryGeneratorNew2 {
     /**
      * @param words the sentence
      * @param parses the nbest list
-     * @param questionGenerator to generate wh-question from a resolved dependency
      */
     public static List<GroupedQuery> generateQueries(final int sentenceId, final List<String> words,
-                                                     final List<Parse> parses,
-                                                     final QuestionGenerator questionGenerator) {
+                                                     final List<Parse> parses) {
         int numParses = parses.size();
-        // double totalScore = parses.stream().mapToDouble(p->p.score).sum();
-        // TODO: DependencyToId, AnswerSpanResolver
+        double totalScore = parses.stream().mapToDouble(p->p.score).sum();
 
-        // pred.category.argnum -> question -> parses
         // question -> pred.category.argnum -> parses
         Table<String, String, Set<Integer>> questionPool = HashBasedTable.create();
-        // argHeadSet -> answer -> parses
-        Table<ImmutableList<Integer>, String, Set<Integer>> answerPool = HashBasedTable.create();
+        // answer -> answer head ids -> parses
+        Table<String, ImmutableList<Integer>, Set<Integer>> answerPool = HashBasedTable.create();
         // Bipartite, bi-directional question-answer relation.
-        Table<String, ImmutableList<Integer>, Set<Integer>> questionToAnswer = HashBasedTable.create();
-        Table<ImmutableList<Integer>, String, Set<Integer>> answerToQuestion = HashBasedTable.create();
+        Table<String, String, Set<Integer>> questionToAnswer = HashBasedTable.create();
+        Table<String, String, Set<Integer>> answerToQuestion = HashBasedTable.create();
 
-        for (int i = 0; i < words.size(); i++) {
-            // For lambda.
-            final int predId = i;
-            Table<Category, Integer, Set<Integer>> depToParses = HashBasedTable.create();
-            for (int j = 0; j < numParses; j++) {
-                // For lambda.
-                final int parseId = j;
-                parses.get(parseId).dependencies.stream()
-                        .filter(d -> d.getHead() == predId)
-                        .forEach(dep -> {
-                            Category category = dep.getCategory();
-                            int argNum = dep.getArgNumber();
-                            if (!depToParses.contains(category, argNum)) {
-                                depToParses.put(category, argNum, new HashSet<>());
-                            }
-                            depToParses.get(category, argNum).add(parseId);
-                        });
-            }
-            for (Category category : depToParses.rowKeySet()) {
-                for (int argNum : depToParses.row(category).keySet()) {
-                    for (int parseId : depToParses.get(category, argNum)) {
-                        final Parse parse = parses.get(parseId);
-                        Optional<QuestionAnswerPair> qaPairOpt = questionGenerator.generateQuestion(predId, argNum,
-                                words, parse);
-                        if (!qaPairOpt.isPresent()) {
-                            continue;
-                        }
-                        QuestionAnswerPair qa = qaPairOpt.get();
-                        String qkey = String.format("%d.%s.%d", predId, category, argNum);
-                        String question = qa.renderQuestion();
-                        final ImmutableList<Integer> heads = ImmutableList.copyOf(qa.targetDeps.stream()
-                                .map(ResolvedDependency::getArgument).sorted()
-                                .collect(Collectors.toList()));
-                        /*
-                        List<String> spans = new ArrayList<>();
-                        for (int j = 0; j < heads.size(); j++) {
-                            spans.add(getAnswerSpan(qa.answers.get(j), heads.get(j), words));
-                        }
-                        String answer = spans.stream().collect(Collectors.joining(QuestionAnswerPair.answerDelimiter));
-                        */
-                        String answer = qa.renderAnswer();
-
-                        // Register to question pool.
-                        if (!questionPool.contains(question, qkey)) {
-                            questionPool.put(question, qkey, new HashSet<>());
-                        }
-                        questionPool.get(question, qkey).add(parseId);
-
-                        // Register to answer pool.
-                        if (!answerPool.contains(heads, answer)) {
-                            answerPool.put(heads, answer, new HashSet<>());
-                        }
-                        answerPool.get(heads, answer).add(parseId);
-
-                        if (!questionToAnswer.contains(question, heads)) {
-                            questionToAnswer.put(question, heads, new HashSet<>());
-                        }
-                        if (!answerToQuestion.contains(heads, question)) {
-                            answerToQuestion.put(heads, question, new HashSet<>());
-                        }
-                        questionToAnswer.get(question, heads).add(parseId);
-                        answerToQuestion.get(heads, question).add(parseId);
+        for (int parseId = 0; parseId < numParses; parseId++) {
+            final Parse parse = parses.get(parseId);
+            for (int predId = 0; predId < words.size(); predId++) {
+                final Category category = parses.get(parseId).categories.get(predId);
+                for (int argNum = 1; argNum <= category.getNumberOfArguments(); argNum++) {
+                    List<QuestionAnswerPairReduced> qaList =
+                            QuestionGenerator.generateAllQAPairs(predId, argNum, words, parse).stream()
+                                    .filter(qa -> qa.targetDep != null)
+                                    .sorted((a1, a2) -> Integer.compare(a1.targetDep.getArgument(),
+                                            a2.targetDep.getArgument()))
+                                    .collect(Collectors.toList());
+                    if (qaList == null || qaList.size() == 0) {
+                        continue;
                     }
+                    String questionStr = qaList.get(0).renderQuestion();
+                    String questionKey = "" + predId + "." + category + "." + argNum;
+                    String answerStr = qaList.stream()
+                            .map(QuestionAnswerPairReduced::renderAnswer)
+                            .collect(Collectors.joining(QuestionAnswerPair.answerDelimiter));
+                    ImmutableList<Integer> answerHead = ImmutableList.copyOf(qaList.stream()
+                            .map(qa -> qa.targetDep.getArgument())
+                            .collect(Collectors.toList()));
+                    // Add stuff.
+                    if (!questionPool.contains(questionStr, questionKey)) {
+                        questionPool.put(questionStr, questionKey, new HashSet<>());
+                    }
+                    questionPool.get(questionStr, questionKey).add(parseId);
+                    if (!answerPool.contains(answerStr, answerHead)) {
+                        answerPool.put(answerStr, answerHead, new HashSet<>());
+                    }
+                    answerPool.get(answerStr, answerHead).add(parseId);
+                    if (!questionToAnswer.contains(questionStr, answerStr)) {
+                        questionToAnswer.put(questionStr, answerStr, new HashSet<>());
+                    }
+                    questionToAnswer.get(questionStr, answerStr).add(parseId);
+                    if (!answerToQuestion.contains(answerStr, questionStr)) {
+                        answerToQuestion.put(answerStr, questionStr, new HashSet<>());
+                    }
+                    answerToQuestion.get(answerStr, questionStr).add(parseId);
                 }
             }
         }
-        List<GroupedQuery> groupedQueryList = new ArrayList<>();
 
+        List<GroupedQuery> groupedQueryList = new ArrayList<>();
         for (String question : questionToAnswer.rowKeySet()) {
             String qkey = getBestSurfaceForm(questionPool.row(question), parses);
             String[] info = qkey.split("\\.");
@@ -122,8 +95,8 @@ public class QueryGeneratorNew2 {
             Map<String, Set<Integer>> spanToParseIds = new HashMap<>();
             Set<String> answers = new HashSet<>();
 
-            for (ImmutableList<Integer> heads : questionToAnswer.row(question).keySet()) {
-                String answer = getBestSurfaceForm(answerPool.row(heads), parses);
+            for (String answer : questionToAnswer.row(question).keySet()) {
+                ImmutableList<Integer> heads = getBestStructure(answerPool.row(answer), parses);
                 if (!answers.contains(answer)) {
                     answers.add(answer);
                     spanToParseIds.put(answer, new HashSet<>());
@@ -142,6 +115,7 @@ public class QueryGeneratorNew2 {
                     }
                 }
             }
+            // TODO: fix this.
             GroupedQuery groupedQuery = new GroupedQuery(sentenceId, words, parses);
             groupedQuery.collapse(predId, category, argNum, question, spanToArgList, spanToParseIds);
             groupedQueryList.add(groupedQuery);
@@ -161,6 +135,20 @@ public class QueryGeneratorNew2 {
             }
         }
         return bestSF;
+    }
+
+    private static ImmutableList<Integer> getBestStructure(final Map<ImmutableList<Integer>, Set<Integer>> headToParses,
+                                                           final List<Parse> parses) {
+        ImmutableList<Integer> bestHeads = null;
+        double bestScore = Double.NEGATIVE_INFINITY;
+        for (ImmutableList<Integer> heads : headToParses.keySet()) {
+            double score = headToParses.get(heads).stream().mapToDouble(i -> parses.get(i).score).sum();
+            if (score > bestScore) {
+                bestScore = score;
+                bestHeads = heads;
+            }
+        }
+        return bestHeads;
     }
 
     private static String punctuations = "...,:?!---LRB-RRB-";
