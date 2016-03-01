@@ -14,6 +14,7 @@ public class RerankerDependencyFactored implements Reranker {
     // Dependency-factored scoring function for each sentence.
     final Map<Integer, List<Parse>> allParses;
     final Map<Integer, DependencyScoreFunction> scoreFunctions;
+    final Map<Integer, double[]> initialParseScores;
     final Map<Integer, double[]> parseScores;
     final static double stepSize = 0.5;
 
@@ -21,13 +22,15 @@ public class RerankerDependencyFactored implements Reranker {
         this.allParses = allParses;
         this.scoreFunctions = new HashMap<>();
         this.parseScores = new HashMap<>();
+        this.initialParseScores = new HashMap<>();
         allParses.forEach((sentIdx, parses) -> {
             scoreFunctions.put(sentIdx, new DependencyScoreFunction(parses));
             double[] scores = new double[parses.size()];
             for (int i = 0; i < parses.size(); i++) {
                 scores[i] = parses.get(i).score;
             }
-            parseScores.put(sentIdx, scores);
+            initialParseScores.put(sentIdx, scores);
+            parseScores.put(sentIdx, Arrays.copyOf(scores, scores.length));
         });
     }
 
@@ -40,22 +43,19 @@ public class RerankerDependencyFactored implements Reranker {
         for (int r : response.chosenOptions) {
             final List<Integer> chosenArgIds = options.get(r).argumentIds;
             final DependencyScoreFunction scoreFunction = scoreFunctions.get(query.sentenceId);
-            chosenArgIds.forEach(argId -> scoreFunction.update(predIdx, argId, category, argNum, stepSize));
+            if (chosenArgIds != null) {
+                chosenArgIds.forEach(argId -> scoreFunction.update(predIdx, argId, category, argNum, stepSize));
+            }
         }
-
-        /*
-        Set<Integer> allArgIds = new HashSet<>();
-        query.answerOptions.forEach(ao -> allArgIds.addAll(ao.argumentIds));
-        allArgIds.removeAll(chosenArgIds);
-        allArgIds.forEach(argId -> scFun.update(predIdx, argId, category, argNum, -1.0));
-        */
     }
 
     public double[] getParseScores(final int sentenceId) {
+        final double[] initScores = initialParseScores.get(sentenceId);
+        final double[] scores = parseScores.get(sentenceId);
         for (int k = 1; k < allParses.get(sentenceId).size(); k++) {
-            parseScores.get(sentenceId)[k] = scoreFunctions.get(sentenceId).getScore(allParses.get(sentenceId).get(k));
+            scores[k] = initScores[k] + scoreFunctions.get(sentenceId).getScore(allParses.get(sentenceId).get(k));
         }
-        return parseScores.get(sentenceId);
+        return scores;
     }
 
     public int getRerankedBest(final int sentenceId) {

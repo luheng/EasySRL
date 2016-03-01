@@ -1,0 +1,47 @@
+<div class="html-element-wrapper">
+  <br />
+  <h2 class="legend">Sentence:</h2>
+  <span>{{sentence}}</span>
+  <br />
+  <br />
+  <h2 class="legend">Question:</h2>
+  <span>{{question}}</span>
+  <br />
+  <br />
+</div>
+<cml:radios name="choice" label="Please choose the best answer:" validates="required" gold="true">
+  {% for answer in answers %}
+  
+  {% assign s2 = "
+  <strong> &amp; </strong>" %}
+  
+  {% assign s3 = "" %}
+  
+  {% capture boxed_answer %}
+  
+  <span style="border:2px solid grey;"> {{ answer | replace: '_AND_', '</span>
+  <strong> &amp; </strong>
+  <span style="border:2px solid grey;">' }} </span>
+  {% endcapture %}
+  
+  {{ boxed_answer }}
+  
+  
+  <cml:radio value="{{ answer }}" label="{{ answer | replace: '_AND_' : s2 }}"></cml:radio>
+  {% endfor %}
+
+
+
+
+
+
+
+</cml:radios>
+<cml:text label="Comment:" validates=""></cml:text>
+
+
+
+
+
+
+

@@ -10,9 +10,10 @@ import java.util.List;
  * Created by luheng on 1/29/16.
  */
 public class Response {
-    List<Integer> chosenOptions;
+    public List<Integer> chosenOptions;
+    public double trust = 1.0;
     // For debugging use.
-    public String debugInfo;
+    public String debugInfo = "";
 
     public Response() {
         chosenOptions = new ArrayList<>();
@@ -24,7 +25,9 @@ public class Response {
     }
 
     public void add(int option) {
-        this.chosenOptions.add(option);
+        if (!chosenOptions.contains(option)) {
+            chosenOptions.add(option);
+        }
     }
 
     public Response(Collection<Integer> options) {

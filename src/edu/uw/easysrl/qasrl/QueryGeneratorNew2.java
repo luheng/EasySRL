@@ -4,7 +4,6 @@ import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Table;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
-import edu.uw.easysrl.qasrl.annotation.InterAnnotatorAgreement;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.grammar.Category;
@@ -14,9 +13,15 @@ import java.util.stream.Collectors;
 
 /**
  * Latest query generator.
+ *
+ * Two options: qkey -> question -> parse ids
+ *              question -> qkey -> parse ids
+ *
+ *
  * Created by luheng on 2/18/16.
  */
 public class QueryGeneratorNew2 {
+
     /**
      * @param words the sentence
      * @param parses the nbest list
@@ -26,10 +31,11 @@ public class QueryGeneratorNew2 {
                                                      final List<Parse> parses,
                                                      final QuestionGenerator questionGenerator) {
         int numParses = parses.size();
-        double totalScore = parses.stream().mapToDouble(p->p.score).sum();
+        // double totalScore = parses.stream().mapToDouble(p->p.score).sum();
         // TODO: DependencyToId, AnswerSpanResolver
 
         // pred.category.argnum -> question -> parses
+        // question -> pred.category.argnum -> parses
         Table<String, String, Set<Integer>> questionPool = HashBasedTable.create();
         // argHeadSet -> answer -> parses
         Table<ImmutableList<Integer>, String, Set<Integer>> answerPool = HashBasedTable.create();
@@ -70,18 +76,20 @@ public class QueryGeneratorNew2 {
                         final ImmutableList<Integer> heads = ImmutableList.copyOf(qa.targetDeps.stream()
                                 .map(ResolvedDependency::getArgument).sorted()
                                 .collect(Collectors.toList()));
+                        /*
                         List<String> spans = new ArrayList<>();
                         for (int j = 0; j < heads.size(); j++) {
                             spans.add(getAnswerSpan(qa.answers.get(j), heads.get(j), words));
                         }
-                        //String answer = spans.stream().collect(Collectors.joining(" # "));
+                        String answer = spans.stream().collect(Collectors.joining(QuestionAnswerPair.answerDelimiter));
+                        */
                         String answer = qa.renderAnswer();
 
                         // Register to question pool.
-                        if (!questionPool.contains(qkey, question)) {
-                            questionPool.put(qkey, question, new HashSet<>());
+                        if (!questionPool.contains(question, qkey)) {
+                            questionPool.put(question, qkey, new HashSet<>());
                         }
-                        questionPool.get(qkey, question).add(parseId);
+                        questionPool.get(question, qkey).add(parseId);
 
                         // Register to answer pool.
                         if (!answerPool.contains(heads, answer)) {
@@ -89,39 +97,39 @@ public class QueryGeneratorNew2 {
                         }
                         answerPool.get(heads, answer).add(parseId);
 
-                        if (!questionToAnswer.contains(qkey, heads)) {
-                            questionToAnswer.put(qkey, heads, new HashSet<>());
+                        if (!questionToAnswer.contains(question, heads)) {
+                            questionToAnswer.put(question, heads, new HashSet<>());
                         }
-                        if (!answerToQuestion.contains(heads, qkey)) {
-                            answerToQuestion.put(heads, qkey, new HashSet<>());
+                        if (!answerToQuestion.contains(heads, question)) {
+                            answerToQuestion.put(heads, question, new HashSet<>());
                         }
-                        questionToAnswer.get(qkey, heads).add(parseId);
-                        answerToQuestion.get(heads, qkey).add(parseId);
+                        questionToAnswer.get(question, heads).add(parseId);
+                        answerToQuestion.get(heads, question).add(parseId);
                     }
                 }
             }
         }
         List<GroupedQuery> groupedQueryList = new ArrayList<>();
 
-        for (String qkey : questionToAnswer.rowKeySet()) {
+        for (String question : questionToAnswer.rowKeySet()) {
+            String qkey = getBestSurfaceForm(questionPool.row(question), parses);
             String[] info = qkey.split("\\.");
             int predId = Integer.parseInt(info[0]);
             Category category = Category.valueOf(info[1]);
             int argNum = Integer.parseInt(info[2]);
-            String question = getBestSurfaceForm(questionPool.row(qkey), parses);
 
             Map<String, ImmutableList<Integer>> spanToArgList = new HashMap<>();
             Map<String, Set<Integer>> spanToParseIds = new HashMap<>();
             Set<String> answers = new HashSet<>();
 
-            for (ImmutableList<Integer> heads : questionToAnswer.row(qkey).keySet()) {
+            for (ImmutableList<Integer> heads : questionToAnswer.row(question).keySet()) {
                 String answer = getBestSurfaceForm(answerPool.row(heads), parses);
                 if (!answers.contains(answer)) {
                     answers.add(answer);
                     spanToParseIds.put(answer, new HashSet<>());
                     spanToArgList.put(answer, heads);
                 }
-                spanToParseIds.get(answer).addAll(questionToAnswer.get(qkey, heads));
+                spanToParseIds.get(answer).addAll(questionToAnswer.get(question, heads));
             }
             for (String answer : answers) {
                 if (answer.startsWith("to ")) {
@@ -181,7 +189,7 @@ public class QueryGeneratorNew2 {
             return "";
         }
         if (!sentStr.toLowerCase().contains(answerStr.toLowerCase())) {
-            System.err.println(answerStr + "\t ... \t " + sentStr);
+            //System.err.println(answerStr + "\t ... \t " + sentStr);
             return "";
         }
         return answerStr;

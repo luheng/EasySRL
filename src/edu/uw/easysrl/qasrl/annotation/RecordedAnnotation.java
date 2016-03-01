@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
+ * Annotation record from a single annotator.
  * Created by luheng on 2/12/16.
  */
 public class RecordedAnnotation {
@@ -25,12 +26,17 @@ public class RecordedAnnotation {
 
     // Answer information
     List<String> answerStrings;
+    String answer;
     int answerId, goldAnswerId;
 
     // Current accuracy
     double rerankF1, oracleF1, onebestF1;
 
+    // Crowdflower computed stuff.
+    double trust;
+
     // Other
+    public String annotatorId;
     public String comment;
 
     protected RecordedAnnotation() {

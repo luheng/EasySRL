@@ -181,7 +181,7 @@ public class InterAnnotatorAgreement {
         return result;
     }
 
-    private static double computeAgreementChance(int total, int agreement, int options) {
+    public static double computeAgreementChance(int total, int agreement, int options) {
         if (total < agreement) {
             return 0.0;
         }
