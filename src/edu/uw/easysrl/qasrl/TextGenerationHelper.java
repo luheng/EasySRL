@@ -5,6 +5,7 @@ import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.Category.Slash;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeLeaf;
+import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeBinary;
 
 
 import java.util.*;
@@ -21,6 +22,7 @@ public class TextGenerationHelper {
     // For now, those are the same.
     // Reference: https://www.cis.upenn.edu/~treebank/tokenization.html
     private static final String trimPunctuation = " ,.:;!?-";
+    private static final String vowels = "aeiou";
     private static Set<String> noSpaceBefore = new HashSet<String>();
     private static Set<String> noSpaceAfter = new HashSet<String>();
     static {
@@ -71,6 +73,12 @@ public class TextGenerationHelper {
         return res;
     }
 
+    public static boolean startsWithVowel(String word) {
+        if(word.length() == 0) return false;
+        char firstLetter = word.toLowerCase().charAt(0);
+        return vowels.indexOf(firstLetter) > -1;
+    }
+
     /**
      * Turns a list of tokens into a nicely rendered string, spacing everything appropriately.
      * Trims extra punctuation at the end though. (Useful feature for now; might want to change later.)
@@ -80,8 +88,14 @@ public class TextGenerationHelper {
         if(rawWords.size() == 0) {
             return "";
         }
-        List<String> words = rawWords.stream().map(TextGenerationHelper::translateTreeBankSymbols).collect(Collectors.toList());
+        List<String> words = rawWords
+            .stream()
+            .map(TextGenerationHelper::translateTreeBankSymbols)
+            .collect(Collectors.toList());
+        Iterator<String> prevIterator = words.iterator();
         Optional<String> prevWord = Optional.empty();
+        Iterator<String> nextIterator = words.iterator(); nextIterator.next();
+        Optional<String> nextWord = Optional.empty(); if(nextIterator.hasNext()) nextWord = Optional.of(nextIterator.next());
         for(String word : words) {
             boolean noSpace = !prevWord.isPresent() ||
                 (prevWord.isPresent() && noSpaceAfter.contains(prevWord.get())) ||
@@ -89,8 +103,19 @@ public class TextGenerationHelper {
             if(!noSpace) {
                 result.append(" ");
             }
-            result.append(word);
-            prevWord = Optional.of(word);
+            if(word.equalsIgnoreCase("a") && nextWord.isPresent() && startsWithVowel(nextWord.get())) {
+                result.append("an");
+            } else if(word.equalsIgnoreCase("an") && nextWord.isPresent() && !startsWithVowel(nextWord.get())) {
+                result.append("a");
+            } else {
+                result.append(word);
+            }
+            prevWord = Optional.of(prevIterator.next());
+            if(nextIterator.hasNext()) {
+                nextWord = Optional.of(nextIterator.next());
+            } else {
+                nextWord = Optional.empty();
+            }
         }
         while(result.length() > 0 &&
               trimPunctuation.indexOf(result.charAt(result.length() - 1)) >= 0) {
@@ -277,9 +302,45 @@ public class TextGenerationHelper {
             result.add(new TextWithDependencies(resultWords, touchedDeps));
             return result;
         }
+        SyntaxTreeNode node = nodeOpt.get();
+
+        // TODO figure out if this is better: optional fix for reducing the size of noun phrases
+        // if asking for an NP, just take the determiner and the noun itself.
+        // Buts then when aking for a noun, get one modifier if present.
+        // if(Category.valueOf("N").matches(node.getCategory())) {
+        //     Optional<SyntaxTreeNode> parentOpt = getParent(node, tree);
+        //     if(parentOpt.isPresent()) {
+        //         SyntaxTreeNode parent = parentOpt.get();
+        //         if(Category.valueOf("N").matches(parent.getCategory())) {
+        //             List<TextWithDependencies> result = new LinkedList<>();
+        //             result.add(new TextWithDependencies(getNodeWords(parent, replacementIndexOpt, replacementWord),
+        //                                                 getContainedDependencies(parent, parse)));
+        //             return result;
+        //         }
+        //     }
+        // } else if((node instanceof SyntaxTreeNodeBinary) &&
+        //           Category.valueOf("NP").matches(node.getCategory()) &&
+        //           Category.valueOf("NP/N").matches(((SyntaxTreeNodeBinary) node).getLeftChild().getHead().getCategory()) &&
+        //           !(lookForOf && // don't do the NP shortcut when there's an of-phrase later that we need to include.
+        //             node.getEndIndex() < tree.getEndIndex() &&
+        //             tree.getLeaves().get(node.getEndIndex()).getWord().equals("of"))) {
+        //     SyntaxTreeNodeLeaf detHead = ((SyntaxTreeNodeBinary) node).getLeftChild().getHead();
+        //     List<TextWithDependencies> phrases = getRepresentativePhrases(headIndexOpt, Category.valueOf("N"), parse, replacementIndexOpt, replacementWord, lookForOf);
+        //     // System.err.println("Reworking headedness of node: category " + node.getCategory() + ", word " + node.getWord());
+        //     // System.err.println("Head node: category " + detHead.getCategory() + ", word " + detHead.getWord());
+        //     // System.err.println("Sub phrase: " + renderString(phrases.get(0).tokens));
+        //     return phrases
+        //         .stream()
+        //         .map(twd -> {
+        //                 List<String> tokens = new LinkedList<>();
+        //                 tokens.addAll(getNodeWords(detHead, replacementIndexOpt, replacementWord));
+        //                 tokens.addAll(twd.tokens);
+        //                 return new TextWithDependencies(tokens, twd.dependencies);
+        //                     })
+        //         .collect(Collectors.toList());
+        // }
 
         // get all of the dependencies that were (presumably) touched in the course of getting the lowest good ancestor
-        SyntaxTreeNode node = nodeOpt.get();
         touchedDeps.addAll(getContainedDependencies(node, parse));
 
         // here we don't necessarily have the whole phrase. `node` is a function into the phrase.
@@ -296,24 +357,6 @@ public class TextGenerationHelper {
                node.getEndIndex() < tree.getEndIndex() &&
                tree.getLeaves().get(node.getEndIndex()).getWord().equals("of") // if the next word is "of",
                ) {
-                // Optional<SyntaxTreeNode> ancestorWithOfOpt = Optional.of(node);
-                // while(ancestorWithOfOpt.isPresent() && ancestorWithOfOpt.get().getEndIndex() <= node.getEndIndex()) {
-                //     ancestorWithOfOpt = getParent(ancestorWithOfOpt.get(), tree);
-                // }
-                // if(ancestorWithOfOpt.isPresent()) {
-                //     SyntaxTreeNode ancestorWithOf = ancestorWithOfOpt.get();
-                //     assert ancestorWithOf instanceof SyntaxTreeNode.SyntaxTreeNodeBinary
-                //         : "Lowest node to contain of-phrase as well must be a binary node";
-                //     SyntaxTreeNode ofSubtree = ((SyntaxTreeNode.SyntaxTreeNodeBinary)ancestorWithOf).getRightChild();
-                //     assert ofSubtree.getStartIndex() == node.getEndIndex()
-                //         : "of phrase should begin where original phrase ends";
-                //     touchedDeps.addAll(getContainedDependencies(ofSubtree, parse));
-                //     List<String> words = getNodeWords(node, replacementIndexOpt, replacementWord);
-                //     words.addAll(getNodeWords(ofSubtree, Optional.empty(), Optional.empty()));
-                //     List<TextWithDependencies> result = new LinkedList<>();
-                //     result.add(new TextWithDependencies(words, touchedDeps));
-                //     return result;
-                // }
                 List<TextWithDependencies> phrasesWithOf =
                     getRepresentativePhrases(Optional.of(node.getEndIndex()),
                                             neededCategory,
@@ -344,6 +387,10 @@ public class TextGenerationHelper {
             List<String> center = getNodeWords(node, replacementIndexOpt, replacementWord);
 
             // choose argument list
+            // Map<Integer, Set<ResolvedDependency>> argDeps = new HashMap<>();
+            // for (int i = 1; i <= currentCategory.getNumberOfArguments(); i++) {
+            //     argDeps.put(i, new HashSet<Integer>());
+            // }
             List<Set<Integer>> argIndices = new LinkedList<Set<Integer>>();
             argIndices.add(new HashSet<Integer>());
             for (int i = 1; i <= currentCategory.getNumberOfArguments(); i++) {
@@ -500,26 +547,24 @@ public class TextGenerationHelper {
     }
 
     // this is also stupid.
-    /*
     public static List<Map<Integer, Optional<ResolvedDependency>>> getAllArgumentChoicePaths(Map<Integer, Set<ResolvedDependency>> choices) {
         List<Map<Integer, Optional<ResolvedDependency>>> pastPaths = new LinkedList<>();
         pastPaths.add(new TreeMap<Integer, Optional<ResolvedDependency>>());
-        // TODO iterate correctly over stuff
-        List<Map.Entry<Integer, Set<ResolvedDependency>> choicesList = choices
+        List<Map.Entry<Integer, Set<ResolvedDependency>>> choicesList = choices
             .entrySet()
             .stream()
-            .sortBy((k, v) -> k)
+            .sorted(Comparator.comparing(e -> e.getKey()))
             .collect(Collectors.toList());
         for(Map.Entry<Integer, Set<ResolvedDependency>> argAndChoiceSet : choicesList) {
             final int argNum = argAndChoiceSet.getKey();
             final Set<ResolvedDependency> choiceSet = argAndChoiceSet.getValue();
             final List<Map<Integer, Optional<ResolvedDependency>>> currentPaths;
-            if(choiceList.isEmpty()) {
+            if(choicesList.isEmpty()) {
                 currentPaths = pastPaths
                     .stream()
                     .map(path -> {
                             Map<Integer, Optional<ResolvedDependency>> newPath = new HashMap<>();
-                            newPath.addAll(path);
+                            newPath.putAll(path);
                             newPath.put(argNum, Optional.empty());
                             return newPath;
                         })
@@ -530,22 +575,17 @@ public class TextGenerationHelper {
                     .flatMap(path -> choiceSet
                              .stream()
                              .map(choice -> {
-                                     // List<Optional<Integer>> newPath = new LinkedList<>();
-                                     // newPath.addAll(path);
-                                     // newPath.add(Optional.of(choice));
-                                     // return newPath;
+                                     Map<Integer, Optional<ResolvedDependency>> newPath = new HashMap<>();
+                                     newPath.putAll(path);
+                                     newPath.put(argNum, Optional.of(choice));
+                                     return newPath;
                                  }))
                     .collect(Collectors.toList());
             }
             pastPaths = currentPaths;
         }
-
-        for(Set<ResolvedDependency> choiceList : choices.keySet().sorted()) {
-            List<Map<Integer, Optional<ResolvedDependency>>> currentPaths;
-        }
         return pastPaths;
     }
-    */
 
     /**
      * Data structure used to return text generated from a parsed sentence.
