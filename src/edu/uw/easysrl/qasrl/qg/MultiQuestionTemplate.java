@@ -13,19 +13,20 @@ import java.util.stream.Stream;
 import java.util.*;
 
 /**
- * The point of a QuestionTemplate is to abstract over all of the questions
- * that could be asked about the various arguments to a predicate.
+ * Generates higher-granularity QA Pairs for multi-answer questions.
  *
- * Created by luheng on 12/10/15.
+ * Created by julian on 2/29/16.
  */
-public class QuestionTemplate {
+public class MultiQuestionTemplate {
+
+    private static boolean logging = true;
 
     public enum QuestionType {
         VERB (
                     Category.valueOf("S\\NP") // intransitives
                     ,Category.valueOf("(S\\NP)/NP") // transitives
-                 /* ,Category.valueOf("(S\\NP)/PP")
-                    ,Category.valueOf("((S\\NP)/NP)/PR")
+                    // ,Category.valueOf("(S\\NP)/PP")
+                 /* ,Category.valueOf("((S\\NP)/NP)/PR")
                     ,Category.valueOf("((S\\NP)/PP)/PR")
                     // T1 said (that) T2
                     ,Category.valueOf("(S[dcl]\\NP)/S")
@@ -57,8 +58,8 @@ public class QuestionTemplate {
                  /* ,Category.valueOf("(S\\NP)\\(S\\NP)")
                     ,Category.valueOf("((S\\NP)\\(S\\NP))/S")
                     ,Category.valueOf("((S\\NP)\\(S\\NP))/(S[ng]\\NP)") // ``by'' as in ``by doing something''.
-                    ,Category.valueOf("((S\NP)\(S\NP))/PP") // according (to): 
-                    ,Category.valueOf("((S\NP)\(S\NP))/PP") // down (from): 
+                    ,Category.valueOf("((S\NP)\(S\NP))/PP") // according (to):
+                    ,Category.valueOf("((S\NP)\(S\NP))/PP") // down (from):
                  */
             ),
         CLAUSE_ADJUNCT(
@@ -94,24 +95,24 @@ public class QuestionTemplate {
     }
 
     public enum Supersense {
-        HOW("as", "with"
-            ),
-        FAR("for"
-            ),
-        LONG("for"
-                ),
-        WHEN("as", "in", "with"
-                ),
-        WHERE("among", "in", "to", "with"
-                ),
-        WHY("as", "to", "for"
-                ),
-        MANNER("as", "with"
-                ),
-        CAPACITY("as"
-                 ),
-        MEANS("in", "with"
-                  );
+        HOW, // means/method/manner/style/role...lots of stuff
+        FAR, // distance
+        LONG, // duration
+        WHEN, // time
+        WHERE, // place
+        WHY, // reason/explanation/benefactor
+        MANNER,
+        // ROLE,
+        MEANS, // should require NP as answer?
+        // MUCH, // magnitude---like frequency (mass)
+        // OFTEN, // frequency (mass)
+        // TIMES, // frequency (count)
+        UNKNOWN;
+
+        // source, destination, beginning, end, more general scale/motion related stuff
+        // medium?
+
+        private final List<String> whWords = new LinkedList<String>();
 
         static {
             HOW.setWhs("How");
@@ -121,89 +122,81 @@ public class QuestionTemplate {
             WHERE.setWhs("Where");
             WHY.setWhs("Why");
             MANNER.setWhs("In", "what", "manner");
-            CAPACITY.setWhs("In", "what", "capacity");
+            // ROLE.setWhs("In", "what", "capacity"); // TODO capacity? role?
             MEANS.setWhs("By", "what", "means");
+            // SOURCE.setWhs("From", "what", "source"); // should have NP as answer
+            // DESTINATION.setWhs("To", "what", "destination"); // should have NP as answer
+            UNKNOWN.setWhs("UNKNOWN");
         }
 
-        public static final Set<String> knownPrepositions = new HashSet<>();
+        private static final Map<String, List<Supersense>> prepositionToSupersenses = new HashMap<>();
+        private static void addPreposition(String preposition, Supersense... senses) {
+            List<Supersense> supersenseList = Arrays.asList(senses);
+            prepositionToSupersenses.put(preposition, supersenseList);
+        }
+
         static {
-            for(Supersense wh : Supersense.values()) {
-                knownPrepositions.addAll(wh.prepositions);
-            }
-
-        }
-
-        public final List<String> whWords = new LinkedList<String>();
-        public final List<String> prepositions;
-        Supersense(String... prepositions) {
-            this.prepositions = Arrays.asList(prepositions);
+            addPreposition("as", HOW, WHEN, WHY);
+            addPreposition("among", WHERE);
+            addPreposition("for", FAR, LONG, WHY);
+            addPreposition("from");
+            addPreposition("in", HOW, WHEN, WHERE, MEANS);
+            addPreposition("to", WHERE, WHY);
+            addPreposition("with", HOW, WHEN, WHERE, MANNER, MEANS);
         }
 
         private void setWhs(String... whWords) {
             this.whWords.clear();
             this.whWords.addAll(Arrays.asList(whWords));
         }
-
-        public boolean admits(String preposition) {
-            for (String p : this.prepositions) {
-                if (p.equalsIgnoreCase(preposition)) {
-                    return true;
-                }
-            }
-            return false;
+        private List<String> getWhWords() {
+            return whWords;
         }
 
-        public static List<List<String>> getWhsFor(String preposition) {
-            List<List<String>> whs = new LinkedList<>();
-            for(Supersense wh : Supersense.values()) {
-                whs.add(wh.whWords);
-            }
-            return whs;
-            /*
-            if(!knownPrepositions.contains(preposition)) {
-                System.err.println("Missing preposition supersenses: " + preposition);
-                for(Supersense wh : Supersense.values()) {
-                    whs.add(wh.whWords);
+        public static List<Supersense> getSupersensesFor(String preposition) {
+            List<Supersense> supersenses = prepositionToSupersenses.get(preposition);
+            if(supersenses == null) {
+                /*
+                int code = preposition.hashCode();
+                if(!missedPrepositionsPrinted.contains(code)) {
+                    if(logging) System.err.println("Need preposition supersenses: " + preposition);
+                    missedPrepositionsPrinted.add(code);
                 }
-                return whs;
-            } else {
-                for(Supersense wh : Supersense.values()) {
-                    if(wh.admits(preposition)) {
-                        whs.add(wh.whWords);
-                    }
-                }
-                return whs;
+                */
+                supersenses = new LinkedList<>();
+                supersenses.add(UNKNOWN);
             }
-            */
+            // whs = Arrays.asList(Supersense.values());
+            return supersenses;
         }
-
 
     }
 
     private static final Set<Integer> qaPairsPrinted = new HashSet<Integer>();
+    private static final Set<Integer> missedPrepositionsPrinted = new HashSet<Integer>();
 
-    // Categories to skip ..
-    // private static final Category auxiliaries = Category.valueOf("(S[dcl]\\NP)/(S[b]\\NP)");
+    // Categories to skip
+    private static final Category auxiliaries = Category.valueOf("(S[dcl]\\NP)/(S[b]\\NP)");
     // private static final Category controlParticles = Category.valueOf("(S[to]\\NP)/(S[b]\\NP)");
-    // private static final Category controlParticles = Category.valueOf("(S\\NP)/(S[b]\\NP)");
-    // private static final Category pastParticiples = Category.valueOf("(S[dcl]\\NP)/(S[pt]\\NP)");
+    private static final Category controlParticles = Category.valueOf("(S\\NP)/(S[b]\\NP)");
+    private static final Category pastParticiples = Category.valueOf("(S[dcl]\\NP)/(S[pt]\\NP)");
 
-    private static final String[] otherFilteredCategories = new String[] {
-        "(S/S)/NP",
-        "(S\\NP)\\(S\\NP)",
-        "S[em]/S[dcl]",
-        "(S/S)/(S/S)",
-        "(S[b]\\NP)/(S[pt]\\NP)",
-        "S[qem]/S[dcl]",
-        "(S\\S)/S[dcl]",
-        "(S[adj]\\NP)/(S[to]\\NP)",
-        "S/S",
-        "((S\\NP)/(S\\NP))/((S\\NP)/(S\\NP))", // i.e. more
-        "((S\\NP)\\(S\\NP))/((S\\NP)\\(S\\NP))",
-        "((S\\NP)\\(S\\NP))\\((S\\NP)\\(S\\NP))",
-        "((S\\NP)\\(S\\NP))/(S[b]\\NP)",
-        "(((S\\NP)\\(S\\NP))\\((S\\NP)\\(S\\NP)))/(((S\\NP)\\(S\\NP))\\((S\\NP)\\(S\\NP)))",
-    };
+    // private static final String[] otherFilteredCategories = new String[] {
+    //     "(S/S)/NP",
+    //     "(S\\NP)\\(S\\NP)",
+    //     "S[em]/S[dcl]",
+    //     "(S/S)/(S/S)",
+    //     "(S[b]\\NP)/(S[pt]\\NP)",
+    //     "S[qem]/S[dcl]",
+    //     "(S\\S)/S[dcl]",
+    //     "(S[adj]\\NP)/(S[to]\\NP)",
+    //     "S/S",
+    //     "((S\\NP)/(S\\NP))/((S\\NP)/(S\\NP))", // i.e. more
+    //     "((S\\NP)\\(S\\NP))/((S\\NP)\\(S\\NP))",
+    //     "((S\\NP)\\(S\\NP))\\((S\\NP)\\(S\\NP))",
+    //     "((S\\NP)\\(S\\NP))/(S[b]\\NP)",
+    //     "(((S\\NP)\\(S\\NP))\\((S\\NP)\\(S\\NP)))/(((S\\NP)\\(S\\NP))\\((S\\NP)\\(S\\NP)))",
+    // };
 
     private static final Set<String> badPredicates = new HashSet<>();
     static {
@@ -229,15 +222,15 @@ public class QuestionTemplate {
     // so it's not sensitive to having multiple arguments or locations.
     public Map<Integer, Category> argCategories;
     // for each arg num, lists all of the deps ending in arguments
-    public Map<Integer, List<ResolvedDependency>> allArgDeps;
-    // this is for convenience and just returns the index of the first one
-    public Map<Integer, Optional<Integer>> argIndices;
+    public Map<Integer, Set<ResolvedDependency>> allArgDeps;
+    // returns a list of all indices of arguments for each arg num
+    public List<Set<Integer>> argIndices;
 
     public VerbHelper verbHelper;
 
     public QuestionType type;
 
-    public QuestionTemplate(int predicateIndex, List<String> words, Parse parse, VerbHelper verbHelper) {
+    public MultiQuestionTemplate(int predicateIndex, List<String> words, Parse parse, VerbHelper verbHelper) {
         this.categories = parse.categories;
         this.predicateIndex = predicateIndex;
         this.predicateCategory = categories.get(predicateIndex);
@@ -245,23 +238,26 @@ public class QuestionTemplate {
         this.tree = parse.syntaxTree;
         this.verbHelper = verbHelper;
         this.words = words;
-        this.allArgDeps = new HashMap<Integer, List<ResolvedDependency>>();
+        this.allArgDeps = new HashMap<Integer, Set<ResolvedDependency>>();
         for (ResolvedDependency dep : parse.dependencies) {
             if (dep.getHead() == predicateIndex && dep.getArgument() != dep.getHead()) {
                 if(!allArgDeps.containsKey(dep.getArgNumber())) {
-                    allArgDeps.put(dep.getArgNumber(), new ArrayList<ResolvedDependency>());
+                    allArgDeps.put(dep.getArgNumber(), new HashSet<ResolvedDependency>());
                 }
                 allArgDeps.get(dep.getArgNumber()).add(dep);
             }
         }
-        this.argIndices = new HashMap<Integer, Optional<Integer>>();
-        allArgDeps.forEach((k, v) -> argIndices.put(k, Optional.of(v.get(0).getArgument())));
         int numArguments = predicateCategory.getNumberOfArguments();
+        this.argIndices = new LinkedList<Set<Integer>>();
+        argIndices.add(new HashSet<Integer>());
         this.argCategories = new HashMap<Integer, Category>();
         for (int i = 1; i <= numArguments; i++) {
-            if(!argIndices.containsKey(i)) argIndices.put(i, Optional.empty());
+            argIndices.add(new HashSet<Integer>());
             argCategories.put(i, predicateCategory.getArgument(i));
         }
+        allArgDeps.forEach((k, v) -> argIndices.set(k, v.stream()
+                                                    .map(ResolvedDependency::getArgument)
+                                                    .collect(Collectors.toSet())));
 
         this.type = QuestionType.getTypeFor(predicateCategory);
 
@@ -280,28 +276,37 @@ public class QuestionTemplate {
         */
     }
 
-    private boolean cantAskQuestion(int targetArgNum) {
-        Optional<Integer> argIndexOpt = Optional.ofNullable(argIndices.get(targetArgNum)).flatMap(x -> x);
+    private boolean cantAskQuestion(int argNumber, List<Optional<Integer>> chosenArgs) {
+        Optional<Integer> argIndexOpt = chosenArgs.get(argNumber);
         if(!argIndexOpt.isPresent()) {
-            return false;
+            return true;
         }
         int argIndex = argIndexOpt.get();
+        Category observedArgCategory = categories.get(argIndex);
         boolean cantAsk = type == QuestionType.INVALID ||
             (badPredicates.contains(words.get(predicateIndex))) ||
-            (type == QuestionType.NOUN_ADJUNCT &&
-             words.get(predicateIndex).equals("of")) || // "of" is just a doozy
+            (auxiliaries.matches(observedArgCategory) ||
+             controlParticles.matches(observedArgCategory) ||
+             pastParticiples.matches(observedArgCategory) ||
+             Category.valueOf("NP[thr]").matches(observedArgCategory) ||
+             Category.valueOf("NP[expl]").matches(observedArgCategory)) ||
+            words.get(predicateIndex).equalsIgnoreCase("of") || // "of" is just a doozy
             (type == QuestionType.VERB_ADJUNCT &&
-             argIndices.values().stream()
+             chosenArgs.stream()
              .filter(Optional::isPresent).map(Optional::get)
-             .anyMatch(index -> verbHelper.isCopulaVerb(words.get(index)))) || // adverbs of copulas are wonky and not helpful
+             .map(words::get)
+             .anyMatch(VerbHelper::isCopulaVerb)) || // adverbs of copulas are wonky and not helpful
             (type == QuestionType.VERB_ADJUNCT &&
              words.get(predicateIndex).equalsIgnoreCase("when") &&
-             targetArgNum == 3) || // #what did I eat ice cream when? <-- bad question. but works for others: after, before, etc.
+             argNumber == 3) || // #what did I eat ice cream when? <-- bad question. but works for others: after, before, etc.
             (type == QuestionType.ADJECTIVE_ADJUNCT &&
-             targetArgNum == 2) || // "full of promise" -> "something was _ of promise; what's _?" --- can't really ask it.
+             argNumber == 2) || // "full of promise" -> "something was _ of promise; what's _?" --- can't really ask it.
             categories.get(argIndex).matches(Category.valueOf("PR")) // don't ask about a particle; TODO where are all the PR arguments...?
             ;
         return cantAsk;
+        // return !(Category.valueOf("(S\\NP)/PP").matches(predicateCategory) &&
+        //          argNumber == 2);
+        // return !(type == QuestionType.NOUN_ADJUNCT);
     }
 
     /**
@@ -310,126 +315,124 @@ public class QuestionTemplate {
      * because we will be trying all of the different preposition supersenses
      * that could possibly be appropriate for a preposition in question.
      */
-    public List<QuestionAnswerPair> getAllQAPairsForArgument(int targetArgNum) {
-        if (cantAskQuestion(targetArgNum)) {
-            return new ArrayList<QuestionAnswerPair>();
+    public List<QuestionAnswerPairReduced> getAllQAPairsForArgument(int targetArgNum) {
+        List<List<Optional<Integer>>> argPaths = TextGenerationHelper.getAllArgumentChoicePaths(argIndices);
+        final List<QuestionAnswerPairReduced> qaPairs = new ArrayList<>();
+        for(List<Optional<Integer>> chosenArgs : argPaths) {
+            instantiateForArgument(targetArgNum, chosenArgs).ifPresent(qaPairs::add);
+            getBasicSupersenseQAPairs(targetArgNum, chosenArgs).forEach(qaPairs::add);
         }
-        // add the basic question
-        final List<QuestionAnswerPair> qaPairs = new ArrayList<>();
-        // instantiateForArgument(targetArgNum).ifPresent(qaPairs::add);
-        qaPairs.addAll(getBasicSupersenseQAPairs(targetArgNum));
         return qaPairs;
     }
 
-    private List<QuestionAnswerPair> getBasicSupersenseQAPairs(int targetArgNum) {
-        final List<QuestionAnswerPair> qaPairs = new ArrayList<>();
-
+    private List<QuestionAnswerPairReduced> getBasicSupersenseQAPairs(int targetArgNum, List<Optional<Integer>> chosenArgs) {
+        if (cantAskQuestion(targetArgNum, chosenArgs)) {
+            return new LinkedList<QuestionAnswerPairReduced>();
+        }
         // for now, we will only try to do this with prepositional verb adjuncts,
         // when asking about the verb.
-        final Optional<Integer> verbIndexOpt = argIndices.get(2);
-        if(!(Category.valueOf("((S\\NP)\\(S\\NP))/NP").matches(predicateCategory) &&
-             targetArgNum == 2 &&
-             verbIndexOpt.isPresent())) {
-            return qaPairs;
-        }
-        final int verbIndex = verbIndexOpt.get();
-        // at this point, we know we need to split the verb.
-
-        // first, basic adjunct questions: how, when, where.
-        List<QuestionAnswerPair> basicAdjunctPairs = getSupersenseWhs().stream().map(wh -> {
-            final List<ResolvedDependency> questionDeps = new ArrayList<>();
-            final List<String> auxiliaries = getAuxiliariesForPredVerb(verbIndex);
-            final String verbArgReplacement = TextGenerationHelper.renderString(getBarePredVerb(verbIndex));
-            final TextWithDependencies verbWithDeps = TextGenerationHelper.getRepresentativePhrases(Optional.of(verbIndex), argCategories.get(2), parse, verbArgReplacement).get(0);
-            questionDeps.addAll(verbWithDeps.dependencies);
-            final List<String> verb = verbWithDeps.tokens;
-            // first we add the deps to the list of deps we've touched
-            final Optional<ResolvedDependency> verbDepOpt = Optional.ofNullable(allArgDeps.get(2)).map(deps -> deps.get(0));
-            verbDepOpt.ifPresent(questionDeps::add);
-            final Optional<ResolvedDependency> subjDepOpt = parse.dependencies.stream()
-                .filter(dep -> dep.getHead() == verbIndex &&
-                        dep.getArgument() != dep.getHead() &&
-                        dep.getArgNumber() == 1)
-                .findFirst();
-            subjDepOpt.ifPresent(questionDeps::add);
-
-            // then we locate the subj in the sentence
-            final Optional<Integer> subjIndexOpt = subjDepOpt.map(ResolvedDependency::getArgument);
-            final Category subjCategory = argCategories.get(1); // this is always NP anyway
-
-            // then we generate the text, again logging the dependencies touched.
-
-            // first, the subject
-            List<String> subj = new ArrayList<>();
-            if(!subjIndexOpt.isPresent()) {
-                TextWithDependencies subjWithDeps = TextGenerationHelper.getRepresentativePhrases(subjIndexOpt, subjCategory, parse).get(0);
-                questionDeps.addAll(subjWithDeps.dependencies);
-                subj = subjWithDeps.tokens;
-            } else {
-                int subjIndex = subjIndexOpt.get();
-                // replace the word with a pronoun of the proper case, if necessary
-                Optional<Pronoun> pronounOpt = Pronoun.fromString(words.get(subjIndex));
-                Optional<String> fixedPronounString = pronounOpt.map(pron -> pron.withCase(Pronoun.Case.NOMINATIVE).toString());
-                TextWithDependencies subjWithDeps = TextGenerationHelper.getRepresentativePhrases(subjIndexOpt, subjCategory, parse, fixedPronounString).get(0);
-                questionDeps.addAll(subjWithDeps.dependencies);
-                subj = subjWithDeps.tokens;
-            }
-
-            // and now we construct the question
-            final List<String> questionWords = new ArrayList<>();
-            questionWords.addAll(wh);
-            questionWords.addAll(auxiliaries);
-            questionWords.addAll(subj);
-            questionWords.addAll(verb);
-            final List<String> question = questionWords
-                .stream()
-                .filter(s -> s != null && !s.isEmpty()) // to mitigate oversights. harmless anyway
-                .collect(Collectors.toList());
-            // and the answer is our PP.
-            final List<ResolvedDependency> targetDeps = allArgDeps.get(targetArgNum);
-            final TextWithDependencies answerWithDeps = TextGenerationHelper
-                .getRepresentativePhrases(Optional.of(predicateIndex), Category.valueOf("(S\\NP)\\(S\\NP)"), parse).get(0);
-            final List<TextWithDependencies> answers = new ArrayList<>();
-            answers.add(answerWithDeps);
-            return new QuestionAnswerPair(predicateIndex,
-                                          predicateCategory,
-                                          questionDeps,
-                                          question,
-                                          targetDeps,
-                                          answers);
-        }).collect(Collectors.toList());
-        for(QuestionAnswerPair qaPair : basicAdjunctPairs) {
-            int code = (qaPair.renderQuestion() + qaPair.renderAnswer()).hashCode();
-            if(!qaPairsPrinted.contains(code)) {
-                // System.err.println(qaPair.renderQuestion());
-                // System.err.println("\t" + qaPair.renderAnswer());
-                qaPairsPrinted.add(code);
+        List<QuestionAnswerPairReduced> qaPairs = new LinkedList<>();
+        if(Category.valueOf("((S\\NP)\\(S\\NP))/NP").matches(predicateCategory) && targetArgNum == 2 && chosenArgs.get(2).isPresent()) {
+            for(Supersense supersense : Supersense.getSupersensesFor(words.get(predicateIndex))) {
+                qaPairs.add(getBasicSupersenseQAPair(targetArgNum, chosenArgs, supersense));
             }
         }
-        qaPairs.addAll(basicAdjunctPairs);
         return qaPairs;
+    }
+
+    private QuestionAnswerPairReduced getBasicSupersenseQAPair(int targetArgNum, List<Optional<Integer>> chosenArgs, Supersense supersense) {
+        final int verbIndex = chosenArgs.get(2).get();
+        final List<String> wh = supersense.getWhWords();
+        final Set<ResolvedDependency> questionDeps = new HashSet<>();
+        final List<String> auxiliaries = getAuxiliariesForPredVerb(verbIndex);
+        final String verbArgReplacement = TextGenerationHelper.renderString(getBarePredVerb(verbIndex));
+        final TextWithDependencies verbWithDeps = TextGenerationHelper
+            .getRepresentativePhrases(Optional.of(verbIndex), argCategories.get(2), parse, verbArgReplacement).get(0);
+        questionDeps.addAll(verbWithDeps.dependencies);
+        final List<String> verb = verbWithDeps.tokens;
+        // first we add the deps to the list of deps we've touched
+        // XXX TODO get the right deps for args
+        final Optional<ResolvedDependency> verbDepOpt = Optional.empty();
+        // final Optional<ResolvedDependency> verbDepOpt = Optional.ofNullable(allArgDeps.get(2)).map(deps -> deps.get(0));
+        verbDepOpt.ifPresent(questionDeps::add);
+        final Optional<ResolvedDependency> subjDepOpt = parse.dependencies.stream()
+            .filter(dep -> dep.getHead() == verbIndex &&
+                    dep.getArgument() != dep.getHead() &&
+                    dep.getArgNumber() == 1)
+            .findFirst();
+        subjDepOpt.ifPresent(questionDeps::add);
+
+        // then we locate the subj in the sentence
+        final Optional<Integer> subjIndexOpt = chosenArgs.get(1);
+        final Category subjCategory = argCategories.get(1); // this is always NP anyway
+
+        // then we generate the text, again logging the dependencies touched.
+
+        // first, the subject
+        List<String> subj = new ArrayList<>();
+        if(!subjIndexOpt.isPresent()) {
+            TextWithDependencies subjWithDeps = TextGenerationHelper
+                .getRepresentativePhrases(subjIndexOpt, subjCategory, parse).get(0);
+            questionDeps.addAll(subjWithDeps.dependencies);
+            subj = subjWithDeps.tokens;
+        } else {
+            int subjIndex = subjIndexOpt.get();
+            // replace the word with a pronoun of the proper case, if necessary
+            Optional<Pronoun> pronounOpt = Pronoun.fromString(words.get(subjIndex));
+            Optional<String> fixedPronounString = pronounOpt.map(pron -> pron.withCase(Pronoun.Case.NOMINATIVE).toString());
+            TextWithDependencies subjWithDeps = TextGenerationHelper
+                .getRepresentativePhrases(subjIndexOpt, subjCategory, parse, fixedPronounString).get(0);
+            questionDeps.addAll(subjWithDeps.dependencies);
+            subj = subjWithDeps.tokens;
+        }
+
+        // and now we construct the question
+        final List<String> questionWords = new ArrayList<>();
+        questionWords.addAll(wh);
+        questionWords.addAll(auxiliaries);
+        questionWords.addAll(subj);
+        questionWords.addAll(verb);
+        final List<String> question = questionWords
+            .stream()
+            .filter(s -> s != null && !s.isEmpty()) // to mitigate oversights. harmless anyway
+            .collect(Collectors.toList());
+        // and the answer is our PP.
+        // XXX get the right one
+        final ResolvedDependency targetDep = null;
+        // TODO get all of them
+        final TextWithDependencies answer = TextGenerationHelper
+            .getRepresentativePhrases(Optional.of(predicateIndex), Category.valueOf("(S\\NP)\\(S\\NP)"), parse).get(0);
+        return new QuestionAnswerPairReduced(predicateIndex,
+                                      predicateCategory,
+                                      verbIndex,
+                                      new QuestionAnswerPairReduced.SupersenseQuestionType(supersense),
+                                      questionDeps,
+                                      question,
+                                      targetDep,
+                                      answer);
+        // for(QuestionAnswerPair qaPair : basicAdjunctPairs) {
+        //     int code = (qaPair.renderQuestion() + qaPair.renderAnswer()).hashCode();
+        //     if(!qaPairsPrinted.contains(code)) {
+        //         if(logging) {
+        //             System.err.println(qaPair.renderQuestion());
+        //             System.err.println("\t" + qaPair.renderAnswer());
+        //         }
+        //         qaPairsPrinted.add(code);
+        //     }
+        // }
 
     }
 
-    public List<List<String>> getSupersenseWhs() {
-        String predWord = words.get(predicateIndex);
-        return Supersense.getWhsFor(predWord);
-    }
-
-    /**
-     * Instantiate into a question about a particular argument.
-     * @param targetArgNum : the argument number under the predicate
-     *                       associated with what's being asked about in the question
-     * @return a question asking for the targetArgNum'th argument of template's predicate
-     */
-    public Optional<QuestionAnswerPair> instantiateForArgument(int targetArgNum) {
-        if (cantAskQuestion(targetArgNum)) {
+    public Optional<QuestionAnswerPairReduced> instantiateForArgument(int targetArgNum, List<Optional<Integer>> chosenArgs) {
+        if(cantAskQuestion(targetArgNum, chosenArgs)) {
             return Optional.empty();
         }
+        final Set<ResolvedDependency> questionDeps = new HashSet<>();
 
-        final List<ResolvedDependency> questionDeps = new ArrayList<>();
-
-        final String wh = getWhWordByArgNum(targetArgNum);
+        final Optional<Integer> targetIndexOpt = chosenArgs.get(targetArgNum);
+        assert targetIndexOpt.isPresent() : "Should not ask questions about unrealized arguments";
+        final int targetIndex = targetIndexOpt.get();
+        final String wh = getWhWordByArgNum(targetIndex);
         final List<String> auxiliaries = new ArrayList<>();
         // we need the verb of the clause our predicate appears in,
         // which we will use to determine the auxiliaries we'll be using
@@ -437,9 +440,9 @@ public class QuestionTemplate {
         if(type == QuestionType.VERB) {
             verbIndexOpt = Optional.of(predicateIndex);
         } else if(type == QuestionType.VERB_ADJUNCT) {
-            verbIndexOpt = argIndices.get(2);
+            verbIndexOpt = chosenArgs.get(2);
         } else if(type == QuestionType.RELATIVIZER) {
-            verbIndexOpt = argIndices.get(2);
+            verbIndexOpt = chosenArgs.get(2);
         } else {
             verbIndexOpt = Optional.empty();
         }
@@ -481,36 +484,43 @@ public class QuestionTemplate {
             List<String> argWords = new ArrayList<>();
             // TODO: restructure/simplify this, we have lots of things only working because of guarantees established earlier in the code...
             if(currentArgNum == targetArgNum) { // if we're asking about the target, we have to put in placeholder words
-                // we won't ask about the target if it's unrealized, so this is safe
-                if(verbIndexOpt.isPresent() && argIndices.get(currentArgNum).get() == verbIndexOpt.get()) {
+                // we won't ask about the target if it's unrealized, so this should be safe
+                Optional<Integer> argIndexOpt = chosenArgs.get(currentArgNum);
+                assert argIndexOpt.isPresent();
+                int argIndex = argIndexOpt.get();
+                if(verbIndexOpt.isPresent() && (argIndex == verbIndexOpt.get())) {
                     // this can only happen when we're asking about the verb,
                     // which means we're not asking about the subject,
                     // which means the verb must be split.
                     // in any such situation the result should be "do" anyway.
-                    argWords.addAll(getTargetMainVerbPlaceholder(currentArgNum));
+                    argWords.addAll(getTargetMainVerbPlaceholder(argIndex));
                 } else {
-                    argWords.addAll(getTargetArgumentPlaceholder(currentArgNum));
+                    argWords.addAll(getTargetArgumentPlaceholder(currentArgNum, argIndex));
                 }
             } else {
                 // this is complicated... consider simplifying.
-                // first we add the dependency to the list of deps we've touched
-                Optional<ResolvedDependency> firstArgDepOpt = Optional.ofNullable(allArgDeps.get(currentArgNum)).map(deps -> deps.get(0));
+                // TODO XXX we add the dependency to the list of deps we've touched
+                // Optional<ResolvedDependency> firstArgDepOpt = Optional.ofNullable(allArgDeps.get(currentArgNum)).map(deps -> deps.get(0));
+                // firstArgDepOpt.ifPresent(dep -> questionDeps.add(dep));
+
+                final Optional<Integer> argIndexOpt;
                 // and now, we have an XXX HACK workaround to get subjects to show up when using adverbs!
                 if(type == QuestionType.VERB_ADJUNCT && currentArgNum == 1) {
-                    firstArgDepOpt = parse.dependencies.stream()
+                    argIndexOpt = parse.dependencies.stream()
                         .filter(dep -> dep.getHead() == verbIndexOpt.get() &&
                                 dep.getArgument() != dep.getHead() &&
                                 dep.getArgNumber() == 1)
-                        .findFirst();
+                        .findFirst()
+                        .map(ResolvedDependency::getArgumentIndex);
+                } else {
+                    argIndexOpt = chosenArgs.get(currentArgNum);
                 }
-                firstArgDepOpt.ifPresent(dep -> questionDeps.add(dep));
-                // then we locate the argument in the sentence
-                final Optional<Integer> argIndexOpt = firstArgDepOpt.map(ResolvedDependency::getArgument);
                 final Category argCategory = argCategories.get(currentArgNum);
                 // then we generate the text for that argument, again logging the dependencies touched.
 
                 if(!argIndexOpt.isPresent()) {
-                    TextWithDependencies argWithDeps = TextGenerationHelper.getRepresentativePhrases(argIndexOpt, argCategory, parse).get(0);
+                    TextWithDependencies argWithDeps = TextGenerationHelper
+                        .getRepresentativePhrases(argIndexOpt, argCategory, parse).get(0);
                     questionDeps.addAll(argWithDeps.dependencies);
                     argWords = argWithDeps.tokens;
                 } else {
@@ -524,16 +534,19 @@ public class QuestionTemplate {
                         } else {
                             fixedPronounString = pronounOpt.map(pron -> pron.withCase(Pronoun.Case.ACCUSATIVE).toString());
                         }
-                        TextWithDependencies argWithDeps = TextGenerationHelper.getRepresentativePhrases(argIndexOpt, argCategory, parse, fixedPronounString).get(0);
+                        TextWithDependencies argWithDeps = TextGenerationHelper
+                            .getRepresentativePhrases(argIndexOpt, argCategory, parse, fixedPronounString).get(0);
                         questionDeps.addAll(argWithDeps.dependencies);
                         argWords = argWithDeps.tokens;
                     } else if(verbIndexOpt.isPresent() && argIndex == verbIndexOpt.get()) {
                         String verbArgReplacement = TextGenerationHelper.renderString(getNonTargetBareArgumentVerb(verbIndexOpt.get()));
-                        TextWithDependencies argWithDeps = TextGenerationHelper.getRepresentativePhrases(Optional.of(argIndex), argCategory, parse, verbArgReplacement).get(0);
+                        TextWithDependencies argWithDeps = TextGenerationHelper
+                            .getRepresentativePhrases(Optional.of(argIndex), argCategory, parse, verbArgReplacement).get(0);
                         questionDeps.addAll(argWithDeps.dependencies);
                         argWords = argWithDeps.tokens;
                     } else {
-                        TextWithDependencies argWithDeps = TextGenerationHelper.getRepresentativePhrases(Optional.of(argIndex), argCategory, parse).get(0);
+                        TextWithDependencies argWithDeps = TextGenerationHelper
+                            .getRepresentativePhrases(Optional.of(argIndex), argCategory, parse).get(0);
                         questionDeps.addAll(argWithDeps.dependencies);
                         argWords = argWithDeps.tokens;
                     }
@@ -550,7 +563,7 @@ public class QuestionTemplate {
                 left.addAll(0, argWords);
                 break;
             case EITHER:
-                System.err.println("Undirected slash appeared in supertagged data :(");
+                assert false : "Undirected slash appeared in supertagged data";
                 right.addAll(argWords);
                 break;
             }
@@ -570,25 +583,29 @@ public class QuestionTemplate {
             .stream()
             .filter(s -> s != null && !s.isEmpty()) // to mitigate oversights. harmless anyway
             .collect(Collectors.toList());
-        final List<ResolvedDependency> targetDeps = allArgDeps.get(targetArgNum);
-        final List<TextWithDependencies> answers = targetDeps
-                .stream()
-                .map(ResolvedDependency::getArgument)
-                .sorted(Integer::compare)
-                .map(index -> { // we need to un-tense verbs that appear as answers
-                    Optional<String> replaceOpt = Optional.of(argCategories.get(targetArgNum))
-                        .filter(cat -> cat.isFunctionInto(Category.valueOf("S\\NP")))
-                        .map(arg -> TextGenerationHelper.renderString(getBarePredVerb(index)));
-                    return TextGenerationHelper.getRepresentativePhrases(Optional.of(index), argCategories.get(targetArgNum), parse, replaceOpt).get(0);
-                })
-            .collect(Collectors.toList());
 
-        return Optional.of(new QuestionAnswerPair(predicateIndex,
-                                                  predicateCategory,
-                                                  questionDeps,
-                                                  question,
-                                                  targetDeps,
-                                                  answers));
+        // XXX TODO get correct dependencies
+        final ResolvedDependency targetDep = null;
+        assert chosenArgs.get(targetArgNum).isPresent()
+            : "We should not be asking about an unrealized argument";
+        final int answerIndex = chosenArgs.get(targetArgNum).get();
+        final Category answerCategory = argCategories.get(targetArgNum);
+        Optional<String> replaceOpt = Optional.of(answerCategory)
+            .filter(cat -> cat.isFunctionInto(Category.valueOf("S\\NP")))
+            .map(arg -> TextGenerationHelper.renderString(getBarePredVerb(answerIndex)));
+        final TextWithDependencies answer = TextGenerationHelper
+            .getRepresentativePhrases(Optional.of(answerIndex), answerCategory, parse, replaceOpt)
+            .get(0);
+
+        final QuestionAnswerPairReduced qaPair = new QuestionAnswerPairReduced(predicateIndex,
+                                                                 predicateCategory,
+                                                                 predicateIndex,
+                                                                 new QuestionAnswerPairReduced.StandardQuestionType(type),
+                                                                 questionDeps,
+                                                                 question,
+                                                                 targetDep,
+                                                                 answer);
+        return Optional.of(qaPair);
     }
 
     /**
@@ -598,9 +615,8 @@ public class QuestionTemplate {
      * @param argNum the argument number of the word we're abstracting away
      * @return a 2-element array of { "wh-word", "extra words" } where extra words may be empty
      */
-    public String getWhWordByArgNum(int argNum) {
-        // assume the argument is realized, since we don't ask for unrealized ones.
-        return argIndices.get(argNum)
+    public String getWhWordByArgNum(int index) {
+        return Optional.of(index)
             .map(words::get)
             .flatMap(Pronoun::fromString)
             .filter(Pronoun::isAnimate)
@@ -614,8 +630,7 @@ public class QuestionTemplate {
         return result;
     }
 
-    public List<String> getTargetMainVerbPlaceholder(int argNum) {
-        int argIndex = argIndices.get(argNum).get();
+    public List<String> getTargetMainVerbPlaceholder(int argIndex) {
         // category of actual arg as it appears in the sentence.
         Category argCategory = categories.get(argIndex);
         List<String> result = new ArrayList<>();
@@ -642,14 +657,13 @@ public class QuestionTemplate {
     /**
      * Assumes the argument at argNum is present.
      */
-    public List<String> getTargetArgumentPlaceholder(int argNum) {
+    public List<String> getTargetArgumentPlaceholder(int argNum, int argIndex) {
         ArrayList<String> result = new ArrayList<>();
         if(type == QuestionType.NOUN_ADJUNCT) {
             return result;
         }
         // only add the placeholder if we expect something verbal.
         if(argCategories.get(argNum).isFunctionInto(Category.valueOf("(S\\NP)"))) {
-            int argIndex = argIndices.get(argNum).get();
             // category of actual arg as it appears in the sentence.
             Category argCategory = categories.get(argIndex);
             if (argCategory.isFunctionInto(Category.valueOf("S[to]\\NP"))) {
@@ -663,6 +677,9 @@ public class QuestionTemplate {
             } else if (argCategory.isFunctionInto(Category.valueOf("S\\NP"))) { // catch-all for verbs
                 result.add("do");
             }
+        } else if(argCategories.get(argNum).isFunctionInto(Category.valueOf("PP"))) {
+            // if it's a PP argument, we'll put the PP in the question.
+            result.add(words.get(argIndex));
         }
         // otherwise maybe it's an S[dcl] or something, in which case we don't want a placeholder.
         // TODO maybe add preposition
