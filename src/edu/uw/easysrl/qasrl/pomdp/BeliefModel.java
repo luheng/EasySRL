@@ -13,17 +13,24 @@ public class BeliefModel {
     // Distribution over parses.
     List<Parse> parses;
     public double[] belief;
+    private double[] prior;
+    public static final double epsilon = 1e-6;
+    public static final double smoothing = 1e-3;
 
     public BeliefModel(List<Parse> parses) {
         this.parses = parses;
         belief = new double[parses.size()];
+        prior = new double[parses.size()];
+        double sum = parses.stream().mapToDouble(p -> p.score).sum();
+        for (int i = 0; i < parses.size(); i++) {
+            prior[i] = parses.get(i).score / sum;
+        }
         resetToPrior();
     }
 
     public void resetToPrior() {
         for (int i = 0; i < parses.size(); i++) {
-            //belief[i] = 100.0 - i;
-            belief[i] = parses.get(i).score;
+            belief[i] = prior[i];
         }
         normalize();
     }
@@ -41,9 +48,14 @@ public class BeliefModel {
     public void update(ObservationModel obs, GroupedQuery query, Response response) {
         for (int i = 0; i < parses.size(); i++) {
             double p = obs.getObservationProbability(query, response, i, parses.get(i));
-            if (!Double.isNaN(p)) {
-                belief[i] *= p;
+            if (Double.isNaN(p)) {
+                System.err.println("NAN p");
+                p = 0.0;
+            } else if (Double.isInfinite(p)) {
+                System.err.println("infinite p");
+                p = 0.0;
             }
+            belief[i] = belief[i] * p + prior[i] * smoothing;
         }
         normalize();
     }
@@ -51,7 +63,7 @@ public class BeliefModel {
     public int getBestState() {
         int bestState = 0;
         for (int i = 1; i < belief.length; i++) {
-            if (belief[i] > belief[bestState]) {
+            if (belief[i] > belief[bestState] + epsilon) {
                 bestState = i;
             }
         }

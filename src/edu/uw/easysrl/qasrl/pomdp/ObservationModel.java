@@ -68,8 +68,10 @@ public class ObservationModel {
                 userResponseType = 1;
             } else if (user == gold) {
                 userResponseType = 2;
+            } else if (maxOverlap > 0 && maxOverlapOptions.contains(user)){
+                userResponseType = 3;
             } else {
-                userResponseType = maxOverlapOptions.contains(user) ? 3 : 4;
+                userResponseType = 4;
             }
             observation[questionType][goldType][userResponseType] += userResponse.trust;
             counts[questionType][goldType] ++;
@@ -125,12 +127,14 @@ public class ObservationModel {
                     parseIsNA = true;
                 } else if (!option.isNAOption()){
                     int depOverlap = computeDependencyOverlap(query, option, parse);
-                    if (depOverlap > maxOverlap) {
-                        maxOverlapOptions = new HashSet<>();
-                        maxOverlap = depOverlap;
-                    }
-                    if (depOverlap == maxOverlap) {
-                        maxOverlapOptions.add(i);
+                    if (depOverlap > 0) {
+                        if (depOverlap > maxOverlap) {
+                            maxOverlapOptions = new HashSet<>();
+                            maxOverlap = depOverlap;
+                        }
+                        if (depOverlap == maxOverlap) {
+                            maxOverlapOptions.add(i);
+                        }
                     }
                 }
             }
@@ -154,15 +158,17 @@ public class ObservationModel {
                 // System.out.println("Num. max overlap:\t" + K);
                 return observation[questionType][parseType][3] / K;
             } else {
-                int numOtherOptions = query.getAnswerOptions().size() - maxOverlapOptions.size()
-                        - (perfectMatchHasMaxOverlap ? 0 : 1) - 2;
-                //System.out.println("Other number of options:\t" + numOtherOptions);
+                int K = query.getAnswerOptions().size() - maxOverlapOptions.size() - (perfectMatchHasMaxOverlap ? 0 : 1) - 2;
+                // FIXME: why?
+                if (K <= 0) {
+                    K = 1;
+                }
                 /* if (numOtherOptions > 2) {
                     System.out.println(query.getDebuggingInfo(response));
                 }
                 */
-                //System.out.println("Num other:\t" + numOtherOptions);
-                return observation[questionType][parseType][4] / numOtherOptions;
+                //System.out.println("Num other:\t" + K);
+                return observation[questionType][parseType][4] / K;
             }
         }
     }

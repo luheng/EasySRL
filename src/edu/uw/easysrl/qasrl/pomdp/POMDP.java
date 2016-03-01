@@ -33,7 +33,7 @@ public class POMDP {
     private int timeStep;
 
     // The state space.
-    private Map<Integer, List<Parse>> allParses;
+    public Map<Integer, List<Parse>> allParses;
     private Map<Integer, List<Results>> allResults;
     private Map<Integer, Integer> oracleParseIds;
 
@@ -188,8 +188,6 @@ public class POMDP {
 
     public void receiveObservationForQuery(GroupedQuery query, Response response) {
         beliefModel.update(observationModel, query, response);
-        //    history.addAction(query);
-        //history.addObservation(response);
     }
 
     public List<String> getSentenceById(int sentenceId) {
@@ -200,11 +198,19 @@ public class POMDP {
         return allResults.get(sid).get(beliefModel.getBestState());
     }
 
+    public int getRerankParseId(int sid) {
+        return beliefModel.getBestState();
+    }
+
     public Results getOneBestF1(int sid) {
         return allResults.get(sid).get(0);
     }
 
     public Results getOracleF1(int sid) {
         return allResults.get(sid).get(oracleParseIds.get(sid));
+    }
+
+    public int getOracleParseId(int sid) {
+        return oracleParseIds.get(sid);
     }
 }
