@@ -31,6 +31,8 @@ public class GroupedQuery {
 
         public String getAnswer() { return answer; }
 
+        public double getProbability() { return probability; }
+
         public ImmutableList<Integer> getArgumentIds() { return argumentIds; }
 
         public Set<Integer> getParseIds() { return parseIds; }

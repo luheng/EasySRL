@@ -12,13 +12,17 @@ import java.util.List;
 public class BeliefModel {
     // Distribution over parses.
     List<Parse> parses;
-    double[] belief;
+    public double[] belief;
 
     public BeliefModel(List<Parse> parses) {
         this.parses = parses;
         belief = new double[parses.size()];
+        resetToPrior();
+    }
+
+    public void resetToPrior() {
         for (int i = 0; i < parses.size(); i++) {
-            //belief[i] = 100.0 - i;  //
+            //belief[i] = 100.0 - i;
             belief[i] = parses.get(i).score;
         }
         normalize();

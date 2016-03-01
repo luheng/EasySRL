@@ -25,7 +25,7 @@ public class POMDP {
     // The action space.
     private List<GroupedQuery> queryPool;
 
-    private BeliefModel beliefModel;
+    public BeliefModel beliefModel;
     private ObservationModel observationModel, baseObservationModel;
     private History history;
     private Policy policy;
@@ -173,9 +173,23 @@ public class POMDP {
         return action;
     }
 
+    public void resetBeliefModel() {
+        beliefModel.resetToPrior();
+    }
+
+    public List<GroupedQuery> getQueryPool() {
+        return queryPool;
+    }
+
     public void receiveObservation(Response response) {
         beliefModel.update(observationModel, history.getLastAction(), response);
         history.addObservation(response);
+    }
+
+    public void receiveObservationForQuery(GroupedQuery query, Response response) {
+        beliefModel.update(observationModel, query, response);
+        //    history.addAction(query);
+        //history.addObservation(response);
     }
 
     public List<String> getSentenceById(int sentenceId) {
