@@ -34,6 +34,7 @@ public abstract class MultiQuery {
     }
 
     public abstract Set<String> getResponse(MultiResponseSimulator responseSimulator);
+    public abstract boolean isJeopardyStyle();
 
     // prompt is a question, choices are answers
     public static class Forward extends MultiQuery {
@@ -45,6 +46,10 @@ public abstract class MultiQuery {
 
         public Set<String> getResponse(MultiResponseSimulator responseSimulator) {
             return responseSimulator.answersForQuestion(this);
+        }
+
+        public boolean isJeopardyStyle() {
+            return false;
         }
     }
 
@@ -58,6 +63,10 @@ public abstract class MultiQuery {
 
         public Set<String> getResponse(MultiResponseSimulator responseSimulator) {
             return responseSimulator.questionsForAnswer(this);
+        }
+
+        public boolean isJeopardyStyle() {
+            return true;
         }
     }
 

@@ -19,25 +19,25 @@ public class MultiResponseSimulator {
     public MultiResponseSimulator(List<Parse> goldParses) {
         this.goldParses = goldParses;
         this.qaPairsForSentenceId = new HashMap<>();
-        System.out.println("GOLD QUESTION--ANSWER PAIRS");
-        for(int id = 0; id < goldParses.size(); id++) {
-            System.out.println("==========");
-            Parse parse = goldParses.get(id);
-            List<String> words = parse.syntaxTree.getLeaves()
-                .stream()
-                .map(SyntaxTreeNode::getWord)
-                .collect(Collectors.toList());
-            System.out.println(TextGenerationHelper.renderString(words));
-            for(QuestionAnswerPairReduced qaPair : getQAPairs(id)) {
-                System.out.println(String.format("%s %s %s; question main: %s",
-                                                 words.get(qaPair.predicateIndex),
-                                                 qaPair.predicateCategory,
-                                                 qaPair.questionType,
-                                                 words.get(qaPair.questionMainIndex)));
-                System.out.println(qaPair.renderQuestion());
-                System.out.println("  " + qaPair.renderAnswer());
-            }
-        }
+        // System.out.println("GOLD QUESTION--ANSWER PAIRS");
+        // for(int id = 0; id < goldParses.size(); id++) {
+        //     System.out.println("==========");
+        //     Parse parse = goldParses.get(id);
+        //     List<String> words = parse.syntaxTree.getLeaves()
+        //         .stream()
+        //         .map(SyntaxTreeNode::getWord)
+        //         .collect(Collectors.toList());
+        //     System.out.println(TextGenerationHelper.renderString(words));
+        //     for(QuestionAnswerPairReduced qaPair : getQAPairs(id)) {
+        //         System.out.println(String.format("%s %s %s; question main: %s",
+        //                                          words.get(qaPair.predicateIndex),
+        //                                          qaPair.predicateCategory,
+        //                                          qaPair.questionType,
+        //                                          words.get(qaPair.questionMainIndex)));
+        //         System.out.println(qaPair.renderQuestion());
+        //         System.out.println("  " + qaPair.renderAnswer());
+        //     }
+        // }
     }
 
     protected Set<String> answersForQuestion(MultiQuery query) {
@@ -51,10 +51,10 @@ public class MultiResponseSimulator {
             .stream()
             .filter(answers::contains)
             .collect(Collectors.toSet());
-        answers
-            .stream()
-            .filter(answer -> !checks.contains(answer))
-            .forEach(answer -> System.out.println("GG: " + answer));
+        // answers
+        //     .stream()
+        //     .filter(answer -> !checks.contains(answer))
+        //     .forEach(answer -> System.out.println("GG: " + answer));
         return checks;
     }
 
@@ -69,10 +69,10 @@ public class MultiResponseSimulator {
             .stream()
             .filter(questions::contains)
             .collect(Collectors.toSet());
-        questions
-            .stream()
-            .filter(question -> !checks.contains(question))
-            .forEach(question -> System.out.println("GG: " + question));
+        // questions
+        //     .stream()
+        //     .filter(question -> !checks.contains(question))
+        //     .forEach(question -> System.out.println("GG: " + question));
         return checks;
     }
 
