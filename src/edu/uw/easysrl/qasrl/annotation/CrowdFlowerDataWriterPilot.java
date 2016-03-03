@@ -18,7 +18,7 @@ import java.util.stream.IntStream;
  * Group query by sentences.
  * Created by luheng on 2/9/16.
  */
-public class CrowdFlowerDataWriter {
+public class CrowdFlowerDataWriterPilot {
     static final int nBest = 100;
     static final int maxNumSentences = 100;
     static final int maxNumSentencesPerFile = 50;
