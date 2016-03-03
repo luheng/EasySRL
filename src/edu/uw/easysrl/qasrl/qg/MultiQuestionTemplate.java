@@ -278,6 +278,7 @@ public class MultiQuestionTemplate {
         int argIndex = argIndexOpt.get();
         Category observedArgCategory = categories.get(argIndex);
         boolean cantAsk = type == QuestionType.INVALID ||
+            (words.get(argIndex).matches("[0-9]+")) ||
             (badPredicates.contains(words.get(predicateIndex))) ||
             (auxiliaries.matches(observedArgCategory) ||
              controlParticles.matches(observedArgCategory) ||
@@ -316,7 +317,7 @@ public class MultiQuestionTemplate {
         final List<QuestionAnswerPairReduced> qaPairs = new ArrayList<>();
         for(Map<Integer, Optional<ResolvedDependency>> chosenArgDeps : argPaths) {
             instantiateForArgument(targetArgNum, chosenArgDeps).ifPresent(qaPairs::add);
-            getBasicSupersenseQAPairs(targetArgNum, chosenArgDeps).forEach(qaPairs::add);
+            // getBasicSupersenseQAPairs(targetArgNum, chosenArgDeps).forEach(qaPairs::add);
         }
         return qaPairs;
     }
