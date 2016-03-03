@@ -72,6 +72,18 @@ public class QuestionAnswerPairReduced {
         public String toString() {
             return supersense.toString();
         }
+
+        public boolean equals(Object o) {
+            if(!(o instanceof SupersenseQuestionType)) {
+                return false;
+            } else {
+                return this.toString().equals(o.toString());
+            }
+        }
+
+        public int hashCode() {
+            return toString().hashCode();
+        }
     }
 
     public static class StandardQuestionType implements QuestionType {
@@ -81,6 +93,17 @@ public class QuestionAnswerPairReduced {
         }
         public String toString() {
             return type.toString();
+        }
+        public boolean equals(Object o) {
+            if(!(o instanceof StandardQuestionType)) {
+                return false;
+            } else {
+                return this.toString().equals(o.toString());
+            }
+        }
+
+        public int hashCode() {
+            return toString().hashCode();
         }
     }
 }

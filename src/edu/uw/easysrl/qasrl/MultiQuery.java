@@ -19,6 +19,9 @@ public abstract class MultiQuery {
 
     final Table<String, String, List<QuestionAnswerPairReduced>> qaStringsToQAPairs;
     final Table<String, String, Set<Parse>> qaStringsToParses;
+    protected Set<QuestionAnswerPairReduced> allQAPairs;
+    private Set<Integer> predIds;
+    private Set<QuestionAnswerPairReduced.QuestionType> questionTypes;
 
     public MultiQuery(int sentenceId, String prompt, Set<String> options,
                       Table<String, String, List<QuestionAnswerPairReduced>> qaStringsToQAPairs,
@@ -28,6 +31,9 @@ public abstract class MultiQuery {
         this.options = options;
         this.qaStringsToQAPairs = qaStringsToQAPairs;
         this.qaStringsToParses = qaStringsToParses;
+        this.predIds = null; // TODO
+        this.questionTypes = null;
+        this.allQAPairs = new HashSet<QuestionAnswerPairReduced>();
 
         assert this.options.size() > 0
             : "cannot have a MultiQuery with no answer options";
@@ -36,12 +42,26 @@ public abstract class MultiQuery {
     public abstract Set<String> getResponse(MultiResponseSimulator responseSimulator);
     public abstract boolean isJeopardyStyle();
 
+    public Set<QuestionAnswerPairReduced.QuestionType> getQuestionTypes() {
+        if(questionTypes == null) {
+            questionTypes = new HashSet<QuestionAnswerPairReduced.QuestionType>();
+            allQAPairs
+                .stream()
+                .map(qaPair -> qaPair.questionType)
+                .forEach(questionTypes::add);
+        }
+        return questionTypes;
+    }
+
     // prompt is a question, choices are answers
     public static class Forward extends MultiQuery {
         public Forward(int sentenceId, String prompt, Set<String> options,
                        Table<String, String, List<QuestionAnswerPairReduced>> qaStringsToQAPairs,
                        Table<String, String, Set<Parse>> qaStringsToParses) {
             super(sentenceId, prompt, options, qaStringsToQAPairs, qaStringsToParses);
+            for(String answer : options) {
+                allQAPairs.addAll(qaStringsToQAPairs.get(prompt, answer));
+            }
         }
 
         public Set<String> getResponse(MultiResponseSimulator responseSimulator) {
@@ -59,6 +79,9 @@ public abstract class MultiQuery {
                        Table<String, String, List<QuestionAnswerPairReduced>> qaStringsToQAPairs,
                        Table<String, String, Set<Parse>> qaStringsToParses) {
             super(sentenceId, prompt, options, qaStringsToQAPairs, qaStringsToParses);
+            for(String question : options) {
+                allQAPairs.addAll(qaStringsToQAPairs.get(question, prompt));
+            }
         }
 
         public Set<String> getResponse(MultiResponseSimulator responseSimulator) {
