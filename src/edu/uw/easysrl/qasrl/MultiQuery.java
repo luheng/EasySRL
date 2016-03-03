@@ -23,6 +23,10 @@ public abstract class MultiQuery {
     private Set<Integer> predIds;
     private Set<QuestionAnswerPairReduced.QuestionType> questionTypes;
 
+    public Map<String, Double> optionScores;
+    public double confidence = .0;
+    public double uncertainty = .0;
+
     public MultiQuery(int sentenceId, String prompt, Set<String> options,
                       Table<String, String, List<QuestionAnswerPairReduced>> qaStringsToQAPairs,
                       Table<String, String, Set<Parse>> qaStringsToParses) {
@@ -93,6 +97,26 @@ public abstract class MultiQuery {
         }
     }
 
+    public void computeProbabilities(double[] parseDist) {
+        double totalScore = .0;
+        for (double p : parseDist) {
+            totalScore += p;
+        }
+        Set<Parse> allParses = new HashSet<>();
+
+        optionScores = new HashMap<>();
+        uncertainty = .0;
+        for (String option : options) {
+            final Collection<Parse> parses = !isJeopardyStyle() ?
+                    qaStringsToParses.get(prompt, option) : qaStringsToParses.get(option, prompt);
+            allParses.addAll(parses);
+            double prob = parses.stream().mapToDouble(p -> p.score).sum() / totalScore;
+            optionScores.put(option, prob);
+            uncertainty -= prob > 0 ? prob * Math.log(prob) : 0;
+        }
+        confidence = allParses.stream().mapToDouble(p -> p.score).sum() / totalScore;
+    }
+
     public String toStringWithResponse(MultiResponseSimulator responseSimulator) {
         Set<String> checks = getResponse(responseSimulator);
         StringBuilder sb = new StringBuilder();
@@ -106,6 +130,28 @@ public abstract class MultiQuery {
             sb.append(option);
             sb.append("\n");
         }
+        return sb.toString();
+    }
+
+    public String toStringWithResponse(final Set<String> checks) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(prompt + "\n");
+        Set<String> printedOptions = new HashSet<>();
+        for(String option : options) {
+            if(checks.contains(option)) {
+                sb.append(" *\t");
+                printedOptions.add(option);
+            } else {
+                sb.append("  \t");
+            }
+            sb.append(option);
+            sb.append("\n");
+        }
+        // Handle additional options such as bad question and answer unlisted.
+        checks.stream()
+                .filter(s -> !printedOptions.contains(s))
+                .sorted()
+                .forEach(s -> sb.append(" *\t" + s + "\n"));
         return sb.toString();
     }
 
