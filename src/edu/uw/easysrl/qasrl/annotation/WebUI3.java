@@ -160,6 +160,7 @@ public class WebUI3 {
                 int sentId = query.sentenceId;
 
                 // TODO: response simulator.
+                Mult
 
                 // TODO: append to history.
 
