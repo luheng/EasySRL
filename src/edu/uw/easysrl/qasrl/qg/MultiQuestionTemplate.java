@@ -316,7 +316,8 @@ public class MultiQuestionTemplate {
         List<Map<Integer, Optional<ResolvedDependency>>> argPaths = TextGenerationHelper.getAllArgumentChoicePaths(allArgDeps);
         final List<QuestionAnswerPairReduced> qaPairs = new ArrayList<>();
         for(Map<Integer, Optional<ResolvedDependency>> chosenArgDeps : argPaths) {
-            instantiateForArgument(targetArgNum, chosenArgDeps).ifPresent(qaPairs::add);
+            instantiateForArgument(targetArgNum, chosenArgDeps).stream().findFirst().ifPresent(qaPairs::add);
+            // instantiateForArgument(targetArgNum, chosenArgDeps).forEach(qaPairs::add);
             // getBasicSupersenseQAPairs(targetArgNum, chosenArgDeps).forEach(qaPairs::add);
         }
         return qaPairs;
@@ -403,12 +404,10 @@ public class MultiQuestionTemplate {
                                       answer);
     }
 
-    public Optional<QuestionAnswerPairReduced> instantiateForArgument(int targetArgNum, Map<Integer, Optional<ResolvedDependency>> chosenArgDeps) {
+    public List<QuestionAnswerPairReduced> instantiateForArgument(int targetArgNum, Map<Integer, Optional<ResolvedDependency>> chosenArgDeps) {
         if(cantAskQuestion(targetArgNum, chosenArgDeps)) {
-            return Optional.empty();
+            return new LinkedList<QuestionAnswerPairReduced>();
         }
-        final Set<ResolvedDependency> questionDeps = new HashSet<>();
-
         // we should never ask about unrealized arguments
         final ResolvedDependency targetDep = chosenArgDeps.get(targetArgNum).get();
         final int targetIndex = targetDep.getArgument();
@@ -456,20 +455,27 @@ public class MultiQuestionTemplate {
         }
 
         // Add arguments on either side until done, according to CCG category.
-        final List<String> left = new ArrayList<>();
-        final List<String> right = new ArrayList<>();
+        List<TextWithDependencies> lefts = new LinkedList<>();
+        lefts.add(new TextWithDependencies(new LinkedList<String>(), new HashSet<ResolvedDependency>()));
+
+        List<TextWithDependencies> rights = new LinkedList<>();
+        rights.add(new TextWithDependencies(new LinkedList<String>(), new HashSet<ResolvedDependency>()));
+
         Category currentCategory = predicateCategory;
+
         for(int currentArgNum = predicateCategory.getNumberOfArguments(); currentArgNum > 0; currentArgNum--) {
             // get the surface form of the argument in question
-            List<String> argWords = new ArrayList<>();
+            final List<TextWithDependencies> argTWDs;
             // TODO: restructure/simplify this, we have lots of things only working because of guarantees established earlier in the code...
             if(currentArgNum == targetArgNum) { // if we're asking about the target, we have to put in placeholder words
                 // here we know target dep and target index will be the arg dep and index.
                 if(verbIndexOpt.isPresent() && (targetIndex == verbIndexOpt.get())) {
                     // since we're asking about the verb, we're going to include the subject, so we'll split the verb.
-                    argWords.addAll(getTargetMainVerbPlaceholder(targetIndex));
+                    argTWDs = new LinkedList<TextWithDependencies>();
+                    argTWDs.add(new TextWithDependencies(getTargetMainVerbPlaceholder(targetIndex), new HashSet<>()));
                 } else {
-                    argWords.addAll(getTargetArgumentPlaceholder(currentArgNum, targetIndex));
+                    argTWDs = new LinkedList<TextWithDependencies>();
+                    argTWDs.add(new TextWithDependencies(getTargetArgumentPlaceholder(currentArgNum, targetIndex), new HashSet<>()));
                 }
             } else {
                 // this is complicated... consider simplifying.
@@ -484,16 +490,11 @@ public class MultiQuestionTemplate {
                                 dep.getArgNumber() == 1)
                         .findFirst();
                 }
-                argDepOpt.ifPresent(dep -> questionDeps.add(dep));
                 final Optional<Integer> argIndexOpt = argDepOpt.map(ResolvedDependency::getArgument);
 
                 // then we generate the text for that argument, again logging the dependencies touched.
                 if(!argIndexOpt.isPresent()) {
-                    TextWithDependencies argWithDeps = TextGenerationHelper
-                        .getRepresentativePhrases(argIndexOpt, argCategory, parse)
-                        .get(0);
-                    questionDeps.addAll(argWithDeps.dependencies);
-                    argWords = argWithDeps.tokens;
+                    argTWDs = TextGenerationHelper.getRepresentativePhrases(argIndexOpt, argCategory, parse);
                 } else {
                     int argIndex = argIndexOpt.get();
                     if(!verbIndexOpt.isPresent() || (verbIndexOpt.isPresent() && argIndex != verbIndexOpt.get())) {
@@ -505,22 +506,12 @@ public class MultiQuestionTemplate {
                         } else {
                             fixedPronounString = pronounOpt.map(pron -> pron.withCase(Pronoun.Case.ACCUSATIVE).toString());
                         }
-                        TextWithDependencies argWithDeps = TextGenerationHelper
-                            .getRepresentativePhrases(argIndexOpt, argCategory, parse, fixedPronounString)
-                            .get(0);
-                        questionDeps.addAll(argWithDeps.dependencies);
-                        argWords = argWithDeps.tokens;
+                        argTWDs = TextGenerationHelper.getRepresentativePhrases(argIndexOpt, argCategory, parse, fixedPronounString);
                     } else if(verbIndexOpt.isPresent() && argIndex == verbIndexOpt.get()) {
                         String verbArgReplacement = TextGenerationHelper.renderString(getNonTargetBareArgumentVerb(verbIndexOpt.get()));
-                        TextWithDependencies argWithDeps = TextGenerationHelper
-                            .getRepresentativePhrases(Optional.of(argIndex), argCategory, parse, verbArgReplacement).get(0);
-                        questionDeps.addAll(argWithDeps.dependencies);
-                        argWords = argWithDeps.tokens;
+                        argTWDs = TextGenerationHelper.getRepresentativePhrases(Optional.of(argIndex), argCategory, parse, verbArgReplacement);
                     } else {
-                        TextWithDependencies argWithDeps = TextGenerationHelper
-                            .getRepresentativePhrases(Optional.of(argIndex), argCategory, parse).get(0);
-                        questionDeps.addAll(argWithDeps.dependencies);
-                        argWords = argWithDeps.tokens;
+                        argTWDs = TextGenerationHelper.getRepresentativePhrases(Optional.of(argIndex), argCategory, parse);
                     }
                 }
             }
@@ -529,14 +520,19 @@ public class MultiQuestionTemplate {
             final Slash slash = currentCategory.getSlash();
             switch(slash) {
             case FWD:
-                right.addAll(argWords);
+                rights = rights.stream()
+                    .flatMap(right -> argTWDs.stream()
+                             .map(argTWD -> right.concat(argTWD)))
+                    .collect(Collectors.toList());
                 break;
             case BWD:
-                left.addAll(0, argWords);
+                lefts = lefts.stream()
+                    .flatMap(left -> argTWDs.stream()
+                             .map(argTWD -> argTWD.concat(left)))
+                    .collect(Collectors.toList());
                 break;
             case EITHER:
                 assert false : "Undirected slash appeared in supertagged data";
-                right.addAll(argWords);
                 break;
             }
 
@@ -544,35 +540,50 @@ public class MultiQuestionTemplate {
             currentCategory = currentCategory.getLeft();
         }
 
-        final List<String> questionWords = new ArrayList<>();
-        questionWords.add(wh);
-        questionWords.addAll(auxiliaries);
-        questionWords.addAll(left);
-        questionWords.addAll(pred);
-        questionWords.addAll(right);
+        final List<QuestionAnswerPairReduced> results = new LinkedList<>();
 
-        final List<String> question = questionWords
-            .stream()
-            .filter(s -> s != null && !s.isEmpty()) // to mitigate oversights. harmless anyway
-            .collect(Collectors.toList());
+        for(TextWithDependencies left : lefts) {
+            for(TextWithDependencies right : rights) {
+                final List<String> questionWords = new ArrayList<>();
+                questionWords.add(wh);
+                questionWords.addAll(auxiliaries);
+                questionWords.addAll(left.tokens);
+                questionWords.addAll(pred);
+                questionWords.addAll(right.tokens);
 
-        final Category targetCategory = argCategories.get(targetArgNum);
-        Optional<String> replaceOpt = Optional.of(targetCategory)
-            .filter(cat -> cat.isFunctionInto(Category.valueOf("S\\NP")))
-            .map(arg -> TextGenerationHelper.renderString(getBarePredVerb(targetIndex)));
-        final TextWithDependencies answer = TextGenerationHelper
-            .getRepresentativePhrases(Optional.of(targetIndex), targetCategory, parse, replaceOpt)
-            .get(0);
+                final Set<ResolvedDependency> questionDeps = new HashSet<>();
+                for(int argNum : chosenArgDeps.keySet()) {
+                    chosenArgDeps.get(argNum).ifPresent(questionDeps::add);
+                }
+                questionDeps.addAll(left.dependencies);
+                questionDeps.addAll(right.dependencies);
 
-        final QuestionAnswerPairReduced qaPair = new QuestionAnswerPairReduced(predicateIndex,
-                                                                 predicateCategory,
-                                                                 predicateIndex,
-                                                                 new QuestionAnswerPairReduced.StandardQuestionType(type),
-                                                                 questionDeps,
-                                                                 question,
-                                                                 targetDep,
-                                                                 answer);
-        return Optional.of(qaPair);
+                final List<String> question = questionWords
+                    .stream()
+                    .filter(s -> s != null && !s.isEmpty()) // to mitigate oversights. harmless anyway
+                    .collect(Collectors.toList());
+
+                final Category targetCategory = argCategories.get(targetArgNum);
+                Optional<String> replaceOpt = Optional.of(targetCategory)
+                    .filter(cat -> cat.isFunctionInto(Category.valueOf("S\\NP")))
+                    .map(arg -> TextGenerationHelper.renderString(getBarePredVerb(targetIndex)));
+
+                List<TextWithDependencies> answers = TextGenerationHelper
+                    .getRepresentativePhrases(Optional.of(targetIndex), targetCategory, parse, replaceOpt);
+                for(TextWithDependencies answer : answers) {
+                    final QuestionAnswerPairReduced qaPair = new QuestionAnswerPairReduced(predicateIndex,
+                                                                                           predicateCategory,
+                                                                                           predicateIndex,
+                                                                                           new QuestionAnswerPairReduced.StandardQuestionType(type),
+                                                                                           questionDeps,
+                                                                                           question,
+                                                                                           targetDep,
+                                                                                           answer);
+                    results.add(qaPair);
+                }
+            }
+        }
+        return results;
     }
 
     /**

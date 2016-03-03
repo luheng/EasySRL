@@ -10,6 +10,7 @@ import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeBinary;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Tools for generating text from trees, dependencies, and lists of tokens.
@@ -284,7 +285,6 @@ public class TextGenerationHelper {
      * Constructs a phrase with the desired head and category label.
      * takes an optional (by overloading---see above) argument asking for the head word to be replaced by something else.
      *   the optional argument is used when stripping verbs of their tense. (maybe there's a less hacky way to deal with that...)
-     * TODO: does not handle coordination; we might want to include both args in the case of coordination.
      * In particular this would be for the phrases inside questions: consider "What did something do between April 1991?"
      * For multiple answers to the same question, we just call this multiple times. (it should only get one of multiple
      * constituents together in a coordination construction.)
@@ -412,9 +412,14 @@ public class TextGenerationHelper {
             List<TextWithDependencies> phrases = new LinkedList<>();
 
             for(Map<Integer, Optional<ResolvedDependency>> chosenArgDeps : argumentChoicePaths) {
-                List<String> left = new ArrayList<>();
-                List<String> right = new ArrayList<>();
+                List<TextWithDependencies> lefts = new ArrayList<>();
+                lefts.add(new TextWithDependencies(new LinkedList<>(), new HashSet<>()));
+
+                List<TextWithDependencies> rights = new ArrayList<>();
+                rights.add(new TextWithDependencies(new LinkedList<>(), new HashSet<>()));
+
                 Set<ResolvedDependency> localDeps = new HashSet<>();
+
                 for(int currentArgNum = currentCategory.getNumberOfArguments();
                     currentArgNum > neededCategory.getNumberOfArguments();
                     currentArgNum--) {
@@ -424,22 +429,22 @@ public class TextGenerationHelper {
                     Optional<Integer> argIndexOpt = argDepOpt.map(ResolvedDependency::getArgument);
                     // recover dep using the fact that we know the head leaf, arg num, and arg index.
                     argDepOpt.map(localDeps::add);
-                    final int curArg = currentArgNum; // just so we can use it in the lambda below
-                    // TODO do it for all arrangements of sub-phrases
-                    TextWithDependencies argTextWithDeps =
-                        getRepresentativePhrases(argIndexOpt, argCat, parse, replacementIndexOpt, replacementWord, lookForOf)
-                        .get(0);
-                    List<String> argPhrase = argTextWithDeps.tokens;
-                    localDeps.addAll(argTextWithDeps.dependencies);
+                    List<TextWithDependencies> argTWDs =
+                        getRepresentativePhrases(argIndexOpt, argCat, parse, replacementIndexOpt, replacementWord, lookForOf);
                     // add the argument on the left or right side, depending on the slash
                     Slash slash = currentCategory.getSlash();
                     switch(slash) {
                     case FWD:
-                        right.addAll(argPhrase);
+                        rights = rights.stream()
+                            .flatMap(right -> argTWDs.stream()
+                                     .map(argTWD -> right.concat(argTWD)))
+                            .collect(Collectors.toList());
                         break;
                     case BWD:
-                        argPhrase.addAll(left);
-                        left = argPhrase;
+                        lefts = lefts.stream()
+                            .flatMap(left -> argTWDs.stream()
+                                     .map(argTWD -> argTWD.concat(left)))
+                            .collect(Collectors.toList());
                         break;
                     case EITHER:
                         System.err.println("Undirected slash appeared in supertagged data :(");
@@ -448,12 +453,18 @@ public class TextGenerationHelper {
                     // proceed to the next argument
                     currentCategory = currentCategory.getLeft();
                 }
-                List<String> result = new ArrayList<>();
-                result.addAll(left);
-                result.addAll(center);
-                result.addAll(right);
-                localDeps.addAll(touchedDeps);
-                phrases.add(new TextWithDependencies(result, localDeps));
+                for(TextWithDependencies left : lefts) {
+                    for(TextWithDependencies right : rights) {
+                        List<String> resultTokens = new ArrayList<>();
+                        resultTokens.addAll(left.tokens);
+                        resultTokens.addAll(center);
+                        resultTokens.addAll(right.tokens);
+                        localDeps.addAll(touchedDeps);
+                        localDeps.addAll(left.dependencies);
+                        localDeps.addAll(right.dependencies);
+                        phrases.add(new TextWithDependencies(resultTokens, localDeps));
+                    }
+                }
             }
             return phrases;
         }
@@ -555,6 +566,17 @@ public class TextGenerationHelper {
         public TextWithDependencies(List<String> tokens, Set<ResolvedDependency> dependencies) {
             this.tokens = tokens;
             this.dependencies = dependencies;
+        }
+
+        // functional concat
+        public TextWithDependencies concat(TextWithDependencies other) {
+            List<String> newTokens = new LinkedList<>();
+            Set<ResolvedDependency> newDependencies = new HashSet<>();
+            newTokens.addAll(this.tokens);
+            newTokens.addAll(other.tokens);
+            newDependencies.addAll(this.dependencies);
+            newDependencies.addAll(other.dependencies);
+            return new TextWithDependencies(newTokens, newDependencies);
         }
     }
 }
