@@ -257,8 +257,9 @@ public class GroupedQuery {
     public String getDebuggingInfo(final Response response) {
         String result = String.format("SID=%d\t%s\n", sentenceId, sentence.stream().collect(Collectors.joining(" ")));
         result += String.format("%d:%s\t%s.%d\n", predicateIndex, sentence.get(predicateIndex), category, argumentNumber);
-        result += String.format("QID=%d\tconf=%.2f\tunc=%.2f\tent=%.2f\tmarg=%.2f\t%s\n", queryId, questionConfidence,
-                attachmentUncertainty, answerEntropy, answerMargin, question);
+        //result += String.format("QID=%d\tconf=%.2f\tunc=%.2f\tent=%.2f\tmarg=%.2f\t%s\n", queryId, questionConfidence,
+        //        attachmentUncertainty, answerEntropy, answerMargin, question);
+        result += String.format("QID=%d\tconf=%.2f\t%s\n", queryId, questionConfidence, question);
         for (int i = 0; i < answerOptions.size(); i++) {
             AnswerOption ao = answerOptions.get(i);
             String match = (response.chosenOptions.contains(i) ? "G" : " ");

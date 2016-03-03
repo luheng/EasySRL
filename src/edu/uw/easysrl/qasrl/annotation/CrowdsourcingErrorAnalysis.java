@@ -1,5 +1,6 @@
 package edu.uw.easysrl.qasrl.annotation;
 
+import com.google.common.base.Strings;
 import edu.uw.easysrl.corpora.ParallelCorpusReader;
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.pomdp.POMDP;
@@ -27,6 +28,8 @@ public class CrowdsourcingErrorAnalysis {
     public static void main(String[] args) {
         Map<Integer, List<AlignedAnnotation>> annotations = loadData(annotationFilePath);
         assert annotations != null;
+
+        System.out.println(annotations.keySet().stream().sorted().map(String::valueOf).collect(Collectors.joining(", ")));
 
         //printOneStepAnalysis(annotations);
         printSequentialAnalysis(annotations);
@@ -202,8 +205,13 @@ public class CrowdsourcingErrorAnalysis {
                 }
                 // Take majority vote;
                 query.computeProbabilities(learner.beliefModel.belief);
-                learner.receiveObservationForQuery(query, new Response(userOption));
-                rerankedF1[userOption] = learner.getRerankedF1(sentenceId);
+                // Incorporate all answers.
+                for (int j = 0; j < optionDist.length; j++) {
+                    for (int k = 0; k < optionDist[j]; k++) {
+                        learner.receiveObservationForQuery(query, new Response(j));
+                    }
+                    rerankedF1[j] = learner.getRerankedF1(sentenceId);
+                }
 
                 // Print.
                 String sentenceStr = query.getSentence().stream().collect(Collectors.joining(" "));
@@ -239,7 +247,7 @@ public class CrowdsourcingErrorAnalysis {
                         }
                     }
                     GroupedQuery.AnswerOption option = query.getAnswerOptions().get(j);
-                    if (j == userOption) {
+                    //if (j == userOption) {
                         Results debuggingF1 = CcgEvaluation.evaluate(
                                 learner.allParses.get(sentenceId).get(rerankParseId).dependencies,
                                 learner.goldParses.get(sentenceId).dependencies);
@@ -248,10 +256,10 @@ public class CrowdsourcingErrorAnalysis {
                                 option.getAnswer(), 100.0 * rerankedF1[j].getF1(), improvement,
                                 DebugPrinter.getShortListString(option.getParseIds()));
                         currentF1 = rerankedF1[j];
-                    } else {
-                        result += String.format("%-8s\t%.3f\t%-40s\t-\t-\t%s\n", match, option.getProbability(),
-                                option.getAnswer(), DebugPrinter.getShortListString(option.getParseIds()));
-                    }
+                    //} else {
+                    //    result += String.format("%-8s\t%.3f\t%-40s\t-\t-\t%s\n", match, option.getProbability(),
+                    //            option.getAnswer(), DebugPrinter.getShortListString(option.getParseIds()));
+                    //}
                 }
                 int cnt = optionDist.length;
                 for (int j : unmatched) {
