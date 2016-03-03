@@ -51,17 +51,12 @@ public class CrowdFlowerDataWriter {
     public static void main(String[] args) throws IOException {
         POMDP learner = new POMDP(nBest, 10000 /* horizon */, 0.0 /* money penalty */);
         Set<Integer> heldOutSentences = new HashSet<>();
-
         // Print test questions.
         try {
             printTestQuestions(learner, heldOutSentences);
         } catch (IOException e) {
             e.printStackTrace();
         }
-
-        System.out.println(
-                heldOutSentences.stream().sorted().map(String::valueOf).collect(Collectors.joining(", "))
-        );
 
         List<double[]> avgNumQueries = new ArrayList<>(), avgOptionsPerQuery = new ArrayList<>(),
                        avgNumBinaryQueries = new ArrayList<>(),
