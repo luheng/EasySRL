@@ -52,21 +52,16 @@ public class CrowdFlowerDataWriter {
         POMDP learner = new POMDP(nBest, 10000 /* horizon */, 0.0 /* money penalty */);
         Set<Integer> heldOutSentences = new HashSet<>();
 
-        // Get oracle parses.
-        List<Parse> oracleParses = IntStream.range(0, learner.goldParses.size())
-                .mapToObj(sid -> learner.allParses.containsKey(sid) ?
-                        learner.allParses.get(sid).get(learner.getOracleParseId(sid)) : null)
-                .collect(Collectors.toList());
-
-        ResponseSimulator responseSimulator = new ResponseSimulatorGold(oracleParses, new QuestionGenerator(),
-                false /* Allow label match */);
-
         // Print test questions.
         try {
             printTestQuestions(learner, heldOutSentences);
         } catch (IOException e) {
             e.printStackTrace();
         }
+
+        System.out.println(
+                heldOutSentences.stream().sorted().map(String::valueOf).collect(Collectors.joining(", "))
+        );
 
         List<double[]> avgNumQueries = new ArrayList<>(), avgOptionsPerQuery = new ArrayList<>(),
                        avgNumBinaryQueries = new ArrayList<>(),
@@ -107,7 +102,6 @@ public class CrowdFlowerDataWriter {
 
             // Process questions.
             for (int sentenceId : sentenceIds) {
-                final List<String> sentence = learner.getSentenceById(sentenceId);
                 learner.initializeForSentence(sentenceId);
                 List<GroupedQuery> queries = learner.getQueryPool().stream()
                         .filter(query -> query.answerEntropy > minAnswerEntropy
@@ -135,10 +129,17 @@ public class CrowdFlowerDataWriter {
                     }
                 }
                 for (GroupedQuery query : queries) {
-                    Response oracleResponse = responseSimulator.answerQuestion(query);
+                    int oracleId = learner.getOracleParseId(sentenceId);
+                    Response oracleResponse = new Response();
+                    for (int i = 0; i < query.getAnswerOptions().size(); i++) {
+                        if (query.getAnswerOptions().get(i).getParseIds().contains(oracleId)) {
+                            oracleResponse.add(i);
+                        }
+                    }
                     if (r == 0 && lineCounter < 100) {
-                        System.out.println("SID=" + sentenceId);
-                        System.out.println(sentence.stream().collect(Collectors.joining(" ")));
+                       // System.out.println("SID=" + sentenceId);
+                        //System.out.println(sentence.stream().collect(Collectors.joining(" ")));
+                        System.out.println("OracleID=" + learner.getOracleParseId(sentenceId));
                         System.out.println(query.getDebuggingInfo(oracleResponse));
                     }
                     learner.receiveObservationForQuery(query, oracleResponse);

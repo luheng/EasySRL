@@ -316,7 +316,7 @@ public class MultiQuestionTemplate {
         final List<QuestionAnswerPairReduced> qaPairs = new ArrayList<>();
         for(Map<Integer, Optional<ResolvedDependency>> chosenArgDeps : argPaths) {
             instantiateForArgument(targetArgNum, chosenArgDeps).ifPresent(qaPairs::add);
-            getBasicSupersenseQAPairs(targetArgNum, chosenArgDeps).forEach(qaPairs::add);
+            //getBasicSupersenseQAPairs(targetArgNum, chosenArgDeps).forEach(qaPairs::add);
         }
         return qaPairs;
     }

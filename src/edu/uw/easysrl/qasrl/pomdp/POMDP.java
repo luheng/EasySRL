@@ -3,8 +3,6 @@ package edu.uw.easysrl.qasrl.pomdp;
 import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
-import edu.uw.easysrl.qasrl.pomdp.BeliefModel;
-import edu.uw.easysrl.qasrl.pomdp.ObservationModel;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
@@ -27,7 +25,7 @@ public class POMDP {
 
     public BeliefModel beliefModel;
     private ObservationModel observationModel, baseObservationModel;
-    private History history;
+    public History history;
     private Policy policy;
     private RewardFunction rewardFunction;
     private int timeStep;
@@ -126,12 +124,13 @@ public class POMDP {
         timeStep = 0;
         List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
         List<Parse> parses = allParses.get(sentIdx);
-        List<GroupedQuery> queries = QueryGeneratorNew2.generateQueries(sentIdx, words, parses);
+        List<GroupedQuery> queries = QueryGeneratorByKey.generateQueries(sentIdx, words, parses);
         queries.stream().forEach(query -> {
+            query.computeProbabilities(beliefModel.belief);
             query.setQueryId(queryPool.size());
             queryPool.add(query);
         });
-        System.err.println("Total number of queries:\t" + queryPool.size());
+        //System.out.println("Total number of queries:\t" + queryPool.size());
     }
 
     /**
@@ -150,15 +149,16 @@ public class POMDP {
         timeStep = 0;
         List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
         List<Parse> parses = allParses.get(sentIdx);
-        List<GroupedQuery> queries = QueryGeneratorNew2.generateQueries(sentIdx, words, parses);
+        List<GroupedQuery> queries = QueryGeneratorSurfaceForm.generateQueries(sentIdx, words, parses);
         queries.stream().forEach(query -> {
+            query.computeProbabilities(beliefModel.belief);
             if (annotations.stream().anyMatch(annotation -> annotation.sentenceId == sentIdx
                     && annotation.question.equals(query.getQuestion()))) {
                 query.setQueryId(queryPool.size());
                 queryPool.add(query);
             }
         });
-        System.out.println("Total number of queries:\t" + queryPool.size());
+        //System.out.println("Total number of queries:\t" + queryPool.size());
     }
 
     public Optional<GroupedQuery> generateAction() {
