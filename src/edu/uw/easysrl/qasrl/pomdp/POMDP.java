@@ -18,7 +18,6 @@ public class POMDP {
     public final List<List<InputReader.InputWord>> sentences;
     public final List<Parse> goldParses;
     final BaseCcgParser parser;
-    final QuestionGenerator questionGenerator;
 
     // The action space.
     private List<GroupedQuery> queryPool;
@@ -54,7 +53,6 @@ public class POMDP {
         sentences = new ArrayList<>();
         goldParses = new ArrayList<>();
         DataLoader.readDevPool(sentences, goldParses);
-        questionGenerator = new QuestionGenerator();
         if (nBest <= 10) {
             preparsedFile = "parses.10best.out";
         } else if (nBest <= 50) {
@@ -74,7 +72,6 @@ public class POMDP {
     public POMDP(POMDP other) {
         this.sentences = other.sentences;
         this.goldParses = other.goldParses;
-        this.questionGenerator = other.questionGenerator;
         this.parser = other.parser;
         this.nBest = other.nBest;
         this.horizon = other.horizon;
