@@ -38,7 +38,6 @@ public class QueryGeneratorSurfaceForm {
         Table<String, ImmutableList<Integer>, Set<Integer>> answerPool = HashBasedTable.create();
         // Bipartite, bi-directional question-answer relation.
         Table<String, String, Set<Integer>> questionToAnswer = HashBasedTable.create();
-        
         for (int parseId = 0; parseId < numParses; parseId++) {
             final Parse parse = parses.get(parseId);
             for (int predId = 0; predId < words.size(); predId++) {
