@@ -9,10 +9,9 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.swing.text.html.Option;
 
+import edu.stanford.nlp.ling.Word;
 import edu.uw.easysrl.qasrl.*;
-import edu.uw.easysrl.qasrl.corpora.GreedyAnswerAligner;
 import edu.uw.easysrl.qasrl.pomdp.POMDP;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
@@ -31,17 +30,21 @@ import org.eclipse.jetty.util.resource.Resource;
  */
 public class WebUI3 {
     // Parameters.
-    private static int nBest = 50;
+    private static int nBest = 100;
 
+    // Stores all the sentences, n-best list and the gold parses.
     private static POMDP baseLearner;
-    private static ResponseSimulatorGold goldSimulator;
-    private static Map<String, POMDP> activeLearningMap;
+    // user name -> all the queries for the current sentence.
+    private static Map<String, List<MultiQuery>> activeLearningMap;
+    // user name -> all the answered queries.
+    private static Map<String, List<MultiQuery>> activeLearningHistoryMap;
+    // user name -> current query id.
+    private static Map<String, Integer> queryIdMap;
+    // user name -> remaining sentence ids.
     private static Map<String, List<Integer>> sentenceIdsMap;
-    private static Map<String, ActiveLearningHistory> activeLearningHistoryMap;
+    // user name -> annotation file.
     private static Map<String, BufferedWriter> annotationFileWriterMap;
     private static Map<String, String> annotationFileNameMap;
-
-    private static final int maxNumberOfUsers = 100;
 
     private static final DateFormat dateFormat = new SimpleDateFormat("yyyyMMdd-HHmm");
     private static final String annotationPath  = "./webapp/annotation_files/";
@@ -57,11 +60,11 @@ public class WebUI3 {
         nBest = Integer.parseInt(args[1]);
 
         baseLearner = new POMDP(nBest, 10000 /* horizon */ , 0.0 /* money penalty */);
-        goldSimulator = new ResponseSimulatorGold(baseLearner.goldParses, new QuestionGenerator());
         activeLearningMap = new HashMap<>();
         activeLearningHistoryMap = new HashMap<>();
         annotationFileWriterMap = new HashMap<>();
         annotationFileNameMap = new HashMap<>();
+        queryIdMap = new HashMap<>();
         sentenceIdsMap = new HashMap<>();
 
         // Servlet Context Handler
@@ -126,12 +129,6 @@ public class WebUI3 {
             final String userName = request.getParameter("UserName");
             // Add new user.
             if (!activeLearningMap.containsKey(userName)) {
-                if (activeLearningMap.size() >= maxNumberOfUsers) {
-                    // TODO: limit number of users.
-                }
-                POMDP newLearner = new POMDP(baseLearner);
-                activeLearningMap.put(userName, newLearner);
-                activeLearningHistoryMap.put(userName, new ActiveLearningHistory());
                 String userFileName = userName + "_" + dateFormat.format(new Date()) + ".txt";
                 annotationFileWriterMap.put(userName, new BufferedWriter(new FileWriter(
                         new File(annotationPath + userFileName))));
@@ -141,41 +138,52 @@ public class WebUI3 {
                     sentIds.add(sid);
                 }
                 sentenceIdsMap.put(userName, sentIds);
-                newLearner.initializeForSentence(sentIds.get(0));
+                activeLearningHistoryMap.put(userName, new ArrayList<>());
+
+                // Generate all queries for the sentence.
+                // TODO: Query pruning.
+                int firstSentId = sentIds.get(0);
+                QueryGeneratorBothWays queryGenerator = new QueryGeneratorBothWays(
+                        firstSentId,
+                        baseLearner.getSentenceById(firstSentId),
+                        baseLearner.allParses.get(firstSentId));
+                activeLearningMap.put(userName, queryGenerator.getAllMaximalQueries());
+                queryIdMap.put(userName, 0);
             }
 
-            final POMDP learner = activeLearningMap.get(userName);
-            final ActiveLearningHistory history = activeLearningHistoryMap.get(userName);
             final BufferedWriter fileWriter = annotationFileWriterMap.get(userName);
-
             final String[] userAnswers = request.getParameterValues("UserAnswer");
             if (userAnswers != null) {
-                Response response = new Response();
-                for (String userAnswer : userAnswers) {
-                    System.out.println(userAnswer);
-                    int optionId = Integer.parseInt(userAnswer);
-                    // Create user response objective.
-                    response.add(optionId);
+                int lastQueryId = queryIdMap.get(userName);
+                final List<MultiQuery> queryPool = activeLearningMap.get(userName);
+                MultiQuery query = queryPool.get(lastQueryId);
+                int sentId = query.sentenceId;
+
+                // TODO: response simulator.
+
+                // TODO: append to history.
+
+                // TODO: print history.
+                String annotationStr = "";
+                annotationStr += "SID=" + sentId + "\n";
+                annotationStr += "QID=" + lastQueryId + "\n";
+
+                // FIXME: to string method of Multi Query
+                annotationStr += query.toString() + "\n";
+                annotationStr += "[RESPONSES]:\n";
+                for (String answer : userAnswers) {
+                    annotationStr += answer + "\n";
                 }
                 if (request.getParameter("Comment") != null) {
-                    response.debugInfo = request.getParameter("Comment").trim();
+                    annotationStr += "[COMMENT]:\n" + request.getParameter("Comment").trim();
                 }
-                GroupedQuery query = learner.history.getLastAction();
-                int sentId = query.getSentenceId();
-                // Get gold response for debugging.
-                Response goldResponse = goldSimulator.answerQuestion(query);
-                learner.receiveObservation(response);
-                // Append to history
-                history.add(query, response, goldResponse,
-                        learner.getRerankedF1(query.getSentenceId()),
-                        learner.getRerankedF1(sentId),
-                        learner.getOneBestF1(sentId),
-                        learner.getOracleF1(sentId));
-                // Print latest history.
-                final String latestHistoryStr = history.printLatestHistory();
-                System.out.println(latestHistoryStr);
-                fileWriter.write(latestHistoryStr + "\n");
+                // Writing annotation to file.
+                fileWriter.write(annotationStr + "\n");
                 fileWriter.flush();
+
+                // Advance to the next query.
+                queryIdMap.put(userName, lastQueryId + 1);
+                activeLearningHistoryMap.get(userName).add(query);
             }
             httpResponse.setContentType("text/html; charset=utf-8");
             httpResponse.setStatus(HttpServletResponse.SC_OK);
@@ -183,8 +191,6 @@ public class WebUI3 {
         }
 
         private void update(final String userName, final PrintWriter httpWriter) {
-            final POMDP learner = activeLearningMap.get(userName);
-            final ActiveLearningHistory history = activeLearningHistoryMap.get(userName);
             final List<Integer> sentenceIds = sentenceIdsMap.get(userName);
 
             httpWriter.println(WebUIHelper.printHTMLHeader());
@@ -193,24 +199,33 @@ public class WebUI3 {
             httpWriter.println("<body style=\"padding-left: 80px; padding-right=80px;\">");
             //httpWriter.println("<container>\n" + WebUIHelper.printInstructions() + "</container>\n");
 
-            // Print progress bar.
+            // Print the progress bar.
             int numTotal = sentencesToAnnotate.length;
             int numAnswered = numTotal - sentenceIds.size();
             httpWriter.println(WebUIHelper.printProgressBar(numAnswered, 0 /* numSkipped */, numTotal));
 
-            // Get next query.
-            Optional<GroupedQuery> action;
-            while (!(action = learner.generateAction()).isPresent()) {
+            // Get next query from pool.
+            List<MultiQuery> queryPool = activeLearningMap.get(userName);
+            int queryId = queryIdMap.get(userName);
+            if (queryId >= queryPool.size()) {
                 sentenceIds.remove(0);
                 if (sentenceIds.size() == 0) {
                     return;
                 }
                 int newSentId = sentenceIds.get(0);
-                learner.initializeForSentence(newSentId);
+                QueryGeneratorBothWays queryGenerator = new QueryGeneratorBothWays(
+                        newSentId,
+                        baseLearner.getSentenceById(newSentId),
+                        baseLearner.allParses.get(newSentId));
+                queryPool = queryGenerator.getAllMaximalQueries();
+                queryId = 0;
+                activeLearningMap.put(userName, queryPool);
+                queryIdMap.put(userName, queryId);
             }
-            GroupedQuery nextQuery = action.get();
-            // Print sentence
-            final List<String> words = nextQuery.getSentence();
+            MultiQuery query = queryPool.get(queryId);
+
+            // Print sentence.
+            final List<String> words = baseLearner.getSentenceById(query.sentenceId);
 
             httpWriter.println("<container><div class=\"row\">\n");
             httpWriter.println("<div class=\"col-md-12\">");
@@ -218,44 +233,24 @@ public class WebUI3 {
             httpWriter.println("<panel panel-default>\n");
             httpWriter.println("<h5><span class=\"label label-primary\" for=\"Sentence\">Sentence:</span></h5>");
             httpWriter.println("<div id=\"Sentence\"> " + TextGenerationHelper.renderHTMLSentenceString(words,
-                    nextQuery.getPredicateIndex(), true /* highlight predicate */) + " </div>");
+                    -1 /* don't the predicate id */, true /* highlight predicate */) + " </div>");
             httpWriter.println("<h5><span class=\"label label-primary\" for=\"Question\">Question:</span><br></h5>");
-            httpWriter.println("<div id=\"Question\"> " + nextQuery.getQuestion() + " </div>");
+            httpWriter.println("<div id=\"Question\"> " + query.prompt + " </div>");
 
             httpWriter.println("<h5><span class=\"label label-primary\" for=\"AnswerOptions\">Answer Options:</span></h5>");
             httpWriter.println("<form class=\"form-group\" id=\"AnswerOptions\" action=\"\" method=\"get\">");
             httpWriter.println(String.format("<input type=\"hidden\" input name=\"UserName\" value=\"%s\"/>", userName));
-            final List<GroupedQuery.AnswerOption> options = nextQuery.getAnswerOptions();
 
-            int badQuestionOptionId = -1,
-                    unlistedAnswerId = -1;
-            for (int i = 0; i < options.size(); i++) {
-                GroupedQuery.AnswerOption option = options.get(i);
-                /*
-                if (GroupedQuery.BadQuestionOption.class.isInstance(option)) {
-                    badQuestionOptionId = i;
-                    continue;
-                }
-                if (GroupedQuery.NoAnswerOption.class.isInstance(option)) {
-                    unlistedAnswerId = i;
-                    continue;
-                }
-                */
-                String optionValue = String.valueOf(i);
-                String optionString = option.getAnswer().replace(QuestionAnswerPair.answerDelimiter, "<i><b> _AND_ </i></b>");
+            for (String optionStr : query.options) {
                 httpWriter.println(String.format("<input name=\"UserAnswer\" type=\"checkbox\" value=\"%s\" />&nbsp %s <br/>",
-                        optionValue, optionString));
+                        optionStr, optionStr));
             }
-            /*
-            if (badQuestionOptionId >= 0) {
-                httpWriter.println(String.format("<input name=\"UserAnswer\" type=\"checkbox\" value=\"%s\"/> &nbsp Question is not valid. <br/>",
-                        String.valueOf(badQuestionOptionId)));
-            }
-            if (unlistedAnswerId >= 0) {
-                httpWriter.println(String.format("<input name=\"UserAnswer\" type=\"checkbox\" value=\"%s\"/> &nbsp Answer is not listed. <br/>",
-                        String.valueOf(unlistedAnswerId)));
-            }
-            */
+
+            // Other options.
+            httpWriter.println(String.format("<input name=\"UserAnswer\" type=\"checkbox\" value=\"%s\" />&nbsp %s <br/>",
+                    "::Answer not listed.", "Answer not listed."));
+            httpWriter.println(String.format("<input name=\"UserAnswer\" type=\"checkbox\" value=\"%s\" />&nbsp %s <br/>",
+                    "::Bad question.", "Bad question."));
 
             // Comment box.
             httpWriter.println("<br><span class=\"label label-primary\" for=\"Comment\">Comments (if any):</span> <br>");
@@ -273,17 +268,19 @@ public class WebUI3 {
                     + "Switch to Next Sentence</button>");
             httpWriter.println("</form>");
 
-            // Gold info and debugging info.
+            // TODO: Gold info and debugging info.
+            /*
             if (history.size() > 0) {
                 httpWriter.println(WebUIHelper.printDebuggingInfo(history) + "<br><br>");
                 httpWriter.println(WebUIHelper.printSentenceDebuggingInfo(history) + "<br><br>");
             }
             httpWriter.println(WebUIHelper.printGoldInfo(nextQuery, goldSimulator.answerQuestion(nextQuery)) + "<br><br>");
+            */
 
             // File download link
-            if (history.size() > 0) {
+            if (activeLearningHistoryMap.get(userName).size() > 0) {
                 String annotationFileName = annotationFileNameMap.get(userName);
-                httpWriter.println(String.format("<a href=\"%s\" download=\"%s\">Click to download annotation file.</a>",
+                httpWriter.println(String.format("<br><a href=\"%s\" download=\"%s\">Click to download annotation file.</a>",
                         "/annotation_files/" + annotationFileName, annotationFileName));
             }
 
