@@ -5,7 +5,6 @@ import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
 
-import javax.swing.text.html.Option;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -139,7 +138,7 @@ public class ActiveLearningBySentence {
         for (int sentIdx : sentenceIds) {
             List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
             List<Parse> parses = allParses.get(sentIdx);
-            List<GroupedQuery> queries = QueryGeneratorNew2.generateQueries(sentIdx, words, parses, questionGenerator);
+            List<GroupedQuery> queries = QueryGeneratorSurfaceForm.generateQueries(sentIdx, words, parses);
             queries.stream().forEach(query -> {
                 // query.computeProbabilities(reranker.expScores.get(query.sentenceId));
                 query.computeProbabilities(reranker.getParseScores(query.sentenceId));
