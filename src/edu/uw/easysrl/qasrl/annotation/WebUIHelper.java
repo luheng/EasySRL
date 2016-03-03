@@ -41,8 +41,8 @@ public class WebUIHelper {
     }
 
     public static String printProgressBar(int numAnswered, int numSkipped, int numTotal) {
-        int w1 = (int) Math.ceil(1.0 * numAnswered / numTotal);
-        int w2 = (int) Math.ceil(1.0 * numSkipped / numTotal);
+        int w1 = (int) Math.ceil(100.0 * numAnswered / numTotal);
+        int w2 = (int) Math.ceil(100.0 * numSkipped / numTotal);
 
         return String.format("<span class=\"label label-info\" for=\"progress\">%d annotated. %d skipped. %d remaining.</span>\n",
                         numAnswered, numSkipped, numTotal - numAnswered - numSkipped)

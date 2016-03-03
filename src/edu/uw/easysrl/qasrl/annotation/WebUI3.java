@@ -4,17 +4,15 @@ import java.io.*;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import edu.stanford.nlp.ling.Word;
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.pomdp.POMDP;
-import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
-import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.handler.ContextHandler;
@@ -34,6 +32,9 @@ public class WebUI3 {
 
     // Stores all the sentences, n-best list and the gold parses.
     private static POMDP baseLearner;
+    // Response simulator.
+    private static MultiResponseSimulator responseSimulator;
+
     // user name -> all the queries for the current sentence.
     private static Map<String, List<MultiQuery>> activeLearningMap;
     // user name -> all the answered queries.
@@ -45,6 +46,8 @@ public class WebUI3 {
     // user name -> annotation file.
     private static Map<String, BufferedWriter> annotationFileWriterMap;
     private static Map<String, String> annotationFileNameMap;
+
+    private static Map<String, Set<String>> parametersMap;
 
     private static final DateFormat dateFormat = new SimpleDateFormat("yyyyMMdd-HHmm");
     private static final String annotationPath  = "./webapp/annotation_files/";
@@ -60,10 +63,13 @@ public class WebUI3 {
         nBest = Integer.parseInt(args[1]);
 
         baseLearner = new POMDP(nBest, 10000 /* horizon */ , 0.0 /* money penalty */);
+        responseSimulator = new MultiResponseSimulator(baseLearner.goldParses);
+
         activeLearningMap = new HashMap<>();
         activeLearningHistoryMap = new HashMap<>();
         annotationFileWriterMap = new HashMap<>();
         annotationFileNameMap = new HashMap<>();
+        parametersMap = new HashMap<>();
         queryIdMap = new HashMap<>();
         sentenceIdsMap = new HashMap<>();
 
@@ -101,17 +107,22 @@ public class WebUI3 {
                 throws IOException, ServletException{
             if (request.getParameter("UserName") != null && request.getParameter("UserName").length() > 0) {
                 String userName = request.getParameter("UserName");
-                System.out.println(userName);
-                httpResponse.sendRedirect(httpResponse.encodeRedirectURL("/annotate?UserName=" + userName));
+                String newRequest = "/annotate?UserName=" + userName;
+                if (request.getParameter("FilterBinary") != null) {
+                    newRequest += "&FilterBinary=True";
+                }
+                httpResponse.sendRedirect(httpResponse.encodeRedirectURL(newRequest));
             } else {
                 PrintWriter httpWriter = httpResponse.getWriter();
                 httpWriter.println(WebUIHelper.printHTMLHeader());
                 httpWriter.println("<body style=\"padding: 50px;\">");
-                httpWriter.println("<form>\n<div class=\"form-group\">"
+                httpWriter.println("<form class=\"form-group\">\n"
                         + "<label for=\"UserName\">Please enter your name here: </label>\n"
-                        + "<input type=\"text\" id=\"UserName\" input name=\"UserName\">\n"
-                        + "<button type=\"submit\" class=\"btn btn-primary\">Go!</button>\n"
-                        + "</div></form>");
+                        + "<input type=\"text\" input name=\"UserName\"/>\n"
+                        + "<br/>"
+                        + "<input name=\"FilterBinary\" type=\"checkbox\" value=\"True\" />&nbsp Filter binary queries. <br/>"
+                        + "<br/><button class=\"btn btn-primary\" type=\"submit\" class=\"btn btn-primary\">Go!</button>\n"
+                        + "</form>");
                 httpWriter.println("</body>");
             }
         }
@@ -139,16 +150,14 @@ public class WebUI3 {
                 }
                 sentenceIdsMap.put(userName, sentIds);
                 activeLearningHistoryMap.put(userName, new ArrayList<>());
+                parametersMap.put(userName, new HashSet<>());
+                if (request.getParameter("FilterBinary") != null && request.getParameter("FilterBinary").equals("True")) {
+                    parametersMap.get(userName).add("FilterBinaryQueries");
+                }
 
                 // Generate all queries for the sentence.
                 // TODO: Query pruning.
-                int firstSentId = sentIds.get(0);
-                QueryGeneratorBothWays queryGenerator = new QueryGeneratorBothWays(
-                        firstSentId,
-                        baseLearner.getSentenceById(firstSentId),
-                        baseLearner.allParses.get(firstSentId));
-                activeLearningMap.put(userName, queryGenerator.getAllMaximalQueries());
-                queryIdMap.put(userName, 0);
+                initializeForUserAndSentence(userName, sentIds.get(0));
             }
 
             final BufferedWriter fileWriter = annotationFileWriterMap.get(userName);
@@ -159,25 +168,20 @@ public class WebUI3 {
                 MultiQuery query = queryPool.get(lastQueryId);
                 int sentId = query.sentenceId;
 
+<<<<<<< HEAD
                 // TODO: response simulator.
                 Mult
+=======
+                final Set<String> checks = new HashSet<>();
+                Collections.addAll(checks, userAnswers);
+>>>>>>> 1d642979776fe046c00b84379c0204339f074f71
 
-                // TODO: append to history.
-
-                // TODO: print history.
                 String annotationStr = "";
                 annotationStr += "SID=" + sentId + "\n";
                 annotationStr += "QID=" + lastQueryId + "\n";
+                annotationStr += query.toStringWithResponse(checks);
+                annotationStr += "COMMENT::\t" + request.getParameter("Comment").trim() + "\n";
 
-                // FIXME: to string method of Multi Query
-                annotationStr += query.toString() + "\n";
-                annotationStr += "[RESPONSES]:\n";
-                for (String answer : userAnswers) {
-                    annotationStr += answer + "\n";
-                }
-                if (request.getParameter("Comment") != null) {
-                    annotationStr += "[COMMENT]:\n" + request.getParameter("Comment").trim();
-                }
                 // Writing annotation to file.
                 fileWriter.write(annotationStr + "\n");
                 fileWriter.flush();
@@ -191,8 +195,32 @@ public class WebUI3 {
             update(userName, httpResponse.getWriter());
         }
 
+        private void initializeForUserAndSentence(String userName, int sentenceId) {
+            QueryGeneratorBothWays queryGenerator = new QueryGeneratorBothWays(
+                    sentenceId,
+                    baseLearner.getSentenceById(sentenceId),
+                    baseLearner.allParses.get(sentenceId));
+            double[] parseScores = new double[nBest];
+            final List<Parse> parses = baseLearner.allParses.get(sentenceId);
+            for (int i = 0; i < parses.size(); i++) {
+                parseScores[i] = parses.get(i).score;
+            }
+            List<MultiQuery> queryList =
+                    parametersMap.get(userName).contains("FilterBinaryQueries") ?
+                            queryGenerator.getAllMaximalQueries().stream()
+                                    .filter(q -> q.options.size() > 1)
+                                    .collect(Collectors.toList())
+                            : queryGenerator.getAllMaximalQueries();
+            queryList.forEach(q -> q.computeProbabilities(parseScores));
+            System.err.println("sentence " + sentenceId + " has " + queryList.size() + " queries.");
+            activeLearningMap.put(userName, queryList);
+            queryIdMap.put(userName, 0);
+        }
+
         private void update(final String userName, final PrintWriter httpWriter) {
             final List<Integer> sentenceIds = sentenceIdsMap.get(userName);
+            List<MultiQuery> queryPool = activeLearningMap.get(userName);
+            int queryId = queryIdMap.get(userName);
 
             httpWriter.println(WebUIHelper.printHTMLHeader());
             httpWriter.println("<h1><font face=\"arial\">Annotation Demo</font></h1>\n");
@@ -201,27 +229,21 @@ public class WebUI3 {
             //httpWriter.println("<container>\n" + WebUIHelper.printInstructions() + "</container>\n");
 
             // Print the progress bar.
-            int numTotal = sentencesToAnnotate.length;
-            int numAnswered = numTotal - sentenceIds.size();
-            httpWriter.println(WebUIHelper.printProgressBar(numAnswered, 0 /* numSkipped */, numTotal));
+            int numTotalSentences = sentencesToAnnotate.length;
+            int numAnsweredSentences = numTotalSentences - sentenceIds.size();
+            int numTotalQueries = queryPool.size();
+            httpWriter.println(WebUIHelper.printProgressBar(numAnsweredSentences, 0 /* numSkipped */, numTotalSentences));
+            httpWriter.println(WebUIHelper.printProgressBar(queryId, 0 /* numSkipped */, numTotalQueries));
 
             // Get next query from pool.
-            List<MultiQuery> queryPool = activeLearningMap.get(userName);
-            int queryId = queryIdMap.get(userName);
             if (queryId >= queryPool.size()) {
                 sentenceIds.remove(0);
                 if (sentenceIds.size() == 0) {
                     return;
                 }
                 int newSentId = sentenceIds.get(0);
-                QueryGeneratorBothWays queryGenerator = new QueryGeneratorBothWays(
-                        newSentId,
-                        baseLearner.getSentenceById(newSentId),
-                        baseLearner.allParses.get(newSentId));
-                queryPool = queryGenerator.getAllMaximalQueries();
+                initializeForUserAndSentence(userName, newSentId);
                 queryId = 0;
-                activeLearningMap.put(userName, queryPool);
-                queryIdMap.put(userName, queryId);
             }
             MultiQuery query = queryPool.get(queryId);
 
@@ -249,9 +271,9 @@ public class WebUI3 {
 
             // Other options.
             httpWriter.println(String.format("<input name=\"UserAnswer\" type=\"checkbox\" value=\"%s\" />&nbsp %s <br/>",
-                    "::Answer not listed.", "Answer not listed."));
+                    "Answer not listed.", "Answer not listed."));
             httpWriter.println(String.format("<input name=\"UserAnswer\" type=\"checkbox\" value=\"%s\" />&nbsp %s <br/>",
-                    "::Bad question.", "Bad question."));
+                    "Bad question.", "Bad question."));
 
             // Comment box.
             httpWriter.println("<br><span class=\"label label-primary\" for=\"Comment\">Comments (if any):</span> <br>");
@@ -263,20 +285,21 @@ public class WebUI3 {
 
             httpWriter.println("</panel>\n");
 
+            // Debugging info
+            httpWriter.write("<br/><br/><h3>Debugging Information</h3><br/>"
+                    + "<p> query confidence:\t" + query.confidence + "</p>");
+            for (String option : query.optionScores.keySet()) {
+                httpWriter.write("<br/>" + option + "&nbsp&nbsp&nbsp&nbsp" + query.optionScores.get(option));
+            }
+            httpWriter.write("<br/><br/>");
+
             // Add user name parameter ..
             httpWriter.println(String.format("<input type=\"hidden\" input name=\"UserName\" value=\"%s\"/>", userName));
-            httpWriter.println("<button class=\"btn btn-primary\" input name=\"NextSentence\" type=\"submit\" value=\"SkipSent\">"
-                    + "Switch to Next Sentence</button>");
+            //httpWriter.println("<button class=\"btn btn-primary\" input name=\"NextSentence\" type=\"submit\" value=\"SkipSent\">"
+            //            + "Switch to Next Sentence</button>");
             httpWriter.println("</form>");
 
             // TODO: Gold info and debugging info.
-            /*
-            if (history.size() > 0) {
-                httpWriter.println(WebUIHelper.printDebuggingInfo(history) + "<br><br>");
-                httpWriter.println(WebUIHelper.printSentenceDebuggingInfo(history) + "<br><br>");
-            }
-            httpWriter.println(WebUIHelper.printGoldInfo(nextQuery, goldSimulator.answerQuestion(nextQuery)) + "<br><br>");
-            */
 
             // File download link
             if (activeLearningHistoryMap.get(userName).size() > 0) {

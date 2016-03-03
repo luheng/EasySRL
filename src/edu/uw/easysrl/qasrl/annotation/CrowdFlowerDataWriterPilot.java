@@ -18,7 +18,7 @@ import java.util.stream.IntStream;
  * Group query by sentences.
  * Created by luheng on 2/9/16.
  */
-public class CrowdFlowerDataWriter {
+public class CrowdFlowerDataWriterPilot {
     static final int nBest = 100;
     static final int maxNumSentences = 100;
     static final int maxNumSentencesPerFile = 50;
@@ -58,9 +58,9 @@ public class CrowdFlowerDataWriter {
             e.printStackTrace();
         }
         List<double[]> avgNumQueries = new ArrayList<>(), avgOptionsPerQuery = new ArrayList<>(),
-                       avgNumBinaryQueries = new ArrayList<>(),
-                       oneBestF1 = new ArrayList<>(), rerankF1 = new ArrayList<>(), oracleF1 = new ArrayList<>(),
-                       gainF1 = new ArrayList<>();
+                avgNumBinaryQueries = new ArrayList<>(),
+                oneBestF1 = new ArrayList<>(), rerankF1 = new ArrayList<>(), oracleF1 = new ArrayList<>(),
+                gainF1 = new ArrayList<>();
 
         Random random = new Random(randomSeed);
         List<Integer> sentenceIds = learner.allParses.keySet().stream()
@@ -99,8 +99,8 @@ public class CrowdFlowerDataWriter {
                 learner.initializeForSentence(sentenceId);
                 List<GroupedQuery> queries = learner.getQueryPool().stream()
                         .filter(query -> query.answerEntropy > minAnswerEntropy
-                                            && query.questionConfidence > minQuestionConfidence
-                                            && (!skipBinaryQueries || query.attachmentUncertainty > 1e-6))
+                                && query.questionConfidence > minQuestionConfidence
+                                && (!skipBinaryQueries || query.attachmentUncertainty > 1e-6))
                         .collect(Collectors.toList());
                 // Print query to .csv file.
                 if (r == 0 && annotatedSentences.size() < maxNumSentences) {
@@ -131,7 +131,7 @@ public class CrowdFlowerDataWriter {
                         }
                     }
                     if (r == 0 && lineCounter < 100) {
-                       // System.out.println("SID=" + sentenceId);
+                        // System.out.println("SID=" + sentenceId);
                         //System.out.println(sentence.stream().collect(Collectors.joining(" ")));
                         System.out.println("OracleID=" + learner.getOracleParseId(sentenceId));
                         System.out.println(query.getDebuggingInfo(oracleResponse));
