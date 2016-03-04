@@ -31,6 +31,8 @@ public class PPAttachment {
     Table<Integer, String, Set<Parse>> nounAdjAnswers;
     Table<Integer, String, Set<Parse>> ppArgAnswers;
 
+    Set<Integer> qaIds;
+
     public static Optional<PPAttachment> findPPAttachmentAmbiguity(int ppHead, List<String> sentence,
                                                                    List<QuestionAnswerPairReduced> qaList,
                                                                    List<Parse> parseList) {
@@ -48,19 +50,24 @@ public class PPAttachment {
             if (qa.predicateIndex == ppHead) {
                 if (qa.predicateCategory == verbAdjunct) {
                     if (argNum == 2) {
-                        addQA(argId, qa, parse, ppAttachment.verbAdjQuestions, ppAttachment.verbAdjAnswers);
+                        AnalysisHelper.addQA(argId, qa, parse, ppAttachment.verbAdjQuestions, ppAttachment.verbAdjAnswers);
+                        ppAttachment.qaIds.add(i);
                     } else if (argNum == 3) {
-                        addQA(argId, qa, parse, ppAttachment.ppArgQuestions, ppAttachment.ppArgAnswers);
+                        AnalysisHelper.addQA(argId, qa, parse, ppAttachment.ppArgQuestions, ppAttachment.ppArgAnswers);
+                        ppAttachment.qaIds.add(i);
                     }
                 } else if (qa.predicateCategory == nounAdjunct) {
                     if (argNum == 1) {
-                        addQA(argId, qa, parse, ppAttachment.nounAdjQuestions, ppAttachment.nounAdjAnswers);
+                        AnalysisHelper.addQA(argId, qa, parse, ppAttachment.nounAdjQuestions, ppAttachment.nounAdjAnswers);
+                        ppAttachment.qaIds.add(i);
                     } else if (argNum == 2) {
-                        addQA(argId, qa, parse, ppAttachment.ppArgQuestions, ppAttachment.ppArgAnswers);
+                        AnalysisHelper.addQA(argId, qa, parse, ppAttachment.ppArgQuestions, ppAttachment.ppArgAnswers);
+                        ppAttachment.qaIds.add(i);
                     }
                 }
             } else if (argId == ppHead && category.getArgument(argNum) == Category.PP) {
-                addQA(qa.predicateIndex, qa, parse, ppAttachment.verbArgQuestions, ppAttachment.verbArgAnswers);
+                AnalysisHelper.addQA(qa.predicateIndex, qa, parse, ppAttachment.verbArgQuestions, ppAttachment.verbArgAnswers);
+                ppAttachment.qaIds.add(i);
             }
         }
         int ambiguity = (ppAttachment.verbAdjQuestions.isEmpty() ? 0 : 1)
@@ -76,35 +83,6 @@ public class PPAttachment {
         return AnalysisHelper.getScore(parses) / AnalysisHelper.getScore(allParses);
     }
 
-    public static void printCollapsed(Map<String, Set<Parse>> questions, Table<Integer, String, Set<Parse>> answers,
-                                      List<String> sentence, List<Parse> allParses) {
-        double totalScore = AnalysisHelper.getScore(allParses);
-        Map<String, Double> questionStringToScore = new HashMap<>();
-        questions.entrySet().stream().forEach(q ->
-                questionStringToScore.put(q.getKey(), AnalysisHelper.getScore(q.getValue()) / totalScore));
-        // Sort question strings by score.
-        questionStringToScore.entrySet().stream()
-                .sorted((q1, q2) -> Double.compare(-q1.getValue(), -q2.getValue()))
-                .forEach(q -> System.out.println(String.format("\t%s\t%.3f", q.getKey(), q.getValue())));
-        // Print answers.
-        answers.rowKeySet().stream().sorted().forEach(aid -> {
-            Set<Parse> parses = new HashSet<>();
-            Map<String, Double> answerStringToScore = new HashMap<>();
-            answers.row(aid).entrySet().stream().forEach(a -> {
-                parses.addAll(a.getValue());
-                answerStringToScore.put(a.getKey(), AnalysisHelper.getScore(a.getValue()) / totalScore);
-            });
-            // Print answer head score.
-            System.out.print(String.format("\t%d:%s\t%.3f\t", aid, sentence.get(aid),
-                    AnalysisHelper.getScore(parses) / totalScore));
-            // Sort answer strings by score.
-            System.out.println(answerStringToScore.entrySet().stream()
-                    .sorted((a1, a2) -> Double.compare(-a1.getValue(), -a2.getValue()))
-                    .map(a -> String.format("%s (%.3f)", a.getKey(), a.getValue()))
-                    .collect(Collectors.joining("\t")));
-        });
-    }
-
     private PPAttachment() {
         verbAdjAnswers = HashBasedTable.create();
         verbArgAnswers = HashBasedTable.create();
@@ -115,27 +93,14 @@ public class PPAttachment {
         verbArgQuestions = new HashMap<>();
         nounAdjQuestions = new HashMap<>();
         ppArgQuestions = new HashMap<>();
-    }
 
-    private static void addQA(int head, QuestionAnswerPairReduced qa, Parse parse, Map<String, Set<Parse>> questions,
-                              Table<Integer, String, Set<Parse>> answers) {
-        // Add question.
-        String questionStr = qa.renderQuestion();
-        String answerStr = qa.renderAnswer();
-        if (!questions.containsKey(questionStr)) {
-            questions.put(questionStr, new HashSet<>());
-        }
-        questions.get(questionStr).add(parse);
-        // Add answer.
-        if (!answers.contains(head, answerStr)) {
-            answers.put(head, answerStr, new HashSet<>());
-        }
-        answers.get(head, answerStr).add(parse);
+        qaIds = new HashSet<>();
     }
 
     public static void main(String[] args) {
         POMDP learner = new POMDP(100 /* nbest */, 10000 /* horizon */, 0.0 /* money penalty */);
         int numAmbiguousPPAttachments = 0;
+        int totalQAs = 0, coveredQAs = 0;
         for (int sid : learner.allParses.keySet()) {
             final List<String> sentence = learner.getSentenceById(sid);
             final List<Parse> allParses = learner.allParses.get(sid);
@@ -174,24 +139,28 @@ public class PPAttachment {
                     System.out.println(String.format("%d:%s", ppAttachment.ppHead, sentence.get(ppAttachment.ppHead)));
                     System.out.println(String.format("[verb-adjunct]\t \t%.3f",
                             getAttchmentScore(ppAttachment.verbAdjQuestions, ppAttachment.verbAdjAnswers, allParses)));
-                    printCollapsed(ppAttachment.verbAdjQuestions, ppAttachment.verbAdjAnswers, sentence, allParses);
+                    AnalysisHelper.printCollapsed(ppAttachment.verbAdjQuestions, ppAttachment.verbAdjAnswers, sentence, allParses);
 
                     System.out.println(String.format("[noun-adjunct]\t \t%.3f",
                             getAttchmentScore(ppAttachment.nounAdjQuestions, ppAttachment.nounAdjAnswers, allParses)));
-                    printCollapsed(ppAttachment.nounAdjQuestions, ppAttachment.nounAdjAnswers, sentence, allParses);
+                    AnalysisHelper.printCollapsed(ppAttachment.nounAdjQuestions, ppAttachment.nounAdjAnswers, sentence, allParses);
 
                     System.out.println(String.format("[pp-argument]\t \t%.3f",
                             getAttchmentScore(ppAttachment.ppArgQuestions, ppAttachment.ppArgAnswers, allParses)));
-                    printCollapsed(ppAttachment.ppArgQuestions, ppAttachment.ppArgAnswers, sentence, allParses);
+                    AnalysisHelper.printCollapsed(ppAttachment.ppArgQuestions, ppAttachment.ppArgAnswers, sentence, allParses);
 
                     System.out.println(String.format("[verb-argument]\t \t%.3f",
                             getAttchmentScore(ppAttachment.verbArgQuestions, ppAttachment.verbArgAnswers, allParses)));
-                    printCollapsed(ppAttachment.verbArgQuestions, ppAttachment.verbArgAnswers, sentence, allParses);
+                    AnalysisHelper.printCollapsed(ppAttachment.verbArgQuestions, ppAttachment.verbArgAnswers, sentence, allParses);
                 }
                 System.out.println();
             }
+            totalQAs += qaList.size();
+            coveredQAs += ppAmbiguities.stream().mapToInt(pp -> pp.qaIds.size()).sum();
             numAmbiguousPPAttachments += ppAmbiguities.size();
         }
         System.out.println("Found " + numAmbiguousPPAttachments + " ambiguous PP attachments.");
+        System.out.println(String.format("Covered %d (%.3f%%) of the total %d QAs.",
+                coveredQAs, 100.0 * coveredQAs / totalQAs, totalQAs));
     }
 }
