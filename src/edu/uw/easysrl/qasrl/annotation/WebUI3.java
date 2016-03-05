@@ -168,13 +168,8 @@ public class WebUI3 {
                 MultiQuery query = queryPool.get(lastQueryId);
                 int sentId = query.sentenceId;
 
-<<<<<<< HEAD
-                // TODO: response simulator.
-                Mult
-=======
                 final Set<String> checks = new HashSet<>();
                 Collections.addAll(checks, userAnswers);
->>>>>>> 1d642979776fe046c00b84379c0204339f074f71
 
                 String annotationStr = "";
                 annotationStr += "SID=" + sentId + "\n";
