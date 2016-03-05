@@ -4,7 +4,6 @@ import java.io.*;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -48,6 +47,11 @@ public class WebUI3 {
     private static Map<String, String> annotationFileNameMap;
 
     private static Map<String, Set<String>> parametersMap;
+
+    private static final int questionSurfaceFormTopK = 1;
+    private static final double minPromptConfidence = 0.1;
+    private static final double minOptionConfidence = 0.1;
+    private static final double minOptionEntropy = 0.1;
 
     private static final DateFormat dateFormat = new SimpleDateFormat("yyyyMMdd-HHmm");
     private static final String annotationPath  = "./webapp/annotation_files/";
@@ -95,7 +99,7 @@ public class WebUI3 {
         webInfContextHandler.setHandler(webInfResourceHandler);
 
         HandlerCollection handlerCollection = new HandlerCollection();
-        handlerCollection.setHandlers(new Handler[] {servletHandler, resourceContextHandler, webInfContextHandler });
+        handlerCollection.setHandlers(new Handler[] { servletHandler, resourceContextHandler, webInfContextHandler });
 
         server.setHandler(handlerCollection);
         server.start();
@@ -120,7 +124,7 @@ public class WebUI3 {
                         + "<label for=\"UserName\">Please enter your name here: </label>\n"
                         + "<input type=\"text\" input name=\"UserName\"/>\n"
                         + "<br/>"
-                        + "<input name=\"FilterBinary\" type=\"checkbox\" value=\"True\" />&nbsp Filter binary queries. <br/>"
+                        //+ "<input name=\"FilterBinary\" type=\"checkbox\" value=\"True\" />&nbsp Filter binary queries. <br/>"
                         + "<br/><button class=\"btn btn-primary\" type=\"submit\" class=\"btn btn-primary\">Go!</button>\n"
                         + "</form>");
                 httpWriter.println("</body>");
@@ -191,21 +195,18 @@ public class WebUI3 {
         }
 
         private void initializeForUserAndSentence(String userName, int sentenceId) {
-            QueryGeneratorBothWays queryGenerator = new QueryGeneratorBothWays(
-                    sentenceId,
-                    baseLearner.getSentenceById(sentenceId),
-                    baseLearner.allParses.get(sentenceId));
             double[] parseScores = new double[nBest];
             final List<Parse> parses = baseLearner.allParses.get(sentenceId);
             for (int i = 0; i < parses.size(); i++) {
                 parseScores[i] = parses.get(i).score;
             }
-            List<MultiQuery> queryList =
-                    parametersMap.get(userName).contains("FilterBinaryQueries") ?
-                            queryGenerator.getAllMaximalQueries().stream()
-                                    .filter(q -> q.options.size() > 1)
-                                    .collect(Collectors.toList())
-                            : queryGenerator.getAllMaximalQueries();
+            List<MultiQuery> queryList = AnnotationHelper.getAllQueries(
+                    sentenceId,
+                    baseLearner.getSentenceById(sentenceId),
+                    baseLearner.allParses.get(sentenceId),
+                    questionSurfaceFormTopK,
+                    minPromptConfidence,
+                    minOptionConfidence);
             queryList.forEach(q -> q.computeProbabilities(parseScores));
             System.err.println("sentence " + sentenceId + " has " + queryList.size() + " queries.");
             activeLearningMap.put(userName, queryList);
@@ -216,6 +217,20 @@ public class WebUI3 {
             final List<Integer> sentenceIds = sentenceIdsMap.get(userName);
             List<MultiQuery> queryPool = activeLearningMap.get(userName);
             int queryId = queryIdMap.get(userName);
+
+            // Get next query from pool.
+            if (queryId >= queryPool.size()) {
+                sentenceIds.remove(0);
+                if (sentenceIds.size() == 0) {
+                    return;
+                }
+                int newSentId = sentenceIds.get(0);
+                initializeForUserAndSentence(userName, newSentId);
+                queryPool = activeLearningMap.get(userName);
+                queryId = 0;
+            }
+            MultiQuery query = queryPool.get(queryId);
+
 
             httpWriter.println(WebUIHelper.printHTMLHeader());
             httpWriter.println("<h1><font face=\"arial\">Annotation Demo</font></h1>\n");
@@ -229,18 +244,6 @@ public class WebUI3 {
             int numTotalQueries = queryPool.size();
             httpWriter.println(WebUIHelper.printProgressBar(numAnsweredSentences, 0 /* numSkipped */, numTotalSentences));
             httpWriter.println(WebUIHelper.printProgressBar(queryId, 0 /* numSkipped */, numTotalQueries));
-
-            // Get next query from pool.
-            if (queryId >= queryPool.size()) {
-                sentenceIds.remove(0);
-                if (sentenceIds.size() == 0) {
-                    return;
-                }
-                int newSentId = sentenceIds.get(0);
-                initializeForUserAndSentence(userName, newSentId);
-                queryId = 0;
-            }
-            MultiQuery query = queryPool.get(queryId);
 
             // Print sentence.
             final List<String> words = baseLearner.getSentenceById(query.sentenceId);

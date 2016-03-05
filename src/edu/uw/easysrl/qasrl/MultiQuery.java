@@ -97,6 +97,10 @@ public abstract class MultiQuery {
         }
     }
 
+    public Table<String, String, Set<Parse>> getQaStringsToParses() {
+        return qaStringsToParses;
+    }
+
     public void computeProbabilities(double[] parseDist) {
         double totalScore = .0;
         for (double p : parseDist) {
@@ -109,10 +113,12 @@ public abstract class MultiQuery {
         for (String option : options) {
             final Collection<Parse> parses = !isJeopardyStyle() ?
                     qaStringsToParses.get(prompt, option) : qaStringsToParses.get(option, prompt);
-            allParses.addAll(parses);
-            double prob = parses.stream().mapToDouble(p -> p.score).sum() / totalScore;
-            optionScores.put(option, prob);
-            uncertainty -= prob > 0 ? prob * Math.log(prob) : 0;
+            if (parses != null) {
+                allParses.addAll(parses);
+                double prob = parses.stream().mapToDouble(p -> p.score).sum() / totalScore;
+                optionScores.put(option, prob);
+                uncertainty -= prob > 0 ? prob * Math.log(prob) : 0;
+            }
         }
         confidence = allParses.stream().mapToDouble(p -> p.score).sum() / totalScore;
     }
