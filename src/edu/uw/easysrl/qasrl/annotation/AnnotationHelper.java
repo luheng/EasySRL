@@ -19,10 +19,47 @@ import java.util.stream.Collectors;
  * Created by luheng on 3/4/16.
  */
 public class AnnotationHelper {
+
+    private static void insertQA(Table<String, String, List<QuestionAnswerPairReduced>> qaTable, String s1,
+                                 String s2, QuestionAnswerPairReduced qa) {
+        if (!qaTable.contains(s1, s2)) {
+            qaTable.put(s1, s2, new ArrayList<>());
+        }
+        qaTable.get(s1, s2).add(qa);
+    }
+
+    private static void insertParse(Table<String, String, Set<Parse>> qaTable, String s1, String s2, Parse parse) {
+        if (!qaTable.contains(s1, s2)) {
+            qaTable.put(s1, s2, new HashSet<>());
+        }
+        qaTable.get(s1, s2).add(parse);
+    }
+
+    private static void insertParseId(Map<String, Set<Integer>> qaTable, String s, int parseId) {
+        if (!qaTable.containsKey(s)) {
+            qaTable.put(s, new HashSet<>());
+        }
+        qaTable.get(s).add(parseId);
+    }
+
+    public static void populateScores(Map<String, Double> qaScores, Map<String, Set<Integer>> qaTable,
+                                      List<Parse> allParses) {
+        double totalScore = AnalysisHelper.getScore(allParses);
+        qaTable.entrySet().forEach(e -> qaScores.put(e.getKey(),
+                AnalysisHelper.getScore(e.getValue(), allParses) / totalScore));
+    }
+
     public static List<MultiQuery> getAllQueries(int sentenceId, final List<String> sentence,
                                                  final List<Parse> allParses, int topK, double minQuestionScore) {
         List<MultiQuery> multiQueryList = new ArrayList<>();
-        double totalScore = AnalysisHelper.getScore(allParses);
+
+        // For jeopardy style.
+        Table<String, String, List<QuestionAnswerPairReduced>> answerToQuestionToQaPairs = HashBasedTable.create();
+        Table<String, String, Set<Parse>> answerToQuestionToParses = HashBasedTable.create();
+        Map<String, Set<Integer>> globalAnswerToParseIds = new HashMap<>();
+        Map<String, Double> globalAnswerToScore = new HashMap<>();
+
+        // Create forward-style questions.
         for (int predHead = 0; predHead < sentence.size(); predHead++) {
             Map<Category, Set<Integer>> taggings = new HashMap<>();
             for (int parseId = 0; parseId < allParses.size(); parseId ++) {
@@ -46,20 +83,19 @@ public class AnnotationHelper {
                                 .forEach(qa -> {
                                     String question = qa.renderQuestion();
                                     String answer = qa.renderAnswer();
-                                    if (!questionToParseIds.containsKey(question)) {
-                                        questionToParseIds.put(question, new HashSet<>());
-                                    }
-                                    if (!answerToParseIds.containsKey(answer)) {
-                                        answerToParseIds.put(answer, new HashSet<>());
-                                    }
-                                    if (!qaStringsToParses.contains(question, answer)) {
-                                        qaStringsToParses.put(question, answer, new HashSet<>());
-                                        qaStringsToQAPairs.put(question, answer, new ArrayList<>());
-                                    }
+                                    final Parse parse = allParses.get(parseId);
+
                                     questionToParseIds.get(question).add(parseId);
                                     answerToParseIds.get(answer).add(parseId);
-                                    qaStringsToParses.get(question, answer).add(allParses.get(parseId));
-                                    qaStringsToQAPairs.get(question, answer).add(qa);
+
+                                    insertParseId(questionToParseIds, question, parseId);
+                                    insertParseId(answerToParseIds, answer, parseId);
+                                    insertParseId(globalAnswerToParseIds, answer, parseId);
+
+                                    insertParse(qaStringsToParses, question, answer, parse);
+                                    insertParse(answerToQuestionToParses, answer, question, parse);
+                                    insertQA(qaStringsToQAPairs, question, answer, qa);
+                                    insertQA(answerToQuestionToQaPairs, answer, question, qa);
                                 });
                     }
                     // Filter binary queries.
@@ -67,10 +103,8 @@ public class AnnotationHelper {
                         continue;
                     }
                     // Compute question scores.
-                    questionToParseIds.entrySet().forEach(q -> questionToScore.put(q.getKey(),
-                            AnalysisHelper.getScore(q.getValue(), allParses) / totalScore));
-                    answerToParseIds.entrySet().forEach(a -> answerToScore.put(a.getKey(),
-                            AnalysisHelper.getScore(a.getValue(), allParses) / totalScore));
+                    populateScores(questionToScore, questionToParseIds, allParses);
+                    populateScores(answerToScore, answerToParseIds, allParses);
                     // Prune questions based on surface form score.
                     List<String> filteredQuestions = questionToScore.entrySet().stream()
                             .sorted((q1, q2) -> Double.compare(-q1.getValue(), -q2.getValue()))
@@ -96,6 +130,9 @@ public class AnnotationHelper {
                 }
             }
         }
+        // Create jeopardy-style questions.
+        populateScores(globalAnswerToScore, globalAnswerToParseIds, allParses);
+        
         return multiQueryList;
     }
 }
