@@ -27,6 +27,7 @@ public class CoordinatedArguments {
     Map<String, Set<Parse>> questions;
     Table<ImmutableList<Integer>, String, Set<Parse>> answers;
     Map<ImmutableList<Integer>, String> annotations;
+    Map<ImmutableList<Integer>, Double> answerHeadsToScore;
     int numQAs;
 
     private CoordinatedArguments() {
@@ -69,8 +70,30 @@ public class CoordinatedArguments {
             cordArg.answers.get(argIds, answerStr).add(parse);
             cordArg.numQAs += qaList.size();
         }
+
+        // Compute scores for each arg head group.
+        // TODO: move to a separate function.
+        double totalScore = AnalysisHelper.getScore(allParses);
+        cordArg.answerHeadsToScore = new HashMap<>();
+        cordArg.answers.rowKeySet().stream()
+                .forEach(argIds -> {
+                    Set<Parse> parses = new HashSet<>();
+                    cordArg.answers.row(argIds).entrySet().stream().forEach(a -> {
+                        parses.addAll(a.getValue());
+                    });
+                    cordArg.answerHeadsToScore.put(argIds, AnalysisHelper.getScore(parses) / totalScore);
+                });
+
         boolean hasCoordination = false;
+        /**
+         * Definition of pseudo-coordination: The answers have a dominant single head option.
+         */
+        boolean pseudoCoordination = false;
         for (ImmutableList<Integer> argIds : cordArg.answers.rowKeySet()) {
+            double score = cordArg.answerHeadsToScore.get(argIds);
+            if (argIds.size() == 1 && score > 0.7) {
+                pseudoCoordination = true;
+            }
             String annotation = "";
             if (argIds.size() > 1) {
                 hasCoordination = true;
@@ -87,7 +110,8 @@ public class CoordinatedArguments {
             }
             cordArg.annotations.put(argIds, annotation.trim());
         }
-        return hasCoordination ? Optional.of(cordArg) : Optional.empty();
+        //return hasCoordination ? Optional.of(cordArg) : Optional.empty();
+        return hasCoordination && pseudoCoordination ? Optional.of(cordArg) : Optional.empty();
     }
 
     public void print(List<String> sentence, List<Parse> allParses) {
@@ -102,15 +126,6 @@ public class CoordinatedArguments {
                 .sorted((q1, q2) -> Double.compare(-q1.getValue(), -q2.getValue()))
                 .forEach(q -> System.out.println(String.format("\t%s\t%.3f", q.getKey(), q.getValue())));
         // Print answers.
-        Map<ImmutableList<Integer>, Double> answerHeadsToScore = new HashMap<>();
-        answers.rowKeySet().stream()
-                .forEach(argIds -> {
-                    Set<Parse> parses = new HashSet<>();
-                    answers.row(argIds).entrySet().stream().forEach(a -> {
-                        parses.addAll(a.getValue());
-                    });
-                    answerHeadsToScore.put(argIds, AnalysisHelper.getScore(parses) / totalScore);
-                });
         answers.rowKeySet().stream()
                 .sorted((a1, a2) -> Double.compare(-answerHeadsToScore.get(a1), -answerHeadsToScore.get(a2)))
                 .forEach(argIds -> {
@@ -182,7 +197,7 @@ public class CoordinatedArguments {
             coveredQAs += ambiguities.stream().mapToInt(a -> a.numQAs).sum();
             numCases += ambiguities.size();
         }
-        System.out.println("Found " + numCases + " coordination cases.");
+        System.out.println("Found " + numCases + " pseudo-coordination cases.");
         System.out.println(String.format("Covered %d QAs.", coveredQAs));
     }
 }
