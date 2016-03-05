@@ -3,7 +3,6 @@ package edu.uw.easysrl.qasrl.pomdp;
 import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
-import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
 
@@ -40,6 +39,8 @@ public class POMDP {
             Category.valueOf("S[dcl]"), Category.valueOf("S[wq]"), Category.valueOf("S[q]"),
             Category.valueOf("S[b]\\NP"), Category.valueOf("NP"));
 
+    // Query pruning.
+    QueryPruningParameters queryPruningParams = new QueryPruningParameters();
     // Other parameters.
     int nBest;
     int horizon;
@@ -79,6 +80,10 @@ public class POMDP {
         this.allParses = other.allParses;
         this.allResults = other.allResults;
         this.oracleParseIds = other.oracleParseIds;
+    }
+
+    public void setQueryPruningParameters(QueryPruningParameters queryPruningParams) {
+        this.queryPruningParams = queryPruningParams;
     }
 
     public void setBaseObservationModel(ObservationModel baseObservationModel) {
@@ -121,7 +126,7 @@ public class POMDP {
         timeStep = 0;
         List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
         List<Parse> parses = allParses.get(sentIdx);
-        List<GroupedQuery> queries = QueryGeneratorByKey.generateQueries(sentIdx, words, parses);
+        List<GroupedQuery> queries = QueryGenerator.getAllGroupedQueries(sentIdx, words, parses, queryPruningParams);
         queries.stream().forEach(query -> {
             query.computeProbabilities(beliefModel.belief);
             query.setQueryId(queryPool.size());

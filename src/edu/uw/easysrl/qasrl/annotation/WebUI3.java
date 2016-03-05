@@ -200,7 +200,7 @@ public class WebUI3 {
             for (int i = 0; i < parses.size(); i++) {
                 parseScores[i] = parses.get(i).score;
             }
-            List<MultiQuery> queryList = AnnotationHelper.getAllQueries(
+            List<MultiQuery> queryList = QueryGenerator.getAllMultiQueries(
                     sentenceId,
                     baseLearner.getSentenceById(sentenceId),
                     baseLearner.allParses.get(sentenceId),
