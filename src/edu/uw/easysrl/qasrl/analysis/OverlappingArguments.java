@@ -1,11 +1,10 @@
 package edu.uw.easysrl.qasrl.analysis;
 
 import com.google.common.collect.HashBasedTable;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Table;
+import edu.uw.easysrl.qasrl.AnalysisHelper;
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.pomdp.POMDP;
-import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPairReduced;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.grammar.Category;

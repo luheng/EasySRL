@@ -3,6 +3,7 @@ package edu.uw.easysrl.qasrl.analysis;
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Table;
+import edu.uw.easysrl.qasrl.AnalysisHelper;
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.pomdp.POMDP;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;

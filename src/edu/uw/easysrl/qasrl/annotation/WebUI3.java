@@ -49,6 +49,9 @@ public class WebUI3 {
 
     private static Map<String, Set<String>> parametersMap;
 
+    private static final int questionSurfaceFormTopK = 3;
+    private static final double minQuestionSurfaceFormConfidence = 0.1;
+
     private static final DateFormat dateFormat = new SimpleDateFormat("yyyyMMdd-HHmm");
     private static final String annotationPath  = "./webapp/annotation_files/";
     private static final String webInfPath  = "./webapp/WEB-INF/";
@@ -95,7 +98,7 @@ public class WebUI3 {
         webInfContextHandler.setHandler(webInfResourceHandler);
 
         HandlerCollection handlerCollection = new HandlerCollection();
-        handlerCollection.setHandlers(new Handler[] {servletHandler, resourceContextHandler, webInfContextHandler });
+        handlerCollection.setHandlers(new Handler[] { servletHandler, resourceContextHandler, webInfContextHandler });
 
         server.setHandler(handlerCollection);
         server.start();
@@ -120,7 +123,7 @@ public class WebUI3 {
                         + "<label for=\"UserName\">Please enter your name here: </label>\n"
                         + "<input type=\"text\" input name=\"UserName\"/>\n"
                         + "<br/>"
-                        + "<input name=\"FilterBinary\" type=\"checkbox\" value=\"True\" />&nbsp Filter binary queries. <br/>"
+                        //+ "<input name=\"FilterBinary\" type=\"checkbox\" value=\"True\" />&nbsp Filter binary queries. <br/>"
                         + "<br/><button class=\"btn btn-primary\" type=\"submit\" class=\"btn btn-primary\">Go!</button>\n"
                         + "</form>");
                 httpWriter.println("</body>");
@@ -191,21 +194,17 @@ public class WebUI3 {
         }
 
         private void initializeForUserAndSentence(String userName, int sentenceId) {
-            QueryGeneratorBothWays queryGenerator = new QueryGeneratorBothWays(
-                    sentenceId,
-                    baseLearner.getSentenceById(sentenceId),
-                    baseLearner.allParses.get(sentenceId));
             double[] parseScores = new double[nBest];
             final List<Parse> parses = baseLearner.allParses.get(sentenceId);
             for (int i = 0; i < parses.size(); i++) {
                 parseScores[i] = parses.get(i).score;
             }
-            List<MultiQuery> queryList =
-                    parametersMap.get(userName).contains("FilterBinaryQueries") ?
-                            queryGenerator.getAllMaximalQueries().stream()
-                                    .filter(q -> q.options.size() > 1)
-                                    .collect(Collectors.toList())
-                            : queryGenerator.getAllMaximalQueries();
+            List<MultiQuery> queryList = AnnotationHelper.getAllQueries(
+                    sentenceId,
+                    baseLearner.getSentenceById(sentenceId),
+                    baseLearner.allParses.get(sentenceId),
+                    questionSurfaceFormTopK,
+                    minQuestionSurfaceFormConfidence);
             queryList.forEach(q -> q.computeProbabilities(parseScores));
             System.err.println("sentence " + sentenceId + " has " + queryList.size() + " queries.");
             activeLearningMap.put(userName, queryList);
@@ -223,13 +222,6 @@ public class WebUI3 {
             httpWriter.println("<body style=\"padding-left: 80px; padding-right=80px;\">");
             //httpWriter.println("<container>\n" + WebUIHelper.printInstructions() + "</container>\n");
 
-            // Print the progress bar.
-            int numTotalSentences = sentencesToAnnotate.length;
-            int numAnsweredSentences = numTotalSentences - sentenceIds.size();
-            int numTotalQueries = queryPool.size();
-            httpWriter.println(WebUIHelper.printProgressBar(numAnsweredSentences, 0 /* numSkipped */, numTotalSentences));
-            httpWriter.println(WebUIHelper.printProgressBar(queryId, 0 /* numSkipped */, numTotalQueries));
-
             // Get next query from pool.
             if (queryId >= queryPool.size()) {
                 sentenceIds.remove(0);
@@ -241,6 +233,13 @@ public class WebUI3 {
                 queryId = 0;
             }
             MultiQuery query = queryPool.get(queryId);
+
+            // Print the progress bar.
+            int numTotalSentences = sentencesToAnnotate.length;
+            int numAnsweredSentences = numTotalSentences - sentenceIds.size();
+            int numTotalQueries = queryPool.size();
+            httpWriter.println(WebUIHelper.printProgressBar(numAnsweredSentences, 0 /* numSkipped */, numTotalSentences));
+            httpWriter.println(WebUIHelper.printProgressBar(queryId, 0 /* numSkipped */, numTotalQueries));
 
             // Print sentence.
             final List<String> words = baseLearner.getSentenceById(query.sentenceId);

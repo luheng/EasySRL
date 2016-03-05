@@ -1,5 +1,6 @@
 package edu.uw.easysrl.qasrl.analysis;
 
+import edu.uw.easysrl.qasrl.AnalysisHelper;
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.pomdp.POMDP;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPairReduced;
@@ -17,7 +18,7 @@ public class QuestionAnalysis {
 
     static final int topK = 5;
     static final double minScore = 0.1;
-    static final double maxMargin = 0.5;
+    static final double maxMargin = 0.3;
     static int totalGold;
     static int[] topKCoverGold = new int[topK];
     static int[] topKTotal = new int[topK];
