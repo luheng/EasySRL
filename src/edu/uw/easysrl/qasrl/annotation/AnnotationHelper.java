@@ -2,8 +2,6 @@ package edu.uw.easysrl.qasrl.annotation;
 
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Table;
-import com.sun.org.apache.xpath.internal.operations.Mult;
-import edu.stanford.nlp.util.ArraySet;
 import edu.uw.easysrl.qasrl.AnalysisHelper;
 import edu.uw.easysrl.qasrl.MultiQuery;
 import edu.uw.easysrl.qasrl.Parse;
@@ -50,7 +48,9 @@ public class AnnotationHelper {
     }
 
     public static List<MultiQuery> getAllQueries(int sentenceId, final List<String> sentence,
-                                                 final List<Parse> allParses, int topK, double minQuestionScore) {
+                                                 final List<Parse> allParses, int topK, double minPromptScore,
+                                                 double minOptionScore) {
+        final double totalScore = AnalysisHelper.getScore(allParses);
         List<MultiQuery> multiQueryList = new ArrayList<>();
 
         // For jeopardy style.
@@ -111,17 +111,12 @@ public class AnnotationHelper {
                     List<String> answers = new ArrayList<>(answerToScore.keySet());
                     for (int i = 0; i < filteredQuestions.size(); i++) {
                         String question = filteredQuestions.get(i);
-                        if (i > 0) {
-                            // Top question is high confidence.
-                            if (questionToScore.get(filteredQuestions.get(0)) > 0.9) {
-                                continue;
-                            }
-                            if (questionToScore.get(question) < minQuestionScore) {
-                                continue;
-                            }
+                        if (questionToScore.get(question) < minPromptScore) {
+                            continue;
                         }
                         // Avoid NullPointer exception in MultiQuery..
-                        answers.forEach(answer -> {
+                        double entropy = .0;
+                        for (String answer : answers) {
                             if (!qaStringsToParses.contains(question, answer)) {
                                 qaStringsToParses.put(question, answer, new HashSet<>());
                                 qaStringsToQAPairs.put(question, answer, new ArrayList<>());
@@ -130,10 +125,16 @@ public class AnnotationHelper {
                                         insertParse(globalStringsToParses, question, answer, parse));
                                 qaStringsToQAPairs.get(question, answer).forEach(qa ->
                                         insertQA(globalStringsToQAPairs, question, answer, qa));
+                                double score = AnalysisHelper.getScore(qaStringsToParses.get(question, answer)) / totalScore;
+                                if (score > 0) {
+                                    entropy -= score * Math.log(score);
+                                }
                             }
-                        });
+                        }
+                        System.out.println(entropy);
+                        //if (entropy > minOptionEntropy) {
                         multiQueryList.add(new MultiQuery.Forward(sentenceId, question, answerToScore.keySet(),
-                                qaStringsToQAPairs, qaStringsToParses));
+                                    qaStringsToQAPairs, qaStringsToParses));
                     }
                 }
             }
@@ -146,7 +147,14 @@ public class AnnotationHelper {
                 .map(Entry::getKey)
                 .collect(Collectors.toList());
         for (String answer : sortedAnswers) {
-            Set<String> questions = globalStringsToQAPairs.column(answer).keySet();
+            double score = globalAnswerToScore.get(answer);
+            if (score < minPromptScore) {
+                continue;
+            }
+            Set<String> questions = globalStringsToParses.column(answer).entrySet().stream()
+                    .filter(e -> AnalysisHelper.getScore(e.getValue()) > minOptionScore * totalScore)
+                    .map(Entry::getKey)
+                    .collect(Collectors.toSet());
             if (questions.size() > 1) {
                 multiQueryList.add(new MultiQuery.Backward(sentenceId, answer, questions, globalStringsToQAPairs,
                         globalStringsToParses));

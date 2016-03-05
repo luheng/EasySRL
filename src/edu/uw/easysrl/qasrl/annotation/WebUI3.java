@@ -4,7 +4,6 @@ import java.io.*;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -49,8 +48,10 @@ public class WebUI3 {
 
     private static Map<String, Set<String>> parametersMap;
 
-    private static final int questionSurfaceFormTopK = 3;
-    private static final double minQuestionSurfaceFormConfidence = 0.1;
+    private static final int questionSurfaceFormTopK = 1;
+    private static final double minPromptConfidence = 0.1;
+    private static final double minOptionConfidence = 0.1;
+    private static final double minOptionEntropy = 0.1;
 
     private static final DateFormat dateFormat = new SimpleDateFormat("yyyyMMdd-HHmm");
     private static final String annotationPath  = "./webapp/annotation_files/";
@@ -204,7 +205,8 @@ public class WebUI3 {
                     baseLearner.getSentenceById(sentenceId),
                     baseLearner.allParses.get(sentenceId),
                     questionSurfaceFormTopK,
-                    minQuestionSurfaceFormConfidence);
+                    minPromptConfidence,
+                    minOptionConfidence);
             queryList.forEach(q -> q.computeProbabilities(parseScores));
             System.err.println("sentence " + sentenceId + " has " + queryList.size() + " queries.");
             activeLearningMap.put(userName, queryList);
@@ -216,12 +218,6 @@ public class WebUI3 {
             List<MultiQuery> queryPool = activeLearningMap.get(userName);
             int queryId = queryIdMap.get(userName);
 
-            httpWriter.println(WebUIHelper.printHTMLHeader());
-            httpWriter.println("<h1><font face=\"arial\">Annotation Demo</font></h1>\n");
-
-            httpWriter.println("<body style=\"padding-left: 80px; padding-right=80px;\">");
-            //httpWriter.println("<container>\n" + WebUIHelper.printInstructions() + "</container>\n");
-
             // Get next query from pool.
             if (queryId >= queryPool.size()) {
                 sentenceIds.remove(0);
@@ -230,9 +226,17 @@ public class WebUI3 {
                 }
                 int newSentId = sentenceIds.get(0);
                 initializeForUserAndSentence(userName, newSentId);
+                queryPool = activeLearningMap.get(userName);
                 queryId = 0;
             }
             MultiQuery query = queryPool.get(queryId);
+
+
+            httpWriter.println(WebUIHelper.printHTMLHeader());
+            httpWriter.println("<h1><font face=\"arial\">Annotation Demo</font></h1>\n");
+
+            httpWriter.println("<body style=\"padding-left: 80px; padding-right=80px;\">");
+            //httpWriter.println("<container>\n" + WebUIHelper.printInstructions() + "</container>\n");
 
             // Print the progress bar.
             int numTotalSentences = sentencesToAnnotate.length;

@@ -5,7 +5,7 @@ package edu.uw.easysrl.qasrl;
  * Created by luheng on 1/11/16.
  */
 public class Accuracy {
-    int numCorrect, numTotal;
+    public int numCorrect, numTotal;
 
     public Accuracy() {
         numCorrect = 0;

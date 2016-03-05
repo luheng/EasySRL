@@ -1,5 +1,6 @@
 package edu.uw.easysrl.qasrl.analysis;
 
+import edu.uw.easysrl.qasrl.Accuracy;
 import edu.uw.easysrl.qasrl.AnalysisHelper;
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.pomdp.POMDP;
@@ -22,6 +23,8 @@ public class QuestionAnalysis {
     static int totalGold;
     static int[] topKCoverGold = new int[topK];
     static int[] topKTotal = new int[topK];
+    static Accuracy cumulative05, cumulative07;
+    static int c05Total = 0, c07Total = 0;
 
     private static void printQuestions(final TObjectDoubleHashMap<String> questionToScore,
                                        final Set<String> goldQuestions, List<String> sentence,
@@ -36,19 +39,33 @@ public class QuestionAnalysis {
         System.out.println(String.format("%d:%s\t%s.%d", predHead, sentence.get(predHead), category, argNum));
         System.out.println("[generated]");
         int count = 0;
+        double cumulative = 0;
+        boolean c05 = false, c07 = false;
         double topScore = questionToScore.get(sortedQuestions.get(0));
         for (String question : sortedQuestions) {
             boolean match = goldQuestions.contains(question);
+            double score = questionToScore.get(question);
             for (int i = count; i < topK; i++) {
-                if (count == 0 || topScore - questionToScore.get(question) < maxMargin) {
-                //if (count == 0 || questionToScore.get(question) > minScore) {
+                //if (count == 0 || topScore - questionToScore.get(question) < maxMargin) {
+                if (count == 0 || score > minScore) {
                     topKTotal[i]++;
                     topKCoverGold[i] += (match ? 1 : 0);
                 }
             }
+            if (cumulative < 0.50001) {
+                c05 |= match;
+                c05Total ++;
+            }
+            if (cumulative < 0.70001) {
+                c07 |= match;
+                c07Total ++;
+            }
+            cumulative += score;
             count ++;
             System.out.println(((match ? "*" : " ") + "\t" + question + "\t" + questionToScore.get(question)));
         }
+        cumulative05.add(c05);
+        cumulative07.add(c07);
         System.out.println("[gold]");
         goldQuestions.forEach(q -> System.out.println("\t" + q));
         System.out.println();
@@ -60,6 +77,8 @@ public class QuestionAnalysis {
         totalGold = 0;
         Arrays.fill(topKCoverGold, 0);
         Arrays.fill(topKTotal, 0);
+        cumulative05 = new Accuracy();
+        cumulative07 = new Accuracy();
 
         for (int sid : learner.allParses.keySet()) {
             final List<String> sentence = learner.getSentenceById(sid);
@@ -132,6 +151,8 @@ public class QuestionAnalysis {
                     1.0 * topKTotal[i] / learner.allParses.size(),
                     topKCoverGold[i], 100.0 * topKCoverGold[i] / totalGold));
         }
+        System.out.println("cumulative 0.5:\t" + 1.0 * cumulative05.numCorrect / totalGold + "\t from total:\t" + c05Total);
+        System.out.println("cumulative 0.7:\t" + 1.0 * cumulative07.numCorrect / totalGold + "\t from total:\t" + c07Total);
         //System.out.println("Found " + numCases + " pseudo-coordination cases.");
         //System.out.println(String.format("Covered %d QAs.", coveredQAs));
     }
