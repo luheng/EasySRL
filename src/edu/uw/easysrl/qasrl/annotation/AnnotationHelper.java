@@ -54,8 +54,8 @@ public class AnnotationHelper {
         List<MultiQuery> multiQueryList = new ArrayList<>();
 
         // For jeopardy style.
-        Table<String, String, List<QuestionAnswerPairReduced>> answerToQuestionToQaPairs = HashBasedTable.create();
-        Table<String, String, Set<Parse>> answerToQuestionToParses = HashBasedTable.create();
+        Table<String, String, List<QuestionAnswerPairReduced>> globalStringsToQAPairs = HashBasedTable.create();
+        Table<String, String, Set<Parse>> globalStringsToParses = HashBasedTable.create();
         Map<String, Set<Integer>> globalAnswerToParseIds = new HashMap<>();
         Map<String, Double> globalAnswerToScore = new HashMap<>();
 
@@ -85,17 +85,14 @@ public class AnnotationHelper {
                                     String answer = qa.renderAnswer();
                                     final Parse parse = allParses.get(parseId);
 
-                                    questionToParseIds.get(question).add(parseId);
-                                    answerToParseIds.get(answer).add(parseId);
-
                                     insertParseId(questionToParseIds, question, parseId);
                                     insertParseId(answerToParseIds, answer, parseId);
                                     insertParseId(globalAnswerToParseIds, answer, parseId);
 
                                     insertParse(qaStringsToParses, question, answer, parse);
-                                    insertParse(answerToQuestionToParses, answer, question, parse);
+                                    insertParse(globalStringsToParses, question, answer, parse);
                                     insertQA(qaStringsToQAPairs, question, answer, qa);
-                                    insertQA(answerToQuestionToQaPairs, answer, question, qa);
+                                    insertQA(globalStringsToQAPairs, question, answer, qa);
                                 });
                     }
                     // Filter binary queries.
@@ -114,25 +111,47 @@ public class AnnotationHelper {
                     List<String> answers = new ArrayList<>(answerToScore.keySet());
                     for (int i = 0; i < filteredQuestions.size(); i++) {
                         String question = filteredQuestions.get(i);
-                        if (i > 0 && questionToScore.get(question) < minQuestionScore) {
-                            continue;
+                        if (i > 0) {
+                            // Top question is high confidence.
+                            if (questionToScore.get(filteredQuestions.get(0)) > 0.9) {
+                                continue;
+                            }
+                            if (questionToScore.get(question) < minQuestionScore) {
+                                continue;
+                            }
                         }
                         // Avoid NullPointer exception in MultiQuery..
                         answers.forEach(answer -> {
                             if (!qaStringsToParses.contains(question, answer)) {
                                 qaStringsToParses.put(question, answer, new HashSet<>());
                                 qaStringsToQAPairs.put(question, answer, new ArrayList<>());
+                            } else {
+                                qaStringsToParses.get(question, answer).forEach(parse ->
+                                        insertParse(globalStringsToParses, question, answer, parse));
+                                qaStringsToQAPairs.get(question, answer).forEach(qa ->
+                                        insertQA(globalStringsToQAPairs, question, answer, qa));
                             }
                         });
                         multiQueryList.add(new MultiQuery.Forward(sentenceId, question, answerToScore.keySet(),
-                                    qaStringsToQAPairs, qaStringsToParses));
+                                qaStringsToQAPairs, qaStringsToParses));
                     }
                 }
             }
         }
         // Create jeopardy-style questions.
         populateScores(globalAnswerToScore, globalAnswerToParseIds, allParses);
-        
+        // Find confident answer spans.
+        List<String> sortedAnswers = globalAnswerToScore.entrySet().stream()
+                .sorted((a1, a2) -> Double.compare(-a1.getValue(), -a2.getValue()))
+                .map(Entry::getKey)
+                .collect(Collectors.toList());
+        for (String answer : sortedAnswers) {
+            Set<String> questions = globalStringsToQAPairs.column(answer).keySet();
+            if (questions.size() > 1) {
+                multiQueryList.add(new MultiQuery.Backward(sentenceId, answer, questions, globalStringsToQAPairs,
+                        globalStringsToParses));
+            }
+        }
         return multiQueryList;
     }
 }
