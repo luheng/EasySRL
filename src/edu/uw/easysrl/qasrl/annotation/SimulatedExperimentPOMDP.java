@@ -20,19 +20,18 @@ public class SimulatedExperimentPOMDP {
     static final int horizon = 1000;
     static final double moneyPenalty = 0.1;
 
-    static final int numRandomRuns = 10;
+
+    static final int[] trials = new int[] {10, 20, 30, 40, 50, 60 };
+    static final int numRandomRuns = 20;
 
     static final boolean skipPPQuestions = true;
-    static final double minResponseTrust = 2.5;
+    static final double minResponseTrust = 3;
 
     private static final int maxNumOptionsPerQuestion = 6;
     static {
         GroupedQuery.maxNumNonNAOptionsPerQuery = maxNumOptionsPerQuestion - 2;
     }
     private static final String annotationFilePath = "./Crowdflower_data/f878213.csv";
-
-    static Accuracy answerAcc = new Accuracy();
-    static int numUnmatchedQuestions = 0, numMatchedQuestions = 0;
 
     // Shared data
     static POMDP baseLeaner;
@@ -64,6 +63,9 @@ public class SimulatedExperimentPOMDP {
         }
 
         POMDP learner = new POMDP(baseLeaner);
+        Accuracy answerAcc = new Accuracy();
+        int numUnmatchedQuestions = 0, numMatchedQuestions = 0;
+
         Map<Integer, Integer> oracleIds = new HashMap<>();
         learner.allParses.keySet().forEach(sid -> oracleIds.put(sid, learner.getOracleParseId(sid)));
         ObservationModel observationModel = new ObservationModel(trainingQueries, learner.allParses, oracleIds,
@@ -137,7 +139,6 @@ public class SimulatedExperimentPOMDP {
                 .distinct().sorted()
                 .collect(Collectors.toList());
 
-        int[] trials = new int[] {10, 20, 30, 40, 50, 60 };
         rerankF1 = new ArrayList<>();
         oracleF1 = new ArrayList<>();
         baselineF1 = new ArrayList<>();
