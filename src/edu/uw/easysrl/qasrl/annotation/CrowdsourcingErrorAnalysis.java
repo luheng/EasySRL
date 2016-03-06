@@ -181,7 +181,7 @@ public class CrowdsourcingErrorAnalysis {
 
                 int[] optionDist = getUserResponses(query, annotation);
                 Set<Integer> unmatched = getUnmatchedAnnotationOptions(query, annotation);
-                int goldOption  = goldSimulator.answerQuestion(query).chosenOptions.get(0);
+                int goldOption = goldSimulator.answerQuestion(query).chosenOptions.get(0);
 
                 Results[] rerankedF1 = new Results[optionDist.length];
                 int oracleParseId = learner.getOracleParseId(sentenceId);

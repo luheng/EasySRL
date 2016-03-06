@@ -1,7 +1,11 @@
 package edu.uw.easysrl.qasrl.annotation;
 
 import edu.uw.easysrl.qasrl.*;
+import edu.uw.easysrl.qasrl.analysis.PPAttachment;
+import edu.uw.easysrl.qasrl.corpora.GreedyAnswerAligner;
 import edu.uw.easysrl.qasrl.pomdp.POMDP;
+import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
+import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
@@ -18,12 +22,13 @@ import java.util.stream.Collectors;
  */
 public class CrowdFlowerDataWriterRound2 {
     static final int nBest = 100;
-    static final int maxNumSentences = 100;
-    static final int maxNumSentencesPerFile = 50;
-    static final int numRandomSamples = 1;
+    static final int maxNumSentences = 400;
+    static final int maxNumSentencesPerFile = 100;
+    static final int numRandomSamples = 10;
     static final int randomSeed = 104743;
 
     static final int countEvery = 100;
+    static final boolean skipPPQuestions = true;
     private static boolean highlightPredicate = false;
     // Option pruning.
     private static final int maxNumOptionsPerQuestion = 8;
@@ -34,8 +39,8 @@ public class CrowdFlowerDataWriterRound2 {
     private static QueryPruningParameters queryPruningParameters = new QueryPruningParameters(
             1, /* top K */
             0.1, /* min question confidence */
-            0.03, /* min answer confidence */
-            0.1 /* main attachment entropy */
+            0.05, /* min answer confidence */
+            0.05 /* min attachment entropy */
     );
 
     // Fields for Crowdflower test questions.
@@ -45,6 +50,8 @@ public class CrowdFlowerDataWriterRound2 {
 
     private static final String answerDelimiter = " ### ";
 
+    private static final String cfRound1AnnotationFilePath = "./Crowdflower_data/f878213.csv";
+
     private static final String csvOutputFilePrefix = "./Crowdflower_round2/crowdflower_dev_100best";
 
     // Sentences that happened to appear in instructions ...
@@ -52,18 +59,19 @@ public class CrowdFlowerDataWriterRound2 {
 
     public static void main(String[] args) throws IOException {
         POMDP learner = new POMDP(nBest, 10000 /* horizon */, 0.0 /* money penalty */);
+        ResponseSimulatorGold goldSimlator = new ResponseSimulatorGold(learner.goldParses, new QuestionGenerator());
         learner.setQueryPruningParameters(queryPruningParameters);
 
         Set<Integer> heldOutSentences = new HashSet<>();
         // Print test questions.
         try {
-            printTestQuestions(learner, heldOutSentences);
+            printTestQuestions(learner, goldSimlator, heldOutSentences);
         } catch (IOException e) {
             e.printStackTrace();
         }
         List<double[]> avgNumQueries = new ArrayList<>(),
                        avgOptionsPerQuery = new ArrayList<>(),
-                       avgNumBinaryQueries = new ArrayList<>(),
+                       avgNumNAQueries = new ArrayList<>(),
                        oneBestF1 = new ArrayList<>(),
                        rerankF1 = new ArrayList<>(),
                        oracleF1 = new ArrayList<>(),
@@ -78,7 +86,7 @@ public class CrowdFlowerDataWriterRound2 {
             if (i % countEvery == 0) {
                 avgOptionsPerQuery.add(new double[numRandomSamples]);
                 avgNumQueries.add(new double[numRandomSamples]);
-                avgNumBinaryQueries.add(new double[numRandomSamples]);
+                avgNumNAQueries.add(new double[numRandomSamples]);
                 oneBestF1.add(new double[numRandomSamples]);
                 rerankF1.add(new double[numRandomSamples]);
                 oracleF1.add(new double[numRandomSamples]);
@@ -97,7 +105,7 @@ public class CrowdFlowerDataWriterRound2 {
             int optionCounter = 0;
 
             // Queries that has only one option except for N/A.
-            int numBinaryQueries = 0;
+            int numNAQueries = 0;
             List<Integer> annotatedSentences = new ArrayList<>();
             Results rerank = new Results(),
                     oracle = new Results(),
@@ -106,7 +114,8 @@ public class CrowdFlowerDataWriterRound2 {
             // Process questions.
             for (int sentenceId : sentenceIds) {
                 learner.initializeForSentence(sentenceId);
-                List<GroupedQuery> queries = learner.getQueryPool();
+                List<GroupedQuery> queries = getQueries(learner);
+
                 // Print query to .csv file.
                 if (r == 0 && annotatedSentences.size() < maxNumSentences) {
                     int numSentences = annotatedSentences.size();
@@ -134,20 +143,25 @@ public class CrowdFlowerDataWriterRound2 {
                 for (GroupedQuery query : queries) {
                     int oracleId = learner.getOracleParseId(sentenceId);
                     Response oracleResponse = new Response();
+                    boolean oracleIsNA = false;
                     for (int i = 0; i < query.getAnswerOptions().size(); i++) {
-                        if (query.getAnswerOptions().get(i).getParseIds().contains(oracleId)) {
+                        GroupedQuery.AnswerOption option = query.getAnswerOptions().get(i);
+                        if (option.getParseIds().contains(oracleId)) {
                             oracleResponse.add(i);
+                            if (GroupedQuery.BadQuestionOption.class.isInstance(option)) {
+                                oracleIsNA = true;
+                            }
                         }
                     }
-                    if (r == 0 && lineCounter < 100) {
+                    if (oracleIsNA) {
+                        numNAQueries++;
+                    }
+                    if (r == 0 && lineCounter < 100 && oracleIsNA) {
                         System.out.println("OracleID=" + learner.getOracleParseId(sentenceId));
                         System.out.println(query.getDebuggingInfo(oracleResponse));
                     }
                     learner.receiveObservationForQuery(query, oracleResponse);
                     optionCounter += query.getAnswerOptions().size();
-                    if (query.attachmentUncertainty < 1e-6) {
-                        numBinaryQueries ++;
-                    }
                 }
                 queryCounter += queries.size();
                 annotatedSentences.add(sentenceId);
@@ -158,7 +172,7 @@ public class CrowdFlowerDataWriterRound2 {
                 if (annotatedSentences.size() % countEvery == 0) {
                     int k = annotatedSentences.size() / countEvery - 1;
                     avgNumQueries.get(k)[r] = queryCounter;
-                    avgNumBinaryQueries.get(k)[r] = numBinaryQueries;
+                    avgNumNAQueries.get(k)[r] = numNAQueries;
                     avgOptionsPerQuery.get(k)[r] = 1.0 * optionCounter / queryCounter;
                     oneBestF1.get(k)[r] = 100.0 * oneBest.getF1();
                     rerankF1.get(k)[r]  = 100.0 * rerank.getF1();
@@ -172,8 +186,10 @@ public class CrowdFlowerDataWriterRound2 {
             System.out.println(String.format("On %d sentences:", (k + 1) * 100));
             System.out.println(String.format("Avg. number of queries:\t%.3f (%.3f)",
                     getAverage(avgNumQueries.get(k)), getStd(avgNumQueries.get(k))));
-            System.out.println(String.format("Avg. number of binary queries:\t%.3f (%.3f)",
-                    getAverage(avgNumBinaryQueries.get(k)), getStd(avgNumBinaryQueries.get(k))));
+            System.out.println(String.format("Avg. number of N/A queries:\t%.3f (%.3f)",
+                    getAverage(avgNumNAQueries.get(k)), getStd(avgNumNAQueries.get(k))));
+            System.out.println(String.format("Percentage of N/A queries:\t%.3f%%",
+                    100.0 * getAverage(avgNumNAQueries.get(k)) / getAverage(avgNumQueries.get(k))));
             System.out.println(String.format("Avg. number of options per query:\t%.3f (%.3f)",
                     getAverage(avgOptionsPerQuery.get(k)), getStd(avgOptionsPerQuery.get(k))));
             System.out.println(String.format("Avg. 1-best F1:\t%.3f%%\t%.3f%%",
@@ -187,19 +203,44 @@ public class CrowdFlowerDataWriterRound2 {
         }
     }
 
-    private static void printTestQuestions(POMDP learner, Set<Integer> heldOutSentences) throws IOException {
+    private static List<GroupedQuery> getQueries(POMDP learner) {
+        List<GroupedQuery> queries;
+        if (skipPPQuestions) {
+            queries = learner.getQueryPool().stream()
+                    .filter(q -> q.getCategory() != PPAttachment.nounAdjunct &&
+                            q.getCategory() != PPAttachment.verbAdjunct)
+                    .collect(Collectors.toList());
+        } else {
+            queries = learner.getQueryPool();
+        }
+        return queries;
+    }
+
+    private static void printTestQuestions(POMDP learner, ResponseSimulator goldSimulator,
+                                           Set<Integer> heldOutSentences) throws IOException {
+        // Load test questions from pilot study.
         List<AlignedAnnotation> pilotAnnotations = AlignedAnnotation.getAllAlignedAnnotationsFromPilotStudy();
+        // Load test questions from previous annotation.
+        List<AlignedAnnotation> cfRound1Annotations = CrowdFlowerDataReader.readAggregatedAnnotationFromFile(
+                cfRound1AnnotationFilePath);
+
         pilotAnnotations.stream().forEach(a -> heldOutSentences.add(a.sentenceId));
+        cfRound1Annotations.stream().forEach(a -> heldOutSentences.add(a.sentenceId));
         for (int sid : otherHeldOutSentences) {
             heldOutSentences.add(sid);
         }
-        // Extract high-agreement questions.
-        List<AlignedAnnotation> agreedAnnotations = pilotAnnotations.stream()
-                .filter(annot -> {
-                    int numJudgements = annot.getNumAnnotated();
-                    int numOptions = annot.answerDist.length;
-                    return numOptions > 3 && numJudgements >= 3 && annot.answerDist[annot.goldAnswerId] == numJudgements;
-                }).collect(Collectors.toList());
+        // Extract high-agreement questions from pilot study.
+        List<AlignedAnnotation> agreedAnnotations = new ArrayList<>();
+        pilotAnnotations.stream()
+                .filter(a -> {
+                    int numJudgements = a.getNumAnnotated();
+                    int numOptions = a.answerDist.length;
+                    return numOptions > 3 && numJudgements >= 3 && a.answerDist[a.goldAnswerId] == numJudgements;
+                })
+                .forEach(agreedAnnotations::add);
+        cfRound1Annotations.stream()
+                .filter(a -> a.answerDist[a.goldAnswerId] >= 4)
+                .forEach(agreedAnnotations::add);
         System.out.println("Number of held-out sentences:\t" + heldOutSentences.size());
         System.out.println("Number of high-agreement annotations:\t" + agreedAnnotations.size());
 
@@ -212,23 +253,31 @@ public class CrowdFlowerDataWriterRound2 {
         int numTestQuestions = 0;
         for (AlignedAnnotation test : agreedAnnotations) {
             int sentenceId = test.sentenceId;
-            String goldAnswer = test.answerStrings.get(test.goldAnswerId).replace(" # ", " _AND_ ");
+            String agreedAnswer = "";
+            if (test.goldAnswerId >= 0) {
+                // Inconsistency of answer delimiter..
+                agreedAnswer = test.answerOptions.get(test.goldAnswerId).replace(" # ", QuestionAnswerPair.answerDelimiter);
+            } else {
+                for (int i = 0; i < test.answerOptions.size(); i++) {
+                    if (test.answerDist[i] >= 4) {
+                        agreedAnswer = test.answerOptions.get(i);
+                        break;
+                    }
+                }
+            }
             learner.initializeForSentence(sentenceId);
-            List<GroupedQuery> queries = learner.getQueryPool();
+            List<GroupedQuery> queries = getQueries(learner);
             for (GroupedQuery query : queries) {
                 if (query.getPredicateIndex() == test.predicateId &&
+                        // Surface match.
                         query.getQuestion().equalsIgnoreCase(test.question)) {
-                    int goldAnswerId = -1;
-                    for (int i = 0; i < query.getAnswerOptions().size(); i++) {
-                        GroupedQuery.AnswerOption ao = query.getAnswerOptions().get(i);
-                        if (ao.getAnswer().equalsIgnoreCase(goldAnswer) ||
-                                (GroupedQuery.BadQuestionOption.class.isInstance(ao) &&
-                                        goldAnswer.startsWith("Question is not"))) {
-                            goldAnswerId = i;
-                            break;
-                        }
-                    }
-                    if (goldAnswerId >= 0) {
+                    Response gold = goldSimulator.answerQuestion(query);
+                    int goldAnswerId = gold.chosenOptions.get(0);
+                    GroupedQuery.AnswerOption goldOption = query.getAnswerOptions().get(goldAnswerId);
+                    boolean agreedMatchesGold = goldOption.getAnswer().equals(agreedAnswer) ||
+                            (GroupedQuery.BadQuestionOption.class.isInstance(goldOption) &&
+                                    agreedAnswer.startsWith("Question is not"));
+                    if (agreedMatchesGold) {
                         printQueryToCSVFile(query, goldAnswerId, 10000 + numTestQuestions /* lineCounter */,
                                 csvPrinter);
                         numTestQuestions ++;

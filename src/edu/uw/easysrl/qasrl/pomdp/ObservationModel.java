@@ -1,6 +1,7 @@
 package edu.uw.easysrl.qasrl.pomdp;
 
 import edu.uw.easysrl.qasrl.*;
+import edu.uw.easysrl.qasrl.analysis.PPAttachment;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.HashSet;
@@ -24,7 +25,7 @@ public class ObservationModel {
      * Training an observation model from annotations.
      */
     public ObservationModel(List<GroupedQuery> queries, Map<Integer, List<Parse>> allParses,
-                            Map<Integer, Integer> oracleIds, ResponseSimulator userModel) {
+                            Map<Integer, Integer> oracleIds, ResponseSimulator userModel, double minResponseTrust) {
         // (0, 0, 0) adjunct questions, gold is NA and answer is "question not valid".
         // (0, 0, 1) adjunct questions, gold is NA and answer is "answer not listed".
         // (0, 0, 2) adjunct questions, gold is NA and answer is max. dependency overlap.
@@ -35,7 +36,7 @@ public class ObservationModel {
 
         for (GroupedQuery query : queries) {
             Response userResponse = userModel.answerQuestion(query);
-            if (userResponse.chosenOptions.size() == 0  || userResponse.trust < 2.5) {
+            if (userResponse.chosenOptions.size() == 0  || userResponse.trust < minResponseTrust) {
                 continue;
             }
             int user = userResponse.chosenOptions.get(0);
@@ -50,8 +51,8 @@ public class ObservationModel {
             if (oracleOption < 0) {
                 continue;
             }
-            boolean isAdjunct = query.getCategory().equals(Category.valueOf("((S\\NP)\\(S\\NP))/NP"))
-                    || query.getCategory().equals(Category.valueOf("(NP\\NP)/NP"));
+            boolean isAdjunct = (query.getCategory() == PPAttachment.verbAdjunct ||
+                                 query.getCategory() == PPAttachment.nounAdjunct);
             boolean oracleIsNA = GroupedQuery.BadQuestionOption.class.isInstance(query.getAnswerOptions().get(oracleOption));
             GroupedQuery.AnswerOption userOption = query.getAnswerOptions().get(user);
             Set<Integer> maxOverlapOptions = new HashSet<>();
@@ -126,8 +127,8 @@ public class ObservationModel {
             int K = query.getAnswerOptions().size() - 1;
             return userCorrect ? 1.0 - fixedErrorRate : fixedErrorRate / K;
         } else {
-            boolean isAdjunct = query.getCategory().equals(Category.valueOf("((S\\NP)\\(S\\NP))/NP"))
-                    || query.getCategory().equals(Category.valueOf("(NP\\NP)/NP"));
+            boolean isAdjunct = (query.getCategory() == PPAttachment.verbAdjunct
+                    || query.getCategory() == PPAttachment.nounAdjunct);
             boolean parseIsNA = false;
             int maxOverlap = -1;
             Set<Integer> maxOverlapOptions = new HashSet<>();

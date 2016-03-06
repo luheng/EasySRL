@@ -13,6 +13,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
+ * Experiment on collected data.
  * Created by luheng on 2/27/16.
  */
 public class SimulatedExperimentPOMDP {
@@ -21,11 +22,12 @@ public class SimulatedExperimentPOMDP {
     static final double moneyPenalty = 0.1;
 
 
-    static final int[] trials = new int[] {10, 20, 30, 40, 50, 60 };
+    static final int[] trials = new int[] {10, 20, 30, 40, 50 };
     static final int numRandomRuns = 20;
 
+    static final boolean useObservationModel = false;
     static final boolean skipPPQuestions = true;
-    static final double minResponseTrust = 3;
+    static final double minResponseTrust = 4.0;
 
     private static final int maxNumOptionsPerQuestion = 6;
     static {
@@ -66,11 +68,13 @@ public class SimulatedExperimentPOMDP {
         Accuracy answerAcc = new Accuracy();
         int numUnmatchedQuestions = 0, numMatchedQuestions = 0;
 
-        Map<Integer, Integer> oracleIds = new HashMap<>();
-        learner.allParses.keySet().forEach(sid -> oracleIds.put(sid, learner.getOracleParseId(sid)));
-        ObservationModel observationModel = new ObservationModel(trainingQueries, learner.allParses, oracleIds,
-                userModel);
-        learner.setBaseObservationModel(observationModel);
+        if (useObservationModel) {
+            Map<Integer, Integer> oracleIds = new HashMap<>();
+            learner.allParses.keySet().forEach(sid -> oracleIds.put(sid, learner.getOracleParseId(sid)));
+            ObservationModel observationModel = new ObservationModel(trainingQueries, learner.allParses, oracleIds,
+                    userModel, minResponseTrust);
+            learner.setBaseObservationModel(observationModel);
+        }
 
         assert annotations != null;
         Results rerank = new Results(),
