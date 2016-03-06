@@ -15,7 +15,7 @@ public class BeliefModel {
     public double[] belief;
     private double[] prior;
     public static final double epsilon = 1e-6;
-    public static final double smoothing = 1e-3;
+    public static final double smoothing = 1e-5 ;
 
     public BeliefModel(List<Parse> parses) {
         this.parses = parses;

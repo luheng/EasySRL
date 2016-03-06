@@ -151,7 +151,8 @@ public class POMDP {
         timeStep = 0;
         List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
         List<Parse> parses = allParses.get(sentIdx);
-        List<GroupedQuery> queries = QueryGeneratorSurfaceForm.generateQueries(sentIdx, words, parses);
+        List<GroupedQuery> queries = QueryGenerator.getAllGroupedQueries(sentIdx, words, parses,
+                new QueryPruningParameters());
         queries.stream().forEach(query -> {
             query.computeProbabilities(beliefModel.belief);
             if (annotations.stream().anyMatch(annotation -> annotation.sentenceId == sentIdx
@@ -170,8 +171,8 @@ public class POMDP {
         }
         timeStep ++;
         double reward = rewardFunction.getReward(action, beliefModel, history);
-        System.out.println("Receiving reward:\t" + reward + " at time:\t" + timeStep + "\tbelief entropy:\t" +
-                beliefModel.getEntropy() + "\tmargin:\t" + beliefModel.getMargin());
+        //System.out.println("Receiving reward:\t" + reward + " at time:\t" + timeStep + "\tbelief entropy:\t" +
+        //        beliefModel.getEntropy() + "\tmargin:\t" + beliefModel.getMargin());
         return action;
     }
 

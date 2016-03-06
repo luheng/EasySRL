@@ -35,7 +35,7 @@ public class ObservationModel {
 
         for (GroupedQuery query : queries) {
             Response userResponse = userModel.answerQuestion(query);
-            if (userResponse.chosenOptions.size() == 0  /*|| userResponse.trust < 3 */) {
+            if (userResponse.chosenOptions.size() == 0  || userResponse.trust < 2.5) {
                 continue;
             }
             int user = userResponse.chosenOptions.get(0);
