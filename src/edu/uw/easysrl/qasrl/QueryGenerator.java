@@ -5,6 +5,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Table;
 import com.google.common.collect.Table.Cell;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
+import edu.uw.easysrl.qasrl.analysis.PPAttachment;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPairReduced;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
@@ -22,8 +23,8 @@ import java.util.stream.Collectors;
 public class QueryGenerator {
 
     public static List<MultiQuery> getAllMultiQueries(int sentenceId, final List<String> sentence,
-                                                      final List<Parse> allParses, int topK, double minPromptScore,
-                                                      double minOptionScore) {
+                                                      final List<Parse> allParses,
+                                                      QueryPruningParameters pruningParams) {
         final double totalScore = AnalysisHelper.getScore(allParses);
         List<MultiQuery> multiQueryList = new ArrayList<>();
 
@@ -80,12 +81,12 @@ public class QueryGenerator {
                     List<String> filteredQuestions = questionToScore.entrySet().stream()
                             .sorted((q1, q2) -> Double.compare(-q1.getValue(), -q2.getValue()))
                             .map(Entry::getKey)
-                            .limit(topK)
+                            .limit(pruningParams.questionSurfaceFormTopK)
                             .collect(Collectors.toList());
                     List<String> answers = new ArrayList<>(answerToScore.keySet());
                     for (int i = 0; i < filteredQuestions.size(); i++) {
                         String question = filteredQuestions.get(i);
-                        if (questionToScore.get(question) < minPromptScore) {
+                        if (questionToScore.get(question) < pruningParams.minQuestionConfidence) {
                             continue;
                         }
                         // Avoid NullPointer exception in MultiQuery..
@@ -122,11 +123,11 @@ public class QueryGenerator {
                 .collect(Collectors.toList());
         for (String answer : sortedAnswers) {
             double score = globalAnswerToScore.get(answer);
-            if (score < minPromptScore) {
+            if (score < pruningParams.minQuestionConfidence) {
                 continue;
             }
             Set<String> questions = globalStringsToParses.column(answer).entrySet().stream()
-                    .filter(e -> AnalysisHelper.getScore(e.getValue()) > minOptionScore * totalScore)
+                    .filter(e -> AnalysisHelper.getScore(e.getValue()) > pruningParams.minAnswerConfidence * totalScore)
                     .map(Entry::getKey)
                     .collect(Collectors.toSet());
             if (questions.size() > 1) {
@@ -143,6 +144,16 @@ public class QueryGenerator {
         List<GroupedQuery> queryList = new ArrayList<>();
         for (int predHead = 0; predHead < sentence.size(); predHead++) {
             Map<Category, Set<Integer>> taggings = new HashMap<>();
+            /***** Analysis. ****/
+            /*
+            Map<String, Set<Integer>> labelToArgIds = new HashMap<>();
+            Map<String, Set<String>> labelToQuestions = new HashMap<>();
+            Map<String, Set<Integer>> labelToParseIds = new HashMap<>();
+            boolean predicateHasQuestion = false;
+            boolean predicateIsPP = false;
+            boolean predicateHasSkippedQuestion = false;
+            */
+
             for (int parseId = 0; parseId < allParses.size(); parseId ++) {
                 Parse parse = allParses.get(parseId);
                 Category category = parse.categories.get(predHead);
@@ -151,6 +162,18 @@ public class QueryGenerator {
                 }
                 taggings.get(category).add(parseId);
             }
+            /************** For analysis. *******/
+            /*
+            for (Category category : taggings.keySet()) {
+                for (int argNum = 1; argNum <= category.getNumberOfArguments(); argNum++) {
+                    String label = category + "." + argNum;
+                    labelToArgIds.put(label, new HashSet<>());
+                    labelToQuestions.put(label, new HashSet<>());
+                    labelToParseIds.put(label, new HashSet<>());
+                }
+            }
+            */
+            /***********************************/
             for (Category category : taggings.keySet()) {
                 for (int argNum = 1; argNum <= category.getNumberOfArguments(); argNum++) {
                     Map<String, Set<Integer>> questionToParseIds = new HashMap<>();
@@ -158,9 +181,33 @@ public class QueryGenerator {
                     Map<String, Double> questionToScore = new HashMap<>();
                     Map<String, Double> answerToScore = new HashMap<>();
                     Map<String, ImmutableList<Integer>> answerToArgIds = new HashMap<>();
+
                     for (int parseId : taggings.get(category)) {
                         List<QuestionAnswerPairReduced> qaList = QuestionGenerator.generateAllQAPairs(predHead, argNum,
                                 sentence, allParses.get(parseId));
+
+                        /************** For analysis. *******/
+                        /*
+                        if (qaList.size() > 0) {
+                            predicateHasQuestion = true;
+                        } else {
+                            predicateHasSkippedQuestion = true;
+                        }
+                        if (category == PPAttachment.nounAdjunct || category == PPAttachment.verbAdjunct) {
+                            predicateIsPP = true;
+                        }
+                        String label = category + "." + argNum;
+                        for (ResolvedDependency dep : allParses.get(parseId).dependencies) {
+                            if (dep.getHead() == predHead && dep.getCategory() == category &&
+                                    dep.getArgNumber() == argNum) {
+                                labelToArgIds.get(label).add(dep.getArgument());
+                            }
+                        }
+                        qaList.forEach(qa -> labelToQuestions.get(label).add(qa.renderQuestion()));
+                        labelToParseIds.get(label).add(parseId);
+                        */
+                        /***********************************/
+
                         // Get concatenated answer.
                         Map<Integer, String> argIdToSpan = new HashMap<>();
                         qaList.forEach(qa -> argIdToSpan.put(qa.targetDep.getArgument(), qa.renderAnswer()));
@@ -213,6 +260,31 @@ public class QueryGenerator {
                     }
                 }
             }
+            /********** For analysis. *******/
+            /*
+            if (predicateHasQuestion && predicateHasSkippedQuestion && !predicateIsPP) {
+                double totalScore = AnalysisHelper.getScore(allParses);
+                System.out.println("SID=" + sentenceId + "\t" + sentence.stream().collect(Collectors.joining(" ")));
+                for (String label : labelToArgIds.keySet()) {
+                    double score = AnalysisHelper.getScore(labelToParseIds.get(label), allParses) / totalScore;
+                    if (labelToQuestions.get(label).isEmpty()) {
+                        System.out.println(predHead + ":" + sentence.get(predHead) + "\t" + label + "\t" + score);
+                        for (int argId : labelToArgIds.get(label)) {
+                            System.out.println("\t" + argId + ":" + sentence.get(argId));
+                        }
+                    } else {
+                        System.out.println(predHead + ":" + sentence.get(predHead) + "\t" + label + "\t" + score);
+                        for (String question : labelToQuestions.get(label)) {
+                            System.out.println(question);
+                        }
+                        for (int argId : labelToArgIds.get(label)) {
+                            System.out.println("\t" + argId + ":" + sentence.get(argId));
+                        }
+                    }
+                }
+                System.out.println();
+            }
+            */
         }
         return queryList;
     }

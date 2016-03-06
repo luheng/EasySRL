@@ -204,9 +204,7 @@ public class WebUI3 {
                     sentenceId,
                     baseLearner.getSentenceById(sentenceId),
                     baseLearner.allParses.get(sentenceId),
-                    questionSurfaceFormTopK,
-                    minPromptConfidence,
-                    minOptionConfidence);
+                    new QueryPruningParameters());
             queryList.forEach(q -> q.computeProbabilities(parseScores));
             System.err.println("sentence " + sentenceId + " has " + queryList.size() + " queries.");
             activeLearningMap.put(userName, queryList);

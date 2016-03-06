@@ -68,8 +68,11 @@ public class SimulatedExperimentPOMDP {
             }
         }
 
-        ObservationModel observationModel = new ObservationModel(trainingQueries, qgen.goldParses, userModel, goldModel);
         POMDP learner = new POMDP(nBest, horizon, moneyPenalty);
+        Map<Integer, Integer> oracleIds = new HashMap<>();
+        learner.allParses.keySet().forEach(sid -> oracleIds.put(sid, learner.getOracleParseId(sid)));
+        ObservationModel observationModel = new ObservationModel(trainingQueries, learner.allParses, oracleIds,
+                userModel);
         learner.setBaseObservationModel(observationModel);
 
         assert annotations != null;
@@ -86,7 +89,8 @@ public class SimulatedExperimentPOMDP {
                 Response userResponse = userModel.answerQuestion(action.get());
                 Response goldResponse = goldModel.answerQuestion(action.get());
                 // Hack.
-                /* if (userResponse.trust < 3
+                /*
+                if (userResponse.trust < 3
                         || action.get().getCategory().equals(Category.valueOf("((S\\NP)\\(S\\NP))/NP"))
                         || action.get().getCategory().equals(Category.valueOf("(NP\\NP)/NP"))) {
                     continue;

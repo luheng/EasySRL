@@ -20,15 +20,23 @@ public class CrowdFlowerDataWriterRound2 {
     static final int nBest = 100;
     static final int maxNumSentences = 100;
     static final int maxNumSentencesPerFile = 50;
-    static final int numRandomSamples = 10;
+    static final int numRandomSamples = 1;
     static final int randomSeed = 104743;
 
     static final int countEvery = 100;
     private static boolean highlightPredicate = false;
+    // Option pruning.
     private static final int maxNumOptionsPerQuestion = 8;
     static {
         GroupedQuery.maxNumNonNAOptionsPerQuery = maxNumOptionsPerQuestion - 2;
     }
+    // Query pruning parameters.
+    private static QueryPruningParameters queryPruningParameters = new QueryPruningParameters(
+            1, /* top K */
+            0.1, /* min question confidence */
+            0.03, /* min answer confidence */
+            0.1 /* main attachment entropy */
+    );
 
     // Fields for Crowdflower test questions.
     private static final String[] csvHeader = {
@@ -41,14 +49,6 @@ public class CrowdFlowerDataWriterRound2 {
 
     // Sentences that happened to appear in instructions ...
     private static final int[] otherHeldOutSentences = { 1695, };
-
-    // Query pruning parameters.
-    private static QueryPruningParameters queryPruningParameters = new QueryPruningParameters(
-            1, /* top K */
-            0.1, /* min question confidence */
-            0.01, /* min answer confidence */
-            0.1 /* main attachment entropy */
-    );
 
     public static void main(String[] args) throws IOException {
         POMDP learner = new POMDP(nBest, 10000 /* horizon */, 0.0 /* money penalty */);
