@@ -8,9 +8,7 @@ import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.lang.reflect.Array;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
@@ -50,7 +48,7 @@ public class ResponseSimulatorGold extends ResponseSimulator {
      public Response answerQuestion(GroupedQuery query) {
          Response response = new Response();
          int badQuestionOptionId = -1, noAnswerOptionId = -1;
-         String goldQuestion = "", goldAnswer = "";
+         String goldAnswer = "";
 
          final Parse goldParse = goldParses.get(query.sentenceId);
          final List<String> sentence = query.sentence;
@@ -67,41 +65,48 @@ public class ResponseSimulatorGold extends ResponseSimulator {
          }
 
          for (int argNum = 1; argNum <= goldCategory.getNumberOfArguments(); argNum++) {
-            List<QuestionAnswerPairReduced> qaList = QuestionGenerator
-                    .generateAllQAPairs(predId, argNum, sentence, goldParse).stream()
-                    .sorted((a1, a2) -> Integer.compare(a1.targetDep.getArgument(), a2.targetDep.getArgument()))
-                    .collect(Collectors.toList());
-            if (qaList == null || qaList.size() == 0) {
-                continue;
-            }
-            String questionStr = qaList.get(0).renderQuestion();
-            String answerStr = qaList.stream()
-                    .map(QuestionAnswerPairReduced::renderAnswer)
-                    .collect(Collectors.joining(QuestionAnswerPair.answerDelimiter));
-            boolean questionMatch = query.question.equalsIgnoreCase(questionStr);
-            boolean labelMatch = (goldCategory == query.category && argNum == query.argumentNumber);
-            if (!questionMatch && !(allowLabelMatch && labelMatch)) {
-                continue;
-            }
-            for (int i = 0; i < query.answerOptions.size(); i++) {
-                GroupedQuery.AnswerOption option = query.answerOptions.get(i);
-                if (!option.isNAOption() && option.getAnswer().equals(answerStr)) {
-                    response.add(i);
-                }
-            }
-            goldQuestion = questionStr;
-            goldAnswer = answerStr;
-            break;
+             List<QuestionAnswerPairReduced> qaList = QuestionGenerator
+                     .generateAllQAPairs(predId, argNum, sentence, goldParse);
+             if (qaList == null || qaList.size() == 0) {
+                 continue;
+             }
+             Set<String> questionStr = qaList.stream()
+                     .map(QuestionAnswerPairReduced::renderQuestion)
+                     .collect(Collectors.toSet());
+             Map<Integer, String> argIdToSpan = new HashMap<>();
+             qaList.forEach(qa -> argIdToSpan.put(qa.targetDep.getArgument(), qa.renderAnswer()));
+             List<Integer> goldArgIds = qaList.stream()
+                     .map(qa -> qa.targetDep.getArgument())
+                     .distinct().sorted()
+                     .collect(Collectors.toList());
+             String answerStr = goldArgIds.stream()
+                     .map(argIdToSpan::get)
+                     .collect(Collectors.joining(QuestionAnswerPair.answerDelimiter));
+             boolean questionMatch = questionStr.contains(query.question);
+             boolean labelMatch = (goldCategory == query.category && argNum == query.argumentNumber);
+             if (!questionMatch && !(allowLabelMatch && labelMatch)) {
+                 continue;
+             }
+             for (int i = 0; i < query.answerOptions.size(); i++) {
+                 GroupedQuery.AnswerOption option = query.answerOptions.get(i);
+                 //if (!option.isNAOption() && option.getAnswer().equals(answerStr)) {
+                 if (!option.isNAOption() && option.getArgumentIds().containsAll(goldArgIds) &&
+                         goldArgIds.containsAll(option.getArgumentIds())) {
+                     response.add(i);
+                 }
+             }
+             goldAnswer = answerStr;
+             break;
          }
 
          if (response.chosenOptions.size() == 0) {
-            if (!goldAnswer.isEmpty()) {
-                response.add(noAnswerOptionId);
-                response.debugInfo = "[gold]:\t" + goldAnswer;
-            } else {
-                response.add(badQuestionOptionId);
+             if (!goldAnswer.isEmpty()) {
+                 response.add(noAnswerOptionId);
+             } else {
+                 response.add(badQuestionOptionId);
             }
          }
-        return response;
+         response.debugInfo = "[gold]:\t" + goldAnswer;
+         return response;
     }
 }

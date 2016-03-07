@@ -10,6 +10,7 @@ import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPairReduced;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.grammar.Category;
+import jdk.nashorn.internal.runtime.Debug;
 
 import java.util.*;
 import java.util.Map.Entry;
@@ -177,10 +178,9 @@ public class QueryGenerator {
             for (Category category : taggings.keySet()) {
                 for (int argNum = 1; argNum <= category.getNumberOfArguments(); argNum++) {
                     Map<String, Set<Integer>> questionToParseIds = new HashMap<>();
-                    Map<String, Set<Integer>> answerToParseIds = new HashMap<>();
                     Map<String, Double> questionToScore = new HashMap<>();
-                    Map<String, Double> answerToScore = new HashMap<>();
-                    Map<String, ImmutableList<Integer>> answerToArgIds = new HashMap<>();
+                    Table<ImmutableList<Integer>, String, Set<Integer>> answerToParseIds = HashBasedTable.create();
+                    Table<ImmutableList<Integer>, String, Double> answerToScore = HashBasedTable.create();
 
                     for (int parseId : taggings.get(category)) {
                         List<QuestionAnswerPairReduced> qaList = QuestionGenerator.generateAllQAPairs(predHead, argNum,
@@ -221,29 +221,38 @@ public class QueryGenerator {
                         String answer = argIds.stream()
                                 .map(argIdToSpan::get)
                                 .collect(Collectors.joining(QuestionAnswerPair.answerDelimiter));
-                        answerToArgIds.put(answer, argIds);
-                        insertParseId(answerToParseIds, answer, parseId);
+                        //answerToArgIds.put(answer, argIds);
+                        insertParseId(answerToParseIds, argIds, answer, parseId);
                         // Get questions surface forms.
                         qaList.forEach(qa -> insertParseId(questionToParseIds, qa.renderQuestion(), parseId));
                     }
                     // Compute question scores.
-                    populateScores(questionToScore, questionToParseIds, allParses);
                     populateScores(answerToScore, answerToParseIds, allParses);
-                    List<String> filteredAnswers = answerToScore.entrySet().stream()
-                            .filter(e -> e.getValue() > pruningParams.minAnswerConfidence)
-                            .map(Entry::getKey)
-                            .collect(Collectors.toList());
-                    double answerScoreSum = filteredAnswers.stream()
-                            .mapToDouble(answerToScore::get)
-                            .sum();
-                    double answerEntropy = filteredAnswers.stream()
-                            .mapToDouble(answerToScore::get)
-                            .filter(s -> s > 0)
-                            .map(s -> s / answerScoreSum)
-                            .map(p -> - p * Math.log(p))
-                            .sum();
+                    populateScores(questionToScore, questionToParseIds, allParses);
+                    // Get most probable answer.
+                    Map<String, Set<Integer>> answerStringToParseIds = new HashMap<>();
+                    Map<String, ImmutableList<Integer>> answerStringToArgIds = new HashMap<>();
+                    Map<String, Double> answerStringToScore = new HashMap<>();
+                    double answerScoreSum = .0,
+                           answerEntropy = .0;
+                    for (ImmutableList<Integer> argList : answerToScore.rowKeySet()) {
+                        String answer = getBestSurfaceForm(answerToScore.row(argList));
+                        double score = answerToScore.row(argList).values().stream().mapToDouble(s -> s).sum();
+                        if (score > pruningParams.minAnswerConfidence) {
+                            answerScoreSum += score;
+                            answerStringToScore.put(answer, score);
+                            answerStringToArgIds.put(answer, argList);
+                            answerToParseIds.row(argList).values()
+                                    .forEach(parseIds -> parseIds
+                                            .forEach(pid -> insertParseId(answerStringToParseIds, answer, pid)));
+                        }
+                    }
+                    for (String answer : answerStringToScore.keySet()) {
+                        double p = answerStringToScore.get(answer) / answerScoreSum;
+                        answerEntropy -= (p > 0 ? p * Math.log(p) : 0);
+                    }
                     // Filter unambiguous attachments.
-                    if (filteredAnswers.size() < 2 || answerEntropy < pruningParams.minAnswerEntropy) {
+                    if (answerStringToScore.size() < 2 || answerEntropy < pruningParams.minAnswerEntropy) {
                         continue;
                     }
                     // Get question surface forms.
@@ -255,9 +264,28 @@ public class QueryGenerator {
                             .collect(Collectors.toList());
                     for (String question : filteredQuestions) {
                         GroupedQuery query = new GroupedQuery(sentenceId, sentence, allParses);
-                        query.collapse(predHead, category, argNum, question, answerToArgIds, answerToParseIds);
+                        query.collapse(predHead, category, argNum, question, answerStringToArgIds,
+                                       answerStringToParseIds);
                         queryList.add(query);
                     }
+                    /******** analysis ***********/
+                    /*
+                    System.out.println("SID=" + sentenceId + "\t" + sentence.stream().collect(Collectors.joining(" ")));
+                    filteredQuestions.forEach(System.out::println);
+                    for (ImmutableList<Integer> argList : answerToScore.rowKeySet()) {
+                        System.out.println("\t" + DebugPrinter.getShortListString(argList));
+                        for (String answer : answerToScore.row(argList).keySet()) {
+                            System.out.println("\t\t" + answer + "\t" + answerToScore.get(argList, answer));
+                        }
+                    }
+                    // Actual answers.
+                    for (String answer : answerStringToScore.keySet()) {
+                        System.out.println("\t" + answer + "\t" +
+                                DebugPrinter.getShortListString(answerStringToArgIds.get(answer)) + "\t" +
+                                answerStringToScore.get(answer));
+                    }
+                    System.out.println();
+                    */
                 }
             }
             /********** For analysis. *******/
@@ -289,7 +317,13 @@ public class QueryGenerator {
         return queryList;
     }
 
-
+    public static String getBestSurfaceForm(Map<String, Double> qaToScore) {
+        Entry<String, Double> best = qaToScore.entrySet().stream()
+                .max((e1, e2) -> Double.compare(e1.getValue(), e2.getValue()))
+                //.min((e1, e2) -> Integer.compare(e1.getKey().length(), e2.getKey().length()))
+                .get();
+        return best.getKey();
+    }
 
     private static void insertQA(Table<String, String, List<QuestionAnswerPairReduced>> qaTable, String s1,
                                  String s2, QuestionAnswerPairReduced qa) {
@@ -313,11 +347,29 @@ public class QueryGenerator {
         qaTable.get(s).add(parseId);
     }
 
+    private static void insertParseId(Table<ImmutableList<Integer>, String, Set<Integer>> qaTable,
+                                      ImmutableList<Integer> o, String s, int parseId) {
+        if (!qaTable.contains(o, s)) {
+            qaTable.put(o, s, new HashSet<>());
+        }
+        qaTable.get(o, s).add(parseId);
+    }
+
     private static void populateScores(Map<String, Double> qaScores, Map<String, Set<Integer>> qaTable,
                                        List<Parse> allParses) {
         double totalScore = AnalysisHelper.getScore(allParses);
         qaTable.entrySet().forEach(e -> qaScores.put(e.getKey(),
                 AnalysisHelper.getScore(e.getValue(), allParses) / totalScore));
+    }
+
+    private static void populateScores(Table<ImmutableList<Integer>, String, Double> qaScores,
+                                       Table<ImmutableList<Integer>, String, Set<Integer>> qaTable,
+                                       List<Parse> allParses) {
+        double totalScore = AnalysisHelper.getScore(allParses);
+        qaTable.rowKeySet().forEach(row -> {
+            qaTable.row(row).entrySet().forEach(col ->
+                    qaScores.put(row, col.getKey(), AnalysisHelper.getScore(col.getValue(), allParses) / totalScore));
+        });
     }
 
     /******* Old stuff ********/

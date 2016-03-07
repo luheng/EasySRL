@@ -2,7 +2,6 @@ package edu.uw.easysrl.qasrl.annotation;
 
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.analysis.PPAttachment;
-import edu.uw.easysrl.qasrl.corpora.GreedyAnswerAligner;
 import edu.uw.easysrl.qasrl.pomdp.POMDP;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
@@ -22,7 +21,7 @@ import java.util.stream.Collectors;
  */
 public class CrowdFlowerDataWriterRound2 {
     static final int nBest = 100;
-    static final int maxNumSentences = 400;
+    static final int maxNumSentences = 300;
     static final int maxNumSentencesPerFile = 100;
     static final int numRandomSamples = 10;
     static final int randomSeed = 104743;
@@ -31,16 +30,16 @@ public class CrowdFlowerDataWriterRound2 {
     static final boolean skipPPQuestions = true;
     private static boolean highlightPredicate = false;
     // Option pruning.
-    private static final int maxNumOptionsPerQuestion = 8;
+    private static final int maxNumOptionsPerQuestion = 6;
     static {
         GroupedQuery.maxNumNonNAOptionsPerQuery = maxNumOptionsPerQuestion - 2;
     }
     // Query pruning parameters.
     private static QueryPruningParameters queryPruningParameters = new QueryPruningParameters(
-            1, /* top K */
-            0.1, /* min question confidence */
+            1,    /* top K */
+            0.1,  /* min question confidence */
             0.05, /* min answer confidence */
-            0.05 /* min attachment entropy */
+            0.05  /* min attachment entropy */
     );
 
     // Fields for Crowdflower test questions.
@@ -59,19 +58,22 @@ public class CrowdFlowerDataWriterRound2 {
 
     public static void main(String[] args) throws IOException {
         POMDP learner = new POMDP(nBest, 10000 /* horizon */, 0.0 /* money penalty */);
-        ResponseSimulatorGold goldSimlator = new ResponseSimulatorGold(learner.goldParses, new QuestionGenerator());
+        ResponseSimulatorGold goldSimulator = new ResponseSimulatorGold(learner.goldParses, new QuestionGenerator(),
+                true /* match by label */);
         learner.setQueryPruningParameters(queryPruningParameters);
 
         Set<Integer> heldOutSentences = new HashSet<>();
         // Print test questions.
         try {
-            printTestQuestions(learner, goldSimlator, heldOutSentences);
+            printTestQuestions(learner, goldSimulator, heldOutSentences);
         } catch (IOException e) {
             e.printStackTrace();
         }
         List<double[]> avgNumQueries = new ArrayList<>(),
                        avgOptionsPerQuery = new ArrayList<>(),
                        avgNumNAQueries = new ArrayList<>(),
+                       avgNumOverlappingAnswers = new ArrayList<>(),
+                       avgNumUnlistedAnswers = new ArrayList<>(),
                        oneBestF1 = new ArrayList<>(),
                        rerankF1 = new ArrayList<>(),
                        oracleF1 = new ArrayList<>(),
@@ -87,6 +89,8 @@ public class CrowdFlowerDataWriterRound2 {
                 avgOptionsPerQuery.add(new double[numRandomSamples]);
                 avgNumQueries.add(new double[numRandomSamples]);
                 avgNumNAQueries.add(new double[numRandomSamples]);
+                avgNumUnlistedAnswers.add(new double[numRandomSamples]);
+                avgNumOverlappingAnswers.add(new double[numRandomSamples]);
                 oneBestF1.add(new double[numRandomSamples]);
                 rerankF1.add(new double[numRandomSamples]);
                 oracleF1.add(new double[numRandomSamples]);
@@ -105,7 +109,9 @@ public class CrowdFlowerDataWriterRound2 {
             int optionCounter = 0;
 
             // Queries that has only one option except for N/A.
-            int numNAQueries = 0;
+            int numNAQueries = 0,
+                numUnlistedAnswers = 0,
+                numOverlappingAnswers = 0;
             List<Integer> annotatedSentences = new ArrayList<>();
             Results rerank = new Results(),
                     oracle = new Results(),
@@ -139,28 +145,49 @@ public class CrowdFlowerDataWriterRound2 {
                         lineCounter ++;
                     }
                 }
-                // Simulation.
+                // Simulation and count.
                 for (GroupedQuery query : queries) {
+                    List<GroupedQuery.AnswerOption> options = query.getAnswerOptions();
+                    int numOptions = options.size();
                     int oracleId = learner.getOracleParseId(sentenceId);
                     Response oracleResponse = new Response();
+                    Response goldResponse = goldSimulator.answerQuestion(query);
+                    GroupedQuery.AnswerOption goldOption = options.get(goldResponse.chosenOptions.get(0));
                     boolean oracleIsNA = false;
-                    for (int i = 0; i < query.getAnswerOptions().size(); i++) {
-                        GroupedQuery.AnswerOption option = query.getAnswerOptions().get(i);
+                    boolean goldIsNA = GroupedQuery.BadQuestionOption.class.isInstance(goldOption);
+                    boolean goldIsUnlistedAnswer = GroupedQuery.NoAnswerOption.class.isInstance(goldOption);
+                    boolean hasOverlappingAnswers = false;
+                    for (int i = 0; i < numOptions; i++) {
+                        GroupedQuery.AnswerOption option = options.get(i);
                         if (option.getParseIds().contains(oracleId)) {
                             oracleResponse.add(i);
                             if (GroupedQuery.BadQuestionOption.class.isInstance(option)) {
                                 oracleIsNA = true;
                             }
                         }
+                        for (int j = 0; j < numOptions; j++) {
+                            GroupedQuery.AnswerOption option2 = options.get(j);
+                            if (i != j && option2.getAnswer().contains(option.getAnswer())) {
+                                hasOverlappingAnswers = true;
+                            }
+                        }
                     }
-                    if (oracleIsNA) {
+                    if (goldIsNA && oracleIsNA) {
                         numNAQueries++;
                     }
-                    if (r == 0 && lineCounter < 100 && oracleIsNA) {
+                    if (goldIsUnlistedAnswer) {
+                        numUnlistedAnswers ++;
+                    }
+                    if (hasOverlappingAnswers) {
+                        numOverlappingAnswers ++;
+                    }
+                    if (r == 0 && lineCounter < 100) {
                         System.out.println("OracleID=" + learner.getOracleParseId(sentenceId));
-                        System.out.println(query.getDebuggingInfo(oracleResponse));
+                        //System.out.println(query.getDebuggingInfo(oracleResponse));
+                        System.out.println(query.getDebuggingInfo(goldResponse) + goldResponse.debugInfo);
                     }
                     learner.receiveObservationForQuery(query, oracleResponse);
+                    //learner.receiveObservationForQuery(query, goldResponse);
                     optionCounter += query.getAnswerOptions().size();
                 }
                 queryCounter += queries.size();
@@ -173,6 +200,8 @@ public class CrowdFlowerDataWriterRound2 {
                     int k = annotatedSentences.size() / countEvery - 1;
                     avgNumQueries.get(k)[r] = queryCounter;
                     avgNumNAQueries.get(k)[r] = numNAQueries;
+                    avgNumUnlistedAnswers.get(k)[r] = numUnlistedAnswers;
+                    avgNumOverlappingAnswers.get(k)[r] = numOverlappingAnswers;
                     avgOptionsPerQuery.get(k)[r] = 1.0 * optionCounter / queryCounter;
                     oneBestF1.get(k)[r] = 100.0 * oneBest.getF1();
                     rerankF1.get(k)[r]  = 100.0 * rerank.getF1();
@@ -188,6 +217,10 @@ public class CrowdFlowerDataWriterRound2 {
                     getAverage(avgNumQueries.get(k)), getStd(avgNumQueries.get(k))));
             System.out.println(String.format("Avg. number of N/A queries:\t%.3f (%.3f)",
                     getAverage(avgNumNAQueries.get(k)), getStd(avgNumNAQueries.get(k))));
+            System.out.println(String.format("Avg. number of queries with gold unlisted answers:\t%.3f (%.3f)",
+                    getAverage(avgNumUnlistedAnswers.get(k)), getStd(avgNumUnlistedAnswers.get(k))));
+            System.out.println(String.format("Avg. number of queries with overlapping answers:\t%.3f (%.3f)",
+                    getAverage(avgNumOverlappingAnswers.get(k)), getStd(avgNumOverlappingAnswers.get(k))));
             System.out.println(String.format("Percentage of N/A queries:\t%.3f%%",
                     100.0 * getAverage(avgNumNAQueries.get(k)) / getAverage(avgNumQueries.get(k))));
             System.out.println(String.format("Avg. number of options per query:\t%.3f (%.3f)",
@@ -239,7 +272,13 @@ public class CrowdFlowerDataWriterRound2 {
                 })
                 .forEach(agreedAnnotations::add);
         cfRound1Annotations.stream()
-                .filter(a -> a.answerDist[a.goldAnswerId] >= 4)
+                .filter(a -> {
+                    boolean highAgreement = false;
+                    for (int i = 0; i < a.answerDist.length; i++) {
+                        highAgreement |= (a.answerDist[i] >= 4);
+                    }
+                    return highAgreement;
+                })
                 .forEach(agreedAnnotations::add);
         System.out.println("Number of held-out sentences:\t" + heldOutSentences.size());
         System.out.println("Number of high-agreement annotations:\t" + agreedAnnotations.size());
@@ -269,12 +308,11 @@ public class CrowdFlowerDataWriterRound2 {
             List<GroupedQuery> queries = getQueries(learner);
             for (GroupedQuery query : queries) {
                 if (query.getPredicateIndex() == test.predicateId &&
-                        // Surface match.
                         query.getQuestion().equalsIgnoreCase(test.question)) {
                     Response gold = goldSimulator.answerQuestion(query);
                     int goldAnswerId = gold.chosenOptions.get(0);
                     GroupedQuery.AnswerOption goldOption = query.getAnswerOptions().get(goldAnswerId);
-                    boolean agreedMatchesGold = goldOption.getAnswer().equals(agreedAnswer) ||
+                    boolean agreedMatchesGold = goldOption.getAnswer().equalsIgnoreCase(agreedAnswer) ||
                             (GroupedQuery.BadQuestionOption.class.isInstance(goldOption) &&
                                     agreedAnswer.startsWith("Question is not"));
                     if (agreedMatchesGold) {
@@ -282,7 +320,7 @@ public class CrowdFlowerDataWriterRound2 {
                                 csvPrinter);
                         numTestQuestions ++;
                     } else {
-                        System.err.println(test.toString() + "\n---\n" + query.getDebuggingInfo(new Response(-1)));
+                        System.err.println(test.toString() + "---\n" + query.getDebuggingInfo(gold) + gold.debugInfo);
                     }
                 }
             }

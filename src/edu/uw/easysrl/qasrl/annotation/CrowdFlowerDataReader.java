@@ -14,6 +14,8 @@ import java.util.*;
  */
 public class CrowdFlowerDataReader {
 
+    private static int maxNumAnnotators = 10;
+
     public static List<AlignedAnnotation> readAggregatedAnnotationFromFile(String filePath) throws IOException {
         FileReader fileReader = new FileReader(filePath);
         Iterable<CSVRecord> records = CSVFormat.DEFAULT.withHeader().parse(fileReader);
@@ -67,7 +69,7 @@ public class CrowdFlowerDataReader {
         // Align annotations.
         List<AlignedAnnotation> alignedAnnotations = AlignedAnnotation.getAlignedAnnotations(annotations);
         System.out.println("Getting " + alignedAnnotations.size() + " aligned annotations.");
-        int[] agreementCount = new int[6];
+        int[] agreementCount = new int[maxNumAnnotators];
         Arrays.fill(agreementCount, 0);
         alignedAnnotations.forEach(annotation -> {
             if (annotation.getNumAnnotated() > 5) {
@@ -84,7 +86,7 @@ public class CrowdFlowerDataReader {
             System.out.println(i + "\t" + agreementCount[i] + "\t" + 100.0 * agreementCount[i] / alignedAnnotations.size());
         }
 
-        double[] iaa = computeAgreement(alignedAnnotations, 6 /* number of judgements per row */);
+        double[] iaa = computeAgreement(alignedAnnotations, maxNumAnnotators);
         InterAnnotatorAgreement.printKappa(iaa);
         return alignedAnnotations;
     }
