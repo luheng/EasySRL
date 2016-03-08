@@ -33,9 +33,8 @@ public class SimulatedExperimentPOMDP {
     static final int[] trials = new int[] { 0 };
     static final int numRandomRuns = 1;
 
-    static final boolean useObservationModel = false;
-    static final boolean skipPPQuestions = true;
-    static final double minResponseTrust = 2.5;
+    static final boolean useObservationModel = false;;
+    static final double minResponseTrust = 3.0;
 
     private static final int maxNumOptionsPerQuestion = 6;
     static {
@@ -107,14 +106,17 @@ public class SimulatedExperimentPOMDP {
                 Response userResponse = userModel.answerQuestion(action.get());
                 Response goldResponse = goldModel.answerQuestion(action.get());
                 Category category = action.get().getCategory();
-                if (skipPPQuestions && (category == PPAttachment.nounAdjunct || category == PPAttachment.verbAdjunct
-                        || category == Category.valueOf("((S\\NP)\\(S\\NP))/S[dcl]"))) {
+                // Skip PP
+                if (categoriesToFilter.contains(category)) {
                     continue;
                 }
-                numCoreQuestions ++;
+                // Skip low agreement.
                 if (userResponse.trust < minResponseTrust) {
                     continue;
                 }
+                // Skip pronoun ones.
+
+                numCoreQuestions ++;
 
                 boolean matchesGold = userResponse.chosenOptions.size() > 0 &&
                         (userResponse.chosenOptions.get(0).intValue() == goldResponse.chosenOptions.get(0).intValue());

@@ -1,10 +1,14 @@
 package edu.uw.easysrl.qasrl.pomdp;
 
+import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
+import edu.uw.easysrl.qasrl.qg.QuestionAnswerPairReduced;
+import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
+import jdk.nashorn.internal.ir.annotations.Immutable;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -191,6 +195,62 @@ public class POMDP {
 
     public void receiveObservationForQuery(GroupedQuery query, Response response) {
         beliefModel.update(observationModel, query, response);
+    }
+
+    /**
+     * Hacky method before trying out new soft re-ranker.
+     */
+    public void receiveObservationForQueryNoNA(GroupedQuery query, Response response) {
+        int optionId = response.chosenOptions.get(0);
+        GroupedQuery.AnswerOption option = query.getAnswerOptions().get(optionId);
+        // Do normal update.
+        if (GroupedQuery.BadQuestionOption.class.isInstance(option)) {
+            beliefModel.update(observationModel, query, response);
+            return;
+        }
+        Set<Integer> parsesToReward = new HashSet<>(option.getParseIds());
+        // Redistributed the NA parseIds.
+        GroupedQuery.AnswerOption badQuestionOption = query.getAnswerOptions().stream()
+                .filter(GroupedQuery.BadQuestionOption.class::isInstance)
+                .findAny().get();
+        final int sentId = query.getSentenceId();
+        final int predHead = query.getPredicateIndex();
+        final Category category0 = query.getCategory();
+        final int argNum0 = query.getArgNum();
+        for (int parseId : badQuestionOption.getParseIds()) {
+            int mappedOption = -1;
+            final Parse parse = allParses.get(sentId).get(parseId);
+            final Category category = parse.categories.get(predHead);
+            for (int i = 1; i <= category.getNumberOfArguments(); i++) {
+                final int argNum = i; // for lambda.
+                Set<ResolvedDependency> deps = parse.dependencies.stream()
+                        .filter(dep -> dep.getHead() == predHead && dep.getArgNumber() == argNum)
+                        .collect(Collectors.toSet());
+                List<Integer> argList = deps.stream()
+                        .map(ResolvedDependency::getArgument)
+                        .distinct().sorted().collect(Collectors.toList());
+                for (int opId = 0; opId < query.getAnswerOptions().size(); opId++) {
+                    GroupedQuery.AnswerOption op = query.getAnswerOptions().get(opId);
+                    List<Integer> argList0 = op.getArgumentIds();
+                    if (argList0 != null && argList0.containsAll(argList) && argList.containsAll(argList0)) {
+                        mappedOption = opId;
+                        if (argNum > 1) {
+                            //System.err.println(category0 + "." + argNum0 + "\t" + category + "." + argNum + "\t"
+                            //        + query.getAnswerOptions().get(opId).getAnswer());
+                            //System.err.println(query.getDebuggingInfo(new Response(-1)));
+                        }
+                    }
+                }
+            }
+            if (mappedOption == optionId) {
+                parsesToReward.add(parseId);
+            }
+        }
+        for (int i = 0; i < beliefModel.belief.length; i++) {
+            double p = observationModel.getNoiselessObservationProbability(query, parsesToReward.contains(i));
+            beliefModel.belief[i] = beliefModel.belief[i] * p + beliefModel.prior[i] * BeliefModel.smoothing;
+        }
+        beliefModel.normalize();
     }
 
     public List<String> getSentenceById(int sentenceId) {

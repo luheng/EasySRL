@@ -2,7 +2,6 @@ package edu.uw.easysrl.qasrl.pomdp;
 
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.analysis.PPAttachment;
-import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.HashSet;
 import java.util.List;
@@ -111,6 +110,12 @@ public class ObservationModel {
         }
     }
 
+    public double getNoiselessObservationProbability(GroupedQuery query, boolean userCorrect) {
+        int K = query.getAnswerOptions().size() - 1;
+        return userCorrect ? 1.0 - fixedErrorRate : fixedErrorRate / K;
+
+    }
+
     /**
      * Compute p(observation | action, state)
      * @param query
@@ -124,8 +129,7 @@ public class ObservationModel {
         GroupedQuery.AnswerOption userOption = query.getAnswerOptions().get(user);
         if (observation == null) {
             boolean userCorrect = query.getAnswerOptions().get(user).getParseIds().contains(parseId);
-            int K = query.getAnswerOptions().size() - 1;
-            return userCorrect ? 1.0 - fixedErrorRate : fixedErrorRate / K;
+            return getNoiselessObservationProbability(query, userCorrect);
         } else {
             boolean isAdjunct = (query.getCategory() == PPAttachment.verbAdjunct
                     || query.getCategory() == PPAttachment.nounAdjunct);

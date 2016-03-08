@@ -13,7 +13,7 @@ public class BeliefModel {
     // Distribution over parses.
     List<Parse> parses;
     public double[] belief;
-    private double[] prior;
+    public double[] prior;
     public static final double epsilon = 1e-6;
     public static final double smoothing = 1e-5 ;
 

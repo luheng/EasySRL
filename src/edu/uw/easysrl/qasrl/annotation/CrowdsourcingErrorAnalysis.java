@@ -37,18 +37,10 @@ public class CrowdsourcingErrorAnalysis {
     private static final String annotationFilePath = "./Crowdflower_data/f882410.csv";
 
     static Accuracy answerAcc = new Accuracy();
-    static int numUnmatchedQuestions = 0, numMatchedQuestions = 0;
+    static int numUnmatchedQuestions = 0, numMatchedQuestions = 0, numPronounQuestions = 0;
 
-    static final int minAgreement = 3;
+    static final int minAgreement = 4;
     static final boolean skipPronouns = true;
-
-    static Set<Category> categoriesToFilter = new HashSet<>();
-    static {
-        Collections.addAll(categoriesToFilter,
-                PPAttachment.nounAdjunct,
-                PPAttachment.verbAdjunct,
-                Category.valueOf("((S\\NP)\\(S\\NP))/S[dcl]"));
-    }
 
     public static void main(String[] args) {
         Map<Integer, List<AlignedAnnotation>> annotations = loadData(annotationFilePath);
@@ -99,10 +91,10 @@ public class CrowdsourcingErrorAnalysis {
                 if (annotation == null) {
                     continue;
                 }
-                if (categoriesToFilter.contains(query.getCategory())) {
+                if (QualityControl.categoriesToFilter.contains(query.getCategory())) {
                     continue;
                 }
-                int[] optionDist = getUserResponses(query, annotation);
+                int[] optionDist = QualityControl.getUserResponses(query, annotation);
                 Set<Integer> unmatched = getUnmatchedAnnotationOptions(query, annotation);
                 int goldOption  = goldSimulator.answerQuestion(query).chosenOptions.get(0);
                 Results baselineF1 = learner.getOneBestF1(sentenceId);
@@ -209,39 +201,19 @@ public class CrowdsourcingErrorAnalysis {
                     continue;
                 }
                 if (queryCount == 0) {
-                    /*
-                    for (int i = 0; i < learner.beliefModel.belief.length; i++) {
+                    /* for (int i = 0; i < learner.beliefModel.belief.length; i++) {
                         System.out.print(learner.beliefModel.belief[i] * 100 + "\t");
                     }
-                    System.out.println("\n");
-                    */
+                    System.out.println("\n"); */
                     queryCount ++;
                 }
 
-                int[] optionDist = getUserResponses(query, annotation);
+                int[] optionDist = QualityControl.getUserResponses(query, annotation);
+                int agreement = QualityControl.getAgreementNumber(query, annotation);
                 Set<Integer> unmatched = getUnmatchedAnnotationOptions(query, annotation);
                 int goldOption = goldSimulator.answerQuestion(query).chosenOptions.get(0);
 
-                boolean unanimous = false;
-                boolean optionContainsPronoun = false;
-                for (int i = 0; i < optionDist.length; i++) {
-                    if (optionDist[i] >= minAgreement) {
-                        unanimous = true;
-                    }
-                    for (String span : query.getAnswerOptions().get(i).getAnswer().split(
-                            QuestionAnswerPair.answerDelimiter)) {
-                        if (PronounList.englishPronounSet.contains(span.toLowerCase())) {
-                            optionContainsPronoun = true;
-                            System.err.println(query.getDebuggingInfo(new Response(-1)));
-                        }
-                    }
-                }
-
                 Category category = query.getCategory();
-                if (!unanimous || (skipPronouns && optionContainsPronoun) || categoriesToFilter.contains(category)) {
-                    continue;
-                }
-
                 Results[] rerankedF1 = new Results[optionDist.length];
                 int oracleParseId = learner.getOracleParseId(sentenceId);
                 int oracleOption = -1;
@@ -261,22 +233,33 @@ public class CrowdsourcingErrorAnalysis {
                 if (userOption < 0) {
                     userOption = oneBestOption;
                 }
+
+                // Update probability distribution.
                 query.computeProbabilities(learner.beliefModel.belief);
-                /* if (query.getAnswerOptions().get(userOption).getProbability() < 0.3) {
+                /*if (query.getAnswerOptions().get(userOption).getProbability() < 0.1) {
                     continue;
                 }*/
-                learner.receiveObservationForQuery(query, new Response(userOption));
+                if (agreement < minAgreement || QualityControl.categoriesToFilter.contains(category)) {
+                    continue;
+                }
+                if (skipPronouns && QualityControl.queryContainsPronoun(query)) {
+                    // TODO: Still, see what people choose.
+                    // System.err.println(query.getDebuggingInfo(new Response(userOption)));
+                    numPronounQuestions ++;
+                    continue;
+                }
+
+                //learner.receiveObservationForQuery(query, new Response(userOption));
+                learner.receiveObservationForQueryNoNA(query, new Response(userOption));
                 rerankedF1[userOption] = learner.getRerankedF1(sentenceId);
 
                 // Incorporate all answers.
-                /*
-                for (int j = 0; j < optionDist.length; j++) {
+                /*for (int j = 0; j < optionDist.length; j++) {
                     for (int k = 0; k < optionDist[j]; k++) {
                         learner.receiveObservationForQuery(query, new Response(j));
                     }
                     rerankedF1[j] = learner.getRerankedF1(sentenceId);
-                }
-                */
+                }*/
 
                 // Print.
                 String sentenceStr = query.getSentence().stream().collect(Collectors.joining(" "));
@@ -359,28 +342,10 @@ public class CrowdsourcingErrorAnalysis {
         System.out.println("Baseline:\n" + avgBaseline + "\nRerank:\n" + avgRerank);
         System.out.println("Num improved:\t" + numImprovedSentences + "\nNum worsened:\t" + numWorsenedSentences +
                 "\nNum unchanged:\t" + numUnchangedSentences);
+        System.out.println("Number of pronoun questions:\t" + numPronounQuestions);
         debugging.stream().sorted((b1, b2) ->
             Double.compare(b1.F1, b2.F1)
         ).forEach(b -> System.out.println(b.block));
-    }
-
-    private static int[] getUserResponses(GroupedQuery query, AlignedAnnotation annotation) {
-        String qkey =query.getPredicateIndex() + "\t" + query.getQuestion();
-        int numOptions = query.getAnswerOptions().size();
-        int[] optionDist = new int[numOptions];
-        Arrays.fill(optionDist, 0);
-        String qkey2 = annotation.predicateId + "\t" + annotation.question;
-        if (qkey.equals(qkey2)) {
-            for (int i = 0; i < numOptions; i++) {
-                for (int j = 0; j < annotation.answerOptions.size(); j++) {
-                    if (query.getAnswerOptions().get(i).getAnswer().equals(annotation.answerStrings.get(j))) {
-                        optionDist[i] += annotation.answerDist[j];
-                        break;
-                    }
-                }
-            }
-        }
-        return optionDist;
     }
 
     private static AlignedAnnotation getAlignedAnnotation(GroupedQuery query, List<AlignedAnnotation> annotations) {
