@@ -33,15 +33,17 @@ public class SimulatedExperimentPOMDP {
     static final int[] trials = new int[] { 0 };
     static final int numRandomRuns = 1;
 
-    static final boolean useObservationModel = false;;
-    static final double minResponseTrust = 3.0;
+    static final boolean useObservationModel = false;
+    static final double minResponseTrust = 3.5;
 
     private static final int maxNumOptionsPerQuestion = 6;
     static {
         GroupedQuery.maxNumNonNAOptionsPerQuery = maxNumOptionsPerQuestion - 2;
     }
-    //private static final String annotationFilePath = "./Crowdflower_data/f878213.csv";
-    private static final String annotationFilePath = "./Crowdflower_data/f882410.csv";
+    private static final String[] annotationFiles = {
+            "./Crowdflower_data/f878213.csv",
+            "./Crowdflower_data/f882410.csv"
+    };
 
     // Shared data
     static POMDP baseLeaner;
@@ -79,7 +81,10 @@ public class SimulatedExperimentPOMDP {
         int numUnmatchedQuestions = 0,
             numMatchedQuestions = 0,
             numAffectedSentences = 0,
-            numCoreQuestions = 0;
+            numCoreQuestions = 0,
+            numImprovedSentences = 0,
+            numWorsenedSentences = 0,
+            numUnchangedSentences = 0;
 
         if (useObservationModel) {
             Map<Integer, Integer> oracleIds = new HashMap<>();
@@ -105,9 +110,10 @@ public class SimulatedExperimentPOMDP {
             while ((action = learner.generateAction()).isPresent()) {
                 Response userResponse = userModel.answerQuestion(action.get());
                 Response goldResponse = goldModel.answerQuestion(action.get());
-                Category category = action.get().getCategory();
+                GroupedQuery query = action.get();
+                Category category = query.getCategory();
                 // Skip PP
-                if (categoriesToFilter.contains(category)) {
+                if (QualityControl.categoriesToFilter.contains(category)) {
                     continue;
                 }
                 // Skip low agreement.
@@ -115,9 +121,10 @@ public class SimulatedExperimentPOMDP {
                     continue;
                 }
                 // Skip pronoun ones.
-
+                if (QualityControl.queryContainsPronoun(query)) {
+                    continue;
+                }
                 numCoreQuestions ++;
-
                 boolean matchesGold = userResponse.chosenOptions.size() > 0 &&
                         (userResponse.chosenOptions.get(0).intValue() == goldResponse.chosenOptions.get(0).intValue());
                 if (userResponse.chosenOptions.size() == 0) {
@@ -125,7 +132,7 @@ public class SimulatedExperimentPOMDP {
                 } else {
                     numMatchedQuestions ++;
                     answerAcc.add(matchesGold);
-                    learner.receiveObservation(userResponse);
+                    learner.receiveObservationForQueryNoNA(query, userResponse);
                     usedQuery = true;
                     /* if (!matchesGold) {
                         System.out.println(query.getDebuggingInfo(userResponse, goldResponse) + "\n");
@@ -136,8 +143,17 @@ public class SimulatedExperimentPOMDP {
             oracle.add(learner.getOracleF1(sentenceId));
             onebest.add(learner.getOneBestF1(sentenceId));
             if (usedQuery) {
-                rerank2.add(learner.getRerankedF1(sentenceId));
-                onebest2.add(learner.getOneBestF1(sentenceId));
+                Results before = learner.getOneBestF1(sentenceId);
+                Results after = learner.getRerankedF1(sentenceId);
+                onebest2.add(before);
+                rerank2.add(after);
+                if (before.getF1() < after.getF1() - 1e-6) {
+                    numImprovedSentences ++;
+                } else if (before.getF1() > after.getF1() + 1e-6) {
+                    numWorsenedSentences ++;
+                } else {
+                    numUnchangedSentences ++;
+                }
                 numAffectedSentences ++;
             }
         }
@@ -149,6 +165,9 @@ public class SimulatedExperimentPOMDP {
         System.out.println("rerank:\t" + rerank);
         System.out.println("rerank2:\t" + rerank2);
         System.out.println("oracle:\t" + oracle);
+        System.out.println("Num improved:\t" + numImprovedSentences +
+                "\nNum worsened:\t" + numWorsenedSentences +
+                "\nNum unchanged:\t" + numUnchangedSentences);
 
         int last = rerankF1.size() - 1;
         rerankF1.get(last).add(rerank.getF1());
@@ -166,8 +185,11 @@ public class SimulatedExperimentPOMDP {
     public static void main(String[] args) throws IOException {
         // Read annotations.
         baseLeaner = new POMDP(nBest, horizon, moneyPenalty);
+        annotations = new ArrayList<>();
         try {
-            annotations = CrowdFlowerDataReader.readAggregatedAnnotationFromFile(annotationFilePath);
+            for (String filePath : annotationFiles) {
+                annotations.addAll(CrowdFlowerDataReader.readAggregatedAnnotationFromFile(filePath));
+            }
         } catch (IOException e) {
             e.printStackTrace();
             return;

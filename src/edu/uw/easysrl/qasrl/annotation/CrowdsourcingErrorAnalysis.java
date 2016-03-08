@@ -39,7 +39,7 @@ public class CrowdsourcingErrorAnalysis {
     static Accuracy answerAcc = new Accuracy();
     static int numUnmatchedQuestions = 0, numMatchedQuestions = 0, numPronounQuestions = 0;
 
-    static final int minAgreement = 4;
+    static final int minAgreement = 3;
     static final boolean skipPronouns = true;
 
     public static void main(String[] args) {
@@ -249,14 +249,14 @@ public class CrowdsourcingErrorAnalysis {
                     continue;
                 }
 
-                //learner.receiveObservationForQuery(query, new Response(userOption));
                 learner.receiveObservationForQueryNoNA(query, new Response(userOption));
                 rerankedF1[userOption] = learner.getRerankedF1(sentenceId);
 
                 // Incorporate all answers.
-                /*for (int j = 0; j < optionDist.length; j++) {
+                /*
+                for (int j = 0; j < optionDist.length; j++) {
                     for (int k = 0; k < optionDist[j]; k++) {
-                        learner.receiveObservationForQuery(query, new Response(j));
+                        learner.receiveObservationForQueryNoNA(query, new Response(j));
                     }
                     rerankedF1[j] = learner.getRerankedF1(sentenceId);
                 }*/
