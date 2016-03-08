@@ -4,7 +4,9 @@ import com.google.common.base.Strings;
 import edu.uw.easysrl.corpora.ParallelCorpusReader;
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.analysis.PPAttachment;
+import edu.uw.easysrl.qasrl.corpora.PronounList;
 import edu.uw.easysrl.qasrl.pomdp.POMDP;
+import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
@@ -22,10 +24,31 @@ public class CrowdsourcingErrorAnalysis {
     static {
         GroupedQuery.maxNumNonNAOptionsPerQuery = maxNumOptionsPerQuestion - 2;
     }
-    private static final String annotationFilePath = "./Crowdflower_data/f878213.csv";
+
+    // Query pruning parameters.
+    private static QueryPruningParameters queryPruningParameters = new QueryPruningParameters(
+            1,    /* top K */
+            0.1,  /* min question confidence */
+            0.1,  /* min answer confidence */
+            0.05  /* min attachment entropy */
+    );
+
+    //private static final String annotationFilePath = "./Crowdflower_data/f878213.csv";
+    private static final String annotationFilePath = "./Crowdflower_data/f882410.csv";
 
     static Accuracy answerAcc = new Accuracy();
     static int numUnmatchedQuestions = 0, numMatchedQuestions = 0;
+
+    static final int minAgreement = 3;
+    static final boolean skipPronouns = true;
+
+    static Set<Category> categoriesToFilter = new HashSet<>();
+    static {
+        Collections.addAll(categoriesToFilter,
+                PPAttachment.nounAdjunct,
+                PPAttachment.verbAdjunct,
+                Category.valueOf("((S\\NP)\\(S\\NP))/S[dcl]"));
+    }
 
     public static void main(String[] args) {
         Map<Integer, List<AlignedAnnotation>> annotations = loadData(annotationFilePath);
@@ -64,12 +87,19 @@ public class CrowdsourcingErrorAnalysis {
         // Learn a observation model.
         POMDP learner = new POMDP(nBest, 1000, 0.0);
         ResponseSimulator goldSimulator = new ResponseSimulatorGold(learner.goldParses, new QuestionGenerator());
+        int numWorsenedSentences = 0,
+            numUnchangedSentences = 0,
+            numImprovedSentences = 0;
+
         for (int sentenceId : sentenceIds) {
             learner.initializeForSentence(sentenceId, annotations.get(sentenceId));
             final List<GroupedQuery> queries = learner.getQueryPool();
             for (GroupedQuery query : queries) {
                 AlignedAnnotation annotation = getAlignedAnnotation(query, annotations.get(sentenceId));
                 if (annotation == null) {
+                    continue;
+                }
+                if (categoriesToFilter.contains(query.getCategory())) {
                     continue;
                 }
                 int[] optionDist = getUserResponses(query, annotation);
@@ -117,8 +147,12 @@ public class CrowdsourcingErrorAnalysis {
                     String improvement = " ";
                     if (rerankedF1[j].getF1() < baselineF1.getF1() - 1e-8) {
                         improvement = "[-]";
+                        numWorsenedSentences ++;
                     } else if (rerankedF1[j].getF1() > baselineF1.getF1() + 1e-8) {
                         improvement = "[+]";
+                        numImprovedSentences ++;
+                    } else {
+                        numUnchangedSentences ++;
                     }
                     GroupedQuery.AnswerOption option = query.getAnswerOptions().get(j);
                     result += String.format("%-8s\t%.3f\t%-40s\t%.3f%%\t%s\n", match, option.getProbability(),
@@ -152,9 +186,13 @@ public class CrowdsourcingErrorAnalysis {
 
         Results avgBaseline = new Results(),
                 avgRerank = new Results();
+        int numWorsenedSentences = 0,
+            numUnchangedSentences = 0,
+            numImprovedSentences = 0;
 
         // Learn a observation model.
         POMDP learner = new POMDP(nBest, 1000, 0.0);
+        learner.setQueryPruningParameters(queryPruningParameters);
         ResponseSimulator goldSimulator = new ResponseSimulatorGold(learner.goldParses, new QuestionGenerator());
         List<DebugBlock> debugging = new ArrayList<>();
         for (int sentenceId : sentenceIds) {
@@ -167,11 +205,9 @@ public class CrowdsourcingErrorAnalysis {
             String sentenceDebuggingString = "";
             for (GroupedQuery query : queries) {
                 AlignedAnnotation annotation = getAlignedAnnotation(query, annotations.get(sentenceId));
-
                 if (annotation == null) {
                     continue;
                 }
-
                 if (queryCount == 0) {
                     /*
                     for (int i = 0; i < learner.beliefModel.belief.length; i++) {
@@ -187,13 +223,22 @@ public class CrowdsourcingErrorAnalysis {
                 int goldOption = goldSimulator.answerQuestion(query).chosenOptions.get(0);
 
                 boolean unanimous = false;
+                boolean optionContainsPronoun = false;
                 for (int i = 0; i < optionDist.length; i++) {
-                    if (optionDist[i] >= 5) {
+                    if (optionDist[i] >= minAgreement) {
                         unanimous = true;
                     }
+                    for (String span : query.getAnswerOptions().get(i).getAnswer().split(
+                            QuestionAnswerPair.answerDelimiter)) {
+                        if (PronounList.englishPronounSet.contains(span.toLowerCase())) {
+                            optionContainsPronoun = true;
+                            System.err.println(query.getDebuggingInfo(new Response(-1)));
+                        }
+                    }
                 }
+
                 Category category = query.getCategory();
-                if (!unanimous || (category == PPAttachment.nounAdjunct || category == PPAttachment.verbAdjunct)) {
+                if (!unanimous || (skipPronouns && optionContainsPronoun) || categoriesToFilter.contains(category)) {
                     continue;
                 }
 
@@ -217,6 +262,9 @@ public class CrowdsourcingErrorAnalysis {
                     userOption = oneBestOption;
                 }
                 query.computeProbabilities(learner.beliefModel.belief);
+                /* if (query.getAnswerOptions().get(userOption).getProbability() < 0.3) {
+                    continue;
+                }*/
                 learner.receiveObservationForQuery(query, new Response(userOption));
                 rerankedF1[userOption] = learner.getRerankedF1(sentenceId);
 
@@ -259,8 +307,12 @@ public class CrowdsourcingErrorAnalysis {
                     if (rerankedF1[j] != null) {
                         if (rerankedF1[j].getF1() < currentF1.getF1() - 1e-8) {
                             improvement = "[-]";
+                            numWorsenedSentences ++;
                         } else if (rerankedF1[j].getF1() > currentF1.getF1() + 1e-8) {
                             improvement = "[+]";
+                            numImprovedSentences ++;
+                        } else {
+                            numUnchangedSentences ++;
                         }
                     }
                     GroupedQuery.AnswerOption option = query.getAnswerOptions().get(j);
@@ -305,6 +357,8 @@ public class CrowdsourcingErrorAnalysis {
             }
         }
         System.out.println("Baseline:\n" + avgBaseline + "\nRerank:\n" + avgRerank);
+        System.out.println("Num improved:\t" + numImprovedSentences + "\nNum worsened:\t" + numWorsenedSentences +
+                "\nNum unchanged:\t" + numUnchangedSentences);
         debugging.stream().sorted((b1, b2) ->
             Double.compare(b1.F1, b2.F1)
         ).forEach(b -> System.out.println(b.block));

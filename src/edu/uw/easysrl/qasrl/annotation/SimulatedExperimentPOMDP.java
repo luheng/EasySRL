@@ -21,6 +21,13 @@ public class SimulatedExperimentPOMDP {
     static final int horizon = 1000;
     static final double moneyPenalty = 0.1;
 
+    // Query pruning parameters.
+    private static QueryPruningParameters queryPruningParameters = new QueryPruningParameters(
+            1,    /* top K */
+            0.1,  /* min question confidence */
+            0.05, /* min answer confidence */
+            0.05  /* min attachment entropy */
+    );
 
     //static final int[] trials = new int[] {10, 20, 30, 40, 50 };
     static final int[] trials = new int[] { 0 };
@@ -28,7 +35,7 @@ public class SimulatedExperimentPOMDP {
 
     static final boolean useObservationModel = false;
     static final boolean skipPPQuestions = true;
-    static final double minResponseTrust = 4.0;
+    static final double minResponseTrust = 2.5;
 
     private static final int maxNumOptionsPerQuestion = 6;
     static {
@@ -46,6 +53,7 @@ public class SimulatedExperimentPOMDP {
     private static void runExperiment(int numTrainingSentences) {
         // Learn a observation model.
         POMDP qgen = new POMDP(baseLeaner);
+        qgen.setQueryPruningParameters(queryPruningParameters);
         ResponseSimulator userModel = new ResponseSimulatorRecorded(annotations);
         ResponseSimulator goldModel = new ResponseSimulatorGold(qgen.goldParses, new QuestionGenerator(),
                 false /* allow label match */);
@@ -67,6 +75,7 @@ public class SimulatedExperimentPOMDP {
         }
 
         POMDP learner = new POMDP(baseLeaner);
+        qgen.setQueryPruningParameters(queryPruningParameters);
         Accuracy answerAcc = new Accuracy();
         int numUnmatchedQuestions = 0,
             numMatchedQuestions = 0,
@@ -98,7 +107,8 @@ public class SimulatedExperimentPOMDP {
                 Response userResponse = userModel.answerQuestion(action.get());
                 Response goldResponse = goldModel.answerQuestion(action.get());
                 Category category = action.get().getCategory();
-                if (skipPPQuestions && (category == PPAttachment.nounAdjunct || category == PPAttachment.verbAdjunct)) {
+                if (skipPPQuestions && (category == PPAttachment.nounAdjunct || category == PPAttachment.verbAdjunct
+                        || category == Category.valueOf("((S\\NP)\\(S\\NP))/S[dcl]"))) {
                     continue;
                 }
                 numCoreQuestions ++;
@@ -133,7 +143,7 @@ public class SimulatedExperimentPOMDP {
         System.out.println("Num. affected sentences:\t" + numAffectedSentences);
         System.out.println("Num. core questions:\t" + numCoreQuestions);
         System.out.println("onebest:\t" + onebest);
-        System.out.println("onebest2:\t" + onebest);
+        System.out.println("onebest2:\t" + onebest2);
         System.out.println("rerank:\t" + rerank);
         System.out.println("rerank2:\t" + rerank2);
         System.out.println("oracle:\t" + oracle);
