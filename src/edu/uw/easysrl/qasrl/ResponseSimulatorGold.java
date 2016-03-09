@@ -89,10 +89,17 @@ public class ResponseSimulatorGold extends ResponseSimulator {
              }
              for (int i = 0; i < query.answerOptions.size(); i++) {
                  GroupedQuery.AnswerOption option = query.answerOptions.get(i);
-                 //if (!option.isNAOption() && option.getAnswer().equals(answerStr)) {
-                 if (!option.isNAOption() && option.getArgumentIds().containsAll(goldArgIds) &&
-                         goldArgIds.containsAll(option.getArgumentIds())) {
-                     response.add(i);
+                 if (!query.allowsMultiple()) {
+                     // Radio button version.
+                     if (!option.isNAOption() && option.getArgumentIds().containsAll(goldArgIds) &&
+                             goldArgIds.containsAll(option.getArgumentIds())) {
+                         response.add(i);
+                     }
+                 } else {
+                     // Checkbox version.
+                     if (!option.isNAOption() && goldArgIds.containsAll(option.getArgumentIds())) {
+                         response.add(i);
+                     }
                  }
              }
              goldAnswer = answerStr;

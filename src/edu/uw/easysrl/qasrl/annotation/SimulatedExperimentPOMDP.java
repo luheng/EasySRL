@@ -1,7 +1,6 @@
 package edu.uw.easysrl.qasrl.annotation;
 
 import edu.uw.easysrl.qasrl.*;
-import edu.uw.easysrl.qasrl.analysis.PPAttachment;
 import edu.uw.easysrl.qasrl.pomdp.ObservationModel;
 import edu.uw.easysrl.qasrl.pomdp.POMDP;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;

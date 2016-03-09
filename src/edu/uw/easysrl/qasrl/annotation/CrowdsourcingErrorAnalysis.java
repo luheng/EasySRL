@@ -33,30 +33,32 @@ public class CrowdsourcingErrorAnalysis {
             0.05  /* min attachment entropy */
     );
 
-    //private static final String annotationFilePath = "./Crowdflower_data/f878213.csv";
-    private static final String annotationFilePath = "./Crowdflower_data/f882410.csv";
+    private static final String[] annotationFiles = {
+            "./Crowdflower_data/f878213.csv",
+            "./Crowdflower_data/f882410.csv"
+    };
 
     static Accuracy answerAcc = new Accuracy();
     static int numUnmatchedQuestions = 0, numMatchedQuestions = 0, numPronounQuestions = 0;
 
-    static final int minAgreement = 3;
+    static final int minAgreement = 4;
     static final boolean skipPronouns = true;
 
     public static void main(String[] args) {
-        Map<Integer, List<AlignedAnnotation>> annotations = loadData(annotationFilePath);
+        Map<Integer, List<AlignedAnnotation>> annotations = loadData(annotationFiles);
         assert annotations != null;
-
-        System.out.println(annotations.keySet().stream().sorted().map(String::valueOf).collect(Collectors.joining(", ")));
 
         //printOneStepAnalysis(annotations);
         printSequentialAnalysis(annotations);
     }
 
-    private static Map<Integer, List<AlignedAnnotation>> loadData(String fileName) {
+    private static Map<Integer, List<AlignedAnnotation>> loadData(String[] fileNames) {
         Map<Integer, List<AlignedAnnotation>> sentenceToAnnotations;
-        List<AlignedAnnotation> annotationList;
+        List<AlignedAnnotation> annotationList = new ArrayList<>();
         try {
-            annotationList = CrowdFlowerDataReader.readAggregatedAnnotationFromFile(fileName);
+            for (String fileName : fileNames) {
+                annotationList.addAll(CrowdFlowerDataReader.readAggregatedAnnotationFromFile(fileName));
+            }
         } catch (IOException e) {
             e.printStackTrace();
             return null;

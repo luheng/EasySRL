@@ -77,6 +77,10 @@ public class GroupedQuery {
     String question;
     List<AnswerOption> answerOptions;
 
+    // Extension: checkboxes and jeopardy styles.
+    private boolean allowsMultiple = false;
+    private boolean isJeopardyStyle = false;
+
     // The probability mass of non-NA options.
     public double questionConfidence, attachmentUncertainty;
     public double answerMargin, answerEntropy, normalizedAnswerEntropy;
@@ -127,14 +131,6 @@ public class GroupedQuery {
             if (q1.category == q2.category && q1.argumentNumber == q2.argumentNumber) {
                 return true;
             }
-            // Fuzzy match.
-            /*
-            int argNum1 = q1.argumentNumber == 1 ? 1 : q1.argumentNumber - q1.category.getNumberOfArguments();
-            int argNum2 = q2.argumentNumber == 1 ? 1 : q2.argumentNumber - q2.category.getNumberOfArguments();
-            if (argNum1 == argNum2 && q1.argumentIds.stream().filter(q2.argumentIds::contains).count() > 0) {
-                return true;
-            }
-            */
         }
         return false;
     }
@@ -173,6 +169,27 @@ public class GroupedQuery {
 
     public void setQueryId(int id) {
         this.queryId = id;
+    }
+
+
+    public static GroupedQuery makeQuery(int sentenceId, List<String> sentence, List<Parse> parses,
+                                         int predicateIndex, Category category, int argumentNumber, String question,
+                                         final Map<String, ImmutableList<Integer>> spanToArgList,
+                                         final Map<String, Set<Integer>> spanToParses,
+                                         boolean allowsMultiple, boolean isJeopardyStyle) {
+        GroupedQuery query = new GroupedQuery(sentenceId, sentence, parses);
+        query.collapse(predicateIndex, category, argumentNumber, question, spanToArgList, spanToParses);
+        query.allowsMultiple = allowsMultiple;
+        query.isJeopardyStyle = isJeopardyStyle;
+        return query;
+    }
+
+    public boolean allowsMultiple() {
+        return allowsMultiple;
+    }
+
+    public boolean isJeopardyStyle() {
+        return isJeopardyStyle;
     }
 
     public int getQueryId() {

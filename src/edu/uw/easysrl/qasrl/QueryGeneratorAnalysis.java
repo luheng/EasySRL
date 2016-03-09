@@ -36,7 +36,6 @@ public class QueryGeneratorAnalysis {
         System.out.println("answer confusion:\t" + avgAnswerConfusion / numSentences);
     }
 
-
     /**
      * @param words the sentence
      * @param parses the nbest list

@@ -108,9 +108,10 @@ public class QueryGenerator {
                             }
                         }
                         System.out.println(entropy);
-                        //if (entropy > minOptionEntropy) {
-                        multiQueryList.add(new MultiQuery.Forward(sentenceId, question, answerToScore.keySet(),
-                                qaStringsToQAPairs, qaStringsToParses));
+                        if (entropy > pruningParams.minAnswerEntropy) {
+                            multiQueryList.add(new MultiQuery.Forward(sentenceId, question, answerToScore.keySet(),
+                                    qaStringsToQAPairs, qaStringsToParses));
+                        }
                     }
                 }
             }
@@ -313,6 +314,88 @@ public class QueryGenerator {
                 System.out.println();
             }
             */
+        }
+        return queryList;
+    }
+
+    public static List<GroupedQuery> getAllGroupedQueriesCheckbox(int sentenceId, final List<String> sentence,
+                                                                  final List<Parse> allParses,
+                                                                  QueryPruningParameters pruningParams) {
+        List<GroupedQuery> queryList = new ArrayList<>();
+        for (int predHead = 0; predHead < sentence.size(); predHead++) {
+            Map<Category, Set<Integer>> taggings = new HashMap<>();
+            for (int parseId = 0; parseId < allParses.size(); parseId ++) {
+                Parse parse = allParses.get(parseId);
+                Category category = parse.categories.get(predHead);
+                if (!taggings.containsKey(category)) {
+                    taggings.put(category, new HashSet<>());
+                }
+                taggings.get(category).add(parseId);
+            }
+            for (Category category : taggings.keySet()) {
+                for (int argNum = 1; argNum <= category.getNumberOfArguments(); argNum++) {
+                    Map<String, Set<Integer>> questionToParseIds = new HashMap<>();
+                    Map<String, Double> questionToScore = new HashMap<>();
+                    Table<ImmutableList<Integer>, String, Set<Integer>> answerToParseIds = HashBasedTable.create();
+                    Table<ImmutableList<Integer>, String, Double> answerToScore = HashBasedTable.create();
+
+                    for (int parseId : taggings.get(category)) {
+                        List<QuestionAnswerPairReduced> qaList = QuestionGenerator.generateAllQAPairs(predHead, argNum,
+                                sentence, allParses.get(parseId));
+
+                        Map<Integer, String> argIdToSpan = new HashMap<>();
+                        qaList.forEach(qa -> argIdToSpan.put(qa.targetDep.getArgument(), qa.renderAnswer()));
+                        List<Integer> argIds = argIdToSpan.keySet().stream().sorted().collect(Collectors.toList());
+                        if (argIds.size() == 0) {
+                            continue;
+                        }
+                        argIdToSpan.entrySet().forEach(e -> {
+                            insertParseId(answerToParseIds, ImmutableList.of(e.getKey()), e.getValue(), parseId);
+                            qaList.forEach(qa -> insertParseId(questionToParseIds, qa.renderQuestion(), parseId));
+                        });
+                    }
+                    // Compute question scores.
+                    populateScores(answerToScore, answerToParseIds, allParses);
+                    populateScores(questionToScore, questionToParseIds, allParses);
+                    // Get most probable answer.
+                    Map<String, Set<Integer>> answerStringToParseIds = new HashMap<>();
+                    Map<String, ImmutableList<Integer>> answerStringToArgIds = new HashMap<>();
+                    Map<String, Double> answerStringToScore = new HashMap<>();
+                    double answerScoreSum = .0,
+                           answerEntropy = .0;
+                    for (ImmutableList<Integer> argList : answerToScore.rowKeySet()) {
+                        String answer = getBestSurfaceForm(answerToScore.row(argList));
+                        double score = answerToScore.row(argList).values().stream().mapToDouble(s -> s).sum();
+                        answerScoreSum += score;
+                        answerStringToScore.put(answer, score);
+                        answerStringToArgIds.put(answer, argList);
+                        answerToParseIds.row(argList).values()
+                                .forEach(parseIds -> parseIds
+                                        .forEach(pid -> insertParseId(answerStringToParseIds, answer, pid)));
+                    }
+                    for (String answer : answerStringToScore.keySet()) {
+                        double p = answerStringToScore.get(answer) / answerScoreSum;
+                        answerEntropy -= (p > 0 ? p * Math.log(p) : 0);
+                    }
+                    // Filter unambiguous attachments.
+                    if (answerStringToScore.size() < 2 || answerEntropy < pruningParams.minAnswerEntropy) {
+                        continue;
+                    }
+                    // Get question surface forms.
+                    List<String> filteredQuestions = questionToScore.entrySet().stream()
+                            .sorted((q1, q2) -> Double.compare(-q1.getValue(), -q2.getValue()))
+                            .filter(q -> q.getValue() > pruningParams.minQuestionConfidence)
+                            .limit(pruningParams.questionSurfaceFormTopK)
+                            .map(Entry::getKey)
+                            .collect(Collectors.toList());
+                    for (String question : filteredQuestions) {
+                        GroupedQuery query = GroupedQuery.makeQuery(sentenceId, sentence, allParses, predHead,
+                                category, argNum, question, answerStringToArgIds, answerStringToParseIds,
+                                true /* allow multiple */, false /* jeopardy style */);
+                        queryList.add(query);
+                    }
+                }
+            }
         }
         return queryList;
     }
