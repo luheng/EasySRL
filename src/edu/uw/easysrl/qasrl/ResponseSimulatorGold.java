@@ -107,7 +107,7 @@ public class ResponseSimulatorGold extends ResponseSimulator {
          }
 
          if (response.chosenOptions.size() == 0) {
-             if (!goldAnswer.isEmpty()) {
+             if (!goldAnswer.isEmpty() && noAnswerOptionId >= 0) {
                  response.add(noAnswerOptionId);
              } else {
                  response.add(badQuestionOptionId);

@@ -1,7 +1,6 @@
 package edu.uw.easysrl.qasrl.annotation;
 
 import edu.uw.easysrl.qasrl.*;
-import edu.uw.easysrl.qasrl.analysis.PPAttachment;
 import edu.uw.easysrl.qasrl.pomdp.POMDP;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
@@ -16,19 +15,22 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Checkbox version of Crowdflower data writer2.
- * Created by luheng on 3/8/16.
+ * For analysis purposes for now.
+ * Created by luheng on 2/9/16.
  */
-public class CrowdFlowerDataWriterCheckbox2 {
+public class CrowdFlowerDataWriterRound3 {
     static final int nBest = 100;
     static final int maxNumSentences = 300;
     static final int maxNumSentencesPerFile = 100;
-    static final int numRandomSamples = 1;
+    static final int numRandomSamples = 1; // 10;
     static final int randomSeed = 104743;
 
     static final int countEvery = 100;
-    //static final boolean skipPPQuestions = false;
+    static final boolean skipPPQuestions = true;
+    static final boolean skipPronounQuestions = false;
     private static boolean highlightPredicate = false;
+    private static int minAgreementForTestQuestions = 4;
+
     // Option pruning.
     private static final int maxNumOptionsPerQuestion = 8;
     static {
@@ -47,11 +49,11 @@ public class CrowdFlowerDataWriterCheckbox2 {
             "query_id", "question_confidence", "question_uncertainty", "sent_id", "sentence", "pred_id", "pred_head",
             "question_key", "question", "answers", "_golden ", "choice_gold", "choice_gold_reason"};
 
-    private static final String answerDelimiter = "\n";
+    private static final String answerDelimiter = " ### ";
 
     private static final String cfRound1AnnotationFilePath = "./Crowdflower_data/f878213.csv";
 
-    private static final String csvOutputFilePrefix = "./Crowdflower_round3/crowdflower_dev_100best";
+    private static final String csvOutputFilePrefix = "./Crowdflower_temp/crowdflower_dev_100best";
 
     // Sentences that happened to appear in instructions ...
     private static final int[] otherHeldOutSentences = { 1695, };
@@ -70,15 +72,17 @@ public class CrowdFlowerDataWriterCheckbox2 {
         }
         List<double[]> avgNumQueries = new ArrayList<>(),
                 avgOptionsPerQuery = new ArrayList<>(),
-                avgNumNAQueries = new ArrayList<>(),
+                avgNumGoldNAQueries = new ArrayList<>(),
                 avgNumOverlappingAnswers = new ArrayList<>(),
                 avgNumUnlistedAnswers = new ArrayList<>(),
-                avgNumMultiheadQueries = new ArrayList<>(),
+                avgNumPronounQueries = new ArrayList<>(),
+                avgNumGoldPronounQueries = new ArrayList<>(),
+                avgNumMultiArgQueries = new ArrayList<>(),
+                avgNumGoldMultiArgQueries = new ArrayList<>(),
                 oneBestF1 = new ArrayList<>(),
                 rerankF1 = new ArrayList<>(),
                 oracleF1 = new ArrayList<>(),
                 gainF1 = new ArrayList<>();
-
         Random random = new Random(randomSeed);
         List<Integer> sentenceIds = learner.allParses.keySet().stream()
                 .filter(sid -> !heldOutSentences.contains(sid))
@@ -87,10 +91,13 @@ public class CrowdFlowerDataWriterCheckbox2 {
             if (i % countEvery == 0) {
                 avgOptionsPerQuery.add(new double[numRandomSamples]);
                 avgNumQueries.add(new double[numRandomSamples]);
-                avgNumNAQueries.add(new double[numRandomSamples]);
+                avgNumGoldNAQueries.add(new double[numRandomSamples]);
                 avgNumUnlistedAnswers.add(new double[numRandomSamples]);
-                avgNumMultiheadQueries.add(new double[numRandomSamples]);
                 avgNumOverlappingAnswers.add(new double[numRandomSamples]);
+                avgNumPronounQueries.add(new double[numRandomSamples]);
+                avgNumGoldPronounQueries.add(new double[numRandomSamples]);
+                avgNumMultiArgQueries.add(new double[numRandomSamples]);
+                avgNumGoldMultiArgQueries.add(new double[numRandomSamples]);
                 oneBestF1.add(new double[numRandomSamples]);
                 rerankF1.add(new double[numRandomSamples]);
                 oracleF1.add(new double[numRandomSamples]);
@@ -107,18 +114,19 @@ public class CrowdFlowerDataWriterCheckbox2 {
             int optionCounter = 0;
             // Queries that has only one option except for N/A.
             int numNAQueries = 0,
-                numUnlistedAnswers = 0,
-                numOverlappingAnswers = 0,
-                numMultiheadQueries = 0;
+                    numUnlistedAnswers = 0,
+                    numOverlappingAnswers = 0,
+                    numPronounQueries = 0,
+                    numGoldPronounQueries = 0,
+                    numMultiArgQueries = 0,
+                    numGoldMultiArgQueries =0;
             List<Integer> annotatedSentences = new ArrayList<>();
             Results rerank = new Results(),
                     oracle = new Results(),
                     oneBest = new Results();
             // Process questions.
             for (int sentenceId : sentenceIds) {
-                learner.initializeForSentence(sentenceId);
-                List<GroupedQuery> queries = QueryGenerator.getAllGroupedQueriesCheckbox(sentenceId,
-                        learner.getSentenceById(sentenceId), learner.allParses.get(sentenceId), queryPruningParameters);
+                List<GroupedQuery> queries = getQueriesForSentence(learner, sentenceId);
                 // Print query to .csv file.
                 if (r == 0 && annotatedSentences.size() < maxNumSentences) {
                     int numSentences = annotatedSentences.size();
@@ -138,7 +146,7 @@ public class CrowdFlowerDataWriterCheckbox2 {
                     }
                     // Write query to file.
                     for (GroupedQuery query : queries) {
-                        printQueryToCSVFile(query, "", lineCounter, csvPrinter);
+                        printQueryToCSVFile(query, -1 /* gold option id */, lineCounter, csvPrinter);
                         lineCounter ++;
                     }
                 }
@@ -150,6 +158,7 @@ public class CrowdFlowerDataWriterCheckbox2 {
                     Response oracleResponse = new Response();
                     Response goldResponse = goldSimulator.answerQuestion(query);
                     GroupedQuery.AnswerOption goldOption = options.get(goldResponse.chosenOptions.get(0));
+
                     boolean oracleIsNA = false;
                     boolean goldIsNA = GroupedQuery.BadQuestionOption.class.isInstance(goldOption);
                     boolean goldIsUnlistedAnswer = GroupedQuery.NoAnswerOption.class.isInstance(goldOption);
@@ -178,13 +187,24 @@ public class CrowdFlowerDataWriterCheckbox2 {
                     if (hasOverlappingAnswers) {
                         numOverlappingAnswers ++;
                     }
-                    if (goldResponse.chosenOptions.size() > 1) {
-                        numMultiheadQueries ++;
+                    if (QualityControl.queryContainsPronoun(query)) {
+                        numPronounQueries ++;
+                        if (QualityControl.optionContainsPronoun(goldOption)) {
+                            numGoldPronounQueries ++;
+                        }
                     }
-                    if (r == 0 && lineCounter < 100) {
-                        System.out.println("OracleID=" + learner.getOracleParseId(sentenceId));
-                        //System.out.println(query.getDebuggingInfo(oracleResponse));
-                        System.out.println(query.getDebuggingInfo(goldResponse) + goldResponse.debugInfo);
+                    if (QualityControl.queryContainsMultiArg(query)) {
+                        numMultiArgQueries ++;
+                        if (QualityControl.optionContainsMultiArg(goldOption)) {
+                            numGoldMultiArgQueries ++;
+                        }
+                    }
+                    if (r == 0 && lineCounter < 500) {
+                        if (QualityControl.queryContainsMultiArg(query) && !QualityControl.optionContainsMultiArg(goldOption)) {
+                            System.out.println("OracleID=" + learner.getOracleParseId(sentenceId));
+                            //System.out.println(query.getDebuggingInfo(oracleResponse));
+                            System.out.println(query.getDebuggingInfo(goldResponse) + goldResponse.debugInfo);
+                        }
                     }
                     learner.receiveObservationForQuery(query, oracleResponse);
                     //learner.receiveObservationForQuery(query, goldResponse);
@@ -198,12 +218,15 @@ public class CrowdFlowerDataWriterCheckbox2 {
                 // Compute stats.
                 if (annotatedSentences.size() % countEvery == 0) {
                     int k = annotatedSentences.size() / countEvery - 1;
-                    avgNumQueries.get(k)[r] = queryCounter;
-                    avgNumNAQueries.get(k)[r] = numNAQueries;
-                    avgNumUnlistedAnswers.get(k)[r] = numUnlistedAnswers;
-                    avgNumOverlappingAnswers.get(k)[r] = numOverlappingAnswers;
-                    avgNumMultiheadQueries.get(k)[r] = numMultiheadQueries;
-                    avgOptionsPerQuery.get(k)[r] = 1.0 * optionCounter / queryCounter;
+                    avgNumQueries.get(k)[r]             = queryCounter;
+                    avgNumGoldNAQueries.get(k)[r]       = numNAQueries;
+                    avgNumUnlistedAnswers.get(k)[r]     = numUnlistedAnswers;
+                    avgNumOverlappingAnswers.get(k)[r]  = numOverlappingAnswers;
+                    avgNumPronounQueries.get(k)[r]      = numPronounQueries;
+                    avgNumGoldPronounQueries.get(k)[r]  = numGoldPronounQueries;
+                    avgNumMultiArgQueries.get(k)[r]     = numMultiArgQueries;
+                    avgNumGoldMultiArgQueries.get(k)[r] = numGoldMultiArgQueries;
+                    avgOptionsPerQuery.get(k)[r]        = 1.0 * optionCounter / queryCounter;
                     oneBestF1.get(k)[r] = 100.0 * oneBest.getF1();
                     rerankF1.get(k)[r]  = 100.0 * rerank.getF1();
                     oracleF1.get(k)[r]  = 100.0 * oracle.getF1();
@@ -217,17 +240,30 @@ public class CrowdFlowerDataWriterCheckbox2 {
             System.out.println(String.format("Avg. number of queries:\t%.3f (%.3f)",
                     getAverage(avgNumQueries.get(k)), getStd(avgNumQueries.get(k))));
             System.out.println(String.format("Avg. number of N/A queries:\t%.3f (%.3f)",
-                    getAverage(avgNumNAQueries.get(k)), getStd(avgNumNAQueries.get(k))));
+                    getAverage(avgNumGoldNAQueries.get(k)), getStd(avgNumGoldNAQueries.get(k))));
             System.out.println(String.format("Avg. number of queries with gold unlisted answers:\t%.3f (%.3f)",
                     getAverage(avgNumUnlistedAnswers.get(k)), getStd(avgNumUnlistedAnswers.get(k))));
             System.out.println(String.format("Avg. number of queries with overlapping answers:\t%.3f (%.3f)",
                     getAverage(avgNumOverlappingAnswers.get(k)), getStd(avgNumOverlappingAnswers.get(k))));
             System.out.println(String.format("Percentage of N/A queries:\t%.3f%%",
-                    100.0 * getAverage(avgNumNAQueries.get(k)) / getAverage(avgNumQueries.get(k))));
-            System.out.println(String.format("Avg. number queries with multiple gold head:\t%.3f (%.3f)",
-                    getAverage(avgNumMultiheadQueries.get(k)), getStd(avgNumMultiheadQueries.get(k))));
+                    100.0 * getAverage(avgNumGoldNAQueries.get(k)) / getAverage(avgNumQueries.get(k))));
             System.out.println(String.format("Avg. number of options per query:\t%.3f (%.3f)",
                     getAverage(avgOptionsPerQuery.get(k)), getStd(avgOptionsPerQuery.get(k))));
+
+            double avgQ =  getAverage(avgNumQueries.get(k));
+            double avgP1 = getAverage(avgNumPronounQueries.get(k)),
+                   avgP2 = getAverage(avgNumGoldPronounQueries.get(k)),
+                   avgM1 = getAverage(avgNumMultiArgQueries.get(k)),
+                   avgM2 = getAverage(avgNumGoldMultiArgQueries.get(k));
+            System.out.println(String.format("Avg. number of pronoun queries:\t%.3f (%.3f)\t%.3f%%",
+                    avgP1, getStd(avgNumPronounQueries.get(k)),          100.0 * avgP1 / avgQ));
+            System.out.println(String.format("Avg. number of gold pronoun queries:\t%.3f (%.3f)\t%.3f%%",
+                    avgP2, getStd(avgNumGoldPronounQueries.get(k)),      100.0 * avgP2 / avgQ));
+            System.out.println(String.format("Avg. number of multi-arg queries:\t%.3f (%.3f)\t%.3f%%",
+                    avgM1, getStd(avgNumMultiArgQueries.get(k)),         100.0 * avgM1 / avgQ));
+            System.out.println(String.format("Avg. number of gold mult-arg queries:\t%.3f (%.3f)\t%.3f%%",
+                    avgM2, getAverage(avgNumGoldMultiArgQueries.get(k)), 100.0 * avgM2 / avgQ));
+
             System.out.println(String.format("Avg. 1-best F1:\t%.3f%%\t%.3f%%",
                     getAverage(oneBestF1.get(k)), getStd(oneBestF1.get(k))));
             System.out.println(String.format("Avg. rerank F1:\t%.3f%%\t%.3f%%",
@@ -246,7 +282,6 @@ public class CrowdFlowerDataWriterCheckbox2 {
         // Load test questions from previous annotation.
         List<AlignedAnnotation> cfRound1Annotations = CrowdFlowerDataReader.readAggregatedAnnotationFromFile(
                 cfRound1AnnotationFilePath);
-
         pilotAnnotations.stream().forEach(a -> heldOutSentences.add(a.sentenceId));
         cfRound1Annotations.stream().forEach(a -> heldOutSentences.add(a.sentenceId));
         for (int sid : otherHeldOutSentences) {
@@ -277,7 +312,6 @@ public class CrowdFlowerDataWriterCheckbox2 {
         CSVPrinter csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter(
                 String.format("%s_test.csv", csvOutputFilePrefix))), CSVFormat.EXCEL.withRecordSeparator("\n"));
         csvPrinter.printRecord((Object[]) csvHeader);
-
         // Write test questions.
         int numTestQuestions = 0;
         for (AlignedAnnotation test : agreedAnnotations) {
@@ -285,40 +319,31 @@ public class CrowdFlowerDataWriterCheckbox2 {
             String agreedAnswer = "";
             if (test.goldAnswerId >= 0) {
                 // Inconsistency of answer delimiter..
-                agreedAnswer = test.answerOptions.get(test.goldAnswerId).replace(" # ", QuestionAnswerPair.answerDelimiter);
+                agreedAnswer = test.answerOptions.get(test.goldAnswerId)
+                        .replace(" # ", QuestionAnswerPair.answerDelimiter);
             } else {
                 for (int i = 0; i < test.answerOptions.size(); i++) {
-                    if (test.answerDist[i] >= 4) {
+                    if (test.answerDist[i] >= minAgreementForTestQuestions) {
                         agreedAnswer = test.answerOptions.get(i);
                         break;
                     }
                 }
             }
-            learner.initializeForSentence(sentenceId);
-            List<GroupedQuery> queries = QueryGenerator.getAllGroupedQueriesCheckbox(sentenceId,
-                    learner.getSentenceById(sentenceId), learner.allParses.get(sentenceId), queryPruningParameters);
-            for (GroupedQuery query : queries) {
+            for (GroupedQuery query : getQueriesForSentence(learner, sentenceId)) {
                 if (query.getPredicateIndex() == test.predicateId &&
                         query.getQuestion().equalsIgnoreCase(test.question)) {
                     Response gold = goldSimulator.answerQuestion(query);
-                    List<Integer> goldChoices = gold.chosenOptions;
-                    GroupedQuery.AnswerOption firstGoldOption = query.getAnswerOptions().get(goldChoices.get(0));
-                    String goldStr = firstGoldOption.isNAOption() ? firstGoldOption.getAnswer() :
-                            goldChoices.stream()
-                            .map(id -> query.getAnswerOptions().get(id))
-                            .sorted((o1, o2) -> Integer.compare(o1.getArgumentIds().get(0), o2.getArgumentIds().get(0)))
-                            .map(GroupedQuery.AnswerOption::getAnswer)
-                            .collect(Collectors.joining(QuestionAnswerPair.answerDelimiter));
-                    boolean agreedMatchesGold = goldStr.equalsIgnoreCase(agreedAnswer) ||
-                            (GroupedQuery.BadQuestionOption.class.isInstance(firstGoldOption) &&
+                    int goldAnswerId = gold.chosenOptions.get(0);
+                    GroupedQuery.AnswerOption goldOption = query.getAnswerOptions().get(goldAnswerId);
+                    boolean agreedMatchesGold = goldOption.getAnswer().equalsIgnoreCase(agreedAnswer) ||
+                            (GroupedQuery.BadQuestionOption.class.isInstance(goldOption) &&
                                     agreedAnswer.startsWith("Question is not"));
                     if (agreedMatchesGold) {
-                        printQueryToCSVFile(query, goldStr.replace(QuestionAnswerPair.answerDelimiter, answerDelimiter),
-                                10000 + numTestQuestions /* lineCounter */, csvPrinter);
+                        printQueryToCSVFile(query, goldAnswerId, 10000 + numTestQuestions /* lineCounter */,
+                                csvPrinter);
                         numTestQuestions ++;
                     } else {
-                        System.err.println(test.toString() + "---\n" + query.getDebuggingInfo(gold) + gold.debugInfo +
-                            "\n" + agreedAnswer + "\n" + goldStr);
+                        System.err.println(test.toString() + "---\n" + query.getDebuggingInfo(gold) + gold.debugInfo);
                     }
                 }
             }
@@ -327,14 +352,23 @@ public class CrowdFlowerDataWriterCheckbox2 {
         csvPrinter.close();
     }
 
+    private static List<GroupedQuery> getQueriesForSentence(POMDP learner, int sentenceId) {
+        learner.initializeForSentence(sentenceId);
+        return learner.getQueryPool().stream()
+                .filter(q ->
+                        !(skipPPQuestions && QualityControl.propositionalCategories.contains(q.getCategory())) &&
+                        !(skipPronounQuestions && QualityControl.queryContainsPronoun(q)))
+                .collect(Collectors.toList());
+    }
+
     /**
      *
      * @param query
-     * @param goldAnswerStr: "" if this is not a test question.
+     * @param goldAnswerId: -1 if gold is unknown (means this line is not a test question).
      * @param lineCounter
      * @param csvPrinter
      */
-    private static void printQueryToCSVFile(final GroupedQuery query, String goldAnswerStr, int lineCounter,
+    private static void printQueryToCSVFile(final GroupedQuery query, int goldAnswerId, int lineCounter,
                                             final CSVPrinter csvPrinter) throws IOException {
         // Print to CSV files.
         // "query_id", "question_confidence", "question_uncertainty", "sent_id", "sentence", "pred_id", "pred_head",
@@ -345,7 +379,7 @@ public class CrowdFlowerDataWriterCheckbox2 {
         final String sentenceStr = TextGenerationHelper.renderHTMLSentenceString(sentence, predicateIndex,
                 highlightPredicate);
         final List<String> answerStrings = query.getAnswerOptions().stream()
-                .map(GroupedQuery.AnswerOption::getAnswer)
+                .map(GroupedQuery.AnswerOption::getAnswer) //.replace(" &&& ", " <strong> & </strong> "))
                 .collect(Collectors.toList());
         List<String> csvRow = new ArrayList<>();
         csvRow.add(String.valueOf(lineCounter));
@@ -358,14 +392,14 @@ public class CrowdFlowerDataWriterCheckbox2 {
         csvRow.add(query.getQuestionKey());
         csvRow.add(query.getQuestion());
         csvRow.add(answerStrings.stream().collect(Collectors.joining(answerDelimiter)));
-        if (goldAnswerStr.isEmpty()) {
+        if (goldAnswerId < 0) {
             csvRow.add(""); // _gold
             csvRow.add(""); // choice_gold
             csvRow.add(""); // choice_gold_reason
         } else {
             csvRow.add("TRUE");
-            csvRow.add(goldAnswerStr);
-            csvRow.add("to do.");
+            csvRow.add(answerStrings.get(goldAnswerId));
+            csvRow.add("Based on high-agreement of workers.");
         }
         csvPrinter.printRecord(csvRow);
     }

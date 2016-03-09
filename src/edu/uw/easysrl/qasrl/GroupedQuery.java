@@ -5,6 +5,7 @@ import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.*;
+import java.util.Map.Entry;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -151,9 +152,14 @@ public class GroupedQuery {
                 .collect(Collectors.toList());
         double minOptionScore = (optionScores.size() <= maxNumNonNAOptionsPerQuery) ? -1e-6 :
                 optionScores.get(optionScores.size() - maxNumNonNAOptionsPerQuery) - 1e-6;
-
-        spanToParses.forEach((span, parseIds) -> {
-            ImmutableList<Integer> argList = spanToArgList.get(span);
+        List<String> spans = allowsMultiple ?
+                spanToArgList.entrySet().stream()
+                        .sorted((e1, e2) -> Integer.compare(e1.getValue().get(0), e2.getValue().get(0)))
+                        .map(Entry::getKey).collect(Collectors.toList()) :
+                new ArrayList<>(spanToArgList.keySet());
+        spans.forEach(span -> {
+            final Set<Integer> parseIds = spanToParses.get(span);
+            final ImmutableList<Integer> argList = spanToArgList.get(span);
             AnswerOption newOption = new AnswerOption(argList, span, parseIds);
             double optionScore = parseIds.stream().mapToDouble(id -> parses.get(id).score).sum();
             if (optionScore > minOptionScore) {
@@ -163,7 +169,9 @@ public class GroupedQuery {
             }
             invalidQuestionParseIds.removeAll(parseIds);
         });
-        answerOptions.add(new NoAnswerOption(unlistedAnswerParseIds));
+        if (!allowsMultiple && !isJeopardyStyle) {
+            answerOptions.add(new NoAnswerOption(unlistedAnswerParseIds));
+        }
         answerOptions.add(new BadQuestionOption(invalidQuestionParseIds));
     }
 
@@ -178,9 +186,9 @@ public class GroupedQuery {
                                          final Map<String, Set<Integer>> spanToParses,
                                          boolean allowsMultiple, boolean isJeopardyStyle) {
         GroupedQuery query = new GroupedQuery(sentenceId, sentence, parses);
-        query.collapse(predicateIndex, category, argumentNumber, question, spanToArgList, spanToParses);
         query.allowsMultiple = allowsMultiple;
         query.isJeopardyStyle = isJeopardyStyle;
+        query.collapse(predicateIndex, category, argumentNumber, question, spanToArgList, spanToParses);
         return query;
     }
 

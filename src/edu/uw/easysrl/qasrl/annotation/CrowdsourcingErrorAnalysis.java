@@ -1,12 +1,7 @@
 package edu.uw.easysrl.qasrl.annotation;
 
-import com.google.common.base.Strings;
-import edu.uw.easysrl.corpora.ParallelCorpusReader;
 import edu.uw.easysrl.qasrl.*;
-import edu.uw.easysrl.qasrl.analysis.PPAttachment;
-import edu.uw.easysrl.qasrl.corpora.PronounList;
 import edu.uw.easysrl.qasrl.pomdp.POMDP;
-import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
@@ -93,7 +88,7 @@ public class CrowdsourcingErrorAnalysis {
                 if (annotation == null) {
                     continue;
                 }
-                if (QualityControl.categoriesToFilter.contains(query.getCategory())) {
+                if (QualityControl.propositionalCategories.contains(query.getCategory())) {
                     continue;
                 }
                 int[] optionDist = QualityControl.getUserResponses(query, annotation);
@@ -241,7 +236,7 @@ public class CrowdsourcingErrorAnalysis {
                 /*if (query.getAnswerOptions().get(userOption).getProbability() < 0.1) {
                     continue;
                 }*/
-                if (agreement < minAgreement || QualityControl.categoriesToFilter.contains(category)) {
+                if (agreement < minAgreement || QualityControl.propositionalCategories.contains(category)) {
                     continue;
                 }
                 if (skipPronouns && QualityControl.queryContainsPronoun(query)) {

@@ -112,7 +112,7 @@ public class SimulatedExperimentPOMDP {
                 GroupedQuery query = action.get();
                 Category category = query.getCategory();
                 // Skip PP
-                if (QualityControl.categoriesToFilter.contains(category)) {
+                if (QualityControl.propositionalCategories.contains(category)) {
                     continue;
                 }
                 // Skip low agreement.

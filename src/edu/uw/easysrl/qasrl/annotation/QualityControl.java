@@ -6,35 +6,50 @@ import edu.uw.easysrl.qasrl.corpora.PronounList;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.syntax.grammar.Category;
 
-import edu.uw.easysrl.qasrl.Response;
-
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
 /**
+ * Filtering stuff.
  * Created by luheng on 3/7/16.
  */
 public class QualityControl {
-    static Set<Category> categoriesToFilter = new HashSet<>();
+    static Set<Category> propositionalCategories = new HashSet<>();
     static {
-        Collections.addAll(categoriesToFilter,
+        Collections.addAll(propositionalCategories,
                 PPAttachment.nounAdjunct,
                 PPAttachment.verbAdjunct,
                 Category.valueOf("((S\\NP)\\(S\\NP))/S[dcl]"));
     }
 
     public static boolean queryContainsPronoun(GroupedQuery query) {
-        for (GroupedQuery.AnswerOption option : query.getAnswerOptions()) {
-            for (String span : option.getAnswer().split(
-                    QuestionAnswerPair.answerDelimiter)) {
-                if (PronounList.englishPronounSet.contains(span.toLowerCase())) {
-                    return true;
-                }
+        return query.getAnswerOptions().stream().anyMatch(QualityControl::optionContainsPronoun);
+    }
+
+    public static boolean optionContainsPronoun(GroupedQuery.AnswerOption option) {
+        if (option.isNAOption()) {
+            return false;
+        }
+        for (String span : option.getAnswer().split(QuestionAnswerPair.answerDelimiter)) {
+            if (PronounList.englishPronounSet.contains(span.toLowerCase())) {
+                return true;
             }
         }
         return false;
+    }
+
+    public static boolean queryContainsMultiArg(GroupedQuery query) {
+        return query.getAnswerOptions().stream().anyMatch(QualityControl::optionContainsMultiArg);
+    }
+
+    public static boolean optionContainsMultiArg(GroupedQuery.AnswerOption option) {
+        return option.getAnswer().contains(QuestionAnswerPair.answerDelimiter);
+    }
+
+    public static boolean queryIsPrepositional(GroupedQuery query) {
+        return propositionalCategories.contains(query.getCategory());
     }
 
     public static int getAgreementNumber(GroupedQuery query, AlignedAnnotation annotation) {

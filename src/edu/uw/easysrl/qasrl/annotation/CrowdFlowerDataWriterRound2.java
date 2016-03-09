@@ -51,7 +51,7 @@ public class CrowdFlowerDataWriterRound2 {
 
     private static final String cfRound1AnnotationFilePath = "./Crowdflower_data/f878213.csv";
 
-    private static final String csvOutputFilePrefix = "./Crowdflower_round2/crowdflower_dev_100best";
+    private static final String csvOutputFilePrefix = "./Crowdflower_temp/crowdflower_dev_100best";
 
     // Sentences that happened to appear in instructions ...
     private static final int[] otherHeldOutSentences = { 1695, };
