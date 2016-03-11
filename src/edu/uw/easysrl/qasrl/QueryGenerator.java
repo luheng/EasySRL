@@ -368,7 +368,15 @@ public class QueryGenerator {
                         double score = answerToScore.row(argList).values().stream().mapToDouble(s -> s).sum();
                         answerScoreSum += score;
                         answerStringToScore.put(answer, score);
+                        //if (!answerStringToArgIds.containsKey(answer)) {
                         answerStringToArgIds.put(answer, argList);
+                        /*} else {
+                            // FIXME: this is a hack. Ideally we want a disjunctive set of arg ids.
+                            Set<Integer> extendedArgList = new HashSet<>(answerStringToArgIds.get(answer));
+                            extendedArgList.addAll(argList);
+                            answerStringToArgIds.put(answer, ImmutableList.copyOf(extendedArgList.stream().sorted()
+                                    .collect(Collectors.toList())));
+                        }*/
                         answerToParseIds.row(argList).values()
                                 .forEach(parseIds -> parseIds
                                         .forEach(pid -> insertParseId(answerStringToParseIds, answer, pid)));

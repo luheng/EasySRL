@@ -274,7 +274,7 @@ public class GroupedQuery {
                     ao.argumentIds.stream().map(String::valueOf).collect(Collectors.joining(","));
             String argHeadsStr = ao.isNAOption() ? "N/A" :
                     ao.argumentIds.stream().map(words::get).collect(Collectors.joining(","));
-            String parseIdsStr = DebugPrinter.getShortListString(ao.parseIds);
+            String parseIdsStr = DebugHelper.getShortListString(ao.parseIds);
             System.out.println(String.format("%.2f\t%s%d\t(%s:%s)\t\t\t%s\t%s", ao.probability, match, i, argIdsStr,
                     argHeadsStr, ao.getAnswer(), parseIdsStr));
         }
@@ -294,7 +294,7 @@ public class GroupedQuery {
                     ao.argumentIds.stream().map(String::valueOf).collect(Collectors.joining(","));
             String argHeadsStr = ao.isNAOption() ? "N/A" :
                     ao.argumentIds.stream().map(sentence::get).collect(Collectors.joining(","));
-            String parseIdsStr = DebugPrinter.getShortListString(ao.parseIds);
+            String parseIdsStr = DebugHelper.getShortListString(ao.parseIds);
             result += String.format("%d\t%s\tprob=%.2f\t%s\t(%s:%s)\t%s\n", i, match, ao.probability, ao.getAnswer(),
                     argIdsStr, argHeadsStr, parseIdsStr);
         }
@@ -313,7 +313,7 @@ public class GroupedQuery {
                     ao.argumentIds.stream().map(String::valueOf).collect(Collectors.joining(","));
             String argHeadsStr = ao.isNAOption() ? "N/A" :
                     ao.argumentIds.stream().map(sentence::get).collect(Collectors.joining(","));
-            String parseIdsStr = DebugPrinter.getShortListString(ao.parseIds);
+            String parseIdsStr = DebugHelper.getShortListString(ao.parseIds);
             result += String.format("%d\t%s\tprob=%.2f\t%s\t(%s:%s)\t%s\n", i, match, ao.probability, ao.getAnswer(),
                     argIdsStr, argHeadsStr, parseIdsStr);
         }
@@ -339,7 +339,7 @@ public class GroupedQuery {
             String argIdsStr = ao.argumentIds.stream().map(String::valueOf).collect(Collectors.joining(","));
             String argHeadsStr = ao.argumentIds.get(0) == -1 ? "N/A" :
                     ao.argumentIds.stream().map(words::get).collect(Collectors.joining(","));
-            String parseIdsStr = DebugPrinter.getShortListString(ao.parseIds);
+            String parseIdsStr = DebugHelper.getShortListString(ao.parseIds);
             System.out.println(String.format("%.2f\t%s[%d]\t%s\t%s:%s\t%s",
                     ao.probability,
                     match, i,

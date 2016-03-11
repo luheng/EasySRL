@@ -1,6 +1,7 @@
 package edu.uw.easysrl.qasrl.annotation;
 
 import edu.uw.easysrl.qasrl.*;
+import edu.uw.easysrl.qasrl.pomdp.ExpectedAccuracy;
 import edu.uw.easysrl.qasrl.pomdp.POMDP;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
@@ -36,7 +37,7 @@ public class CrowdsourcingErrorAnalysis {
     static Accuracy answerAcc = new Accuracy();
     static int numUnmatchedQuestions = 0, numMatchedQuestions = 0, numPronounQuestions = 0;
 
-    static final int minAgreement = 4;
+    static final int minAgreement = 3;
     static final boolean skipPronouns = true;
 
     public static void main(String[] args) {
@@ -246,17 +247,14 @@ public class CrowdsourcingErrorAnalysis {
                     continue;
                 }
 
+                double expAcc0 = ExpectedAccuracy.compute(learner.beliefModel.belief, learner.allParses.get(sentenceId));
+                double[] beliefBackup = learner.beliefModel.getClone();
                 learner.receiveObservationForQueryNoNA(query, new Response(userOption));
+                double expAcc =  ExpectedAccuracy.compute(learner.beliefModel.belief, learner.allParses.get(sentenceId));
+                if (expAcc < expAcc0) {
+                    learner.beliefModel.resetTo(beliefBackup);
+                }
                 rerankedF1[userOption] = learner.getRerankedF1(sentenceId);
-
-                // Incorporate all answers.
-                /*
-                for (int j = 0; j < optionDist.length; j++) {
-                    for (int k = 0; k < optionDist[j]; k++) {
-                        learner.receiveObservationForQueryNoNA(query, new Response(j));
-                    }
-                    rerankedF1[j] = learner.getRerankedF1(sentenceId);
-                }*/
 
                 // Print.
                 String sentenceStr = query.getSentence().stream().collect(Collectors.joining(" "));
@@ -303,13 +301,16 @@ public class CrowdsourcingErrorAnalysis {
                         assert Math.abs(debuggingF1.getF1() - rerankedF1[j].getF1()) < 1e-6;
                         result += String.format("%-8s\t%.3f\t%-40s\t%.3f%%\t%s\t%s\n", match, option.getProbability(),
                                 option.getAnswer(), 100.0 * rerankedF1[j].getF1(), improvement,
-                                DebugPrinter.getShortListString(option.getParseIds()));
+                                DebugHelper.getShortListString(option.getParseIds()));
                         currentF1 = rerankedF1[j];
                     } else {
                         result += String.format("%-8s\t%.3f\t%-40s\t-\t-\t%s\n", match, option.getProbability(),
-                                option.getAnswer(), DebugPrinter.getShortListString(option.getParseIds()));
+                                option.getAnswer(), DebugHelper.getShortListString(option.getParseIds()));
                     }
                 }
+                expAcc = ExpectedAccuracy.compute(learner.beliefModel.belief, learner.allParses.get(sentenceId));
+                String expAccImpv = expAcc0 < expAcc ? "[+++]" : "[---]";
+                result += String.format("Exp acc: %.3f%% - %.3f%% %s", 100.0 * expAcc0, 100.0 * expAcc, expAccImpv);
                 int cnt = optionDist.length;
                 for (int j : unmatched) {
                     String match = "";

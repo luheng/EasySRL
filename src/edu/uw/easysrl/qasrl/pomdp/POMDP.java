@@ -276,4 +276,16 @@ public class POMDP {
     public int getOracleParseId(int sid) {
         return oracleParseIds.get(sid);
     }
+
+    public List<Integer> getOracleTopK(int sid) {
+        return null;
+    }
+
+    public List<Integer> getOriginalTopK(int sid) {
+        return null;
+    }
+
+    public List<Integer> getRerankTopK(int sid) {
+        return null;
+    }
 }
