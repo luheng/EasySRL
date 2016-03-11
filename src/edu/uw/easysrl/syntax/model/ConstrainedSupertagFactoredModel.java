@@ -2,6 +2,8 @@ package edu.uw.easysrl.syntax.model;
 
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Table;
+import edu.uw.easysrl.dependencies.DependencyGenerator;
+import edu.uw.easysrl.dependencies.UnlabelledDependency;
 import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.pomdp.Evidence;
 import edu.uw.easysrl.syntax.grammar.Category;
@@ -18,6 +20,7 @@ import java.util.*;
 public class ConstrainedSupertagFactoredModel extends SupertagFactoredModel {
 
     private final List<List<Tagger.ScoredCategory>> tagsForWords;
+    private final DependencyGenerator dependencyGenerator;
     private final boolean includeDependencies;
 
     private Table<Integer, Category, Double> supertagEvidence;
@@ -25,10 +28,12 @@ public class ConstrainedSupertagFactoredModel extends SupertagFactoredModel {
 
     public ConstrainedSupertagFactoredModel(final List<List<Tagger.ScoredCategory>> tagsForWords,
                                             final Set<Evidence> evidenceSet,
+                                            final DependencyGenerator dependencyGenerator,
                                             final boolean includeDependencies) {
         super(tagsForWords, includeDependencies);
-        this.includeDependencies = includeDependencies;
         this.tagsForWords = tagsForWords;
+        this.dependencyGenerator = dependencyGenerator;
+        this.includeDependencies = includeDependencies;
         supertagEvidence = HashBasedTable.create();
         attachmentEvidence = HashBasedTable.create();
         evidenceSet.stream()
@@ -68,25 +73,30 @@ public class ConstrainedSupertagFactoredModel extends SupertagFactoredModel {
     @Override
     public AgendaItem combineNodes(final AgendaItem leftChild, final AgendaItem rightChild, final SyntaxTreeNode node) {
         final int length = leftChild.spanLength + rightChild.spanLength;
-
         // Add a penalty based on length of distance between the heads of the two children.
         // This implements the 'attach low' heuristic.
         final int depLength = Math.abs(leftChild.getParse().getHeadIndex() - rightChild.getParse().getHeadIndex());
         double lengthPenalty = 0.00001 * depLength;
-
         // Extra penalty for clitics, to really make sure they attach locally.
         if (rightChild.getSpanLength() == 1 && rightChild.getParse().getWord().startsWith("'")) {
             lengthPenalty = lengthPenalty * 10;
         }
-
         double evidencePenalty = .0;
-        int h1 = leftChild.getParse().getHeadIndex(), h2 = rightChild.getParse().getHeadIndex();
-        if (attachmentEvidence.contains(h1, h2)) {
-            evidencePenalty = attachmentEvidence.get(h1, h2);
-        } else if (attachmentEvidence.contains(h2, h1)) {
-            evidencePenalty = attachmentEvidence.get(h2, h1);
+        Set<UnlabelledDependency> unlabelledDeps = new HashSet<>();
+        dependencyGenerator.generateDependencies(node, unlabelledDeps);
+        for (UnlabelledDependency dep : unlabelledDeps) {
+            int headId = dep.getHead();
+            if (!attachmentEvidence.containsRow(headId)) {
+                continue;
+            }
+            for (int argId : dep.getArguments()) {
+                boolean headInLeft = leftChild.startOfSpan <= headId && headId < leftChild.startOfSpan + leftChild.spanLength;
+                boolean argInLeft = leftChild.startOfSpan <= argId && argId < leftChild.startOfSpan + leftChild.spanLength;
+                if (headInLeft ^ argInLeft && attachmentEvidence.contains(headId, argId)) {
+                    evidencePenalty += attachmentEvidence.get(headId, argId);
+                }
+            }
         }
-
         return new AgendaItem(node,
                 leftChild.getInsideScore() + rightChild.getInsideScore() - lengthPenalty - evidencePenalty, /* inside */
                 getOutsideUpperBound(leftChild.startOfSpan, leftChild.startOfSpan + length),                /* outside */
@@ -120,13 +130,16 @@ public class ConstrainedSupertagFactoredModel extends SupertagFactoredModel {
             return new ConstrainedSupertagFactoredModel(
                     input.isAlreadyTagged() ? input.getInputSupertags() : tagger.tag(input.getInputWords()),
                     new HashSet<>(),
+                    null,
                     includeDependencies);
         }
 
-        public ConstrainedSupertagFactoredModel make(final InputReader.InputToParser input, Set<Evidence> evidenceSet) {
+        public ConstrainedSupertagFactoredModel make(final InputReader.InputToParser input, Set<Evidence> evidenceSet,
+                                                     DependencyGenerator dependencyGenerator) {
             return new ConstrainedSupertagFactoredModel(
                     input.isAlreadyTagged() ? input.getInputSupertags() : tagger.tag(input.getInputWords()),
                     evidenceSet,
+                    dependencyGenerator,
                     includeDependencies);
         }
 

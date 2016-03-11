@@ -213,7 +213,7 @@ public abstract class BaseCcgParser {
                 return null;
             }
             List<Scored<SyntaxTreeNode>> parses = parser.parseAstarWithConstraints(
-                    new InputReader.InputToParser(sentence, null, null, false), evidenceSet);
+                    new InputReader.InputToParser(sentence, null, null, false), evidenceSet, dependencyGenerator);
             return (parses == null || parses.size() == 0) ? null :
                     getParse(sentence, parses.get(0), dependencyGenerator);
         }
@@ -224,7 +224,7 @@ public abstract class BaseCcgParser {
                 return null;
             }
             List<Scored<SyntaxTreeNode>> parses = parser.parseAstarWithConstraints(
-                    new InputReader.InputToParser(sentence, null, null, false), evidenceSet);
+                    new InputReader.InputToParser(sentence, null, null, false), evidenceSet, dependencyGenerator);
             return (parses == null || parses.size() == 0) ? null :
                     parses.stream().map(p -> getParse(sentence, p, dependencyGenerator)).collect(Collectors.toList());
         }

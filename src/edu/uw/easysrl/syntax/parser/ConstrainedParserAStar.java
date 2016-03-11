@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.PriorityQueue;
 import java.util.Set;
 
+import edu.uw.easysrl.dependencies.DependencyGenerator;
 import edu.uw.easysrl.dependencies.DependencyStructure;
 import edu.uw.easysrl.dependencies.UnlabelledDependency;
 import edu.uw.easysrl.main.InputReader.InputToParser;
@@ -50,9 +51,10 @@ public class ConstrainedParserAStar extends AbstractParser {
 
 
     public List<Scored<SyntaxTreeNode>> parseAstarWithConstraints(final InputToParser input,
-                                                                  Set<Evidence> evidenceSet) {
+                                                                  Set<Evidence> evidenceSet,
+                                                                  DependencyGenerator dependencyGenerator) {
         cellFactory.newSentence();
-        return parseAstar(input.getInputWords(), modelFactory.make(input, evidenceSet));
+        return parseAstar(input.getInputWords(), modelFactory.make(input, evidenceSet, dependencyGenerator));
     }
 
     @Override

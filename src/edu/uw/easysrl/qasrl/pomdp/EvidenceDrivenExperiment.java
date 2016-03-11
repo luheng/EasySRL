@@ -32,8 +32,9 @@ public class EvidenceDrivenExperiment {
             "./Crowdflower_data/f882410.csv"
     };
 
-    static final int minAgreement = 3;
-    static final double penaltyWeight = 2.0;
+    static final int minAgreement = 2;
+    static final double supertagPenaltyWeight = 5.0;
+    static final double attachmentPenaltyWeight = 1.0;
     static final boolean skipPronouns = false;
 
     static BaseCcgParser.ConstrainedCcgParser reparser;
@@ -42,7 +43,7 @@ public class EvidenceDrivenExperiment {
         Map<Integer, List<AlignedAnnotation>> annotations = loadData(annotationFiles);
         assert annotations != null;
 
-        // Reparsing!
+        // Re-parsing!
         reparser = new BaseCcgParser.ConstrainedCcgParser(BaseCcgParser.modelFolder, BaseCcgParser.rootCategories,
                 1 /* nbest */);
 
@@ -148,7 +149,8 @@ public class EvidenceDrivenExperiment {
 
                 // Get evidence and reset weight.
                 Set<Evidence> evidenceSet = Evidence.getEvidenceFromQuery(query, multiResponse);
-                evidenceSet.forEach(ev -> ev.confidence = penaltyWeight);
+                evidenceSet.forEach(ev -> ev.confidence = Evidence.SupertagEvidence.class.isInstance(ev) ?
+                                supertagPenaltyWeight : attachmentPenaltyWeight);
                 allEvidenceSet.addAll(evidenceSet);
 
                 double[] combinedScore = new double[numParses];
@@ -230,9 +232,9 @@ public class EvidenceDrivenExperiment {
                 currentF1 = rerankedF1;
                 currentReparsedF1 = reparsedF1;
             }
-            if (currentF1.getF1() < baselineF1.getF1() - 1e-8) {
+            if (currentReparsedF1.getF1() < baselineF1.getF1() - 1e-8) {
                 numWorsenedSentences ++;
-            } else if (currentF1.getF1() > baselineF1.getF1() + 1e-8) {
+            } else if (currentReparsedF1.getF1() > baselineF1.getF1() + 1e-8) {
                 numImprovedSentences ++;
             } else {
                 numUnchangedSentences ++;
@@ -253,6 +255,7 @@ public class EvidenceDrivenExperiment {
                 "\nNum unchanged:\t" + numUnchangedSentences);
         debugging.stream()
                 .sorted((b1, b2) -> Double.compare(b1.deltaF1, b2.deltaF1))
+                .filter(b -> Math.abs(b.deltaF1) > 1e-3)
                 .forEach(b -> System.out.println(b.block));
     }
 
