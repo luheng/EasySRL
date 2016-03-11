@@ -24,6 +24,13 @@ public abstract class Evidence {
         this.confidence = confidence;
     }
 
+    public boolean isPositive() {
+        return isPositive;
+    }
+
+    public double getConfidence() {
+        return confidence;
+    }
 
     public abstract boolean hasEvidence(Parse parse);
 
@@ -38,13 +45,21 @@ public abstract class Evidence {
      * Negative supertag evidence:
      *   That tag of a predicate is used to generate a question, and voted as "Question not valid".
      */
-    static class SupertagEvidence extends Evidence {
+    public static class SupertagEvidence extends Evidence {
         int predId;
         Category category;
         public SupertagEvidence(int predId, Category category, boolean isPositive, double confidence) {
             super(isPositive, confidence);
             this.predId = predId;
             this.category = category;
+        }
+
+        public int getPredId() {
+            return predId;
+        }
+
+        public Category getCategory() {
+            return category;
         }
 
         public boolean hasEvidence(Parse parse) {
@@ -65,12 +80,20 @@ public abstract class Evidence {
      * Negative attachment evidence:
      *   The (head, arg) dep is not picked by a user, and it's not part of a coordination*.
      */
-    static class AttachmentEvidence extends Evidence {
+    public static class AttachmentEvidence extends Evidence {
         int headId, argId;
         public AttachmentEvidence(int headId, int argId, boolean isPositive, double confidence) {
             super(isPositive, confidence);
             this.headId = headId;
             this.argId = argId;
+        }
+
+        public int getHeadId() {
+            return headId;
+        }
+
+        public int getArgId() {
+            return argId;
         }
 
         public boolean hasEvidence(Parse parse) {
@@ -106,13 +129,13 @@ public abstract class Evidence {
         }
         int predId = query.getPredicateIndex();
         if (questionIsNA) {
-            evidenceList.add(new SupertagEvidence(predId, query.getCategory(), false, response.trust));
+            evidenceList.add(new SupertagEvidence(predId, query.getCategory(), false, 1.0));
         }
         // TODO: take into account coordinations.
         else {
             for (int argId : listedArgIds) {
                 if (!chosenArgIds.contains(argId)) {
-                    evidenceList.add(new AttachmentEvidence(predId, argId, false, response.trust));
+                    evidenceList.add(new AttachmentEvidence(predId, argId, false, 1.0));
                 }
             }
         }

@@ -32,8 +32,9 @@ public class EvidenceDrivenExperiment {
             "./Crowdflower_data/f882410.csv"
     };
 
-    static final int minAgreement = 2;
-    static final boolean skipPronouns = true;
+    static final int minAgreement = 4;
+    static final double penaltyWeight = 10.0;
+    static final boolean skipPronouns = false;
 
     public static void main(String[] args) {
         Map<Integer, List<AlignedAnnotation>> annotations = loadData(annotationFiles);
@@ -144,7 +145,7 @@ public class EvidenceDrivenExperiment {
                     penalty[i] += evidenceList.stream()
                             .filter(ev -> ev.hasEvidence(parse))
                             .mapToDouble(ev -> ev.isPositive ? ev.confidence : -ev.confidence).sum();
-                    combinedScore[i] = parse.score + penalty[i];
+                    combinedScore[i] = parse.score + penaltyWeight * penalty[i];
                 }
                 double expAcc0 = ExpectedAccuracy.compute(learner.beliefModel.belief, learner.allParses.get(sentenceId));
                 learner.beliefModel.resetTo(combinedScore);
