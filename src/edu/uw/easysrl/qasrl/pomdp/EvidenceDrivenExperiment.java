@@ -32,15 +32,21 @@ public class EvidenceDrivenExperiment {
             "./Crowdflower_data/f882410.csv"
     };
 
-    static final int minAgreement = 4;
-    static final double penaltyWeight = 10.0;
+    static final int minAgreement = 3;
+    static final double penaltyWeight = 2.0;
     static final boolean skipPronouns = false;
+
+    static BaseCcgParser.ConstrainedCcgParser reparser;
 
     public static void main(String[] args) {
         Map<Integer, List<AlignedAnnotation>> annotations = loadData(annotationFiles);
         assert annotations != null;
 
-        printSequentialAnalysis(annotations);
+        // Reparsing!
+        reparser = new BaseCcgParser.ConstrainedCcgParser(BaseCcgParser.modelFolder, BaseCcgParser.rootCategories,
+                1 /* nbest */);
+
+        printSequentialAnalysis(annotations, reparser);
     }
 
     private static Map<Integer, List<AlignedAnnotation>> loadData(String[] fileNames) {
@@ -74,12 +80,14 @@ public class EvidenceDrivenExperiment {
         }
     }
 
-    private static void printSequentialAnalysis(Map<Integer, List<AlignedAnnotation>> annotations) {
+    private static void printSequentialAnalysis(Map<Integer, List<AlignedAnnotation>> annotations,
+                                                BaseCcgParser.ConstrainedCcgParser reparser) {
         List<Integer> sentenceIds = annotations.keySet().stream().sorted().collect(Collectors.toList());
         System.out.println(sentenceIds.stream().map(String::valueOf).collect(Collectors.joining(", ")));
 
         Results avgBaseline = new Results(),
-                avgRerank = new Results();
+                avgReranked = new Results(),
+                avgReparsed = new Results();
         int numWorsenedSentences = 0,
                 numUnchangedSentences = 0,
                 numImprovedSentences = 0;
@@ -93,11 +101,13 @@ public class EvidenceDrivenExperiment {
             learner.initializeForSentence(sentenceId, annotations.get(sentenceId));
             Results oracleF1 = learner.getOracleF1(sentenceId);
             Results baselineF1 = learner.getOneBestF1(sentenceId);
-            Results currentF1 = learner.getRerankedF1(sentenceId);
+            Results currentF1 = learner.getOneBestF1(sentenceId);
+            Results currentReparsedF1 = learner.getOneBestF1(sentenceId);
             final List<String> sentence = learner.getSentenceById(sentenceId);
             final List<Parse> parses = learner.allParses.get(sentenceId);
             final int numParses = parses.size();
             final List<GroupedQuery> queries = learner.getQueryPool();
+            final Set<Evidence> allEvidenceSet = new HashSet<>();
             int queryCount = 0;
             String sentenceDebuggingString = "";
             double[] penalty = new double[numParses];
@@ -136,20 +146,29 @@ public class EvidenceDrivenExperiment {
                     continue;
                 }
 
-                // Get evidence.
-                Set<Evidence> evidenceList = Evidence.getEvidenceFromQuery(query, multiResponse);
+                // Get evidence and reset weight.
+                Set<Evidence> evidenceSet = Evidence.getEvidenceFromQuery(query, multiResponse);
+                evidenceSet.forEach(ev -> ev.confidence = penaltyWeight);
+                allEvidenceSet.addAll(evidenceSet);
 
                 double[] combinedScore = new double[numParses];
                 for (int i = 0; i < learner.allParses.get(sentenceId).size(); i++) {
                     Parse parse = learner.allParses.get(sentenceId).get(i);
-                    penalty[i] += evidenceList.stream()
+                    penalty[i] += evidenceSet.stream()
                             .filter(ev -> ev.hasEvidence(parse))
                             .mapToDouble(ev -> ev.isPositive ? ev.confidence : -ev.confidence).sum();
-                    combinedScore[i] = parse.score + penaltyWeight * penalty[i];
+                    combinedScore[i] = parse.score + penalty[i];
                 }
                 double expAcc0 = ExpectedAccuracy.compute(learner.beliefModel.belief, learner.allParses.get(sentenceId));
                 learner.beliefModel.resetTo(combinedScore);
                 Results rerankedF1 = learner.getRerankedF1(sentenceId);
+                Results reparsedF1 = new Results();
+                Parse reparsed = null;
+                if (reparser != null) {
+                    reparsed = reparser.parseWithConstraint(learner.sentences.get(sentenceId), allEvidenceSet);
+                    reparsedF1 = CcgEvaluation.evaluate(reparsed.dependencies,
+                                                        learner.goldParses.get(sentenceId).dependencies);
+                }
 
                 // Print.
                 String sentenceStr = query.getSentence().stream().collect(Collectors.joining(" "));
@@ -159,7 +178,7 @@ public class EvidenceDrivenExperiment {
                         + query.getQuestion() + "\t" + query.getQuestionKey() + "\t"
                         + String.format("Baseline:: %.3f%%\tOracle:: %.3f%%\tOracle ParseId::%d\tRerank ParseId::%d\n",
                         100.0 * baselineF1.getF1(), 100.0 * oracleF1.getF1(), oracleParseId, rerankParseId);
-                result += evidenceList.stream()
+                result += evidenceSet.stream()
                         .map(ev -> ev.toString(sentence))
                         .collect(Collectors.joining("\n")) + "\n";
                 // TODO: add gold, oracle and one-best penalty.
@@ -204,12 +223,13 @@ public class EvidenceDrivenExperiment {
                         parses.get(rerankParseId).score);
                 result += String.format("oracle penalty:%.3f\tscore:%.3f\n", penalty[oracleParseId],
                         parses.get(oracleParseId).score);
-                result += String.format("F1: %.3f%% - %.3f%% %s", 100.0 * currentF1.getF1(), 100.0 * rerankedF1.getF1(),
+                result += String.format("F1: %.3f%% - %.3f%% %s\n", 100.0 * currentF1.getF1(), 100.0 * rerankedF1.getF1(),
                         f1Impv);
+                result += String.format("Reparsed F1: %.3f%%\n", 100.0 * reparsedF1.getF1());
                 sentenceDebuggingString += result + "\n";
                 currentF1 = rerankedF1;
+                currentReparsedF1 = reparsedF1;
             }
-
             if (currentF1.getF1() < baselineF1.getF1() - 1e-8) {
                 numWorsenedSentences ++;
             } else if (currentF1.getF1() > baselineF1.getF1() + 1e-8) {
@@ -218,7 +238,8 @@ public class EvidenceDrivenExperiment {
                 numUnchangedSentences ++;
             }
             avgBaseline.add(baselineF1);
-            avgRerank.add(currentF1);
+            avgReranked.add(currentF1);
+            avgReparsed.add(currentReparsedF1);
             if (queryCount > 0) {
                 sentenceDebuggingString += String.format("Final F1: %.3f%% over %.3f%% baseline.\t",
                         100.0 * currentF1.getF1(),
@@ -227,7 +248,7 @@ public class EvidenceDrivenExperiment {
                 debugging.add(new DebugBlock(currentF1.getF1() - baselineF1.getF1(), sentenceDebuggingString));
             }
         }
-        System.out.println("Baseline:\n" + avgBaseline + "\nRerank:\n" + avgRerank);
+        System.out.println("Baseline:\n" + avgBaseline + "\nRerank:\n" + avgReranked + "\nReparsed:\n" + avgReparsed);
         System.out.println("Num improved:\t" + numImprovedSentences + "\nNum worsened:\t" + numWorsenedSentences +
                 "\nNum unchanged:\t" + numUnchangedSentences);
         debugging.stream()

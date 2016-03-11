@@ -104,5 +104,41 @@ public class ConstrainedSupertagFactoredModel extends SupertagFactoredModel {
                               child.spanLength,
                               includeDependencies);
     }
+
+    public static class ConstrainedSupertagModelFactory extends ModelFactory {
+        private final Tagger tagger;
+        private final boolean includeDependencies;
+
+        public ConstrainedSupertagModelFactory(final Tagger tagger, final boolean includeDependencies) {
+            super();
+            this.tagger = tagger;
+            this.includeDependencies = includeDependencies;
+        }
+
+        @Override
+        public ConstrainedSupertagFactoredModel make(final InputReader.InputToParser input) {
+            return new ConstrainedSupertagFactoredModel(
+                    input.isAlreadyTagged() ? input.getInputSupertags() : tagger.tag(input.getInputWords()),
+                    new HashSet<>(),
+                    includeDependencies);
+        }
+
+        public ConstrainedSupertagFactoredModel make(final InputReader.InputToParser input, Set<Evidence> evidenceSet) {
+            return new ConstrainedSupertagFactoredModel(
+                    input.isAlreadyTagged() ? input.getInputSupertags() : tagger.tag(input.getInputWords()),
+                    evidenceSet,
+                    includeDependencies);
+        }
+
+        @Override
+        public Collection<Category> getLexicalCategories() {
+            return tagger.getLexicalCategories();
+        }
+
+        @Override
+        public boolean isUsingDependencies() {
+            return includeDependencies;
+        }
+    }
 }
 

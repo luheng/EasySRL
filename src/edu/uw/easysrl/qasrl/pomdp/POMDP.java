@@ -38,10 +38,6 @@ public class POMDP {
     private Map<Integer, Integer> oracleParseIds;
 
     String preparsedFile = "";
-    final static String modelFolder = "./model_tritrain_big/";
-    final static List<Category> rootCategories =  Arrays.asList(
-            Category.valueOf("S[dcl]"), Category.valueOf("S[wq]"), Category.valueOf("S[q]"),
-            Category.valueOf("S[b]\\NP"), Category.valueOf("NP"));
 
     // Query pruning.
     QueryPruningParameters queryPruningParams = new QueryPruningParameters();
@@ -68,7 +64,7 @@ public class POMDP {
             preparsedFile = "parses.1000best.out";
         }
         parser = preparsedFile.isEmpty() ?
-                new BaseCcgParser.AStarParser(modelFolder, rootCategories, nBest) :
+                new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, BaseCcgParser.rootCategories, nBest) :
                 new BaseCcgParser.MockParser(preparsedFile, nBest);
         System.err.println("Parse initialized.");
         initializeParses();
