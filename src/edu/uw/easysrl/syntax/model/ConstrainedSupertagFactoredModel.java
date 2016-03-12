@@ -82,6 +82,23 @@ public class ConstrainedSupertagFactoredModel extends SupertagFactoredModel {
             lengthPenalty = lengthPenalty * 10;
         }
         double evidencePenalty = .0;
+
+        /*
+        for (UnlabelledDependency dep : node.getResolvedUnlabelledDependencies()) {
+            int headId = dep.getHead();
+            if (attachmentEvidence.containsRow(headId)) {
+                for (int argId : dep.getArguments()) {
+                    //boolean headInLeft = leftChild.startOfSpan <= headId && headId < leftChild.startOfSpan + leftChild.spanLength;
+                    //boolean argInLeft = leftChild.startOfSpan <= argId && argId < leftChild.startOfSpan + leftChild.spanLength;
+                    //if (headInLeft ^ argInLeft && attachmentEvidence.contains(headId, argId)) {
+                    if (attachmentEvidence.contains(headId, argId)) {
+                        evidencePenalty += attachmentEvidence.get(headId, argId);
+                    }
+                }
+            }
+        }
+        */
+
         Set<UnlabelledDependency> unlabelledDeps = new HashSet<>();
         dependencyGenerator.generateDependencies(node, unlabelledDeps);
         for (UnlabelledDependency dep : unlabelledDeps) {
@@ -97,6 +114,7 @@ public class ConstrainedSupertagFactoredModel extends SupertagFactoredModel {
                 }
             }
         }
+
         return new AgendaItem(node,
                 leftChild.getInsideScore() + rightChild.getInsideScore() - lengthPenalty - evidencePenalty, /* inside */
                 getOutsideUpperBound(leftChild.startOfSpan, leftChild.startOfSpan + length),                /* outside */

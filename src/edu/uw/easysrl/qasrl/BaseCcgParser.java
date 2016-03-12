@@ -187,7 +187,8 @@ public abstract class BaseCcgParser {
             try {
                 Coindexation.parseMarkedUpFile(new File(modelFolder, "markedup"));
                 ConstrainedSupertagModelFactory modelFactory = new ConstrainedSupertagModelFactory(
-                        Tagger.make(modelFolder, supertaggerBeam, 50, null /* cutoffs */), nBest > 1);
+                        Tagger.make(modelFolder, supertaggerBeam, 50, null /* cutoffs */),
+                        false /* include deps */);
                 parser = new ConstrainedParserAStar(modelFactory, maxSentenceLength, nBest, rootCategories, modelFolder,
                         maxChartSize);
                 dependencyGenerator = new DependencyGenerator(parser.getUnaryRules());
