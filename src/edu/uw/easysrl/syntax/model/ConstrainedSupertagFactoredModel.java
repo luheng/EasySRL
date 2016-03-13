@@ -47,6 +47,15 @@ public class ConstrainedSupertagFactoredModel extends SupertagFactoredModel {
                         attachmentEvidence.put(ev1.getHeadId(), ev1.getArgId(), ev1.getConfidence());
                     }
                 });
+        // Normalize attachment evidence.
+        attachmentEvidence.rowKeySet().stream().forEach(head -> {
+            int ncols = attachmentEvidence.row(head).size();
+            Set<Integer> args = new HashSet<>(attachmentEvidence.row(head).keySet());
+            args.forEach(arg -> {
+                double weight = attachmentEvidence.get(head, arg);
+                attachmentEvidence.put(head, arg, weight / ncols);
+            });
+        });
         computeOutsideProbabilities();
     }
 

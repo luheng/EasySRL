@@ -32,6 +32,10 @@ public class GroupedQuery {
 
         public String getAnswer() { return answer; }
 
+        public void setProbability(double probability) {
+            this.probability = probability;
+        }
+
         public double getProbability() { return probability; }
 
         public ImmutableList<Integer> getArgumentIds() { return argumentIds; }
@@ -49,7 +53,11 @@ public class GroupedQuery {
         }
 
         public ImmutableList<Integer> getArgumentIds() { return null; }
-        public String getAnswer() { return "Question is not valid."; }
+        public String getAnswer() {
+            //return "Question is not valid.";
+            return "Bad question.";
+        }
+
         public boolean isNAOption() {
             return true;
         }

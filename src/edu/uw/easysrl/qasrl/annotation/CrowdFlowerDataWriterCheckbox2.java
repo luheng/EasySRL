@@ -1,7 +1,6 @@
 package edu.uw.easysrl.qasrl.annotation;
 
 import edu.uw.easysrl.qasrl.*;
-import edu.uw.easysrl.qasrl.analysis.PPAttachment;
 import edu.uw.easysrl.qasrl.pomdp.POMDP;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
@@ -21,7 +20,7 @@ import java.util.stream.Collectors;
  */
 public class CrowdFlowerDataWriterCheckbox2 {
     static final int nBest = 100;
-    static final int maxNumSentences = 300;
+    static final int maxNumSentences = 100;
     static final int maxNumSentencesPerFile = 100;
     static final int numRandomSamples = 1;
     static final int randomSeed = 104743;
@@ -38,8 +37,8 @@ public class CrowdFlowerDataWriterCheckbox2 {
     private static QueryPruningParameters queryPruningParameters = new QueryPruningParameters(
             1,    /* top K */
             0.1,  /* min question confidence */
-            0.05, /* min answer confidence */
-            0.05  /* min attachment entropy */
+            0.01, /* min answer confidence */
+            0.01  /* min attachment entropy */
     );
 
     // Fields for Crowdflower test questions.
@@ -47,11 +46,11 @@ public class CrowdFlowerDataWriterCheckbox2 {
             "query_id", "question_confidence", "question_uncertainty", "sent_id", "sentence", "pred_id", "pred_head",
             "question_key", "question", "answers", "_golden ", "choice_gold", "choice_gold_reason"};
 
-    private static final String answerDelimiter = "\n";
+    private static final String answerDelimiter = " ### ";
 
     private static final String cfRound1AnnotationFilePath = "./Crowdflower_data/f878213.csv";
 
-    private static final String csvOutputFilePrefix = "./Crowdflower_round3/crowdflower_dev_100best";
+    private static final String csvOutputFilePrefix = "./Crowdflower_checkboxes/crowdflower_dev_100best";
 
     // Sentences that happened to appear in instructions ...
     private static final int[] otherHeldOutSentences = { 1695, };
@@ -117,6 +116,8 @@ public class CrowdFlowerDataWriterCheckbox2 {
             // Process questions.
             for (int sentenceId : sentenceIds) {
                 learner.initializeForSentence(sentenceId);
+                final List<Parse> parses = learner.allParses.get(sentenceId);
+                final double totalScore = parses.stream().mapToDouble(p -> p.score).sum();
                 List<GroupedQuery> queries = QueryGenerator.getAllGroupedQueriesCheckbox(sentenceId,
                         learner.getSentenceById(sentenceId), learner.allParses.get(sentenceId), queryPruningParameters);
                 // Print query to .csv file.
@@ -154,8 +155,12 @@ public class CrowdFlowerDataWriterCheckbox2 {
                     boolean goldIsNA = GroupedQuery.BadQuestionOption.class.isInstance(goldOption);
                     boolean goldIsUnlistedAnswer = GroupedQuery.NoAnswerOption.class.isInstance(goldOption);
                     boolean hasOverlappingAnswers = false;
+                    // Manually compute probability.
                     for (int i = 0; i < numOptions; i++) {
                         GroupedQuery.AnswerOption option = options.get(i);
+                        double score = option.getParseIds().stream()
+                                .mapToDouble(p -> parses.get(p).score).sum() / totalScore;
+                        option.setProbability(score);
                         if (option.getParseIds().contains(oracleId)) {
                             oracleResponse.add(i);
                             if (GroupedQuery.BadQuestionOption.class.isInstance(option)) {
@@ -181,7 +186,7 @@ public class CrowdFlowerDataWriterCheckbox2 {
                     if (goldResponse.chosenOptions.size() > 1) {
                         numMultiheadQueries ++;
                     }
-                    if (r == 0 && lineCounter < 100) {
+                    if (r == 0 && lineCounter < maxNumSentences) {
                         System.out.println("OracleID=" + learner.getOracleParseId(sentenceId));
                         //System.out.println(query.getDebuggingInfo(oracleResponse));
                         System.out.println(query.getDebuggingInfo(goldResponse) + goldResponse.debugInfo);
@@ -211,6 +216,13 @@ public class CrowdFlowerDataWriterCheckbox2 {
                 }
             }
         }
+
+        try {
+            csvPrinter.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
         // Print aggregated results.
         for (int k = 0; k < avgNumQueries.size(); k++) {
             System.out.println(String.format("On %d sentences:", (k + 1) * 100));
@@ -240,7 +252,7 @@ public class CrowdFlowerDataWriterCheckbox2 {
     }
 
     private static void printTestQuestions(POMDP learner, ResponseSimulator goldSimulator,
-                                           Set<Integer> heldOutSentences) throws IOException {
+                                               Set<Integer> heldOutSentences) throws IOException {
         // Load test questions from pilot study.
         List<AlignedAnnotation> pilotAnnotations = AlignedAnnotation.getAllAlignedAnnotationsFromPilotStudy();
         // Load test questions from previous annotation.

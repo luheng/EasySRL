@@ -243,6 +243,17 @@ public class QueryGenerator {
                             answerScoreSum += score;
                             answerStringToScore.put(answer, score);
                             answerStringToArgIds.put(answer, argList);
+
+                            if (!answerStringToArgIds.containsKey(answer)) {
+                                answerStringToArgIds.put(answer, argList);
+                            } else {
+                                // FIXME: this is a hack. Ideally we want a disjunctive set of arg ids.
+                                Set<Integer> extendedArgList = new HashSet<>(answerStringToArgIds.get(answer));
+                                extendedArgList.addAll(argList);
+                                answerStringToArgIds.put(answer, ImmutableList.copyOf(extendedArgList.stream().sorted()
+                                        .collect(Collectors.toList())));
+                            }
+
                             answerToParseIds.row(argList).values()
                                     .forEach(parseIds -> parseIds
                                             .forEach(pid -> insertParseId(answerStringToParseIds, answer, pid)));
@@ -338,11 +349,9 @@ public class QueryGenerator {
                     Map<String, Double> questionToScore = new HashMap<>();
                     Table<ImmutableList<Integer>, String, Set<Integer>> answerToParseIds = HashBasedTable.create();
                     Table<ImmutableList<Integer>, String, Double> answerToScore = HashBasedTable.create();
-
                     for (int parseId : taggings.get(category)) {
                         List<QuestionAnswerPairReduced> qaList = QuestionGenerator.generateAllQAPairs(predHead, argNum,
                                 sentence, allParses.get(parseId));
-
                         Map<Integer, String> argIdToSpan = new HashMap<>();
                         qaList.forEach(qa -> argIdToSpan.put(qa.targetDep.getArgument(), qa.renderAnswer()));
                         List<Integer> argIds = argIdToSpan.keySet().stream().sorted().collect(Collectors.toList());
