@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
  */
 public class CrowdFlowerDataWriterCheckbox2 {
     static final int nBest = 100;
-    static final int maxNumSentences = 100;
+    static final int maxNumSentences = 500;
     static final int maxNumSentencesPerFile = 100;
     static final int numRandomSamples = 1;
     static final int randomSeed = 104743;
@@ -186,7 +186,7 @@ public class CrowdFlowerDataWriterCheckbox2 {
                     if (goldResponse.chosenOptions.size() > 1) {
                         numMultiheadQueries ++;
                     }
-                    if (r == 0 && lineCounter < maxNumSentences) {
+                    if (r == 0 && 300 < lineCounter && lineCounter < maxNumSentences) {
                         System.out.println("OracleID=" + learner.getOracleParseId(sentenceId));
                         //System.out.println(query.getDebuggingInfo(oracleResponse));
                         System.out.println(query.getDebuggingInfo(goldResponse) + goldResponse.debugInfo);

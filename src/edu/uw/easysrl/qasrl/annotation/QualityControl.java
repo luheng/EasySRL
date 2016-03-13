@@ -24,6 +24,12 @@ public class QualityControl {
                 Category.valueOf("((S\\NP)\\(S\\NP))/S[dcl]"));
     }
 
+    static Set<String> badQuestionStrings = new HashSet<>();
+    static {
+        badQuestionStrings.add("Question is not valid.");
+        badQuestionStrings.add("Bad question.");
+    }
+
     public static boolean queryContainsPronoun(GroupedQuery query) {
         return query.getAnswerOptions().stream().anyMatch(QualityControl::optionContainsPronoun);
     }
@@ -71,7 +77,11 @@ public class QualityControl {
         if (qkey.equals(qkey2)) {
             for (int i = 0; i < numOptions; i++) {
                 for (int j = 0; j < annotation.answerOptions.size(); j++) {
-                    if (query.getAnswerOptions().get(i).getAnswer().equals(annotation.answerStrings.get(j))) {
+                    GroupedQuery.AnswerOption option = query.getAnswerOptions().get(i);
+                    String annotatedStr = annotation.answerStrings.get(j);
+                    if (option.getAnswer().equals(annotatedStr) ||
+                            (GroupedQuery.BadQuestionOption.class.isInstance(option) &&
+                                    badQuestionStrings.contains(annotatedStr))) {
                         optionDist[i] += annotation.answerDist[j];
                         break;
                     }

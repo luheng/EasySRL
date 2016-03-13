@@ -1,14 +1,14 @@
 package edu.uw.easysrl.qasrl.pomdp;
 
+import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.qasrl.GroupedQuery;
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.Response;
+import edu.uw.easysrl.qasrl.corpora.PronounList;
+import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.syntax.grammar.Category;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Created by luheng on 3/9/16.
@@ -115,16 +115,25 @@ public abstract class Evidence {
         boolean questionIsNA = false;
         Set<Integer> chosenArgIds = new HashSet<>(),
                      listedArgIds = new HashSet<>();
+        Map<Integer, String> argIdToSpan = new HashMap<>();
         for (int i = 0; i < query.getAnswerOptions().size(); i++) {
             GroupedQuery.AnswerOption option = query.getAnswerOptions().get(i);
+
             if (GroupedQuery.BadQuestionOption.class.isInstance(option) && response.chosenOptions.contains(i)) {
                 questionIsNA = true;
             }
             if (!option.isNAOption()) {
-                if (response.chosenOptions.contains(i)) {
-                    chosenArgIds.addAll(option.getArgumentIds());
+                final ImmutableList<Integer> argIds = option.getArgumentIds();
+                /*
+                final String[] answerSpans = option.getAnswer().split(QuestionAnswerPair.answerDelimiter);
+                for (int j = 0; j < argIds.size(); j++) {
+                    argIdToSpan.put(argIds.get(j), answerSpans[j]);
                 }
-                listedArgIds.addAll(option.getArgumentIds());
+                */
+                if (response.chosenOptions.contains(i)) {
+                    chosenArgIds.addAll(argIds);
+                }
+                listedArgIds.addAll(argIds);
             }
         }
         int predId = query.getPredicateIndex();
@@ -135,7 +144,11 @@ public abstract class Evidence {
         else {
             for (int argId : listedArgIds) {
                 if (!chosenArgIds.contains(argId)) {
+                    // String argSpan = argIdToSpan.get(argId).toLowerCase();
+                    // Do not penalize pronouns.
+                    //if (!PronounList.englishPronounSet.contains(argSpan)) {
                     evidenceList.add(new AttachmentEvidence(predId, argId, false, 1.0));
+                    //}
                 }
             }
         }

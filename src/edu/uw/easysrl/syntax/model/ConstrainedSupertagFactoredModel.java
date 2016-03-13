@@ -90,7 +90,7 @@ public class ConstrainedSupertagFactoredModel extends SupertagFactoredModel {
         if (rightChild.getSpanLength() == 1 && rightChild.getParse().getWord().startsWith("'")) {
             lengthPenalty = lengthPenalty * 10;
         }
-        double evidencePenalty = .0;
+        double evidencePenalty = 0.0;
 
         /*
         for (UnlabelledDependency dep : node.getResolvedUnlabelledDependencies()) {
@@ -117,7 +117,7 @@ public class ConstrainedSupertagFactoredModel extends SupertagFactoredModel {
             }
             for (int argId : dep.getArguments()) {
                 boolean headInLeft = leftChild.startOfSpan <= headId && headId < leftChild.startOfSpan + leftChild.spanLength;
-                boolean argInLeft = leftChild.startOfSpan <= argId && argId < leftChild.startOfSpan + leftChild.spanLength;
+                boolean argInLeft =  leftChild.startOfSpan <= argId &&  argId <  leftChild.startOfSpan + leftChild.spanLength;
                 if (headInLeft ^ argInLeft && attachmentEvidence.contains(headId, argId)) {
                     evidencePenalty += attachmentEvidence.get(headId, argId);
                 }

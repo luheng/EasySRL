@@ -242,7 +242,7 @@ public class QueryGenerator {
                         if (score > pruningParams.minAnswerConfidence) {
                             answerScoreSum += score;
                             answerStringToScore.put(answer, score);
-                            answerStringToArgIds.put(answer, argList);
+                            //answerStringToArgIds.put(answer, argList);
 
                             if (!answerStringToArgIds.containsKey(answer)) {
                                 answerStringToArgIds.put(answer, argList);

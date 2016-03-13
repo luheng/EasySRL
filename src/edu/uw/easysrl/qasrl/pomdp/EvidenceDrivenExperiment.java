@@ -21,10 +21,10 @@ public class EvidenceDrivenExperiment {
 
     // Query pruning parameters.
     private static QueryPruningParameters queryPruningParameters = new QueryPruningParameters(
-            1,    /* top K */
-            0.1,  /* min question confidence */
-            0.1,  /* min answer confidence */
-            0.05  /* min attachment entropy */
+            1,     /* top K */
+            0.1,   /* min question confidence */
+            0.01,  /* min answer confidence */
+            0.01   /* min attachment entropy */
     );
 
     private static final String[] annotationFiles = {
@@ -92,7 +92,9 @@ public class EvidenceDrivenExperiment {
                 avgReranked = new Results(),
                 avgReparsed = new Results(),
                 avgBeselineChanged = new Results(),
-                avgReparsedChanged = new Results();
+                avgReparsedChanged = new Results(),
+                avgOracleChanged = new Results(),
+                avgReparsedOracle = new Results();
         int numWorsenedSentences = 0,
                 numUnchangedSentences = 0,
                 numImprovedSentences = 0,
@@ -108,7 +110,10 @@ public class EvidenceDrivenExperiment {
             Results baselineF1 = learner.getOneBestF1(sentenceId);
             Results currentF1 = learner.getOneBestF1(sentenceId);
             Results currentReparsedF1 = learner.getOneBestF1(sentenceId);
-            Parse reparsed = null;
+
+            List<Parse> reparsed = null;
+            List<Results> reparsedF1 = null;
+
             final List<String> sentence = learner.getSentenceById(sentenceId);
             final List<Parse> parses = learner.allParses.get(sentenceId);
             final int numParses = parses.size();
@@ -169,11 +174,16 @@ public class EvidenceDrivenExperiment {
                 double expAcc0 = ExpectedAccuracy.compute(learner.beliefModel.belief, learner.allParses.get(sentenceId));
                 learner.beliefModel.resetTo(combinedScore);
                 Results rerankedF1 = learner.getRerankedF1(sentenceId);
-                Results reparsedF1 = new Results();
+
+                // Reparsing resutls.
                 if (reparser != null) {
-                    reparsed = reparser.parseWithConstraint(learner.sentences.get(sentenceId), allEvidenceSet);
-                    reparsedF1 = CcgEvaluation.evaluate(reparsed.dependencies,
-                                                        learner.goldParses.get(sentenceId).dependencies);
+                    reparsed = new ArrayList<>();
+                    reparsed.add(reparser.parseWithConstraint(learner.sentences.get(sentenceId), allEvidenceSet));
+                    //reparsedF1 = CcgEvaluation.evaluate(reparsed.dependencies,gold.dependencies);
+                    //reparsed = reparser.parseNBestWithConstraint(learner.sentences.get(sentenceId), allEvidenceSet);
+                    final Parse gold = learner.goldParses.get(sentenceId);
+                    reparsedF1 = reparsed.stream().map(p -> CcgEvaluation.evaluate(p.dependencies, gold.dependencies))
+                            .collect(Collectors.toList());
                 }
                 // Print.
                 String sentenceStr = query.getSentence().stream().collect(Collectors.joining(" "));
@@ -230,19 +240,20 @@ public class EvidenceDrivenExperiment {
                 result += String.format("oracle penalty:%.3f\tscore:%.3f\n", penalty[oracleParseId],
                         parses.get(oracleParseId).score);
                 */
-                result += String.format("F1: %.3f%% -> %.3f%% %s\n", 100.0 * currentF1.getF1(), 100.0 * reparsedF1.getF1(),
-                        f1Impv);
+                result += String.format("F1: %.3f%% -> %.3f%% %s\n",
+                        100.0 * currentReparsedF1.getF1(),
+                        100.0 * reparsedF1.get(0).getF1(), f1Impv);
                 result += String.format("Reranked F1: %.3f%%\n", 100.0 * rerankedF1.getF1());
-                result += String.format("Reparsed F1: %.3f%%\n", 100.0 * reparsedF1.getF1());
+                result += String.format("Reparsed F1: %.3f%%\n", 100.0 * reparsedF1.get(0).getF1());
                 sentenceDebuggingString += result + "\n";
                 currentF1 = rerankedF1;
-                currentReparsedF1 = reparsedF1;
+                currentReparsedF1 = reparsedF1.get(0);
             }
             boolean changedOneBest = reparsed != null &&
-                    CcgEvaluation.evaluate(reparsed.dependencies, parses.get(0).dependencies).getF1()
+                    CcgEvaluation.evaluate(reparsed.get(0).dependencies, parses.get(0).dependencies).getF1()
                             < 1.0 - 1e-3;
             double deltaF1 = currentReparsedF1.getF1() - baselineF1.getF1();
-            String changeStr = "";
+            String changeStr;
             if (deltaF1 < - 1e-8) {
                 numWorsenedSentences ++;
                 changeStr = "Worsened.";
@@ -259,6 +270,12 @@ public class EvidenceDrivenExperiment {
             if (changedOneBest) {
                 avgBeselineChanged.add(baselineF1);
                 avgReparsedChanged.add(currentReparsedF1);
+                avgOracleChanged.add(oracleF1);
+
+                // Get oracle for re-parsed.
+                Results newOracle = reparsedF1.stream().max((r1, r2) -> Double.compare(r1.getF1(), r2.getF1())).get();
+                avgReparsedOracle.add(newOracle);
+
                 numChanged ++;
             }
             if (queryCount > 0) {
@@ -268,7 +285,8 @@ public class EvidenceDrivenExperiment {
             }
         }
         System.out.println("Baseline:\n" + avgBaseline + "\nRerank:\n" + avgReranked + "\nReparsed:\n" + avgReparsed);
-        System.out.println("Baseline-changed\n" + avgBeselineChanged + "\nReparsed-changed:\n" + avgReparsedChanged);
+        System.out.println("Baseline-changed\n" + avgBeselineChanged + "\nReparsed-changed:\n" + avgReparsedChanged +
+                "\nOracle-changed\n" + avgOracleChanged + "\nReparsed-oracle:\t" + avgReparsedOracle);
         System.out.println("Num improved: " + numImprovedSentences + "\nNum worsened: " + numWorsenedSentences +
                 "\nNum unchanged: " + numUnchangedSentences);
         System.out.println("Num one-best got changed:\t" + numChanged);
