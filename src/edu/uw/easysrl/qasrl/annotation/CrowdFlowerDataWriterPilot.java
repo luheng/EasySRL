@@ -206,7 +206,7 @@ public class CrowdFlowerDataWriterPilot {
         int numTestQuestions = 0;
         for (AlignedAnnotation test : agreedAnnotations) {
             int sentenceId = test.sentenceId;
-            String goldAnswer = test.answerStrings.get(test.goldAnswerId).replace(" # ", " _AND_ ");
+            String goldAnswer = test.answerOptions.get(test.goldAnswerId).replace(" # ", " _AND_ ");
             learner.initializeForSentence(sentenceId);
             List<GroupedQuery> queries = learner.getQueryPool();
             for (GroupedQuery query : queries) {

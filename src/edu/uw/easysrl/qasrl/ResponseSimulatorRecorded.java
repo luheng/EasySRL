@@ -22,9 +22,8 @@ public class ResponseSimulatorRecorded extends ResponseSimulator {
     public ResponseSimulatorRecorded(final List<AlignedAnnotation> alignedAnnotationList) {
         alignedAnnotations = new HashMap<>();
         alignedAnnotationList.forEach(annotation -> {
-            String qkey = annotation.sentenceId + "\t" + annotation.predicateId + "\t" + annotation.predicateCategory
-                    + "\t" + annotation.argumentNumber + "\t" + annotation.question;
-            alignedAnnotations.put(qkey, annotation);
+                String qkey = annotation.annotationKey;
+                alignedAnnotations.put(qkey, annotation);
         });
     }
 

@@ -8,17 +8,113 @@ import org.apache.commons.csv.CSVRecord;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collectors;
+
+import edu.uw.easysrl.main.InputReader;
+import edu.uw.easysrl.qasrl.Parse;
+import edu.uw.easysrl.qasrl.DataLoader;
+import edu.uw.easysrl.qasrl.TextGenerationHelper;
+import edu.uw.easysrl.qasrl.QueryGeneratorBothWays;
+import edu.uw.easysrl.qasrl.qg.QuestionAnswerPairReduced;
 
 /**
  * Created by luheng on 2/24/16.
  */
 public class CrowdFlowerDataReader {
 
+    public static List<AlignedAnnotation> readAggregatedCheckboxAnnotationFromFile(String filePath) throws IOException {
+        FileReader fileReader = new FileReader(filePath);
+        Iterable<CSVRecord> records = CSVFormat.DEFAULT.withHeader().parse(fileReader);
+
+        final List<List<InputReader.InputWord>> sentencesWords = new ArrayList<>();
+        final List<Parse> goldParses = new ArrayList<>();
+        DataLoader.readDevPool(sentencesWords, goldParses);
+        final List<List<String>> sentencesLists = sentencesWords
+            .stream()
+            .map(sent -> sent.stream().map(iw -> iw.word).collect(Collectors.toList()))
+            .collect(Collectors.toList());
+        final List<String> sentences = sentencesLists
+            .stream()
+            .map(TextGenerationHelper::renderString)
+            .collect(Collectors.toList());
+        final Map<Integer, List<QuestionAnswerPairReduced>> allGoldQAPairs = new HashMap<>();
+
+        List<RecordedCheckboxAnnotation> checkboxAnnotations = new ArrayList<>();
+        for (CSVRecord record : records) {
+            //System.out.println(record);
+
+            if (record.get("_golden").equals("true")) {
+                continue;
+            }
+
+            final int sentenceId = Integer.parseInt(record.get("sent_id"));
+            final List<QuestionAnswerPairReduced> goldQAPairs;
+            if(allGoldQAPairs.containsKey(sentenceId)) {
+                goldQAPairs = allGoldQAPairs.get(sentenceId);
+            } else {
+                final List<Parse> goldParse = new LinkedList<>();
+                goldParse.add(goldParses.get(sentenceId));
+                final QueryGeneratorBothWays queryGen = new QueryGeneratorBothWays(sentenceId,
+                                                                                   sentencesLists.get(sentenceId),
+                                                                                   goldParse);
+                goldQAPairs = queryGen.allQAPairs;
+                allGoldQAPairs.put(sentenceId, goldQAPairs);
+            }
+            checkboxAnnotations.addAll(RecordedCheckboxAnnotation.loadFromCSVRecordCrowdFlower(record, goldQAPairs));
+                                       // .stream()
+                                       // .filter(anno -> !anno.answer.toLowerCase().contains("bad question."))
+                                       // .collect(Collectors.toList()));
+        }
+        RecordedCheckboxAnnotation.printStats(checkboxAnnotations);
+        List<Annotation> annotations = new ArrayList<>(checkboxAnnotations);
+
+        System.out.println("Read " + annotations.size() + " annotation records.");
+
+        // Align annotations.
+        List<AlignedAnnotation> alignedAnnotations = AlignedAnnotation.getAlignedAnnotations(annotations);
+        System.out.println("Constructed " + alignedAnnotations.size() + " aligned annotations.");
+        int total = 0;
+        int majorityCorrect = 0;
+        int[] agreementCount = new int[6];
+        Arrays.fill(agreementCount, 0);
+        for(AlignedAnnotation annotation : alignedAnnotations) {
+            if (annotation.getNumAnnotated() > 5) {
+                System.out.println(annotation);
+            }
+            int chosenAnswer = 0;
+            int maxAgree = 0;
+            for(int i = 0; i < annotation.answerDist.length; i++) {
+                int agr = annotation.answerDist[i];
+                if(agr > maxAgree) {
+                    chosenAnswer = i;
+                    maxAgree = agr;
+                }
+            }
+            agreementCount[maxAgree]++;
+
+            total++;
+            if(chosenAnswer == annotation.goldAnswerId) {
+                majorityCorrect++;
+            }
+        }
+        System.out.println("Accuracy of majority vote: " + ((double) majorityCorrect) / total);
+
+        for (int i = 0; i < agreementCount.length; i++) {
+            System.out.println(i + "\t" + agreementCount[i] + "\t" + 100.0 * agreementCount[i] / alignedAnnotations.size());
+        }
+
+        double[] iaa = computeAgreement(alignedAnnotations, 5 /* number of judgements per row */);
+        InterAnnotatorAgreement.printKappa(iaa);
+        double fleissKappa = InterAnnotatorAgreement.fleissKappa(checkboxAnnotations, 5);
+        System.out.println(String.format("Fleiss's Kappa for 5 annotators: %.2f", fleissKappa));
+        return alignedAnnotations;
+    }
+
     public static List<AlignedAnnotation> readAggregatedAnnotationFromFile(String filePath) throws IOException {
         FileReader fileReader = new FileReader(filePath);
         Iterable<CSVRecord> records = CSVFormat.DEFAULT.withHeader().parse(fileReader);
 
-        List<RecordedAnnotation> annotations = new ArrayList<>();
+        List<Annotation> annotations = new ArrayList<>();
         for (CSVRecord record : records) {
             //System.out.println(record);
 
@@ -95,7 +191,8 @@ public class CrowdFlowerDataReader {
     // sent_id	sentence
 
     public static void main(String[] args) throws IOException {
-        readAggregatedAnnotationFromFile(args[0]);
+        readAggregatedCheckboxAnnotationFromFile(args[0]);
+        // readAggregatedAnnotationFromFile(args[0]);
     }
 
     public static double[] computeAgreement(final List<AlignedAnnotation> alignedAnnotations, int maxNumAnnotators) {
@@ -114,7 +211,7 @@ public class CrowdFlowerDataReader {
                 annotationCount[i]++;
             }
             int numAnnotators = annotation.getNumAnnotated();
-            int numOptions = annotation.answerStrings.size();
+            int numOptions = annotation.answerOptions.size();
             for (int i = 2; i <= numAnnotators; i++) {
                 changeAgreement[i] += InterAnnotatorAgreement.computeAgreementChance(numAnnotators, i /* agreement */, numOptions);
             }

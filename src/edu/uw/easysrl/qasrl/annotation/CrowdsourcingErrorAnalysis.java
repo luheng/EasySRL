@@ -302,7 +302,7 @@ public class CrowdsourcingErrorAnalysis {
         if (qkey.equals(qkey2)) {
             for (int i = 0; i < numOptions; i++) {
                 for (int j = 0; j < annotation.answerOptions.size(); j++) {
-                    if (query.getAnswerOptions().get(i).getAnswer().equals(annotation.answerStrings.get(j))) {
+                    if (query.getAnswerOptions().get(i).getAnswer().equals(annotation.answerOptions.get(j))) {
                         optionDist[i] += annotation.answerDist[j];
                         break;
                     }
@@ -325,10 +325,10 @@ public class CrowdsourcingErrorAnalysis {
 
     private static Set<Integer> getUnmatchedAnnotationOptions(GroupedQuery query, AlignedAnnotation annotation) {
         Set<Integer> unmatched = new HashSet<>();
-        for (int i = 0; i < annotation.answerStrings.size(); i++) {
+        for (int i = 0; i < annotation.answerOptions.size(); i++) {
             boolean matched = false;
             for (int j = 0; j < query.getAnswerOptions().size(); j++) {
-                if (query.getAnswerOptions().get(j).getAnswer().equals(annotation.answerStrings.get(i))) {
+                if (query.getAnswerOptions().get(j).getAnswer().equals(annotation.answerOptions.get(i))) {
                     matched = true;
                     break;
                 }

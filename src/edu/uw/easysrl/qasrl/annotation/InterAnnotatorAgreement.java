@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableSet;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.*;
 
 /**
  * Compute inter-annotator agreement.
@@ -20,18 +21,7 @@ import java.util.*;
 
 public class InterAnnotatorAgreement {
 
-    public static void main(String[] args) {
-        Map<String, List<RecordedAnnotation>> annotations = new HashMap<>();
-        for (String fileName : args) {
-            String[] info = fileName.split("/");
-            String annotator = info[info.length - 1].split("_")[0];
-            System.out.println(annotator);
-            try {
-                annotations.put(annotator, RecordedAnnotation.loadAnnotationRecordsFromFile(fileName));
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
+    public static void computeKappaFor4(Map<String, List<Annotation>> annotations) {
         double[] kappa4 = computeAgreement(annotations, null);
         double[] avgKappa2 = new double[3], avgKappa3 = new double[4];
 
@@ -97,6 +87,46 @@ public class InterAnnotatorAgreement {
         System.out.println();
     }
 
+    // this only works for checkboxes because it requires a fixed set of categories.
+    public static double fleissKappa(List<RecordedCheckboxAnnotation> annotations, int numJudgmentsPerItem) {
+        Set<String> annotators = annotations
+            .stream()
+            .map(a -> a.annotatorId)
+            .collect(Collectors.toSet());
+        int numAnnotators = annotators.size();
+        int numCategories = 2;
+
+        List<AlignedAnnotation> alignedAnnotations = AlignedAnnotation
+            .getAlignedAnnotations(new ArrayList<Annotation>(annotations))
+            .stream()
+            .filter(anno -> anno.getNumAnnotated() == 5)
+            .collect(Collectors.toList());
+        int numItems = alignedAnnotations.size();
+        System.out.println("Number of items: " + numItems);
+        List<Integer> numAnswersPerCategory = IntStream.range(0, numCategories)
+            .mapToObj(i -> alignedAnnotations
+                 .stream()
+                 .mapToInt(a -> a.answerDist[i])
+                 .sum())
+            .collect(Collectors.toList());
+        int totalJudgments = numAnswersPerCategory.stream().mapToInt(Integer::intValue).sum();
+        List<Double> propAnswersPerCategory = numAnswersPerCategory
+            .stream()
+            .map(i -> ((double) i) / totalJudgments)
+            .collect(Collectors.toList());
+        double meanAgreement = alignedAnnotations
+            .stream()
+            .mapToDouble(anno -> 1.0 / (numJudgmentsPerItem * (numJudgmentsPerItem - 1)) *
+                 Arrays.stream(anno.answerDist).map(i -> i * (i - 1)).sum())
+            .sum() / numItems;
+        double chanceMeanAgreement = propAnswersPerCategory
+            .stream()
+            .mapToDouble(i -> i * i)
+            .sum();
+        double kappa = (meanAgreement - chanceMeanAgreement) / (1.0 - chanceMeanAgreement);
+        return kappa;
+    }
+
     /**
      * Compute inter-annotator agreement given (not necessarily aligned) annotation records from different people.
      * Cohen's Kappa:
@@ -106,12 +136,19 @@ public class InterAnnotatorAgreement {
      * @param annotations: A map from annotator_identifier to all the annotation records.
      * @param annotators: a subset of annotators.
      */
-    public static double[] computeAgreement(Map<String, List<RecordedAnnotation>> annotations,
+    public static double[] computeAgreement(Map<String, List<Annotation>> annotations,
                                             Collection<String> annotators) {
         if (annotators == null) {
             annotators = annotations.keySet();
+        } else {
+            Map<String, List<Annotation>> filteredAnnotations = new HashMap<>();
+            for(String annotator : annotators) {
+                filteredAnnotations.put(annotator, annotations.get(annotator));
+            }
+            annotations = filteredAnnotations;
         }
-        List<AlignedAnnotation> alignedAnnotations = AlignedAnnotation.getAlignedAnnotations(annotations, annotators);
+
+        List<AlignedAnnotation> alignedAnnotations = AlignedAnnotation.getAlignedAnnotations(annotations);
         int numAnnotators = annotators.size();
         int[] annotationCount = new int[numAnnotators + 1];
         double[] agreement = new double[numAnnotators + 1];
@@ -128,7 +165,7 @@ public class InterAnnotatorAgreement {
                 annotationCount[i]++;
             }
             if (annotation.getNumAnnotated() == numAnnotators) {
-                int numOptions = annotation.answerStrings.size();
+                int numOptions = annotation.answerOptions.size();
                 for (int i = 2; i <= numAnnotators; i++) {
                     changeAgreement[i] += computeAgreementChance(numAnnotators, i /* agreement */, numOptions);
                 }
@@ -157,12 +194,18 @@ public class InterAnnotatorAgreement {
         return kappa;
     }
 
-    public static int[][] computeAccuracy(Map<String, List<RecordedAnnotation>> annotations,
+    public static int[][] computeAccuracy(Map<String, List<Annotation>> annotations,
                                          Collection<String> annotators) {
         if (annotators == null) {
             annotators = annotations.keySet();
+        } else {
+            Map<String, List<Annotation>> filteredAnnotations = new HashMap<>();
+            for(String annotator : annotators) {
+                filteredAnnotations.put(annotator, annotations.get(annotator));
+            }
+            annotations = filteredAnnotations;
         }
-        List<AlignedAnnotation> alignedAnnotations = AlignedAnnotation.getAlignedAnnotations(annotations, annotators);
+        List<AlignedAnnotation> alignedAnnotations = AlignedAnnotation.getAlignedAnnotations(annotations);
         int numAnnotators = annotators.size();
         int[][] result = new int[numAnnotators + 1][2];
         for (AlignedAnnotation annotation : alignedAnnotations) {
@@ -192,4 +235,43 @@ public class InterAnnotatorAgreement {
         return  p * computeAgreementChance(total - 1, agreement - 1, options)
                     + (1.0 - p) * computeAgreementChance(total - 1, agreement, options);
     }
+
+    public static void main(String[] args) {
+        List<String> filenames = Arrays.asList(args);
+        Map<String, List<Annotation>> annotations = getCheckboxAnnotations(filenames);
+        double[] kappa = computeAgreement(annotations, null);
+        printKappa(kappa);
+    }
+
+    public static Map<String, List<Annotation>> getCheckboxAnnotations(List<String> filenames) {
+        Map<String, List<Annotation>> annotations = new HashMap<>();
+        for (String filename : filenames) {
+            String[] info = filename.split("/");
+            String annotator = info[info.length - 1].split("_")[0];
+            System.out.println(annotator);
+            try {
+                annotations.put(annotator,
+                                new ArrayList<>(RecordedCheckboxAnnotation.loadAnnotationRecordsFromFile(filename)));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        return annotations;
+    }
+
+    public static Map<String, List<Annotation>> getMultipleChoiceAnnotations(List<String> filenames) {
+        Map<String, List<Annotation>> annotations = new HashMap<>();
+        for (String filename : filenames) {
+            String[] info = filename.split("/");
+            String annotator = info[info.length - 1].split("_")[0];
+            System.out.println(annotator);
+            try {
+                annotations.put(annotator, new ArrayList<>(RecordedAnnotation.loadAnnotationRecordsFromFile(filename)));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        return annotations;
+    }
+
 }

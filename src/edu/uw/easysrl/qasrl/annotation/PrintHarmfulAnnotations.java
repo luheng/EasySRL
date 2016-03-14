@@ -11,15 +11,18 @@ import java.util.List;
  * Created by luheng on 2/15/16.
  */
 public class PrintHarmfulAnnotations {
-    public static List<RecordedAnnotation> getHarmfulAnnotations(final List<RecordedAnnotation> annotations) {
+    public static List<RecordedAnnotation> getHarmfulAnnotations(final List<Annotation> annotations) {
         List<RecordedAnnotation> result = new ArrayList<>();
         for (int i = 0; i < annotations.size(); i++) {
-            final RecordedAnnotation curr = annotations.get(i);
+            if(!(annotations.get(i) instanceof RecordedAnnotation)) {
+                continue;
+            }
+            final RecordedAnnotation curr = (RecordedAnnotation) annotations.get(i);
             if (i == 0 || annotations.get(i - 1).sentenceId != curr.sentenceId) {
                 if (curr.rerankF1 < curr.onebestF1) {
                     result.add(curr);
                 }
-            } else if (curr.rerankF1 < annotations.get(i - 1).rerankF1) {
+            } else if ((annotations.get(i - 1) instanceof RecordedAnnotation) && curr.rerankF1 < ((RecordedAnnotation)annotations.get(i - 1)).rerankF1) {
                 result.add(curr);
             }
         }
@@ -29,7 +32,7 @@ public class PrintHarmfulAnnotations {
     public static void main(String[] args) {
         String fileName = args[0];
         try {
-            List<RecordedAnnotation> annotations = RecordedAnnotation.loadAnnotationRecordsFromFile(fileName);
+            List<Annotation> annotations = new ArrayList<>(RecordedAnnotation.loadAnnotationRecordsFromFile(fileName));
             List<RecordedAnnotation> harmfulAnnotations = getHarmfulAnnotations(annotations);
 
             harmfulAnnotations.forEach(System.out::println);

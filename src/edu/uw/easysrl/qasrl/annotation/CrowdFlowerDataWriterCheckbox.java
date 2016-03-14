@@ -352,15 +352,19 @@ public class CrowdFlowerDataWriterCheckbox {
                 int numTestQuestions = 0;
                 for (AlignedAnnotation test : agreedAnnotations) {
                     int sentenceId = test.sentenceId;
-                    String goldAnswer = test.answerStrings.get(test.goldAnswerId).replace(" # ", " _AND_ ");
+                    String goldAnswer = test.answerOptions.get(test.goldAnswerId).replace(" # ", " _AND_ ");
                     List<GroupedQuery> queries = learner.getQueriesBySentenceId(sentenceId);
                     for (GroupedQuery query : queries) {
                         // TODO: remove later
                         //System.err.println(query.getDebuggingInfo(responseSimulator.answerQuestion(query)));
 
                         // Match predicate ID, question key and gold answer span.
-                        if (query.getPredicateIndex() == test.predicateId &&
-                                query.getQuestion().equalsIgnoreCase(test.question)) {
+                        // TODO XXX predicateId is no longer populated in AlignedAnnotation;
+                        // instead we match based on getAnnotationKey(); but this needs to reconcile with queries;
+                        // so instead we should have a method on Annotation/AlignedAnnotation determines matching for given queries.
+                        if (false) {
+                            // query.getPredicateIndex() == test.predicateId &&
+                            //     query.getQuestion().equalsIgnoreCase(test.question)) {
                             int goldAnswerId = -1;
                             for (int i = 0; i < query.getAnswerOptions().size(); i++) {
                                 GroupedQuery.AnswerOption ao = query.getAnswerOptions().get(i);
