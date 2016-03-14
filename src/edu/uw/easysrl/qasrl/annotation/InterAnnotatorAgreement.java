@@ -128,7 +128,7 @@ public class InterAnnotatorAgreement {
                 annotationCount[i]++;
             }
             if (annotation.getNumAnnotated() == numAnnotators) {
-                int numOptions = annotation.answerStrings.size();
+                int numOptions = annotation.optionStrings.size();
                 for (int i = 2; i <= numAnnotators; i++) {
                     changeAgreement[i] += computeAgreementChance(numAnnotators, i /* agreement */, numOptions);
                 }

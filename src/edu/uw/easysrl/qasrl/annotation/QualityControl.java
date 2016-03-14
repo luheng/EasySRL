@@ -78,7 +78,30 @@ public class QualityControl {
             for (int i = 0; i < numOptions; i++) {
                 for (int j = 0; j < annotation.answerOptions.size(); j++) {
                     GroupedQuery.AnswerOption option = query.getAnswerOptions().get(i);
-                    String annotatedStr = annotation.answerStrings.get(j);
+                    String annotatedStr = annotation.optionStrings.get(j);
+                    if (option.getAnswer().equals(annotatedStr) ||
+                            (GroupedQuery.BadQuestionOption.class.isInstance(option) &&
+                                    badQuestionStrings.contains(annotatedStr))) {
+                        optionDist[i] += annotation.answerDist[j];
+                        break;
+                    }
+                }
+            }
+        }
+        return optionDist;
+    }
+
+    public static int[] getUserResponsesCheckbox(GroupedQuery query, AlignedAnnotation annotation) {
+        String qkey =query.getPredicateIndex() + "\t" + query.getQuestion();
+        int numOptions = query.getAnswerOptions().size();
+        int[] optionDist = new int[numOptions];
+        Arrays.fill(optionDist, 0);
+        String qkey2 = annotation.predicateId + "\t" + annotation.question;
+        if (qkey.equals(qkey2)) {
+            for (int i = 0; i < numOptions; i++) {
+                for (int j = 0; j < annotation.answerOptions.size(); j++) {
+                    GroupedQuery.AnswerOption option = query.getAnswerOptions().get(i);
+                    String annotatedStr = annotation.optionStrings.get(j);
                     if (option.getAnswer().equals(annotatedStr) ||
                             (GroupedQuery.BadQuestionOption.class.isInstance(option) &&
                                     badQuestionStrings.contains(annotatedStr))) {

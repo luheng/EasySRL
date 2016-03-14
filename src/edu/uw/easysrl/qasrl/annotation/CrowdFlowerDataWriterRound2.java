@@ -255,7 +255,7 @@ public class CrowdFlowerDataWriterRound2 {
         List<AlignedAnnotation> pilotAnnotations = AlignedAnnotation.getAllAlignedAnnotationsFromPilotStudy();
         // Load test questions from previous annotation.
         List<AlignedAnnotation> cfRound1Annotations = CrowdFlowerDataReader.readAggregatedAnnotationFromFile(
-                cfRound1AnnotationFilePath);
+                cfRound1AnnotationFilePath, false /* check box */);
 
         pilotAnnotations.stream().forEach(a -> heldOutSentences.add(a.sentenceId));
         cfRound1Annotations.stream().forEach(a -> heldOutSentences.add(a.sentenceId));

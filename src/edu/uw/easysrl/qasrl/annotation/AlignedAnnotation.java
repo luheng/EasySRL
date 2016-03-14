@@ -24,13 +24,13 @@ public class AlignedAnnotation extends RecordedAnnotation {
         this.predicateString = annotation.predicateString;
         this.questionId = annotation.questionId;
         this.question = annotation.question;
-        this.answerStrings = annotation.answerStrings;
+        this.optionStrings = annotation.optionStrings;
         this.answerId = annotation.answerId;
         this.goldAnswerId = annotation.goldAnswerId;
         annotatorToAnswerId = new HashMap<>();
         annotatorToComment = new HashMap<>();
-        answerDist = new int[answerStrings.size()];
-        answerTrust = new double[answerStrings.size()];
+        answerDist = new int[optionStrings.size()];
+        answerTrust = new double[optionStrings.size()];
         Arrays.fill(answerDist, 0);
         Arrays.fill(answerTrust, 0.0);
     }
@@ -38,13 +38,22 @@ public class AlignedAnnotation extends RecordedAnnotation {
     boolean addAnnotation(String annotator, RecordedAnnotation annotation) {
         // TODO: check options are the same.
         if (answerOptions == null) {
-            answerOptions = annotation.answerStrings;
+            answerOptions = annotation.optionStrings;
         }
         // Some annotation records may contain duplicates.
         if (this.isSameQuestionAs(annotation) && !annotatorToAnswerId.containsKey(annotator)) {
-            annotatorToAnswerId.put(annotator, annotation.answerId);
-            answerDist[annotation.answerId] ++;
-            answerTrust[annotation.answerId] += annotation.trust;
+            if (annotation.multiAnswerIds == null) {
+                annotatorToAnswerId.put(annotator, annotation.answerId);
+                answerDist[annotation.answerId]++;
+                answerTrust[annotation.answerId] += annotation.trust;
+            } else {
+                // TODO: annotator to multi answer ids.
+                annotatorToAnswerId.put(annotator, -1);
+                for (int answerId : annotation.multiAnswerIds) {
+                    answerDist[answerId]++;
+                    answerTrust[answerId] += annotation.trust;
+                }
+            }
             if (annotation.comment != null && !annotation.comment.isEmpty()) {
                 annotatorToComment.put(annotator, annotation.comment);
             }
@@ -101,7 +110,7 @@ public class AlignedAnnotation extends RecordedAnnotation {
                 + "SID=" + sentenceId + "\t" + sentenceString + "\n"
                 + "PRED=" + predicateId + "\t" + predicateString + "\t" + predicateCategory + "." + argumentNumber + "\n"
                 + "QID=" + questionId + "\t" + question + "\n";
-        for (int i = 0; i < answerStrings.size(); i++) {
+        for (int i = 0; i < optionStrings.size(); i++) {
             String match = "";
             for (int j = 0; j < answerDist[i]; j++) {
                 match += "*";
@@ -109,7 +118,7 @@ public class AlignedAnnotation extends RecordedAnnotation {
             if (i == goldAnswerId) {
                 match += "G";
             }
-            result += String.format("%-8s\t%d\t%s\n", match, i, answerStrings.get(i));
+            result += String.format("%-8s\t%d\t%s\n", match, i, optionStrings.get(i));
         }
         for (String annotator : annotatorToComment.keySet()) {
             result += annotator + ":\t" + annotatorToComment.get(annotator) + "\n";

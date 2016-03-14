@@ -11,7 +11,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class EvidenceDrivenExperiment {
+public class EvidenceDrivenExperimentCheckbox {
     private static final int nBest = 100;
     private static final int maxNumOptionsPerQuestion = 6;
     static {
@@ -27,11 +27,10 @@ public class EvidenceDrivenExperiment {
     );
 
     private static final String[] annotationFiles = {
-            "./Crowdflower_data/f878213.csv",
-            "./Crowdflower_data/f882410.csv"
+            "./Crowdflower_data/all-checkbox-responses.csv",
     };
 
-    static final int minAgreement = 2;
+    static final int minAgreement = 3;
     static final double supertagPenaltyWeight = 5.0;
     static final double attachmentPenaltyWeight = 1.0;
 
@@ -58,8 +57,7 @@ public class EvidenceDrivenExperiment {
         List<AlignedAnnotation> annotationList = new ArrayList<>();
         try {
             for (String fileName : fileNames) {
-                annotationList.addAll(CrowdFlowerDataReader.readAggregatedAnnotationFromFile(fileName,
-                        false /* checkbox */));
+                annotationList.addAll(CrowdFlowerDataReader.readAggregatedAnnotationFromFile(fileName, true /* checkbox */));
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -217,8 +215,8 @@ public class EvidenceDrivenExperiment {
                             DebugHelper.getShortListString(option.getArgumentIds()),
                             option.getArgumentIds().stream().map(sentence::get).collect(Collectors.joining(",")));
                     result += String.format("%-8s\t%.3f\t%-40s\t%-30s\t-\t-\t%s\n", match, option.getProbability(),
-                                option.getAnswer(), headStr,
-                                DebugHelper.getShortListString(option.getParseIds()));
+                            option.getAnswer(), headStr,
+                            DebugHelper.getShortListString(option.getParseIds()));
                 }
                 String f1Impv = " ";
                 if (rerankedF1 != null) {
@@ -290,7 +288,7 @@ public class EvidenceDrivenExperiment {
         System.out.println("Num one-best got changed:\t" + numChanged);
         debugging.stream()
                 .sorted((b1, b2) -> Double.compare(b1.deltaF1, b2.deltaF1))
-               // .filter(b -> Math.abs(b.deltaF1) > 1e-3)
+                        // .filter(b -> Math.abs(b.deltaF1) > 1e-3)
                 .forEach(b -> System.out.println(b.block));
     }
 

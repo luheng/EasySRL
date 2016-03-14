@@ -2,7 +2,6 @@ package edu.uw.easysrl.qasrl.annotation;
 
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.pomdp.POMDP;
-import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
@@ -12,7 +11,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 /**
  * Group query by sentences.
@@ -206,7 +204,7 @@ public class CrowdFlowerDataWriterPilot {
         int numTestQuestions = 0;
         for (AlignedAnnotation test : agreedAnnotations) {
             int sentenceId = test.sentenceId;
-            String goldAnswer = test.answerStrings.get(test.goldAnswerId).replace(" # ", " _AND_ ");
+            String goldAnswer = test.optionStrings.get(test.goldAnswerId).replace(" # ", " _AND_ ");
             learner.initializeForSentence(sentenceId);
             List<GroupedQuery> queries = learner.getQueryPool();
             for (GroupedQuery query : queries) {

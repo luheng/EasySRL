@@ -49,11 +49,13 @@ public class ConstrainedSupertagFactoredModel extends SupertagFactoredModel {
                 });
         // Normalize attachment evidence.
         attachmentEvidence.rowKeySet().stream().forEach(head -> {
-            int ncols = attachmentEvidence.row(head).size();
+            int numArgs = attachmentEvidence.row(head).size();
+            //double norm = Math.sqrt(1.0 * numArgs);
+            double norm = 1.0 * numArgs;
             Set<Integer> args = new HashSet<>(attachmentEvidence.row(head).keySet());
             args.forEach(arg -> {
                 double weight = attachmentEvidence.get(head, arg);
-                attachmentEvidence.put(head, arg, weight / ncols);
+                attachmentEvidence.put(head, arg, weight / norm);
             });
         });
         computeOutsideProbabilities();

@@ -187,7 +187,8 @@ public class SimulatedExperimentPOMDP {
         annotations = new ArrayList<>();
         try {
             for (String filePath : annotationFiles) {
-                annotations.addAll(CrowdFlowerDataReader.readAggregatedAnnotationFromFile(filePath));
+                annotations.addAll(CrowdFlowerDataReader.readAggregatedAnnotationFromFile(filePath,
+                        false /* check box */));
             }
         } catch (IOException e) {
             e.printStackTrace();

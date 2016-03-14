@@ -25,9 +25,13 @@ public class RecordedAnnotation {
     public String question;
 
     // Answer information
-    List<String> answerStrings;
+    List<String> optionStrings;
     String answer;
     int answerId, goldAnswerId;
+
+    // Multi-answer information
+    List<String> multiAnswers;
+    List<Integer> multiAnswerIds, goldAnswerIds;
 
     // Current accuracy
     double rerankF1, oracleF1, onebestF1;
@@ -40,7 +44,7 @@ public class RecordedAnnotation {
     public String comment;
 
     protected RecordedAnnotation() {
-        answerStrings = new ArrayList<>();
+        optionStrings = new ArrayList<>();
     }
 
     public static List<RecordedAnnotation> loadAnnotationRecordsFromFile(String fileName) throws IOException {
@@ -92,8 +96,8 @@ public class RecordedAnnotation {
                     }
                     info = line.split("\\t");
                     int id = Integer.parseInt(info[0]);
-                    assert (id == curr.answerStrings.size());
-                    curr.answerStrings.add(info[3]);
+                    assert (id == curr.optionStrings.size());
+                    curr.optionStrings.add(info[3]);
                     String match = info[1];
                     if (match.contains("*")) {
                         curr.answerId = id;
@@ -126,7 +130,7 @@ public class RecordedAnnotation {
                 && predicateId == other.predicateId
                 && argumentNumber == other.argumentNumber
                 && question.equalsIgnoreCase(other.question)
-                && answerStrings.size() == other.answerStrings.size()
+                && optionStrings.size() == other.optionStrings.size()
                 && goldAnswerId == other.goldAnswerId;
     }
 
@@ -138,8 +142,8 @@ public class RecordedAnnotation {
                 + "PRED=" + predicateId + "\t" + predicateString + "\t" + predicateCategory + "." + argumentNumber + "\n"
                 + "QID=" + questionId + "\t" + question + "\n"
                 + "ANS/GOLD=" + answerId + "/" + goldAnswerId + "\n";
-        for (int i = 0; i < answerStrings.size(); i++) {
-            result += i + "\t" + answerStrings.get(i) + "\n";
+        for (int i = 0; i < optionStrings.size(); i++) {
+            result += i + "\t" + optionStrings.get(i) + "\n";
         }
         result += String.format("1B=%.3f\tRR=%.3f\tOR=%.3f", onebestF1, rerankF1, oracleF1) + "\n";
         return result;

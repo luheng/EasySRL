@@ -36,7 +36,8 @@ public class SimulatedExperimentsCrowdflower {
         // Read annotations.
         List<AlignedAnnotation> annotations;
         try {
-            annotations = CrowdFlowerDataReader.readAggregatedAnnotationFromFile(annotationFilePath);
+            annotations = CrowdFlowerDataReader.readAggregatedAnnotationFromFile(annotationFilePath,
+                    false /* check box */);
         } catch (IOException e) {
             e.printStackTrace();
             return;

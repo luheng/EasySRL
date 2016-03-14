@@ -53,7 +53,8 @@ public class CrowdsourcingErrorAnalysis {
         List<AlignedAnnotation> annotationList = new ArrayList<>();
         try {
             for (String fileName : fileNames) {
-                annotationList.addAll(CrowdFlowerDataReader.readAggregatedAnnotationFromFile(fileName));
+                annotationList.addAll(CrowdFlowerDataReader.readAggregatedAnnotationFromFile(fileName,
+                        false /* checkbox */));
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -359,10 +360,10 @@ public class CrowdsourcingErrorAnalysis {
 
     private static Set<Integer> getUnmatchedAnnotationOptions(GroupedQuery query, AlignedAnnotation annotation) {
         Set<Integer> unmatched = new HashSet<>();
-        for (int i = 0; i < annotation.answerStrings.size(); i++) {
+        for (int i = 0; i < annotation.optionStrings.size(); i++) {
             boolean matched = false;
             for (int j = 0; j < query.getAnswerOptions().size(); j++) {
-                if (query.getAnswerOptions().get(j).getAnswer().equals(annotation.answerStrings.get(i))) {
+                if (query.getAnswerOptions().get(j).getAnswer().equals(annotation.optionStrings.get(i))) {
                     matched = true;
                     break;
                 }

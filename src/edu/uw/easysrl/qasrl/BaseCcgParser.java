@@ -178,7 +178,8 @@ public abstract class BaseCcgParser {
         private final int maxChartSize = 100000;
         private final int maxSentenceLength = 70;
 
-        public ConstrainedCcgParser(String modelFolderPath, List<Category> rootCategories, int nBest)  {
+        public ConstrainedCcgParser(String modelFolderPath, List<Category> rootCategories, int maxTagsPerWord,
+                                    int nBest)  {
             final File modelFolder = Util.getFile(modelFolderPath);
             if (!modelFolder.exists()) {
                 throw new InputMismatchException("Couldn't load model from from: " + modelFolder);
@@ -187,7 +188,8 @@ public abstract class BaseCcgParser {
             try {
                 Coindexation.parseMarkedUpFile(new File(modelFolder, "markedup"));
                 ConstrainedSupertagModelFactory modelFactory = new ConstrainedSupertagModelFactory(
-                        Tagger.make(modelFolder, supertaggerBeam, 100 /* 50, max tags per word */, null /* cutoffs */),
+                        Tagger.make(modelFolder, supertaggerBeam, maxTagsPerWord /* default is 50 */,
+                                null /* cutoffs */),
                         false /* include deps */);
                 parser = new ConstrainedParserAStar(modelFactory, maxSentenceLength, nBest, rootCategories, modelFolder,
                         maxChartSize);

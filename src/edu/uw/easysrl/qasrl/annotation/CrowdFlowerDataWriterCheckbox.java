@@ -352,7 +352,7 @@ public class CrowdFlowerDataWriterCheckbox {
                 int numTestQuestions = 0;
                 for (AlignedAnnotation test : agreedAnnotations) {
                     int sentenceId = test.sentenceId;
-                    String goldAnswer = test.answerStrings.get(test.goldAnswerId).replace(" # ", " _AND_ ");
+                    String goldAnswer = test.optionStrings.get(test.goldAnswerId).replace(" # ", " _AND_ ");
                     List<GroupedQuery> queries = learner.getQueriesBySentenceId(sentenceId);
                     for (GroupedQuery query : queries) {
                         // TODO: remove later
