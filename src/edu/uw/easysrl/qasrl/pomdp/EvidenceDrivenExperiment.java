@@ -6,7 +6,6 @@ import edu.uw.easysrl.qasrl.annotation.CrowdFlowerDataReader;
 import edu.uw.easysrl.qasrl.annotation.QualityControl;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
-import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.io.IOException;
 import java.util.*;
@@ -37,10 +36,10 @@ public class EvidenceDrivenExperiment {
     static final double attachmentPenaltyWeight = 1.0;
 
     static final int ppQuestionMinAgreement = 2;
-    static final double ppQuestionWeight = 0.01;
+    static final double ppQuestionWeight = 0.1;
 
-    static final boolean skipPrepositionalQuestions = true;
-    static final boolean skipPronouns = false;
+    static final boolean skipPrepositionalQuestions = false;
+    static final boolean skipPronounEvidence = false;
 
     static BaseCcgParser.ConstrainedCcgParser reparser;
 
@@ -153,12 +152,9 @@ public class EvidenceDrivenExperiment {
                 if (skipPrepositionalQuestions && isPPQuestion) {
                     continue;
                 }
-                if (skipPronouns && QualityControl.queryContainsPronoun(query)) {
-                    continue;
-                }
                 // Get evidence and reset weight.
                 double questionTypeWeight = isPPQuestion ? ppQuestionWeight : 1.0;
-                Set<Evidence> evidenceSet = Evidence.getEvidenceFromQuery(query, multiResponse);
+                Set<Evidence> evidenceSet = Evidence.getEvidenceFromQuery(query, multiResponse, skipPronounEvidence);
                 evidenceSet.forEach(ev -> ev.confidence = questionTypeWeight *
                         (Evidence.SupertagEvidence.class.isInstance(ev) ? supertagPenaltyWeight :
                                 attachmentPenaltyWeight));

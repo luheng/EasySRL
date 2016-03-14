@@ -5,12 +5,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Table;
 import com.google.common.collect.Table.Cell;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
-import edu.uw.easysrl.qasrl.analysis.PPAttachment;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPairReduced;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.grammar.Category;
-import jdk.nashorn.internal.runtime.Debug;
 
 import java.util.*;
 import java.util.Map.Entry;
@@ -188,8 +186,7 @@ public class QueryGenerator {
                                 sentence, allParses.get(parseId));
 
                         /************** For analysis. *******/
-                        /*
-                        if (qaList.size() > 0) {
+                        /* if (qaList.size() > 0) {
                             predicateHasQuestion = true;
                         } else {
                             predicateHasSkippedQuestion = true;
@@ -242,8 +239,9 @@ public class QueryGenerator {
                         if (score > pruningParams.minAnswerConfidence) {
                             answerScoreSum += score;
                             answerStringToScore.put(answer, score);
-                            //answerStringToArgIds.put(answer, argList);
-
+                            answerStringToArgIds.put(answer, argList);
+                            /*
+                            // TODO: this seems to make a difference for the reranker.
                             if (!answerStringToArgIds.containsKey(answer)) {
                                 answerStringToArgIds.put(answer, argList);
                             } else {
@@ -253,7 +251,7 @@ public class QueryGenerator {
                                 answerStringToArgIds.put(answer, ImmutableList.copyOf(extendedArgList.stream().sorted()
                                         .collect(Collectors.toList())));
                             }
-
+                            */
                             answerToParseIds.row(argList).values()
                                     .forEach(parseIds -> parseIds
                                             .forEach(pid -> insertParseId(answerStringToParseIds, answer, pid)));
@@ -487,7 +485,7 @@ public class QueryGenerator {
                                                      final List<Parse> parses,
                                                      final QuestionGenerator questionGenerator,
                                                      boolean generatePseudoQuestions) {
-        List<Query> unmergedQueries = new ArrayList<>();
+        List<AtomicQuery> unmergedQueries = new ArrayList<>();
         List<GroupedQuery> groupedQueryList = new ArrayList<>();
 
         int numParses = parses.size();
@@ -511,11 +509,11 @@ public class QueryGenerator {
                 if (!generatePseudoQuestions && !qaPairOpt.isPresent()) {
                     continue;
                 }
-                unmergedQueries.add(new Query(qaPairOpt.get(), parseId));
+                unmergedQueries.add(new AtomicQuery(qaPairOpt.get(), parseId));
             }
         }
         /************ Collapse queries **************/
-        for (Query query : unmergedQueries) {
+        for (AtomicQuery query : unmergedQueries) {
             boolean merged = false;
             for (GroupedQuery groupedQuery : groupedQueryList) {
                 if (groupedQuery.canMerge(query)) {
@@ -552,7 +550,7 @@ public class QueryGenerator {
         // Map a surface string of an answer to a set of parse ids.
         Map<String, Set<Integer>> spanToParses = new HashMap<>();
 
-        Map<String, Query> spanToQuery = new HashMap<>();
+        Map<String, AtomicQuery> spanToQuery = new HashMap<>();
 
         groupedQuery.queries.forEach(query -> {
             ImmutableList<Integer> argList = ImmutableList.copyOf(query.argumentIds);
@@ -573,7 +571,7 @@ public class QueryGenerator {
         // Get most representative question.
         double bestQuestionScore = -1.0;
         String bestQuestion = "";
-        Query bestQuery = null;
+        AtomicQuery bestQuery = null;
         for (Entry<String, Set<Integer>> entry : questionToParses.entrySet()) {
             final String question = entry.getKey();
             final Set<Integer> parseIds = entry.getValue();
@@ -583,7 +581,7 @@ public class QueryGenerator {
                 bestQuestion = question;
             }
         }
-        for (Query query : groupedQuery.queries) {
+        for (AtomicQuery query : groupedQuery.queries) {
             if (query.question.equals(bestQuestion)) {
                 bestQuery = query;
                 break;
@@ -665,7 +663,7 @@ public class QueryGenerator {
         // Get most representative question.
         double bestQuestionScore = -1.0;
         String bestQuestion = "";
-        Query bestQuery = null;
+        AtomicQuery bestQuery = null;
         for (Entry<String, Set<Integer>> entry : questionToParses.entrySet()) {
             final String question = entry.getKey();
             final Set<Integer> parseIds = entry.getValue();
@@ -675,7 +673,7 @@ public class QueryGenerator {
                 bestQuestion = question;
             }
         }
-        for (Query query : groupedQuery.queries) {
+        for (AtomicQuery query : groupedQuery.queries) {
             if (query.question.equals(bestQuestion)) {
                 bestQuery = query;
                 break;

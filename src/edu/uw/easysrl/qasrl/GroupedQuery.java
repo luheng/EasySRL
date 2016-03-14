@@ -77,7 +77,7 @@ public class GroupedQuery {
     int sentenceId, totalNumParses, queryId;
     final List<String> sentence;
     final List<Parse> parses;
-    Set<Query> queries;
+    Set<AtomicQuery> queries;
 
     // Information specified only after collapsing;
     int predicateIndex;
@@ -94,8 +94,6 @@ public class GroupedQuery {
     public double questionConfidence, attachmentUncertainty;
     public double answerMargin, answerEntropy, normalizedAnswerEntropy;
 
-    public static double rankDiscountFactor = 0.0;
-    public static boolean estimateWithParseScores = true;
     // Not counting "question invalid" and "answer not listed" options.
     public static int maxNumNonNAOptionsPerQuery = 8;
 
@@ -113,13 +111,13 @@ public class GroupedQuery {
         answerDependencies = new ArrayList<>();
     }
 
-    public GroupedQuery(int sentenceId, final List<String> sentence, final List<Parse> parses, Query query) {
+    public GroupedQuery(int sentenceId, final List<String> sentence, final List<Parse> parses, AtomicQuery query) {
         this(sentenceId, sentence, parses);
         queries.add(query);
     }
 
-    public boolean canMerge(final Query queryToMerge) {
-        for (Query query : queries) {
+    public boolean canMerge(final AtomicQuery queryToMerge) {
+        for (AtomicQuery query : queries) {
             if (canMerge(queryToMerge, query)) {
                 return true;
             }
@@ -127,11 +125,11 @@ public class GroupedQuery {
         return false;
     }
 
-    public void addQuery(final Query query) {
+    public void addQuery(final AtomicQuery query) {
         this.queries.add(query);
     }
 
-    private static boolean canMerge(Query q1, Query q2) {
+    private static boolean canMerge(AtomicQuery q1, AtomicQuery q2) {
         if (q1.predicateIndex == q2.predicateIndex) {
             // Doing exact match.
             if (q1.question.equals(q2.question) && !q1.question.equalsIgnoreCase("-NOQ-")) {

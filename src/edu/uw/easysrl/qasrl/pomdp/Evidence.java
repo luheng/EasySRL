@@ -109,7 +109,8 @@ public abstract class Evidence {
         }
     }
 
-    public static Set<Evidence> getEvidenceFromQuery(GroupedQuery query, Response response) {
+    public static Set<Evidence> getEvidenceFromQuery(GroupedQuery query, Response response,
+                                                     boolean doNotPenalizePronouns) {
         Set<Evidence> evidenceList = new HashSet<>();
 
         boolean questionIsNA = false;
@@ -124,31 +125,33 @@ public abstract class Evidence {
             }
             if (!option.isNAOption()) {
                 final ImmutableList<Integer> argIds = option.getArgumentIds();
-                /*
-                final String[] answerSpans = option.getAnswer().split(QuestionAnswerPair.answerDelimiter);
-                for (int j = 0; j < argIds.size(); j++) {
-                    argIdToSpan.put(argIds.get(j), answerSpans[j]);
-                }
-                */
                 if (response.chosenOptions.contains(i)) {
                     chosenArgIds.addAll(argIds);
                 }
                 listedArgIds.addAll(argIds);
+                if (doNotPenalizePronouns) {
+                    final String[] answerSpans = option.getAnswer().split(QuestionAnswerPair.answerDelimiter);
+                    for (int j = 0; j < argIds.size(); j++) {
+                        argIdToSpan.put(argIds.get(j), answerSpans[j]);
+                    }
+                }
             }
         }
         int predId = query.getPredicateIndex();
         if (questionIsNA) {
             evidenceList.add(new SupertagEvidence(predId, query.getCategory(), false, 1.0));
         }
-        // TODO: take into account coordinations.
+        // TODO: take into account co-ordinations.
         else {
             for (int argId : listedArgIds) {
                 if (!chosenArgIds.contains(argId)) {
-                    // String argSpan = argIdToSpan.get(argId).toLowerCase();
-                    // Do not penalize pronouns.
-                    //if (!PronounList.englishPronounSet.contains(argSpan)) {
+                    if (doNotPenalizePronouns) {
+                        String argSpan = argIdToSpan.get(argId).toLowerCase();
+                        if (PronounList.englishPronounSet.contains(argSpan)) {
+                            continue;
+                        }
+                    }
                     evidenceList.add(new AttachmentEvidence(predId, argId, false, 1.0));
-                    //}
                 }
             }
         }

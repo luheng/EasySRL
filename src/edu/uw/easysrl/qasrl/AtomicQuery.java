@@ -12,7 +12,7 @@ import java.util.stream.Collectors;
  * A wrapper around QuestionAnswerPair.
  * Created by luheng on 1/20/16.
  */
-public class Query {
+public class AtomicQuery {
     // < p, c, n, a, k, Q, A >
     int predicateIndex;
     Category category;
@@ -22,7 +22,7 @@ public class Query {
     QuestionAnswerPair qaPair;
     String question, answer;
 
-    public Query(QuestionAnswerPair qaPair, int parseId) {
+    public AtomicQuery(QuestionAnswerPair qaPair, int parseId) {
         this.predicateIndex = qaPair.predicateIndex;
         this.category = qaPair.predicateCategory;
         this.argumentNumber = qaPair.targetDeps.get(0).getArgNumber();
