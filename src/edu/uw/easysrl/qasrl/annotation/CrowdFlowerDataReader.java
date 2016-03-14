@@ -65,13 +65,12 @@ public class CrowdFlowerDataReader {
                                        // .filter(anno -> !anno.answer.toLowerCase().contains("bad question."))
                                        // .collect(Collectors.toList()));
         }
-        RecordedCheckboxAnnotation.printStats(checkboxAnnotations);
-        List<Annotation> annotations = new ArrayList<>(checkboxAnnotations);
+        List<Annotation> allAnnotations = new ArrayList<>(checkboxAnnotations);
 
-        System.out.println("Read " + annotations.size() + " annotation records.");
+        System.out.println("Read " + allAnnotations.size() + " annotation records.");
 
         // Align annotations.
-        List<AlignedAnnotation> alignedAnnotations = AlignedAnnotation.getAlignedAnnotations(annotations);
+        List<AlignedAnnotation> alignedAnnotations = AlignedAnnotation.getAlignedAnnotations(allAnnotations);
         System.out.println("Constructed " + alignedAnnotations.size() + " aligned annotations.");
         int total = 0;
         int majorityCorrect = 0;
@@ -107,6 +106,47 @@ public class CrowdFlowerDataReader {
         InterAnnotatorAgreement.printKappa(iaa);
         double fleissKappa = InterAnnotatorAgreement.fleissKappa(checkboxAnnotations, 5);
         System.out.println(String.format("Fleiss's Kappa for 5 annotators: %.2f", fleissKappa));
+        List<Annotation> majorityAnnotations = alignedAnnotations
+            .stream()
+            .map(anno -> anno.aggregate(answerDist -> {
+                        if(answerDist.get(0) > answerDist.get(1)) {
+                            return Optional.of(0);
+                        } else if(answerDist.get(1) > answerDist.get(0)){
+                            return Optional.of(1);
+                        } else {
+                            return Optional.empty();
+                        }
+                    }, "majority"))
+            .filter(Optional::isPresent).map(Optional::get)
+            .collect(Collectors.toList());
+        List<Annotation> unanimousAnnotations = alignedAnnotations
+            .stream()
+            .map(anno -> anno.aggregate(answerDist -> {
+                        if(answerDist.get(0) == answerDist.get(1)) {
+                            return Optional.empty();
+                        } else if(answerDist.get(0) == 0) {
+                            return Optional.of(1);
+                        } else if(answerDist.get(1) == 0){
+                            return Optional.of(0);
+                        } else {
+                            return Optional.empty();
+                        }
+                    }, "unanimous"))
+            .filter(Optional::isPresent).map(Optional::get)
+            .collect(Collectors.toList());
+        double[][] stats = new double[3][];
+        stats[0] = InterAnnotatorAgreement.binaryStats(allAnnotations);
+        stats[1] = InterAnnotatorAgreement.binaryStats(majorityAnnotations);
+        stats[2] = InterAnnotatorAgreement.binaryStats(unanimousAnnotations);
+        for(int i = 0; i < stats.length; i++) {
+            if(i == 0) System.out.println("All:");
+            else if(i == 1) System.out.println("Majority:");
+            else if(i == 2) System.out.println("Unanimous:");
+            System.out.println(String.format("Accuracy: %.2f", stats[i][0]));
+            System.out.println(String.format("Precision: %.2f", stats[i][1]));
+            System.out.println(String.format("Recall: %.2f", stats[i][2]));
+            System.out.println(String.format("F1: %.2f", stats[i][3]));
+        }
         return alignedAnnotations;
     }
 

@@ -3,6 +3,7 @@ package edu.uw.easysrl.qasrl.annotation;
 import java.io.IOException;
 import java.util.*;
 import java.util.stream.*;
+import java.util.function.Function;
 
 import edu.uw.easysrl.syntax.grammar.Category;
 
@@ -49,6 +50,32 @@ public class AlignedAnnotation {
         answerTrust = new double[answerOptions.size()];
         Arrays.fill(answerDist, 0);
         Arrays.fill(answerTrust, 0.0);
+    }
+
+    public Optional<Annotation> aggregate(Function<List<Integer>, Optional<Integer>> chooseAnswer, String strategyName) {
+        if(getNumAnnotated() == 0) {
+            return Optional.empty();
+        }
+        List<Integer> answerCounts = new ArrayList<>(answerDist.length);
+        for(int i : answerDist) {
+            answerCounts.add(i);
+        }
+        Optional<Integer> answerOpt = chooseAnswer.apply(answerCounts);
+        if(!answerOpt.isPresent()) {
+            return Optional.empty();
+        }
+        int answer = answerOpt.get();
+        Annotation.BasicAnnotation ann = new Annotation.BasicAnnotation();
+        ann.sentenceId = this.sentenceId;
+        ann.sentenceString = this.sentenceString;
+        ann.comment = strategyName + " of " + answerDist[answer] + " out of " + getNumAnnotated() + "annotators";
+        ann.trust = answerTrust[answer];
+        ann.annotatorId = strategyName;
+        ann.answerOptions = this.answerOptions;
+        ann.answerId = answer;
+        ann.goldAnswerId = this.goldAnswerId;
+        ann.annotationKey = this.annotationKey;
+        return Optional.of(ann);
     }
 
     boolean addAnnotation(String annotator, Annotation annotation) {

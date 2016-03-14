@@ -87,6 +87,37 @@ public class InterAnnotatorAgreement {
         System.out.println();
     }
 
+    // returns { accuracy, precision, recall, F1 }
+    public static double[] binaryStats(List<Annotation> annotations) {
+        // precision and recall only make sense with two options.
+        // 0 is negative, 1 is positive.
+        assert annotations.stream().allMatch(anno -> anno.getNumAnswers() == 2);
+
+        int total = annotations.size();
+        long tp = annotations
+            .stream()
+            .filter(anno -> anno.getAnswerId() == 1 && anno.getGoldAnswerId() == 1)
+            .collect(Collectors.counting());
+        long fp = annotations
+            .stream()
+            .filter(anno -> anno.getAnswerId() == 1 && anno.getGoldAnswerId() == 0)
+            .collect(Collectors.counting());
+        long tn = annotations
+            .stream()
+            .filter(anno -> anno.getAnswerId() == 0 && anno.getGoldAnswerId() == 0)
+            .collect(Collectors.counting());
+        long fn = annotations
+            .stream()
+            .filter(anno -> anno.getAnswerId() == 0 && anno.getGoldAnswerId() == 1)
+            .collect(Collectors.counting());
+        double accuracy = ((double)tp + tn) / total;
+        double precision = ((double)tp)/(tp + fp);
+        double recall = ((double)tp)/(tp + fn);
+        double f1 = 2.0 * precision * recall / (precision + recall);
+        double[] result = { accuracy, precision, recall, f1 };
+        return result;
+    }
+
     // this only works for checkboxes because it requires a fixed set of categories.
     public static double fleissKappa(List<RecordedCheckboxAnnotation> annotations, int numJudgmentsPerItem) {
         Set<String> annotators = annotations
