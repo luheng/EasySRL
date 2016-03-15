@@ -22,23 +22,23 @@ public class EvidenceDrivenExperimentCheckbox {
     private static QueryPruningParameters queryPruningParameters = new QueryPruningParameters(
             1,     /* top K */
             0.1,   /* min question confidence */
-            0.01,  /* min answer confidence */
-            0.01   /* min attachment entropy */
+            0.05,  /* min answer confidence */
+            0.05   /* min attachment entropy */
     );
 
     private static final String[] annotationFiles = {
             "./Crowdflower_data/all-checkbox-responses.csv",
     };
 
-    static final int minAgreement = 3;
+    static final int minAgreement = 2;
     static final double supertagPenaltyWeight = 5.0;
     static final double attachmentPenaltyWeight = 1.0;
 
     static final int ppQuestionMinAgreement = 4;
-    static final double ppQuestionWeight = 0.0001;
+    static final double ppQuestionWeight = 1.0;
 
-    static final boolean skipPrepositionalQuestions = true;
-    static final boolean skipPronounEvidence = false;
+    static final boolean skipPrepositionalQuestions = false;
+    static final boolean skipPronounEvidence = true;
 
     static final int maxTagsPerWord = 50;
     static BaseCcgParser.ConstrainedCcgParser reparser;
@@ -57,7 +57,8 @@ public class EvidenceDrivenExperimentCheckbox {
         List<AlignedAnnotation> annotationList = new ArrayList<>();
         try {
             for (String fileName : fileNames) {
-                annotationList.addAll(CrowdFlowerDataReader.readAggregatedAnnotationFromFile(fileName, true /* checkbox */));
+                annotationList.addAll(CrowdFlowerDataReader.readAggregatedAnnotationFromFile(fileName,
+                        true /* checkbox */));
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -87,6 +88,7 @@ public class EvidenceDrivenExperimentCheckbox {
                                                 BaseCcgParser.ConstrainedCcgParser reparser) {
         List<Integer> sentenceIds = annotations.keySet().stream().sorted().collect(Collectors.toList());
         System.out.println(sentenceIds.stream().map(String::valueOf).collect(Collectors.joining(", ")));
+        System.out.println("Queried " + sentenceIds.size() + " sentences.");
         Results avgBaseline = new Results(),
                 avgReranked = new Results(),
                 avgReparsed = new Results(),
@@ -104,7 +106,7 @@ public class EvidenceDrivenExperimentCheckbox {
         ResponseSimulator goldSimulator = new ResponseSimulatorGold(learner.goldParses, new QuestionGenerator());
         List<DebugBlock> debugging = new ArrayList<>();
         for (int sentenceId : sentenceIds) {
-            learner.initializeForSentence(sentenceId, annotations.get(sentenceId));
+            learner.initializeForSentence(sentenceId, annotations.get(sentenceId), true /* checkbox */);
             Results oracleF1 = learner.getOracleF1(sentenceId);
             Results baselineF1 = learner.getOneBestF1(sentenceId);
             Results currentF1 = learner.getOneBestF1(sentenceId);
@@ -129,18 +131,18 @@ public class EvidenceDrivenExperimentCheckbox {
                 }
                 queryCount ++;
                 int[] optionDist = QualityControl.getUserResponses(query, annotation);
-                int goldOption = goldSimulator.answerQuestion(query).chosenOptions.get(0);
+                final List<Integer> goldOptions = goldSimulator.answerQuestion(query).chosenOptions;
                 int oracleParseId = learner.getOracleParseId(sentenceId);
-                int oracleOption = -1;
-                int oneBestOption = -1;
+                final List<Integer> oracleOptions = new ArrayList<>();
+                final List<Integer> oneBestOptions = new ArrayList<>();
                 Response multiResponse = new Response();
                 boolean isPPQuestion =  QualityControl.queryIsPrepositional(query);
                 for (int j = 0; j < optionDist.length; j++) {
                     if (query.getAnswerOptions().get(j).getParseIds().contains(oracleParseId)) {
-                        oracleOption = j;
+                        oracleOptions.add(j);
                     }
                     if (query.getAnswerOptions().get(j).getParseIds().contains(0 /* parse id of one-best */)) {
-                        oneBestOption = j;
+                        oneBestOptions.add(j);
                     }
                     if ((!isPPQuestion && optionDist[j] >= minAgreement) ||
                             (isPPQuestion && optionDist[j] >= ppQuestionMinAgreement)) {
@@ -154,7 +156,11 @@ public class EvidenceDrivenExperimentCheckbox {
                 }
                 // Get evidence and reset weight.
                 double questionTypeWeight = isPPQuestion ? ppQuestionWeight : 1.0;
-                Set<Evidence> evidenceSet = Evidence.getEvidenceFromQuery(query, multiResponse, skipPronounEvidence);
+                Set<Evidence> evidenceSet = Evidence
+                        .getEvidenceFromQuery(query, multiResponse, skipPronounEvidence).stream()
+                        // only use pp for QNA
+                        .filter(ev -> !(isPPQuestion && Evidence.AttachmentEvidence.class.isInstance(ev)))
+                        .collect(Collectors.toSet());
                 evidenceSet.forEach(ev -> ev.confidence = questionTypeWeight *
                         (Evidence.SupertagEvidence.class.isInstance(ev) ? supertagPenaltyWeight :
                                 attachmentPenaltyWeight));
@@ -198,13 +204,13 @@ public class EvidenceDrivenExperimentCheckbox {
                     for (int k = 0; k < optionDist[j]; k++) {
                         match += "*";
                     }
-                    if (j == goldOption) {
+                    if (goldOptions.contains(j)) {
                         match += "G";
                     }
-                    if (j == oracleOption) {
+                    if (oracleOptions.contains(j)) {
                         match += "O";
                     }
-                    if (j == oneBestOption) {
+                    if (oneBestOptions.contains(j)) {
                         match += "B";
                     }
                     if (multiResponse.chosenOptions.contains(j)) {

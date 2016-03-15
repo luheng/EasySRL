@@ -22,8 +22,8 @@ public class EvidenceDrivenExperiment {
     private static QueryPruningParameters queryPruningParameters = new QueryPruningParameters(
             1,     /* top K */
             0.1,   /* min question confidence */
-            0.01,  /* min answer confidence */
-            0.01   /* min attachment entropy */
+            0.05,  /* min answer confidence */
+            0.05   /* min attachment entropy */
     );
 
     private static final String[] annotationFiles = {
@@ -36,12 +36,12 @@ public class EvidenceDrivenExperiment {
     static final double attachmentPenaltyWeight = 1.0;
 
     static final int ppQuestionMinAgreement = 4;
-    static final double ppQuestionWeight = 0.0001;
+    static final double ppQuestionWeight = 1.0;
 
-    static final boolean skipPrepositionalQuestions = true;
+    static final boolean skipPrepositionalQuestions = false; // true
     static final boolean skipPronounEvidence = false;
 
-    static final int maxTagsPerWord = 50;
+    static final int maxTagsPerWord = 50; // 100
     static BaseCcgParser.ConstrainedCcgParser reparser;
 
     public static void main(String[] args) {
@@ -89,6 +89,7 @@ public class EvidenceDrivenExperiment {
                                                 BaseCcgParser.ConstrainedCcgParser reparser) {
         List<Integer> sentenceIds = annotations.keySet().stream().sorted().collect(Collectors.toList());
         System.out.println(sentenceIds.stream().map(String::valueOf).collect(Collectors.joining(", ")));
+        System.out.println("Queried " + sentenceIds.size() + " sentences.");
         Results avgBaseline = new Results(),
                 avgReranked = new Results(),
                 avgReparsed = new Results(),
@@ -156,7 +157,9 @@ public class EvidenceDrivenExperiment {
                 }
                 // Get evidence and reset weight.
                 double questionTypeWeight = isPPQuestion ? ppQuestionWeight : 1.0;
-                Set<Evidence> evidenceSet = Evidence.getEvidenceFromQuery(query, multiResponse, skipPronounEvidence);
+                Set<Evidence> evidenceSet = Evidence.getEvidenceFromQuery(query, multiResponse, skipPronounEvidence).stream()
+                        .filter(ev -> !(isPPQuestion && Evidence.AttachmentEvidence.class.isInstance(ev)))
+                        .collect(Collectors.toSet());
                 evidenceSet.forEach(ev -> ev.confidence = questionTypeWeight *
                         (Evidence.SupertagEvidence.class.isInstance(ev) ? supertagPenaltyWeight :
                                 attachmentPenaltyWeight));
@@ -284,10 +287,11 @@ public class EvidenceDrivenExperiment {
         }
         System.out.println("Baseline:\n" + avgBaseline + "\nRerank:\n" + avgReranked + "\nReparsed:\n" + avgReparsed);
         System.out.println("Baseline-changed\n" + avgBeselineChanged + "\nReparsed-changed:\n" + avgReparsedChanged +
-                "\nOracle-changed\n" + avgOracleChanged + "\nReparsed-oracle:\t" + avgReparsedOracle);
+                "\nOracle-changed\n" + avgOracleChanged);
+        //+ "\nReparsed-oracle:\n" + avgReparsedOracle);
         System.out.println("Num improved: " + numImprovedSentences + "\nNum worsened: " + numWorsenedSentences +
                 "\nNum unchanged: " + numUnchangedSentences);
-        System.out.println("Num one-best got changed:\t" + numChanged);
+        System.out.println("Num changed sentences: " + numChanged);
         debugging.stream()
                 .sorted((b1, b2) -> Double.compare(b1.deltaF1, b2.deltaF1))
                // .filter(b -> Math.abs(b.deltaF1) > 1e-3)

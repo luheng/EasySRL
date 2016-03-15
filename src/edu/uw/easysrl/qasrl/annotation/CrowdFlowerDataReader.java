@@ -13,7 +13,7 @@ import java.util.*;
  */
 public class CrowdFlowerDataReader {
 
-    private static int maxNumAnnotators = 5;
+    private static int maxNumAnnotators = 10;
 
     public static List<AlignedAnnotation> readAggregatedAnnotationFromFile(String filePath, boolean isCheckbox)
             throws IOException {

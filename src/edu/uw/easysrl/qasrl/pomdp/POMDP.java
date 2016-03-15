@@ -141,6 +141,10 @@ public class POMDP {
      * @param annotations
      */
     public void initializeForSentence(int sentIdx, List<AlignedAnnotation> annotations) {
+        this.initializeForSentence(sentIdx, annotations, false);
+    }
+
+    public void initializeForSentence(int sentIdx, List<AlignedAnnotation> annotations, boolean isCheckbox) {
         queryPool = new ArrayList<>();
         beliefModel = new BeliefModel(allParses.get(sentIdx));
         observationModel = baseObservationModel == null ? new ObservationModel() :
@@ -151,8 +155,9 @@ public class POMDP {
         timeStep = 0;
         List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
         List<Parse> parses = allParses.get(sentIdx);
-        List<GroupedQuery> queries = QueryGenerator.getAllGroupedQueries(sentIdx, words, parses,
-                new QueryPruningParameters());
+        List<GroupedQuery> queries = isCheckbox ?
+                QueryGenerator.getAllGroupedQueriesCheckbox(sentIdx, words, parses, new QueryPruningParameters()) :
+                QueryGenerator.getAllGroupedQueries(sentIdx, words, parses, new QueryPruningParameters());
         queries.stream().forEach(query -> {
             query.computeProbabilities(beliefModel.belief);
             if (annotations.stream().anyMatch(annotation -> annotation.sentenceId == sentIdx
