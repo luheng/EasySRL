@@ -34,8 +34,8 @@ public class AnnotationPrecisionRecall {
 
     private static final String[] annotationFiles = {
             //"./Crowdflower_data/all-checkbox-responses.csv",
-            "./Crowdflower_data/f878213.csv",
-            //"./Crowdflower_data/f882410.csv"
+            //"./Crowdflower_data/f878213.csv",
+            "./Crowdflower_data/f882410.csv"
     };
 
     static final boolean isCheckbox = false;
@@ -77,6 +77,9 @@ public class AnnotationPrecisionRecall {
             }
             sentenceToAnnotations.get(sentId).add(annotation);
         });
+
+        System.out.println("Queried " + sentenceToAnnotations.keySet().size() + " sentences.");
+
         return sentenceToAnnotations;
     }
 
@@ -84,10 +87,12 @@ public class AnnotationPrecisionRecall {
                                                POMDP learner, boolean analyzePrepositionQuestions) {
         List<Integer> sentenceIds = annotations.keySet().stream().sorted().collect(Collectors.toList());
         //System.out.println(sentenceIds.stream().map(String::valueOf).collect(Collectors.joining(", ")));
-        System.out.println("Queried " + sentenceIds.size() + " sentences.");
 
-        int numGoldIsNA = 0, numUserIsNA = 0, numUserNAMatch = 0,  numOneBestIsNA = 0, numOnebestNAMatch  = 0;
-        int numGoldArgs = 0, numUserArgs = 0, numUserArgMatch = 0, numOneBestArgs = 0, numOnebestArgMatch = 0;
+        Results userNaF1     = new Results(),
+                userArgF1    = new Results(),
+                onebestNaF1  = new Results(),
+                onebestArgF1 = new Results(),
+                effectivePenaltyF1 = new Results();
 
         for (int sentenceId : sentenceIds) {
             learner.initializeForSentence(sentenceId, annotations.get(sentenceId), isCheckbox);
@@ -137,6 +142,7 @@ public class AnnotationPrecisionRecall {
                 final int predId            = query.getPredicateIndex();
                 final Category goldCategory = goldParse.categories.get(predId);
                 boolean questionMatch       = false;
+
                 // Search for gold arNnum.
                 for (int j = 1; j <= goldCategory.getNumberOfArguments(); j++) {
                     final int argNum = j;
@@ -189,43 +195,40 @@ public class AnnotationPrecisionRecall {
                 boolean userIsNA    = responseIsBadQuestion(query, multiResponse.chosenOptions);
 
                 // Compute precision and recall.
-                numGoldIsNA += goldIsNA ? 1 : 0;
-                numUserIsNA += userIsNA ? 1 : 0;
-                numOneBestIsNA += onebestIsNA ? 1 : 0;
 
-                numGoldArgs += goldArgIds.size();
-                numUserArgs += userArgIds.size();
-                numOneBestArgs += onebestArgIds.size();
+                userNaF1.add(getF1(userIsNA, goldIsNA));
+                userArgF1.add(getF1(userArgIds, goldArgIds));
 
-                numUserNAMatch  += goldIsNA && userIsNA ? 1 : 0;
-                numUserArgMatch += goldArgIds.stream().filter(userArgIds::contains).count();
+                onebestNaF1.add(getF1(onebestIsNA, goldIsNA));
+                onebestArgF1.add(getF1(onebestArgIds, goldArgIds));
 
-                numOnebestNAMatch += goldIsNA && onebestIsNA ? 1 : 0;
-                numOnebestArgMatch += goldArgIds.stream().filter(onebestArgIds::contains).count();
+                effectivePenaltyF1.add(getF1(effectivePenalizedArgIds, effectivePenalizableArgIds));
 
-                if (goldArgIds.stream().filter(userArgIds::contains).count() < userArgIds.size()) {
+                //if (goldArgIds.stream().filter(userArgIds::contains).count() < userArgIds.size()) {
                     // TODO: debug precision loss.
-                }
+                //}
             }
         }
 
-        Results userNaF1     = new Results(numUserIsNA, numUserNAMatch, numGoldIsNA),
-                userArgF1    = new Results(numUserArgs, numUserArgMatch, numGoldArgs),
-                onebestNaF1  = new Results(numOneBestIsNA, numOnebestNAMatch, numGoldIsNA),
-                onebestArgF1 = new Results(numOneBestArgs, numOnebestArgMatch, numGoldArgs);
-
         System.out.println("Min agreement: " + minAgreement);
         //System.out.println("Look at prepositions: " + analyzePrepositionQuestions);
-        System.out.println("Bad question P/R/F1:\n" + userNaF1);
         System.out.println("Attachment P/R/F1:\n" + userArgF1);
+        System.out.println("Bad question P/R/F1:\n" + userNaF1);
+        System.out.println("Effective penalty P/R/F1:\n" + effectivePenaltyF1);
+        System.out.println("Eff. penalty per sentence: " +
+                effectivePenaltyF1.getRecall() * effectivePenaltyF1.getFrequency() / sentenceIds.size());
+        System.out.println("Bad penalty per sentence: " +
+                (1.0 - effectivePenaltyF1.getPrecision()) * effectivePenaltyF1.getPredictedFrequency() / sentenceIds.size());
         //System.out.println("Bad question P/R/F1:\n" + onebestNaF1);
         //System.out.println("Attachment P/R/F1:\n" + onebestArgF1);
     }
 
     private static Results getF1(Set<Integer> userSet, Set<Integer> truthSet) {
-        return new Results(userSet.size(),
-                (int) userSet.stream().filter(truthSet::contains).count(),
-                truthSet.size());
+        return new Results(userSet.size(), (int) userSet.stream().filter(truthSet::contains).count(), truthSet.size());
+    }
+
+    private static Results getF1(boolean user, boolean truth) {
+        return new Results(user ? 1 : 0, user & truth ? 1 : 0, truth ? 1 : 0);
     }
 
     private static Set<Integer> getChosenArgumentIds(final GroupedQuery query, final Collection<Integer> optionIds) {
