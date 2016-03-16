@@ -22,7 +22,9 @@ public class AnalysisHelper {
     }
 
     public static double getScore(final Collection<Integer> parseIds, final List<Parse> allParses) {
-        return parseIds.stream().mapToDouble(id -> allParses.get(id).score).sum();
+        return parseIds.stream()
+                .filter(id -> id >= 0 && id < allParses.size())
+                .mapToDouble(id -> allParses.get(id).score).sum();
     }
 
     public static void addQA(int argHead, QuestionAnswerPairReduced qa, Parse parse, Map<String, Set<Parse>> questions,
