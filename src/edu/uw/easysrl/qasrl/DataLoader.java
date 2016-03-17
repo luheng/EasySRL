@@ -16,6 +16,7 @@ import edu.uw.easysrl.syntax.grammar.Preposition;
  * Read gold input for active learning simulation.
  * Created by luheng on 1/4/16.
  */
+@Deprecated
 public class DataLoader {
 
     public static void readDevPool(List<List<InputReader.InputWord>> sentences, List<Parse> goldParses) {
