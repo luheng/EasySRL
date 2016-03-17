@@ -147,6 +147,62 @@ public class CrowdFlowerDataReader {
             System.out.println(String.format("Recall: %.2f", stats[i][2]));
             System.out.println(String.format("F1: %.2f", stats[i][3]));
         }
+
+        Set<Integer> unanimousIncorrectQueryIds = unanimousAnnotations
+            .stream()
+            .filter(anno -> anno.getAnswerId() != anno.getGoldAnswerId())
+            .map(anno -> anno.getAnnotationKey())
+            .flatMap(key -> checkboxAnnotations
+                     .stream()
+                     .filter(anno -> anno.getAnnotationKey().equals(key))
+                     .map(anno -> anno.questionId))
+            .collect(Collectors.toSet());
+        Map<Integer, List<RecordedCheckboxAnnotation>> queryIdToAnnotations = checkboxAnnotations
+            .stream()
+            .collect(Collectors.groupingBy(anno -> anno.questionId));
+        Map<Integer, List<AlignedAnnotation>> queryIdToAlignedAnnotations = queryIdToAnnotations.entrySet()
+            .stream()
+            .collect(Collectors.toMap(Map.Entry::getKey, e -> AlignedAnnotation.getAlignedAnnotations(new ArrayList<>(e.getValue()))));
+        List<Map.Entry<Integer, List<AlignedAnnotation>>> sortedAlignedAnnotationGroups = queryIdToAlignedAnnotations.entrySet()
+            .stream()
+            .filter(e -> unanimousIncorrectQueryIds.contains(e.getKey()))
+            .sorted((e1, e2) -> e1.getKey().compareTo(e2.getKey()))
+            .collect(Collectors.toList());
+        for(Map.Entry<Integer, List<AlignedAnnotation>> entry : sortedAlignedAnnotationGroups) {
+            List<AlignedAnnotation> annos = entry.getValue();
+            // definitely should be nonempty
+            assert annos.size() > 0;
+            String question = annos.get(0).question;
+            // every entry should have the same question
+            assert annos.stream().allMatch(a -> a.question.equals(question));
+            System.out.println(annos.get(0).sentenceString);
+            System.out.println(question);
+            for(AlignedAnnotation anno : annos) {
+                String answerPrefix = "";
+                if(anno.goldAnswerId == 1) {
+                    answerPrefix += "G";
+                } else {
+                    answerPrefix += " ";
+                }
+                for(int i = 0; i < 5; i++) {
+                    if(i < anno.answerDist[1]) {
+                        answerPrefix += "*";
+                    } else {
+                        answerPrefix += " ";
+                    }
+                }
+                String answer = checkboxAnnotations
+                    .stream()
+                    .filter(a -> a.getAnnotationKey().equals(anno.annotationKey))
+                    .findFirst()
+                    .get()
+                    .answer;
+                System.out.println(answerPrefix + "\t" + answer);
+            }
+            System.out.println();
+        }
+
+
         return alignedAnnotations;
     }
 

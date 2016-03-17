@@ -142,8 +142,7 @@ public class AlignedAnnotation {
 
     @Override
     public String toString() {
-        // Number of iteration in user session.
-        String result = annotationKey + "\n";
+        String result = annotationKey + "\n" + question + "\n";
         for (int i = 0; i < answerOptions.size(); i++) {
             String match = "";
             for (int j = 0; j < answerDist[i]; j++) {

@@ -25,7 +25,9 @@ public class MultiQuestionTemplate {
         VERB (
                     Category.valueOf("S\\NP") // intransitives
                     ,Category.valueOf("(S\\NP)/NP") // transitives
-                    // ,Category.valueOf("(S\\NP)/PP")
+                    ,Category.valueOf("(S\\NP)/PP")
+                    ,Category.valueOf("((S\\NP)/PP)/NP")
+                    // ,Category.valueOf("(S\\NP)/(PP/NP)") // e.g., an action was called for
                  /* ,Category.valueOf("((S\\NP)/NP)/PR")
                     ,Category.valueOf("((S\\NP)/PP)/PR")
                     // T1 said (that) T2
@@ -38,8 +40,6 @@ public class MultiQuestionTemplate {
                     ,Category.valueOf("(S\\NP)/(S[ng]\\NP)")
                     // T1 made T3 T2; ditransitives
                     ,Category.valueOf("((S\\NP)/NP)/NP")
-                    // T1 gave T3 to T2
-                    ,Category.valueOf("((S\\NP)/PP)/NP")
                     // T1 promised T3 to do T2
                     ,Category.valueOf("((S\\NP)/(S[to]\\NP))/NP") // Category.valueOf("((S[dcl]\\NP)/(S[to]\\NP))/NP")
                  */
@@ -301,8 +301,10 @@ public class MultiQuestionTemplate {
             categories.get(argIndex).matches(Category.valueOf("PR")) // don't ask about a particle; TODO where are all the PR arguments...?
             ;
         return cantAsk;
-        // return !(Category.valueOf("(S\\NP)/PP").matches(predicateCategory) &&
-        //          argNumber == 2);
+        // return cantAsk ||
+        //     !((Category.valueOf("(S\\NP)/PP").matches(predicateCategory) && argNumber == 2) ||
+        //       (Category.valueOf("((S\\NP)/PP)/NP").matches(predicateCategory) && argNumber == 2));
+        // return cantAsk || !(type == QuestionType.VERB_ADJUNCT && argNumber == 3);
         // return !(type == QuestionType.NOUN_ADJUNCT);
     }
 
@@ -316,8 +318,8 @@ public class MultiQuestionTemplate {
         List<Map<Integer, Optional<ResolvedDependency>>> argPaths = TextGenerationHelper.getAllArgumentChoicePaths(allArgDeps);
         final List<QuestionAnswerPairReduced> qaPairs = new ArrayList<>();
         for(Map<Integer, Optional<ResolvedDependency>> chosenArgDeps : argPaths) {
-            instantiateForArgument(targetArgNum, chosenArgDeps).stream().findFirst().ifPresent(qaPairs::add);
-            // instantiateForArgument(targetArgNum, chosenArgDeps).forEach(qaPairs::add);
+            // instantiateForArgument(targetArgNum, chosenArgDeps).stream().findFirst().ifPresent(qaPairs::add);
+            instantiateForArgument(targetArgNum, chosenArgDeps).forEach(qaPairs::add);
             // getBasicSupersenseQAPairs(targetArgNum, chosenArgDeps).forEach(qaPairs::add);
         }
         return qaPairs;
@@ -438,8 +440,14 @@ public class MultiQuestionTemplate {
             int verbIndex = verbIndexOpt.get();
             if(verbIndex == predicateIndex) {
                 if(shouldSplitVerb) {
-                    auxiliaries.addAll(getAuxiliariesForPredVerb(predicateIndex));
-                    pred.addAll(getBarePredVerb(predicateIndex));
+                    // XXX temporary hack to generate the same questions for PP arguments and PP adjuncts
+                    if(type == QuestionType.VERB && argCategories.get(targetArgNum).matches(Category.valueOf("PP"))) {
+                        auxiliaries.addAll(getAuxiliariesForArgVerb(predicateIndex));
+                        pred.addAll(getNonTargetBareArgumentVerb(predicateIndex));
+                    } else {
+                        auxiliaries.addAll(getAuxiliariesForPredVerb(predicateIndex));
+                        pred.addAll(getBarePredVerb(predicateIndex));
+                    }
                 } else {
                     pred.addAll(getUnsplitPredVerb(predicateIndex));
                 }
@@ -564,9 +572,16 @@ public class MultiQuestionTemplate {
                     .collect(Collectors.toList());
 
                 final Category targetCategory = argCategories.get(targetArgNum);
-                Optional<String> replaceOpt = Optional.of(targetCategory)
-                    .filter(cat -> cat.isFunctionInto(Category.valueOf("S\\NP")))
-                    .map(arg -> TextGenerationHelper.renderString(getBarePredVerb(targetIndex)));
+                Optional<String> replaceOpt;
+                if(targetCategory.isFunctionInto(Category.valueOf("S\\NP"))) {
+                    replaceOpt = Optional.of(TextGenerationHelper.renderString(getBarePredVerb(targetIndex)));
+                } else if(targetCategory.isFunctionInto(Category.valueOf("PP"))) {
+                    // we don't want to include the preposition in the answer,
+                    // since we already included it in the question.
+                    replaceOpt = Optional.of("");
+                } else {
+                    replaceOpt = Optional.empty();
+                }
 
                 List<TextWithDependencies> answers = TextGenerationHelper
                     .getRepresentativePhrases(Optional.of(targetIndex), targetCategory, parse, replaceOpt);
@@ -628,7 +643,6 @@ public class MultiQuestionTemplate {
         } else if (argCategory.isFunctionInto(Category.valueOf("S\\NP"))) { // catch-all for verbs
             result.add("do");
         }
-        // TODO maybe add preposition
         return result;
     }
 
@@ -660,7 +674,6 @@ public class MultiQuestionTemplate {
             result.add(words.get(argIndex));
         }
         // otherwise maybe it's an S[dcl] or something, in which case we don't want a placeholder.
-        // TODO maybe add preposition
         return result;
     }
 
@@ -676,14 +689,13 @@ public class MultiQuestionTemplate {
         Category argCategory = categories.get(argIndex);
         if (argCategory.isFunctionInto(Category.valueOf("S[to]\\NP"))) {
             result.add(verb);
-        } else if (argCategory.isFunctionInto(Category.valueOf("S[ng]\\NP"))) {
+        } else if (argCategory.isFunctionInto(Category.valueOf("S[ng]\\NP")) ||
+                   argCategory.isFunctionInto(Category.valueOf("S[pss]\\NP")) ||
+                   argCategory.isFunctionInto(Category.valueOf("S[adj]\\NP"))) {
             result.add("be");
             result.add(verb);
         } else if (argCategory.isFunctionInto(Category.valueOf("S[pt]\\NP"))) {
             result.add("have");
-            result.add(verb);
-        } else if (argCategory.isFunctionInto(Category.valueOf("S[pss]\\NP"))) {
-            result.add("be");
             result.add(verb);
         } else if (argCategory.isFunctionInto(Category.valueOf("S[dcl]\\NP"))) {
             result.add(uninflectedVerb);
@@ -812,17 +824,4 @@ public class MultiQuestionTemplate {
         }
         return result;
     }
-
-    public String toString() {
-        String str = "";
-        /*
-        str += predSlot.toString(words) + ":\t";
-        for (ArgumentSlot slot : slots) {
-            str += slot.toString(words) + "\t";
-        }
-        */
-        str += "herp";
-        return str.trim();
-    }
-
 }

@@ -166,6 +166,9 @@ public class VerbHelper {
     }
 
     public Optional<String> getUninflected(String word) {
+        if(isCopulaVerb(word)) {
+            return Optional.of("be");
+        }
         Optional<String[]> inflections = Optional.ofNullable(inflectionDictionary.getBestInflections(word.toLowerCase()));
         return inflections.map(infl -> infl[0]);
     }

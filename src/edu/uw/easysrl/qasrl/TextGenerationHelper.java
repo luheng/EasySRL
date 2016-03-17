@@ -466,7 +466,12 @@ public class TextGenerationHelper {
                     }
                 }
             }
-            return phrases;
+            // remove empty phrases; this may happen when we have a 1-word phrase and replaced the target word with "";
+            // particularly this is the case when we have a 1-word PP as an argument.
+            return phrases
+                .stream()
+                .filter(twd -> twd.tokens.size() > 0)
+                .collect(Collectors.toList());
         }
 
     }
@@ -490,8 +495,14 @@ public class TextGenerationHelper {
         }
         if(replacementWord.isPresent() && replaceIndexOpt.isPresent()) {
             int indexInWords = replaceIndexOpt.get() - node.getStartIndex();
+            String word = replacementWord.get();
             if(indexInWords >= 0 && indexInWords < words.size()) {
-                words.set(indexInWords, replacementWord.get());
+                // if we replace with empty string, just remove the word
+                if(word.length() > 0) {
+                    words.set(indexInWords, replacementWord.get());
+                } else {
+                    words.remove(indexInWords);
+                }
             }
         }
         return words;
