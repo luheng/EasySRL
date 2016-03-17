@@ -1,5 +1,7 @@
 package edu.uw.easysrl.qasrl.qg;
 
+import edu.uw.easysrl.qasrl.qg.util.*;
+
 import edu.uw.easysrl.corpora.CCGBankDependencies.CCGBankDependency;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.Parse;

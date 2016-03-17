@@ -1,4 +1,4 @@
-package edu.uw.easysrl.qasrl.qg;
+package edu.uw.easysrl.qasrl.qg.util;
 
 import java.util.Map;
 import java.util.HashMap;
@@ -11,7 +11,7 @@ import java.util.Optional;
  *
  * Created by julianmichael on 2/6/16.
  */
-final class Pronoun {
+public final class Pronoun {
     public static enum Case {
         NOMINATIVE, ACCUSATIVE
     }

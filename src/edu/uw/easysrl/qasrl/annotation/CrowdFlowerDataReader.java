@@ -16,6 +16,7 @@ import edu.uw.easysrl.qasrl.DataLoader;
 import edu.uw.easysrl.qasrl.TextGenerationHelper;
 import edu.uw.easysrl.qasrl.QueryGeneratorBothWays;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPairReduced;
+import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 
 /**
  * Created by luheng on 2/24/16.

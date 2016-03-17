@@ -1,5 +1,7 @@
 package edu.uw.easysrl.qasrl.qg;
 
+import edu.uw.easysrl.qasrl.qg.util.*;
+
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.Category.Slash;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;

@@ -1,4 +1,4 @@
-package edu.uw.easysrl.qasrl.qg;
+package edu.uw.easysrl.qasrl.qg.util;
 
 import edu.uw.easysrl.syntax.grammar.Category;
 
