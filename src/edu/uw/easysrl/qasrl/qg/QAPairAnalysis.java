@@ -35,11 +35,22 @@ public class QAPairAnalysis {
 
     // TODO methods to extract interesting information from IQuestionAnswerPairs and QAPairSurfaceForms.
 
-    // this method will probably serve most of our needs; example would be
-    //   getAll(surfaceForm, IQuestionAnswerPair::getPredicateCategory).collect(toImmutableSet())
-    // to get us a set of all predicate categories aggregated into the surface form.
-    // these are simple and varied enough to do inline instead of preparing a bunch of helper methods for them.
-    // Returning a stream because depending on the situation we might want a list or set (or to map it some more).
+    // maybe this can be useful in calculating question confidence?
+    public static ImmutableSet<Integer> parseIdsSupportingQuestionString(String question,
+                                                                         ImmutableList<IQuestionAnswerPair> qaPairs) {
+        return qaPairs.stream()
+            .filter(qaPair -> qaPair.getQuestion().equals(question))
+            .map(IQuestionAnswerPair::getParseId)
+            .collect(toImmutableSet());
+    }
+
+    /**
+     * This method will probably serve most of our needs; example would be
+     *   getAll(surfaceForm, IQuestionAnswerPair::getPredicateCategory).collect(toImmutableSet())
+     * to get us a set of all predicate categories aggregated into the surface form.
+     * These are simple and varied enough to do inline instead of preparing a bunch of helper methods for them.
+     * Returning a stream because depending on the situation we might want a list or set (or to map it some more).
+     */
     public static <T> Stream<T> getAll(QAPairSurfaceForm surfaceForm, Function<IQuestionAnswerPair, T> mapper) {
         return surfaceForm.getQAPairs()
             .stream()

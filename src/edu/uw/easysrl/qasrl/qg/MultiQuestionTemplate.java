@@ -232,13 +232,18 @@ public class MultiQuestionTemplate {
 
     public QuestionType type;
 
-    public MultiQuestionTemplate(int predicateIndex, List<String> words, Parse parse) {
+    private final int sentenceId;
+    private final int parseId;
+
+    public MultiQuestionTemplate(int sentenceId, int parseId, int predicateIndex, List<String> words, Parse parse) {
         this.categories = parse.categories;
         this.predicateIndex = predicateIndex;
         this.predicateCategory = categories.get(predicateIndex);
         this.parse = parse;
         this.tree = parse.syntaxTree;
         this.words = words;
+        this.sentenceId = sentenceId;
+        this.parseId    = parseId;
         final int numArguments = predicateCategory.getNumberOfArguments();
         this.argCategories = new HashMap<Integer, Category>();
         this.allArgDeps = new HashMap<Integer, Set<ResolvedDependency>>();
@@ -391,14 +396,16 @@ public class MultiQuestionTemplate {
         // TODO get all of them
         final TextWithDependencies answer = TextGenerationHelper
             .getRepresentativePhrases(Optional.of(predicateIndex), Category.valueOf("(S\\NP)\\(S\\NP)"), parse).get(0);
-        return new QuestionAnswerPairReduced(predicateIndex,
-                                      predicateCategory,
-                                      verbIndex,
-                                      new QuestionAnswerPairReduced.SupersenseQuestionType(supersense),
-                                      questionDeps,
-                                      question,
-                                      targetDep,
-                                      answer);
+        return new QuestionAnswerPairReduced(sentenceId,
+                                             parseId,
+                                             predicateIndex,
+                                             predicateCategory,
+                                             verbIndex,
+                                             new QuestionAnswerPairReduced.SupersenseQuestionType(supersense),
+                                             questionDeps,
+                                             question,
+                                             targetDep,
+                                             answer);
     }
 
     public List<QuestionAnswerPairReduced> instantiateForArgument(int targetArgNum, Map<Integer, Optional<ResolvedDependency>> chosenArgDeps) {
@@ -581,7 +588,9 @@ public class MultiQuestionTemplate {
                 List<TextWithDependencies> answers = TextGenerationHelper
                     .getRepresentativePhrases(Optional.of(targetIndex), targetCategory, parse, replaceOpt);
                 for(TextWithDependencies answer : answers) {
-                    final QuestionAnswerPairReduced qaPair = new QuestionAnswerPairReduced(predicateIndex,
+                    final QuestionAnswerPairReduced qaPair = new QuestionAnswerPairReduced(sentenceId,
+                                                                                           parseId,
+                                                                                           predicateIndex,
                                                                                            predicateCategory,
                                                                                            predicateIndex,
                                                                                            new QuestionAnswerPairReduced.StandardQuestionType(type),

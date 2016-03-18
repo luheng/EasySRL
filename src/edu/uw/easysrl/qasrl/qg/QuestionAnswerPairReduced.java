@@ -17,11 +17,11 @@ import edu.uw.easysrl.syntax.grammar.Category;
 public class QuestionAnswerPairReduced implements IQuestionAnswerPair {
 
     public int getSentenceId() {
-        return 0; // XXX TODO
+        return sentenceId;
     }
 
     public int getParseId() {
-        return 0; // XXX TODO
+        return parseId;
     }
 
     public int getPredicateIndex() {
@@ -53,6 +53,9 @@ public class QuestionAnswerPairReduced implements IQuestionAnswerPair {
         return renderAnswer();
     }
 
+    private final int parseId;
+    private final int sentenceId;
+
     public final int predicateIndex;
     public final Category predicateCategory;
     public final int questionMainIndex;
@@ -69,10 +72,11 @@ public class QuestionAnswerPairReduced implements IQuestionAnswerPair {
 
     // questionMainIndex will be the predicate if we're asking a normal-style question,
     // and will be the argument if we're asking a flipped-style question.
-    public QuestionAnswerPairReduced(int predicateIndex, Category predicateCategory,
-                              int questionMainIndex, QuestionType questionType,
-                              Set<ResolvedDependency> questionDeps, List<String> question,
-                              ResolvedDependency targetDep, TextWithDependencies answer) {
+    public QuestionAnswerPairReduced(int parseId, int sentenceId,
+                                     int predicateIndex, Category predicateCategory,
+                                     int questionMainIndex, QuestionType questionType,
+                                     Set<ResolvedDependency> questionDeps, List<String> question,
+                                     ResolvedDependency targetDep, TextWithDependencies answer) {
         this.predicateIndex = predicateIndex;
         this.predicateCategory = predicateCategory;
         this.questionMainIndex = questionMainIndex;
@@ -82,6 +86,8 @@ public class QuestionAnswerPairReduced implements IQuestionAnswerPair {
         this.targetDep = targetDep;
         this.answer = answer.tokens;
         this.answerDeps = answer.dependencies;
+        this.parseId = parseId;
+        this.sentenceId = sentenceId;
     }
 
     public String renderQuestion() {
