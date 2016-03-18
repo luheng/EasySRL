@@ -14,6 +14,13 @@ import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.dependencies.SRLFrame;
 import edu.uw.easysrl.syntax.grammar.Preposition;
 
+/**
+ * Data structure to hold information about the sentences and gold parses.
+ * This will make it easier to pass this data around and use it for evaluating QA Pairs.
+ * It also comes with convenience methods to load the data, taken from DataLoader
+ * (which is now deprecated).
+ * Created by julianmichael on 3/17/2016.
+ */
 public final class ParseData {
     private final ImmutableList<ImmutableList<InputReader.InputWord>> sentenceInputWords;
     private final ImmutableList<ImmutableList<String>> sentences;
@@ -46,6 +53,7 @@ public final class ParseData {
         try {
             sentenceIterator = ParallelCorpusReader.READER.readCcgCorpus(readDev);
         } catch (IOException e) {
+            System.out.println(String.format("Failed to read sentences.", sentenceInputWords.size()));
             return Optional.empty();
         }
         while (sentenceIterator.hasNext()) {
@@ -64,7 +72,7 @@ public final class ParseData {
             // TODO: convert gold with CCGBankEvaluation.
             goldParses.add(new Parse(sentence.getCcgbankParse(), sentence.getLexicalCategories(), goldDependencies));
         }
-        System.out.println(String.format("Read %d sentences to the training pool.", sentenceInputWords.size()));
+        System.out.println(String.format("Read %d sentences.", sentenceInputWords.size()));
         return Optional.of(makeParseData(sentenceInputWords, goldParses));
     }
 

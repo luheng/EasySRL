@@ -15,6 +15,7 @@ import edu.uw.easysrl.syntax.grammar.Preposition;
 /**
  * Read gold input for active learning simulation.
  * Created by luheng on 1/4/16.
+ * Deprecated since 3/17/16. Use ParseData instead.
  */
 @Deprecated
 public class DataLoader {

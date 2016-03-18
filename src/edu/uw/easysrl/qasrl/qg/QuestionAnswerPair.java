@@ -11,6 +11,7 @@ import edu.uw.easysrl.qasrl.TextGenerationHelper.TextWithDependencies;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
 
+@Deprecated
 public class QuestionAnswerPair {
     public final int predicateIndex;
     public final Category predicateCategory;

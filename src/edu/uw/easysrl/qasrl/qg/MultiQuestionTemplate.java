@@ -228,17 +228,16 @@ public class MultiQuestionTemplate {
     // returns a list of all indices of arguments for each arg num
     // public List<Set<Integer>> argIndices;
 
-    public VerbHelper verbHelper;
+    private static VerbHelper verbHelper = VerbHelper.trainingSetVerbHelper;
 
     public QuestionType type;
 
-    public MultiQuestionTemplate(int predicateIndex, List<String> words, Parse parse, VerbHelper verbHelper) {
+    public MultiQuestionTemplate(int predicateIndex, List<String> words, Parse parse) {
         this.categories = parse.categories;
         this.predicateIndex = predicateIndex;
         this.predicateCategory = categories.get(predicateIndex);
         this.parse = parse;
         this.tree = parse.syntaxTree;
-        this.verbHelper = verbHelper;
         this.words = words;
         final int numArguments = predicateCategory.getNumberOfArguments();
         this.argCategories = new HashMap<Integer, Category>();

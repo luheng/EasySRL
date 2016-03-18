@@ -10,6 +10,7 @@ import java.util.*;
  * Created by luheng on 12/9/15.
  */
 public class VerbHelper {
+    public static final VerbHelper trainingSetVerbHelper = new VerbHelper(VerbInflectionDictionary.buildFromPropBankTraining());
     private static final String[] enAuxiliaryVerbs = {
             "am",
             "ai", // as in ai n't

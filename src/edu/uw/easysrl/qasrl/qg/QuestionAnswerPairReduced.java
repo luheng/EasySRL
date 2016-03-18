@@ -6,12 +6,53 @@ import java.util.Set;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import com.google.common.collect.ImmutableSet;
+
 import edu.uw.easysrl.qasrl.TextGenerationHelper;
 import edu.uw.easysrl.qasrl.TextGenerationHelper.TextWithDependencies;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
 
-public class QuestionAnswerPairReduced {
+// TODO rename this to BasicQuestionAnswerPair or something
+public class QuestionAnswerPairReduced implements IQuestionAnswerPair {
+
+    public int getSentenceId() {
+        return 0; // XXX TODO
+    }
+
+    public int getParseId() {
+        return 0; // XXX TODO
+    }
+
+    public int getPredicateIndex() {
+        return predicateIndex;
+    }
+
+    public Category getPredicateCategory() {
+        return predicateCategory;
+    }
+
+    // TODO: store the immutable sets as fields
+    public ImmutableSet<ResolvedDependency> getQuestionDependencies() {
+        return ImmutableSet.copyOf(questionDeps);
+    }
+
+    public ResolvedDependency getTargetDependency() {
+        return targetDep;
+    }
+
+    public ImmutableSet<ResolvedDependency> getAnswerDependencies() {
+        return ImmutableSet.copyOf(answerDeps);
+    }
+
+    public String getQuestion() {
+        return renderQuestion();
+    }
+
+    public String getAnswer() {
+        return renderAnswer();
+    }
+
     public final int predicateIndex;
     public final Category predicateCategory;
     public final int questionMainIndex;
