@@ -23,8 +23,7 @@ public class SimulatedExperiment {
 
     public static void main(String[] args) {
         learner = new ActiveLearning(nBest);
-        ResponseSimulator responseSimulator = new ResponseSimulatorGold(learner.goldParses, new QuestionGenerator(),
-                                                                        true /* Allow label match */);
+        ResponseSimulator responseSimulator = new ResponseSimulatorGold(learner.goldParses, true /* Allow label match */);
         Map<Integer, Results> budgetCurve = new HashMap<>();
 
         int queryCounter = 0;

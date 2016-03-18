@@ -75,7 +75,7 @@ public class MTurkDataWriter {
         String modelFolder = commandLineOptions.getModel();
         List<Category> rootCategories = commandLineOptions.getRootCategories();
         QuestionGenerator questionGenerator = new QuestionGenerator();
-        ResponseSimulator responseSimulator = new ResponseSimulatorGold(goldParses, questionGenerator);
+        ResponseSimulator responseSimulator = new ResponseSimulatorGold(goldParses);
 
         BaseCcgParser parser = preparsedFile.isEmpty() ?
                         new BaseCcgParser.AStarParser(modelFolder, rootCategories, nBest) :

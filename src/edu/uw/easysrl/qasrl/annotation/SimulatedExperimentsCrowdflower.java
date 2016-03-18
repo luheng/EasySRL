@@ -54,7 +54,7 @@ public class SimulatedExperimentsCrowdflower {
 
         assert annotations != null;
         ResponseSimulator responseSimulator = new ResponseSimulatorRecorded(annotations);
-        ResponseSimulator responseSimulatorGold = new ResponseSimulatorGold(learner.goldParses, new QuestionGenerator(),
+        ResponseSimulator responseSimulatorGold = new ResponseSimulatorGold(learner.goldParses,
                 false /* allow label match */);
 
         Results rerank = new Results(),

@@ -58,8 +58,7 @@ public class CrowdFlowerDataWriterRound2 {
 
     public static void main(String[] args) throws IOException {
         POMDP learner = new POMDP(nBest, 10000 /* horizon */, 0.0 /* money penalty */);
-        ResponseSimulatorGold goldSimulator = new ResponseSimulatorGold(learner.goldParses, new QuestionGenerator(),
-                true /* match by label */);
+        ResponseSimulatorGold goldSimulator = new ResponseSimulatorGold(learner.goldParses, true /* match by label */);
         learner.setQueryPruningParameters(queryPruningParameters);
 
         Set<Integer> heldOutSentences = new HashSet<>();

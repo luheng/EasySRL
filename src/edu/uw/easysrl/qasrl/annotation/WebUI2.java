@@ -48,7 +48,7 @@ public class WebUI2 {
         nBest = Integer.parseInt(args[1]);
 
         baseLearner = new ActiveLearningBySentence(nBest);
-        goldSimulator = new ResponseSimulatorGold(baseLearner.goldParses, new QuestionGenerator());
+        goldSimulator = new ResponseSimulatorGold(baseLearner.goldParses);
         activeLearningMap = new HashMap<>();
         activeLearningHistoryMap = new HashMap<>();
         annotationFileWriterMap = new HashMap<>();

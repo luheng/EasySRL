@@ -19,25 +19,18 @@ import java.util.stream.Collectors;
  */
 public class ResponseSimulatorGold extends ResponseSimulator {
     private final List<Parse> goldParses;
-    private QuestionGenerator questionGenerator;
     private boolean allowLabelMatch = true;
-
-    // Evidence propagation switches
-    // TODO: debug this ..
-    public boolean propagateArgumentAdjunctEvidence = false;
 
     // TODO: simulate noise level.
     // TODO: partial reward for parses that got part of the answer heads right ..
-    public ResponseSimulatorGold(List<Parse> goldParses, QuestionGenerator questionGenerator) {
+    public ResponseSimulatorGold(List<Parse> goldParses) {
         this.goldParses = goldParses;
-        this.questionGenerator = questionGenerator;
     }
 
-    public ResponseSimulatorGold(List<Parse> goldParses, QuestionGenerator questionGenerator, boolean allowLabelMatch) {
-        this(goldParses, questionGenerator);
+    public ResponseSimulatorGold(List<Parse> goldParses, boolean allowLabelMatch) {
+        this(goldParses);
         this.allowLabelMatch = allowLabelMatch;
     }
-
 
     /**
      * If exists a gold dependency that generates the same question ...
@@ -107,8 +100,10 @@ public class ResponseSimulatorGold extends ResponseSimulator {
          }
 
          if (response.chosenOptions.size() == 0) {
-             if (!goldAnswer.isEmpty() && noAnswerOptionId >= 0) {
-                 response.add(noAnswerOptionId);
+             if (!goldAnswer.isEmpty()) {
+                 if (noAnswerOptionId >= 0) {
+                     response.add(noAnswerOptionId);
+                 }
              } else {
                  response.add(badQuestionOptionId);
             }

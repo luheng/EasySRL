@@ -55,8 +55,7 @@ public class SimulatedExperimentPOMDP {
         POMDP qgen = new POMDP(baseLeaner);
         qgen.setQueryPruningParameters(queryPruningParameters);
         ResponseSimulator userModel = new ResponseSimulatorRecorded(annotations);
-        ResponseSimulator goldModel = new ResponseSimulatorGold(qgen.goldParses, new QuestionGenerator(),
-                false /* allow label match */);
+        ResponseSimulator goldModel = new ResponseSimulatorGold(qgen.goldParses, false /* allow label match */);
 
         System.err.println("Training sentences:\t" + numTrainingSentences + "\ttest sentences:\t"
                 + (sentenceIds.size() - numTrainingSentences));

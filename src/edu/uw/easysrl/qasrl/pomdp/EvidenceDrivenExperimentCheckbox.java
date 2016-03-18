@@ -1,6 +1,7 @@
 package edu.uw.easysrl.qasrl.pomdp;
 
 import edu.uw.easysrl.qasrl.*;
+import edu.uw.easysrl.qasrl.analysis.PPAttachment;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
 import edu.uw.easysrl.qasrl.annotation.CrowdFlowerDataReader;
 import edu.uw.easysrl.qasrl.annotation.QualityControl;
@@ -31,10 +32,10 @@ public class EvidenceDrivenExperimentCheckbox {
     };
 
     static final int minAgreement = 2;
-    static final double supertagPenaltyWeight = 5.0;
+    static final double supertagPenaltyWeight = 1.0;
     static final double attachmentPenaltyWeight = 1.0;
 
-    static final int ppQuestionMinAgreement = 4;
+    static final int ppQuestionMinAgreement = 2;
     static final double ppQuestionWeight = 1.0;
 
     static final boolean skipPrepositionalQuestions = false;
@@ -103,7 +104,7 @@ public class EvidenceDrivenExperimentCheckbox {
         // Learn a observation model.
         POMDP learner = new POMDP(nBest, 1000, 0.0);
         learner.setQueryPruningParameters(queryPruningParameters);
-        ResponseSimulator goldSimulator = new ResponseSimulatorGold(learner.goldParses, new QuestionGenerator());
+        ResponseSimulator goldSimulator = new ResponseSimulatorGold(learner.goldParses);
         List<DebugBlock> debugging = new ArrayList<>();
         for (int sentenceId : sentenceIds) {
             learner.initializeForSentence(sentenceId, annotations.get(sentenceId), true /* checkbox */);
@@ -154,12 +155,21 @@ public class EvidenceDrivenExperimentCheckbox {
                 if (skipPrepositionalQuestions && isPPQuestion) {
                     continue;
                 }
+                if (isPPQuestion) {
+                    if (query.getCategory() == PPAttachment.nounAdjunct) {
+                        if (query.getArgNum() == 1) {
+                            continue;
+                        }
+                    } else if (query.getArgNum() == 2) {
+                        continue;
+                    }
+                }
                 // Get evidence and reset weight.
                 double questionTypeWeight = isPPQuestion ? ppQuestionWeight : 1.0;
                 Set<Evidence> evidenceSet = Evidence
                         .getEvidenceFromQuery(query, multiResponse, skipPronounEvidence).stream()
-                        // only use pp for QNA
-                        .filter(ev -> !(isPPQuestion && Evidence.AttachmentEvidence.class.isInstance(ev)))
+                        // only use pp fo right attachment
+                        //.filter(ev -> !(isPPQuestion && Evidence.AttachmentEvidence.class.isInstance(ev)))
                         .collect(Collectors.toSet());
                 evidenceSet.forEach(ev -> ev.confidence = questionTypeWeight *
                         (Evidence.SupertagEvidence.class.isInstance(ev) ? supertagPenaltyWeight :

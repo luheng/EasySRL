@@ -18,7 +18,7 @@ public class SimulatedExperimentBySentence {
 
     public static void main(String[] args) {
         learner = new ActiveLearningBySentence(nBest);
-        ResponseSimulator responseSimulator = new ResponseSimulatorGold(learner.goldParses, new QuestionGenerator(),
+        ResponseSimulator responseSimulator = new ResponseSimulatorGold(learner.goldParses,
                 true /* Allow label match */);
         Map<Integer, Results> rerankCurve = new HashMap<>(),
                               oracleCurve = new HashMap<>(),

@@ -106,7 +106,7 @@ public class ActiveLearningInteractive {
         int avgBestK = 0, avgOracleK = 0;
 
         // For debugging.
-        ResponseSimulatorGold goldHuman = new ResponseSimulatorGold(goldParses, questionGenerator);
+        ResponseSimulatorGold goldHuman = new ResponseSimulatorGold(goldParses);
         List<Integer> sentenceOrder = IntStream.range(0, sentences.size()).boxed().collect(Collectors.toList());
         if (shuffleSentences) {
             Collections.shuffle(sentenceOrder, new Random(randomSeed));

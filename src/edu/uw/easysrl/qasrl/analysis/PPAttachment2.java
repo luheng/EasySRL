@@ -7,8 +7,6 @@ import edu.uw.easysrl.qasrl.AnalysisHelper;
 import edu.uw.easysrl.qasrl.DebugHelper;
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.pomdp.POMDP;
-import edu.uw.easysrl.qasrl.qg.QuestionAnswerPairReduced;
-import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.*;
@@ -68,7 +66,9 @@ public class PPAttachment2 {
                 if (parseId == 0) {
                     if (attachmentType != AttachmentType.PP_ARGUMENT) {
                         ppAttachment.onebestAttachmentType = attachmentType;
-                        ppAttachment.onebestAttachment1 = attachmentId;
+                        // Look at directed attachment accuracy.
+                        ppAttachment.onebestAttachment1 = attachmentType == AttachmentType.VERB_ARGUMENT ? -attachmentId : attachmentId;
+                        //ppAttachment.onebestAttachment1 = attachmentId;
                     } else {
                         ppAttachment.onebestAttachment2 = attachmentId;
                     }
@@ -237,9 +237,26 @@ public class PPAttachment2 {
         System.out.println();
 
         // Attachment accuracy.
-        double acc1 = ppAmbiguities.stream().filter(pp -> pp.goldAttachment1 == pp.onebestAttachment1).count();
-        double acc2 = ppAmbiguities.stream().filter(pp -> pp.goldAttachment2 == pp.onebestAttachment2).count();
-        System.out.println(String.format("Left attachment accuracy: %.3f%%", 100.0 * acc1 / ppAmbiguities.size()));
-        System.out.println(String.format("Right attachment accuracy: %.3f%%", 100.0 * acc2 / ppAmbiguities.size()));
+        double acc1 = ppAmbiguities.stream().filter(pp -> pp.goldAttachment1 == pp.onebestAttachment1 &&
+                pp.goldAttachmentType == AttachmentType.NOUN_ADJUNCT &&
+                pp.onebestAttachmentType == AttachmentType.NOUN_ADJUNCT).count();
+        double acc2 = ppAmbiguities.stream().filter(pp -> pp.goldAttachment1 == pp.onebestAttachment1 &&
+                pp.goldAttachmentType == AttachmentType.VERB_ADJUNCT &&
+                pp.onebestAttachmentType == AttachmentType.VERB_ADJUNCT).count();
+        double acc3 = ppAmbiguities.stream().filter(pp -> pp.goldAttachment1 == pp.onebestAttachment1 &&
+                (pp.goldAttachmentType == AttachmentType.VERB_ADJUNCT || pp.goldAttachmentType == AttachmentType.VERB_ARGUMENT) &&
+                (pp.onebestAttachmentType == AttachmentType.VERB_ADJUNCT || pp.onebestAttachmentType == AttachmentType.VERB_ARGUMENT)).count();
+        double norm1 = ppAmbiguities.stream().filter(pp ->
+                pp.goldAttachmentType == AttachmentType.NOUN_ADJUNCT &&
+                pp.onebestAttachmentType == AttachmentType.NOUN_ADJUNCT).count();
+        double norm2 = ppAmbiguities.stream().filter(pp ->
+                pp.goldAttachmentType == AttachmentType.VERB_ADJUNCT &&
+                pp.onebestAttachmentType == AttachmentType.VERB_ADJUNCT).count();
+        double norm3 = ppAmbiguities.stream().filter(pp ->
+                (pp.goldAttachmentType == AttachmentType.VERB_ADJUNCT || pp.goldAttachmentType == AttachmentType.VERB_ARGUMENT) &&
+                (pp.onebestAttachmentType == AttachmentType.VERB_ADJUNCT || pp.onebestAttachmentType == AttachmentType.VERB_ARGUMENT)).count();
+        System.out.println(String.format("NOUN_ADJ attachment accuracy: %.3f%%", 100.0 * acc1 / norm1));
+        System.out.println(String.format("VERB_ADJ attachment accuracy: %.3f%%", 100.0 * acc2 / norm2));
+        System.out.println(String.format("VERB (directed) attachment accuracy: %.3f%%", 100.0 * acc3 / norm3));
     }
 }

@@ -27,21 +27,21 @@ public class EvidenceDrivenExperiment {
     );
 
     private static final String[] annotationFiles = {
-            "./Crowdflower_data/f878213.csv",
+            //"./Crowdflower_data/f878213.csv",
             "./Crowdflower_data/f882410.csv"
     };
 
     static final int minAgreement = 2;
-    static final double supertagPenaltyWeight = 5.0;
+    static final double supertagPenaltyWeight = 1.0;
     static final double attachmentPenaltyWeight = 1.0;
 
     static final int ppQuestionMinAgreement = 4;
     static final double ppQuestionWeight = 1.0;
 
-    static final boolean skipPrepositionalQuestions = false; // true
-    static final boolean skipPronounEvidence = false;
+    static final boolean skipPrepositionalQuestions = true;
+    static final boolean skipPronounEvidence = true;
 
-    static final int maxTagsPerWord = 50; // 100
+    static final int maxTagsPerWord = 50;
     static BaseCcgParser.ConstrainedCcgParser reparser;
 
     public static void main(String[] args) {
@@ -104,7 +104,7 @@ public class EvidenceDrivenExperiment {
         // Learn a observation model.
         POMDP learner = new POMDP(nBest, 1000, 0.0);
         learner.setQueryPruningParameters(queryPruningParameters);
-        ResponseSimulator goldSimulator = new ResponseSimulatorGold(learner.goldParses, new QuestionGenerator());
+        ResponseSimulator goldSimulator = new ResponseSimulatorGold(learner.goldParses);
         List<DebugBlock> debugging = new ArrayList<>();
         for (int sentenceId : sentenceIds) {
             learner.initializeForSentence(sentenceId, annotations.get(sentenceId));

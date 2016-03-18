@@ -45,6 +45,8 @@ public class ConstrainedSupertagFactoredModel extends SupertagFactoredModel {
                     } else if (Evidence.AttachmentEvidence.class.isInstance(ev)) {
                         Evidence.AttachmentEvidence ev1 = (Evidence.AttachmentEvidence) ev;
                         attachmentEvidence.put(ev1.getHeadId(), ev1.getArgId(), ev1.getConfidence());
+                        // undirected evidence.
+                        // attachmentEvidence.put(ev1.getArgId(), ev1.getHeadId(), ev1.getConfidence());
                     }
                 });
         // Normalize attachment evidence.
@@ -94,22 +96,20 @@ public class ConstrainedSupertagFactoredModel extends SupertagFactoredModel {
         }
         double evidencePenalty = 0.0;
 
-        /*
         for (UnlabelledDependency dep : node.getResolvedUnlabelledDependencies()) {
             int headId = dep.getHead();
             if (attachmentEvidence.containsRow(headId)) {
                 for (int argId : dep.getArguments()) {
-                    //boolean headInLeft = leftChild.startOfSpan <= headId && headId < leftChild.startOfSpan + leftChild.spanLength;
-                    //boolean argInLeft = leftChild.startOfSpan <= argId && argId < leftChild.startOfSpan + leftChild.spanLength;
-                    //if (headInLeft ^ argInLeft && attachmentEvidence.contains(headId, argId)) {
                     if (attachmentEvidence.contains(headId, argId)) {
                         evidencePenalty += attachmentEvidence.get(headId, argId);
                     }
                 }
             }
         }
-        */
 
+        // TODO: equals check
+        // TODO: keep track of dependencies
+        /*
         Set<UnlabelledDependency> unlabelledDeps = new HashSet<>();
         dependencyGenerator.generateDependencies(node, unlabelledDeps);
         for (UnlabelledDependency dep : unlabelledDeps) {
@@ -124,7 +124,7 @@ public class ConstrainedSupertagFactoredModel extends SupertagFactoredModel {
                     evidencePenalty += attachmentEvidence.get(headId, argId);
                 }
             }
-        }
+        }*/
 
         return new AgendaItem(node,
                 leftChild.getInsideScore() + rightChild.getInsideScore() - lengthPenalty - evidencePenalty, /* inside */

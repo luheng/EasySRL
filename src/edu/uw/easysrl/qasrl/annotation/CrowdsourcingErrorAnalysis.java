@@ -77,7 +77,7 @@ public class CrowdsourcingErrorAnalysis {
 
         // Learn a observation model.
         POMDP learner = new POMDP(nBest, 1000, 0.0);
-        ResponseSimulator goldSimulator = new ResponseSimulatorGold(learner.goldParses, new QuestionGenerator());
+        ResponseSimulator goldSimulator = new ResponseSimulatorGold(learner.goldParses);
         int numWorsenedSentences = 0,
             numUnchangedSentences = 0,
             numImprovedSentences = 0;
@@ -184,7 +184,7 @@ public class CrowdsourcingErrorAnalysis {
         // Learn a observation model.
         POMDP learner = new POMDP(nBest, 1000, 0.0);
         learner.setQueryPruningParameters(queryPruningParameters);
-        ResponseSimulator goldSimulator = new ResponseSimulatorGold(learner.goldParses, new QuestionGenerator());
+        ResponseSimulator goldSimulator = new ResponseSimulatorGold(learner.goldParses);
         List<DebugBlock> debugging = new ArrayList<>();
         for (int sentenceId : sentenceIds) {
             learner.initializeForSentence(sentenceId, annotations.get(sentenceId));

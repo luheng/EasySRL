@@ -308,8 +308,7 @@ public class CrowdFlowerDataWriterCheckbox {
                 rerankF1 = new ArrayList<>(),
                 oracleF1 = new ArrayList<>(),
                 gainF1 = new ArrayList<>();
-        ResponseSimulator responseSimulator = new ResponseSimulatorGold(baseLearner.goldParses, new QuestionGenerator(),
-                true /* Allow label match */);
+        ResponseSimulator responseSimulator = new ResponseSimulatorGold(baseLearner.goldParses, true /* Allow label match */);
         Random random = new Random(randomSeed);
         List<Integer> sentenceIds = baseLearner.getAllSentenceIds().stream()
                 .filter(sid -> !heldOutSentences.contains(sid))
