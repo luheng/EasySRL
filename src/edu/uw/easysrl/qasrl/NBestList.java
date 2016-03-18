@@ -22,6 +22,18 @@ public final class NBestList {
         return parses.size();
     }
 
+    public ImmutableList<Parse> getParses() {
+        return parses;
+    }
+
+    public ImmutableList<Double> getScores() {
+        return scores;
+    }
+
+    public Double getScore(int parseId) {
+        return scores.get(parseId);
+    }
+
     public NBestList(ImmutableList<Parse> parses, ImmutableList<Double> scores) {
         this.parses = parses;
         this.scores = scores;
