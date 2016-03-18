@@ -26,13 +26,19 @@ public class BasicQuery<QA extends QAPairSurfaceForm> implements Query<QA> {
         return options;
     }
 
+    public ImmutableList<QA> getQAPairSurfaceForms() {
+        return qaPairSurfaceForms;
+    }
+
     private final int sentenceId;
     private final String prompt;
     private final ImmutableList<String> options;
+    private final ImmutableList<QA> qaPairSurfaceForms;
 
-    public BasicQuery(int sentenceId, String prompt, ImmutableList<String> options) {
+    public BasicQuery(int sentenceId, String prompt, ImmutableList<String> options, ImmutableList<QA> qaPairSurfaceForms) {
         this.sentenceId = sentenceId;
         this.prompt = prompt;
         this.options = options;
+        this.qaPairSurfaceForms = qaPairSurfaceForms;
     }
 }

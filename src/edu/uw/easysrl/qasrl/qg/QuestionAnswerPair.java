@@ -11,8 +11,54 @@ import edu.uw.easysrl.qasrl.TextGenerationHelper.TextWithDependencies;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
 
+import static edu.uw.easysrl.util.GuavaCollectors.*;
+
+import com.google.common.collect.ImmutableSet;
+
 @Deprecated
-public class QuestionAnswerPair {
+public class QuestionAnswerPair implements IQuestionAnswerPair {
+
+    public int getSentenceId() {
+        return -1; // XXX
+    }
+
+    public int getParseId() {
+        return -1; // XXX
+    }
+
+    public int getPredicateIndex() {
+        return predicateIndex;
+    }
+
+    public Category getPredicateCategory() {
+        return predicateCategory;
+    }
+
+    public ImmutableSet<ResolvedDependency> getQuestionDependencies() {
+        return ImmutableSet.copyOf(questionDeps);
+    }
+
+    public ResolvedDependency getTargetDependency() {
+        assert targetDeps.size() > 0
+            : "pretty sure we shouldn't have a QA pair with no target deps";
+        return targetDeps.get(0);
+    }
+
+    public ImmutableSet<ResolvedDependency> getAnswerDependencies() {
+        return answerDeps
+            .stream()
+            .flatMap(x -> x.stream())
+            .collect(toImmutableSet());
+    }
+
+    public String getQuestion() {
+        return renderQuestion();
+    }
+
+    public String getAnswer() {
+        return renderAnswer();
+    }
+
     public final int predicateIndex;
     public final Category predicateCategory;
     public final List<ResolvedDependency> questionDeps;

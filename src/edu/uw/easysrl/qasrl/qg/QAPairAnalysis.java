@@ -8,6 +8,9 @@ import edu.uw.easysrl.qasrl.qg.surfaceform.*;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 
 import java.util.function.Predicate;
+import java.util.function.Function;
+
+import java.util.stream.Stream;
 
 /**
  * Utility methods to operate on QuestionAnswerPairs and QAPairSurfaceForms.
@@ -24,46 +27,37 @@ import java.util.function.Predicate;
  * others might be functions on lists of QAPairSurfaceForms.
  * But it's convenient to have all of these things
  * (which will likely make use of each other)
- * in one place.
+ * in one place, instead of having to hunt around various classes for them.
  *
  * Created by julianmichael on 3/17/2016.
  */
-public class QAPairAnalyzer {
+public class QAPairAnalysis {
 
-    // TODO methods to extract interesting information from QAPairSurfaceForms
+    // TODO methods to extract interesting information from IQuestionAnswerPairs and QAPairSurfaceForms.
 
-    public static ImmutableSet<ResolvedDependency> getAllTargetDependencies(QAPairSurfaceForm surfaceForm) {
+    // this method will probably serve most of our needs; example would be
+    //   getAll(surfaceForm, IQuestionAnswerPair::getPredicateCategory).collect(toImmutableSet())
+    // to get us a set of all predicate categories aggregated into the surface form.
+    // these are simple and varied enough to do inline instead of preparing a bunch of helper methods for them.
+    // Returning a stream because depending on the situation we might want a list or set (or to map it some more).
+    public static <T> Stream<T> getAll(QAPairSurfaceForm surfaceForm, Function<IQuestionAnswerPair, T> mapper) {
         return surfaceForm.getQAPairs()
             .stream()
-            .map(IQuestionAnswerPair::getTargetDependency)
-            .collect(toImmutableSet());
+            .map(mapper);
     }
 
     // TODO methods for analyzing question confidence, answer confidence, that kind of thing?
-    // we need to access the list of all parses; how are we going to pass that around...
+    // we need to access the list of all parses; probably those should be passed in as parameters.
 
-    // TODO predicates on question answer pairs go here as static methods
+    // TODO useful, complex predicates on question answer pairs go here as static methods
 
-    // TODO other static methods to filter surface forms in more specific ways go here as well
-
-    // these methods I'm suggesting (and the one below) might not be necessary if we just have enough
-    // useful methods to extract the necessary information from surface forms to do these filters and stuff
-    // in-line.
-
-    public static <T extends QAPairSurfaceForm> ImmutableList<T>
-        filterIfAny(ImmutableList<T> surfaceForms,
-                    Predicate<IQuestionAnswerPair> pred) {
-        return surfaceForms
+    public static boolean forAny(QAPairSurfaceForm surfaceForm, Predicate<IQuestionAnswerPair> pred) {
+        return surfaceForm.getQAPairs()
             .stream()
-            .filter(sf -> sf.getQAPairs()
-                    .stream()
-                    .anyMatch(pred))
-            .collect(toImmutableList());
+            .anyMatch(pred);
     }
 
-    // NOTE: add filterIfAll if it's ever necessary (probably won't be...)
-
-    private QAPairAnalyzer() {
+    private QAPairAnalysis() {
         throw new AssertionError("no instances.");
     }
 }

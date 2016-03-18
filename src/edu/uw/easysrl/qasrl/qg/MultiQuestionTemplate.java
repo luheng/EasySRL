@@ -255,12 +255,6 @@ public class MultiQuestionTemplate {
         }
         this.type = QuestionType.getTypeFor(predicateCategory);
 
-        /*
-        // TODO: maybe we should use the identified PP? Add later.
-        String ppStr = argumentCategory.isFunctionInto(Category.PP) ?
-            PrepositionHelper.getPreposition(words, categories, argIdx) : "";
-        */
-
         /* I'll burn this bridge when I get to it
         // Special case: T1, T2 said, or T2, said T1
         if (numArguments == 2 && predicateCategory.getArgument(1).equals(Category.Sdcl)) {

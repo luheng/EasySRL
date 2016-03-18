@@ -9,18 +9,22 @@ import com.google.common.collect.ImmutableList;
  * Created by julianmichael on 3/17/16.
  */
 public final class BasicQAPairSurfaceForm implements QAPairSurfaceForm {
+    @Override
     public int getSentenceId() {
         return sentenceId;
     }
 
+    @Override
     public String getQuestion() {
         return question;
     }
 
+    @Override
     public String getAnswer() {
         return answer;
     }
 
+    @Override
     public ImmutableList<IQuestionAnswerPair> getQAPairs() {
         return qaPairs;
     }

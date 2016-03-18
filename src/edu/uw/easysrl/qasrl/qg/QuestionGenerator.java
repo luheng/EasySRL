@@ -9,9 +9,10 @@ import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 
 import com.google.common.collect.ImmutableList;
-
+import static edu.uw.easysrl.util.GuavaCollectors.*;
 
 import java.util.*;
+import java.util.stream.IntStream;
 
 /**
  * Created by luheng on 12/8/15.
@@ -46,7 +47,12 @@ public class QuestionGenerator {
     }
 
     public static ImmutableList<IQuestionAnswerPair> generateAllQAPairs(ImmutableList<String> words, Parse parse) {
-        return null; // TODO
+        return IntStream.range(0, words.size())
+            .mapToObj(i -> new Integer(i))
+            .flatMap(predIndex -> IntStream.range(1, parse.categories.get(predIndex).getNumberOfArguments() + 1)
+            .mapToObj(i -> new Integer(i))
+            .flatMap(argNum -> QuestionGenerator.generateAllQAPairs(predIndex, argNum, words, parse).stream()))
+            .collect(toImmutableList());
     }
 }
 

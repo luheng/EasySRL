@@ -32,7 +32,8 @@ public class QueryAggregators {
                         .map(QA::getAnswer)
                         .distinct()
                         .collect(toImmutableList());
-                    return new BasicQuery<QA>(sentenceId, question, answers);
+                    ImmutableList<QA> surfaceForms = ImmutableList.copyOf(e.getValue());
+                    return new BasicQuery<QA>(sentenceId, question, answers, surfaceForms);
                 })
             .collect(toImmutableList());
     }

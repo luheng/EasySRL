@@ -19,4 +19,5 @@ public interface Query<QA extends QAPairSurfaceForm> {
     public int getSentenceId();
     public String getPrompt();
     public ImmutableList<String> getOptions();
+    public ImmutableList<QA> getQAPairSurfaceForms();
 }
