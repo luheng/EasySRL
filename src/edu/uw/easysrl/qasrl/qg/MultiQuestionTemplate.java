@@ -340,7 +340,9 @@ public class MultiQuestionTemplate {
         return qaPairs;
     }
 
-    private QuestionAnswerPairReduced getBasicSupersenseQAPair(int targetArgNum, Map<Integer, Optional<ResolvedDependency>> chosenArgDeps, Supersense supersense) {
+    private QuestionAnswerPairReduced getBasicSupersenseQAPair(int targetArgNum,
+                                                               Map<Integer, Optional<ResolvedDependency>> chosenArgDeps,
+                                                               Supersense supersense) {
         final ResolvedDependency verbDep = chosenArgDeps.get(2).get();
         final int verbIndex = verbDep.getArgument();
         final List<String> wh = supersense.getWhWords();
@@ -400,6 +402,7 @@ public class MultiQuestionTemplate {
                                              parseId,
                                              predicateIndex,
                                              predicateCategory,
+                                             targetArgNum,
                                              verbIndex,
                                              new QuestionAnswerPairReduced.SupersenseQuestionType(supersense),
                                              questionDeps,
@@ -592,6 +595,7 @@ public class MultiQuestionTemplate {
                                                                                            parseId,
                                                                                            predicateIndex,
                                                                                            predicateCategory,
+                                                                                           targetArgNum,
                                                                                            predicateIndex,
                                                                                            new QuestionAnswerPairReduced.StandardQuestionType(type),
                                                                                            questionDeps,
@@ -609,7 +613,6 @@ public class MultiQuestionTemplate {
      * Get the wh-word (and extra words to append to the question) associated with
      * the expected answer to a question about argument argNum.
      * extra words e.g. in "what did someone he do X for?" "what did someone want X to do?"
-     * @param argNum the argument number of the word we're abstracting away
      * @return a 2-element array of { "wh-word", "extra words" } where extra words may be empty
      */
     public String getWhWordByIndex(int index) {

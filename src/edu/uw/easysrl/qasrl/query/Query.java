@@ -16,8 +16,11 @@ import com.google.common.collect.ImmutableList;
  * Created by julianmichael on 3/17/2016.
  */
 public interface Query<QA extends QAPairSurfaceForm> {
-    public int getSentenceId();
-    public String getPrompt();
-    public ImmutableList<String> getOptions();
-    public ImmutableList<QA> getQAPairSurfaceForms();
+    int getSentenceId();
+    String getPrompt();
+    ImmutableList<String> getOptions();
+    ImmutableList<QA> getQAPairSurfaceForms();
+    boolean allowMultipleChoices();
+
+    String toString(ImmutableList<String> sentence);
 }

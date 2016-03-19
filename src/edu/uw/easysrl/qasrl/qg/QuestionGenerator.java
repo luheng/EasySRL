@@ -1,5 +1,6 @@
 package edu.uw.easysrl.qasrl.qg;
 
+import edu.uw.easysrl.qasrl.NBestList;
 import edu.uw.easysrl.qasrl.qg.util.*;
 
 import edu.uw.easysrl.corpora.CCGBankDependencies.CCGBankDependency;
@@ -59,11 +60,26 @@ public class QuestionGenerator {
     public static ImmutableList<IQuestionAnswerPair> generateAllQAPairs(int sentenceId, int parseId,
                                                                         ImmutableList<String> words, Parse parse) {
         return IntStream.range(0, words.size())
-            .mapToObj(i -> new Integer(i))
+            .mapToObj(Integer::new)
             .flatMap(predIndex -> IntStream.range(1, parse.categories.get(predIndex).getNumberOfArguments() + 1)
-            .mapToObj(i -> new Integer(i))
-            .flatMap(argNum -> QuestionGenerator.generateAllQAPairs(sentenceId, parseId, predIndex, argNum, words, parse).stream()))
+                    .mapToObj(Integer::new)
+                    .flatMap(argNum -> QuestionGenerator.generateAllQAPairs(sentenceId, parseId, predIndex, argNum, words, parse).stream()))
             .collect(toImmutableList());
+    }
+
+    public static ImmutableList<IQuestionAnswerPair> generateAllQAPairs(int sentenceId, ImmutableList<String> words,
+                                                                        NBestList nBestList) {
+        return IntStream.range(0, words.size()).boxed()
+                .flatMap(predId -> IntStream.range(0, nBestList.getN()).boxed()
+                                .flatMap(parseId -> {
+                                    final Parse parse = nBestList.getParse(parseId);
+                                    final Category category = parse.categories.get(predId);
+                                    return IntStream.range(1, category.getNumberOfArguments() + 1).boxed()
+                                            .flatMap(argNum -> QuestionGenerator
+                                                    .generateAllQAPairs(sentenceId, parseId, predId, argNum, words, parse)
+                                                    .stream());
+                                })
+                ).collect(toImmutableList());
     }
 }
 

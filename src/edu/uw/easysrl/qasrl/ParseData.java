@@ -53,7 +53,7 @@ public final class ParseData {
         try {
             sentenceIterator = ParallelCorpusReader.READER.readCcgCorpus(readDev);
         } catch (IOException e) {
-            System.out.println(String.format("Failed to read sentences.", sentenceInputWords.size()));
+            System.out.println(String.format("Failed to read %d sentences.", sentenceInputWords.size()));
             return Optional.empty();
         }
         while (sentenceIterator.hasNext()) {

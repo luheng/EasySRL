@@ -26,6 +26,10 @@ public final class NBestList {
         return parses;
     }
 
+    public Parse getParse(final int parseId) {
+        return parses.get(parseId);
+    }
+
     public ImmutableList<Double> getScores() {
         return scores;
     }

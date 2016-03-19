@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
  * Query generator.
  * Created by luheng on 1/17/16.
  */
-public class QueryGenerator {
+public class QueryGeneratorFinal {
 
     /**
      * @param words the sentence

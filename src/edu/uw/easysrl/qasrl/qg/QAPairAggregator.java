@@ -13,5 +13,5 @@ import com.google.common.collect.ImmutableList;
  */
 @FunctionalInterface
 public interface QAPairAggregator<T extends QAPairSurfaceForm> {
-    public ImmutableList<T> aggregate(ImmutableList<IQuestionAnswerPair> qaPairs);
+    ImmutableList<T> aggregate(ImmutableList<IQuestionAnswerPair> qaPairs);
 }

@@ -26,6 +26,10 @@ public class QuestionAnswerPair implements IQuestionAnswerPair {
         return -1; // XXX
     }
 
+    public int getArgumentNumber() {
+        return -1; // XXX
+    }
+
     public int getPredicateIndex() {
         return predicateIndex;
     }

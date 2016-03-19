@@ -1,8 +1,12 @@
 package edu.uw.easysrl.qasrl.query;
 
+import edu.uw.easysrl.qasrl.DebugPrinter;
 import edu.uw.easysrl.qasrl.qg.surfaceform.*;
 
 import com.google.common.collect.ImmutableList;
+import edu.uw.easysrl.syntax.grammar.Category;
+
+import java.util.stream.Collectors;
 
 /**
  * Most basic implementation of the QAPairSurfaceForm interface;
@@ -34,11 +38,44 @@ public class BasicQuery<QA extends QAPairSurfaceForm> implements Query<QA> {
     private final String prompt;
     private final ImmutableList<String> options;
     private final ImmutableList<QA> qaPairSurfaceForms;
+    private boolean allowMultipleChoices;
 
-    public BasicQuery(int sentenceId, String prompt, ImmutableList<String> options, ImmutableList<QA> qaPairSurfaceForms) {
+    public BasicQuery(int sentenceId, String prompt, ImmutableList<String> options, ImmutableList<QA> qaPairSurfaceForms,
+                      boolean allowMultipleChoices) {
         this.sentenceId = sentenceId;
         this.prompt = prompt;
         this.options = options;
         this.qaPairSurfaceForms = qaPairSurfaceForms;
+        this.allowMultipleChoices = allowMultipleChoices;
+    }
+
+    public boolean allowMultipleChoices() {
+        return allowMultipleChoices;
+    }
+
+    public String toString(final ImmutableList<String> sentence) {
+        // TODO: .....
+        String result = "";
+        final int predicateIndex = qaPairSurfaceForms.get(0).getQAPairs().get(0).getPredicateIndex();
+        final Category category  = qaPairSurfaceForms.get(0).getQAPairs().get(0).getPredicateCategory();
+        final int argumentNumber = qaPairSurfaceForms.get(0).getQAPairs().get(0).getArgumentNumber();
+
+        result += sentence.stream().collect(Collectors.joining(" ")) + "\n";
+        result += String.format("%d:%s\t%s\t%d\n", predicateIndex, sentence.get(predicateIndex), category, argumentNumber);
+        result += prompt + "\n";
+        //System.out.println(String.format("%.2f\t%.2f\t%s", answerEntropy, answerMargin, question));
+
+        for (int i = 0; i < options.size(); i++) {
+            //String match = (response.chosenOptions.contains(i) ? "*" : "");
+            /*
+            String argIdsStr = ao.isNAOption() ? "_" :
+                    ao.argumentIds.stream().map(String::valueOf).collect(Collectors.joining(","));
+            String argHeadsStr = ao.isNAOption() ? "N/A" :
+                    ao.argumentIds.stream().map(words::get).collect(Collectors.joining(","));
+            String parseIdsStr = DebugPrinter.getShortListString(ao.parseIds);
+            */
+            result += String.format("%d\t%s\n", i, options.get(i));
+        }
+        return result;
     }
 }

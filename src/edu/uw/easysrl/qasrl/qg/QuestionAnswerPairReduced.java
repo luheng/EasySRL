@@ -32,6 +32,8 @@ public class QuestionAnswerPairReduced implements IQuestionAnswerPair {
         return predicateCategory;
     }
 
+    public int getArgumentNumber() { return argumentNumber; }
+
     // TODO: store the immutable sets as fields
     public ImmutableSet<ResolvedDependency> getQuestionDependencies() {
         return ImmutableSet.copyOf(questionDeps);
@@ -58,6 +60,7 @@ public class QuestionAnswerPairReduced implements IQuestionAnswerPair {
 
     public final int predicateIndex;
     public final Category predicateCategory;
+    public final int argumentNumber;
     public final int questionMainIndex;
     public final QuestionType questionType;
     public final List<String> question;
@@ -73,12 +76,13 @@ public class QuestionAnswerPairReduced implements IQuestionAnswerPair {
     // questionMainIndex will be the predicate if we're asking a normal-style question,
     // and will be the argument if we're asking a flipped-style question.
     public QuestionAnswerPairReduced(int parseId, int sentenceId,
-                                     int predicateIndex, Category predicateCategory,
+                                     int predicateIndex, Category predicateCategory, int argumentNumber,
                                      int questionMainIndex, QuestionType questionType,
                                      Set<ResolvedDependency> questionDeps, List<String> question,
                                      ResolvedDependency targetDep, TextWithDependencies answer) {
         this.predicateIndex = predicateIndex;
         this.predicateCategory = predicateCategory;
+        this.argumentNumber = argumentNumber;
         this.questionMainIndex = questionMainIndex;
         this.questionType = questionType;
         this.questionDeps = questionDeps;

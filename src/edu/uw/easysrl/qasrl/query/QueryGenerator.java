@@ -15,6 +15,6 @@ import com.google.common.collect.ImmutableList;
  * Created by julianmichael on 3/17/16.
  */
 @FunctionalInterface
-public interface QueryAggregator<QA extends QAPairSurfaceForm, Q extends Query<QA>> {
-    public ImmutableList<Q> aggregate(ImmutableList<QA> qaPairs);
+public interface QueryGenerator<QA extends QAPairSurfaceForm, Q extends Query<QA>> {
+    ImmutableList<Q> aggregate(ImmutableList<QA> qaPairs);
 }

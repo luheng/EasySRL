@@ -139,7 +139,7 @@ public class MTurkDataWriter {
         for (int sentIdx : allParses.keySet()) {
             List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
             List<Parse> parses = allParses.get(sentIdx);
-            List<GroupedQuery> queries = QueryGenerator.generateQueries(sentIdx, words, parses, questionGenerator,
+            List<GroupedQuery> queries = QueryGeneratorFinal.generateQueries(sentIdx, words, parses, questionGenerator,
                     generatePseudoQuestions);
             queries.forEach(query -> query.computeProbabilities(reranker.expScores.get(query.sentenceId)));
             queryList.addAll(queries);

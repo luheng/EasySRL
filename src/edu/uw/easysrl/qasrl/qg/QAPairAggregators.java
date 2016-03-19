@@ -9,7 +9,9 @@ import com.google.common.collect.HashMultiset;
 import static edu.uw.easysrl.util.GuavaCollectors.*;
 import static java.util.stream.Collectors.*;
 
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.stream.Collectors;
 
 /**
  * Helper class where we put all of our useful QAPairAggregator instances
@@ -21,44 +23,44 @@ import java.util.Comparator;
  */
 public final class QAPairAggregators {
 
-    public static QAPairAggregator<BasicQAPairSurfaceForm> aggregateByString() {
+    public static QAPairAggregator<QAPairSurfaceForm> aggregateByString() {
         return qaPairs -> qaPairs
             .stream()
-            .collect(groupingBy(qa -> qa.getQuestion()))
+            .collect(groupingBy(IQuestionAnswerPair::getQuestion))
             .entrySet()
             .stream()
             .flatMap(eQuestion -> eQuestion.getValue()
-                     .stream()
-                     .collect(groupingBy(qa -> qa.getAnswer()))
-                     .entrySet()
-                     .stream()
-                     .map(eAnswer -> {
-                             assert eAnswer.getValue().size() > 0
-                                 : "list in group should always be nonempty";
-                             int sentenceId = eAnswer.getValue().get(0).getSentenceId();
-                             return new BasicQAPairSurfaceForm(sentenceId,
-                                                               eQuestion.getKey(),
-                                                               eAnswer.getKey(),
-                                                               ImmutableList.copyOf(eAnswer.getValue()));
-                         }))
+                    .stream()
+                    .collect(groupingBy(IQuestionAnswerPair::getAnswer))
+                    .entrySet()
+                    .stream()
+                    .map(eAnswer -> {
+                        assert eAnswer.getValue().size() > 0
+                                : "list in group should always be nonempty";
+                        int sentenceId = eAnswer.getValue().get(0).getSentenceId();
+                        return new BasicQAPairSurfaceForm(sentenceId,
+                                eQuestion.getKey(),
+                                eAnswer.getKey(),
+                                ImmutableList.copyOf(eAnswer.getValue()));
+                    }))
             .collect(toImmutableList());
     }
 
     public static QAPairAggregator<TargetDependencySurfaceForm> aggregateByTargetDependency() {
         return qaPairs -> qaPairs
             .stream()
-            .collect(groupingBy(qa -> qa.getTargetDependency()))
+            .collect(groupingBy(IQuestionAnswerPair::getTargetDependency))
             .entrySet()
             .stream()
             .map(e -> {
-                    ResolvedDependency targetDep = e.getKey();
-                    assert e.getValue().size() > 0
+                final ResolvedDependency targetDep = e.getKey();
+                final Collection<IQuestionAnswerPair> qaList = e.getValue();
+                assert qaList.size() > 0
                         : "list in group should always be nonempty";
-                    int sentenceId = e.getValue().get(0).getSentenceId();
-                    // plurality vote on question and answer
-                    String pluralityQuestion = HashMultiset
-                        .create(e.getValue()
-                                .stream()
+                int sentenceId = e.getValue().get(0).getSentenceId();
+                // plurality vote on question and answer
+                String pluralityQuestion = HashMultiset
+                        .create(qaList.stream()
                                 .map(IQuestionAnswerPair::getQuestion)
                                 .collect(toList()))
                         .entrySet()
@@ -66,9 +68,8 @@ public final class QAPairAggregators {
                         .max(Comparator.comparing(Multiset.Entry::getCount))
                         .map(Multiset.Entry::getElement)
                         .get(); // there should always be one because our list is nonempty
-                    String pluralityAnswer = HashMultiset
-                        .create(e.getValue()
-                                .stream()
+                String pluralityAnswer = HashMultiset
+                        .create(qaList.stream()
                                 .map(IQuestionAnswerPair::getAnswer)
                                 .collect(toList()))
                         .entrySet()
@@ -76,10 +77,12 @@ public final class QAPairAggregators {
                         .max(Comparator.comparing(Multiset.Entry::getCount))
                         .map(Multiset.Entry::getElement)
                         .get(); // there should always be one because our list is nonempty
-                    return new TargetDependencySurfaceForm(sentenceId, pluralityQuestion, pluralityAnswer,
-                                                           ImmutableList.copyOf(e.getValue()),
-                                                           targetDep);
-                })
+                return new TargetDependencySurfaceForm(sentenceId,
+                                                       pluralityQuestion,
+                                                       pluralityAnswer,
+                                                       ImmutableList.copyOf(qaList),
+                                                       targetDep);
+            })
             .collect(toImmutableList());
     }
 

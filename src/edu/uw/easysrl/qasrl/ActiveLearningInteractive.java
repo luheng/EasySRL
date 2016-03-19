@@ -132,7 +132,7 @@ public class ActiveLearningInteractive {
         for (int sentIdx : allParses.keySet()) {
             List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
             List<Parse> parses = allParses.get(sentIdx);
-            allQueries.addAll(QueryGenerator.generateQueries(sentIdx, words, parses, questionGenerator,
+            allQueries.addAll(QueryGeneratorFinal.generateQueries(sentIdx, words, parses, questionGenerator,
                     false /* generatePseudoQuestions */));
         }
         List<GroupedQuery> queryList = allQueries.stream()

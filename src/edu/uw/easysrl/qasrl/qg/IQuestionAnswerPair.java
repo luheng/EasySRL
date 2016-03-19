@@ -13,18 +13,20 @@ import edu.uw.easysrl.syntax.grammar.Category;
  * Created by julianmichael on 3/17/2016.
  */
 public interface IQuestionAnswerPair {
-    public int getSentenceId();
-    public int getParseId();
-    public int getPredicateIndex();
-    public Category getPredicateCategory();
+    int getSentenceId();
+    int getParseId();
+    int getPredicateIndex();
+    Category getPredicateCategory();
+    int getArgumentNumber();
+
     // questionMainIndex will be the predicate if we're asking a normal-style question,
     // and will be the argument if we're asking a flipped-style question.
     // public int getQuestionMainIndex();
     // public QuestionType getQuestionType();
-    public ImmutableSet<ResolvedDependency> getQuestionDependencies();
-    public ResolvedDependency getTargetDependency();
-    public ImmutableSet<ResolvedDependency> getAnswerDependencies();
+    ImmutableSet<ResolvedDependency> getQuestionDependencies();
+    ResolvedDependency getTargetDependency();
+    ImmutableSet<ResolvedDependency> getAnswerDependencies();
 
-    public String getQuestion();
-    public String getAnswer();
+    String getQuestion();
+    String getAnswer();
 }
