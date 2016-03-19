@@ -1,13 +1,10 @@
 package edu.uw.easysrl.qasrl.qg;
 
 import edu.uw.easysrl.qasrl.NBestList;
-import edu.uw.easysrl.qasrl.qg.util.*;
 
-import edu.uw.easysrl.corpora.CCGBankDependencies.CCGBankDependency;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.syntax.grammar.Category;
-import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 
 import com.google.common.collect.ImmutableList;
 import static edu.uw.easysrl.util.GuavaCollectors.*;
@@ -39,7 +36,7 @@ public class QuestionGenerator {
     }
 
     @Deprecated
-    public static List<QuestionAnswerPairReduced> generateAllQAPairs(int predicateIdx,
+    public static List<RawQuestionAnswerPair> generateAllQAPairs(int predicateIdx,
                                                                      int argumentNumber,
                                                                      List<String> words,
                                                                      Parse parse) {
@@ -47,7 +44,7 @@ public class QuestionGenerator {
         return template.getAllQAPairsForArgument(argumentNumber);
     }
 
-    public static List<QuestionAnswerPairReduced> generateAllQAPairs(int sentenceId,
+    public static List<RawQuestionAnswerPair> generateAllQAPairs(int sentenceId,
                                                                      int parseId,
                                                                      int predicateIdx,
                                                                      int argumentNumber,

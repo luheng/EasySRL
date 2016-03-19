@@ -7,19 +7,14 @@ import edu.uw.easysrl.qasrl.NBestList;
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.ParseData;
 import edu.uw.easysrl.qasrl.qg.IQuestionAnswerPair;
-import edu.uw.easysrl.qasrl.qg.QAPairAggregator;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregators;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
-import edu.uw.easysrl.qasrl.qg.surfaceform.BasicQAPairSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAPairSurfaceForm;
-import edu.uw.easysrl.qasrl.query.BasicQuery;
 import edu.uw.easysrl.qasrl.query.Query;
-import edu.uw.easysrl.qasrl.query.QueryGenerator;
 import edu.uw.easysrl.qasrl.query.QueryGenerators;
 
-import java.util.ArrayList;
-
 /**
+ * Make sure everything works.
  * Created by luheng on 3/18/16.
  */
 public class RefactorExperiment {

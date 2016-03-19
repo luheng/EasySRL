@@ -25,8 +25,8 @@ import com.google.common.collect.ImmutableList;
  * Created by julianmichael on 3/17/2016.
  */
 public interface QAPairSurfaceForm {
-    public int getSentenceId();
-    public String getQuestion();
-    public String getAnswer();
-    public ImmutableList<IQuestionAnswerPair> getQAPairs();
+    int getSentenceId();
+    String getQuestion();
+    String getAnswer();
+    ImmutableList<IQuestionAnswerPair> getQAPairs();
 }

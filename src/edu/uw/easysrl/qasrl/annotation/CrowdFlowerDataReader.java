@@ -2,7 +2,6 @@ package edu.uw.easysrl.qasrl.annotation;
 
 import edu.uw.easysrl.syntax.grammar.Category;
 import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 
 import java.io.FileReader;
@@ -15,8 +14,7 @@ import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.DataLoader;
 import edu.uw.easysrl.qasrl.TextGenerationHelper;
 import edu.uw.easysrl.qasrl.QueryGeneratorBothWays;
-import edu.uw.easysrl.qasrl.qg.QuestionAnswerPairReduced;
-import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
+import edu.uw.easysrl.qasrl.qg.RawQuestionAnswerPair;
 
 /**
  * Created by luheng on 2/24/16.
@@ -38,7 +36,7 @@ public class CrowdFlowerDataReader {
             .stream()
             .map(TextGenerationHelper::renderString)
             .collect(Collectors.toList());
-        final Map<Integer, List<QuestionAnswerPairReduced>> allGoldQAPairs = new HashMap<>();
+        final Map<Integer, List<RawQuestionAnswerPair>> allGoldQAPairs = new HashMap<>();
 
         List<RecordedCheckboxAnnotation> checkboxAnnotations = new ArrayList<>();
         for (CSVRecord record : records) {
@@ -49,7 +47,7 @@ public class CrowdFlowerDataReader {
             }
 
             final int sentenceId = Integer.parseInt(record.get("sent_id"));
-            final List<QuestionAnswerPairReduced> goldQAPairs;
+            final List<RawQuestionAnswerPair> goldQAPairs;
             if(allGoldQAPairs.containsKey(sentenceId)) {
                 goldQAPairs = allGoldQAPairs.get(sentenceId);
             } else {

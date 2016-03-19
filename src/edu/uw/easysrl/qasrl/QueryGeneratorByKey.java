@@ -4,13 +4,12 @@ import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Table;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
-import edu.uw.easysrl.qasrl.qg.QuestionAnswerPairReduced;
+import edu.uw.easysrl.qasrl.qg.RawQuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
 /**
  * Created by luheng on 3/1/16.
@@ -38,7 +37,7 @@ public class QueryGeneratorByKey {
             for (int predId = 0; predId < words.size(); predId++) {
                 final Category category = parses.get(parseId).categories.get(predId);
                 for (int argNum = 1; argNum <= category.getNumberOfArguments(); argNum++) {
-                    List<QuestionAnswerPairReduced> qaList = QuestionGenerator
+                    List<RawQuestionAnswerPair> qaList = QuestionGenerator
                             .generateAllQAPairs(predId, argNum, words, parse);
                     if (qaList.size() == 0) {
                         continue;
@@ -46,7 +45,7 @@ public class QueryGeneratorByKey {
                     Map<Integer, String> argHeadToSpan = new HashMap<>();
                     qaList.forEach(qa -> argHeadToSpan.put(qa.targetDep.getArgument(), qa.renderAnswer()));
                     List<String> questionStrList = qaList.stream()
-                            .map(QuestionAnswerPairReduced::renderQuestion)
+                            .map(RawQuestionAnswerPair::renderQuestion)
                             .collect(Collectors.toList());
                     String qkey = "" + predId + "." + category + "." + argNum;
                     ImmutableList<Integer> heads = ImmutableList.copyOf(argHeadToSpan.keySet().stream()

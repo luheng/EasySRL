@@ -6,10 +6,8 @@ import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.DataLoader;
 import edu.uw.easysrl.qasrl.TextGenerationHelper;
 import edu.uw.easysrl.qasrl.QueryGeneratorBothWays;
-import edu.uw.easysrl.qasrl.qg.QuestionAnswerPairReduced;
+import edu.uw.easysrl.qasrl.qg.RawQuestionAnswerPair;
 
-import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 
 import java.io.*;
@@ -54,7 +52,7 @@ public class RecordedCheckboxAnnotation extends Annotation {
         this.argumentNumber = other.argumentNumber;
     }
 
-    public static List<RecordedCheckboxAnnotation> loadFromCSVRecordCrowdFlower(CSVRecord record, List<QuestionAnswerPairReduced> goldQAPairs) {
+    public static List<RecordedCheckboxAnnotation> loadFromCSVRecordCrowdFlower(CSVRecord record, List<RawQuestionAnswerPair> goldQAPairs) {
         List<RecordedCheckboxAnnotation> annotations = new ArrayList<>();
         RecordedCheckboxAnnotation annotation = new RecordedCheckboxAnnotation();
         final int sentenceId = Integer.parseInt(record.get("sent_id"));
@@ -100,7 +98,7 @@ public class RecordedCheckboxAnnotation extends Annotation {
             .stream()
             .map(TextGenerationHelper::renderString)
             .collect(Collectors.toList());
-        final Map<Integer, List<QuestionAnswerPairReduced>> allGoldQAPairs = new HashMap<>();
+        final Map<Integer, List<RawQuestionAnswerPair>> allGoldQAPairs = new HashMap<>();
 
         List<RecordedCheckboxAnnotation> annotations = new ArrayList<>();
         BufferedReader reader;
@@ -141,7 +139,7 @@ public class RecordedCheckboxAnnotation extends Annotation {
             }
 
             // we need to just compute the gold answers ourselves.
-            final List<QuestionAnswerPairReduced> goldQAPairs;
+            final List<RawQuestionAnswerPair> goldQAPairs;
             if(allGoldQAPairs.containsKey(sentenceId)) {
                 goldQAPairs = allGoldQAPairs.get(sentenceId);
             } else {
@@ -233,7 +231,7 @@ public class RecordedCheckboxAnnotation extends Annotation {
         }
     }
 
-    private static boolean goldSupportsAnnotation(List<QuestionAnswerPairReduced> goldQAPairs, RecordedCheckboxAnnotation candidate) {
+    private static boolean goldSupportsAnnotation(List<RawQuestionAnswerPair> goldQAPairs, RecordedCheckboxAnnotation candidate) {
         switch(goldSupport) {
         case GOLD_BY_STRING: return goldSupportsAnnotationByString(goldQAPairs, candidate);
         case GOLD_BY_PRED_AND_ARG: return goldSupportsAnnotationByPredAndArg(goldQAPairs, candidate);
@@ -241,8 +239,8 @@ public class RecordedCheckboxAnnotation extends Annotation {
         }
     }
 
-    private static boolean goldSupportsAnnotationByString(List<QuestionAnswerPairReduced> goldQAPairs, RecordedCheckboxAnnotation candidate) {
-        List<QuestionAnswerPairReduced> questionMatches = goldQAPairs
+    private static boolean goldSupportsAnnotationByString(List<RawQuestionAnswerPair> goldQAPairs, RecordedCheckboxAnnotation candidate) {
+        List<RawQuestionAnswerPair> questionMatches = goldQAPairs
             .stream()
             .filter(qa -> qa.renderQuestion().equals(candidate.question))
             .collect(Collectors.toList());
@@ -255,9 +253,9 @@ public class RecordedCheckboxAnnotation extends Annotation {
         return exactMatch || badQuestion;
     }
 
-    private static boolean goldSupportsAnnotationByPredAndArg(List<QuestionAnswerPairReduced> goldQAPairs, RecordedCheckboxAnnotation candidate) {
+    private static boolean goldSupportsAnnotationByPredAndArg(List<RawQuestionAnswerPair> goldQAPairs, RecordedCheckboxAnnotation candidate) {
         assert candidate.predicateCategory != null;
-        List<QuestionAnswerPairReduced> questionStringMatches = goldQAPairs
+        List<RawQuestionAnswerPair> questionStringMatches = goldQAPairs
             .stream()
             .filter(qa -> qa.renderQuestion().equals(candidate.question))
             .collect(Collectors.toList());

@@ -1,17 +1,11 @@
 package edu.uw.easysrl.qasrl;
 
-import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
-import edu.uw.easysrl.qasrl.qg.QuestionAnswerPairReduced;
+import edu.uw.easysrl.qasrl.qg.RawQuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
-import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.syntax.grammar.Category;
 
-import java.lang.reflect.Array;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
-import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
 /**
@@ -67,7 +61,7 @@ public class ResponseSimulatorGold extends ResponseSimulator {
          }
 
          for (int argNum = 1; argNum <= goldCategory.getNumberOfArguments(); argNum++) {
-            List<QuestionAnswerPairReduced> qaList = QuestionGenerator
+            List<RawQuestionAnswerPair> qaList = QuestionGenerator
                     .generateAllQAPairs(predId, argNum, sentence, goldParse).stream()
                     .sorted((a1, a2) -> Integer.compare(a1.targetDep.getArgument(), a2.targetDep.getArgument()))
                     .collect(Collectors.toList());
@@ -76,7 +70,7 @@ public class ResponseSimulatorGold extends ResponseSimulator {
             }
             String questionStr = qaList.get(0).renderQuestion();
             String answerStr = qaList.stream()
-                    .map(QuestionAnswerPairReduced::renderAnswer)
+                    .map(RawQuestionAnswerPair::renderAnswer)
                     .collect(Collectors.joining(QuestionAnswerPair.answerDelimiter));
             boolean questionMatch = query.question.equalsIgnoreCase(questionStr);
             boolean labelMatch = (goldCategory == query.category && argNum == query.argumentNumber);

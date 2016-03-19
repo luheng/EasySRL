@@ -2,7 +2,7 @@ package edu.uw.easysrl.qasrl.annotation;
 
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
-import edu.uw.easysrl.qasrl.qg.QuestionAnswerPairReduced;
+import edu.uw.easysrl.qasrl.qg.RawQuestionAnswerPair;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 
@@ -137,7 +137,7 @@ public class CrowdFlowerDataWriterCheckbox {
         int goldOptionCounter = 0;
         int[] goldOptionHist = new int[30];
         int goldOptionHistOverflow = 0;
-        Map<QuestionAnswerPairReduced.QuestionType, int[]> questionTypeHists = new HashMap<>();
+        Map<RawQuestionAnswerPair.QuestionType, int[]> questionTypeHists = new HashMap<>();
         final int numQueriesPerOptionCount = 1;
         List<Integer> annotatedSentences = new ArrayList<>();
 
@@ -212,7 +212,7 @@ public class CrowdFlowerDataWriterCheckbox {
                 } else {
                     queryHist[numOptions]++;
                     goldOptionHist[numOptions] += gold.size();
-                    for(QuestionAnswerPairReduced.QuestionType qType : query.getQuestionTypes()) {
+                    for(RawQuestionAnswerPair.QuestionType qType : query.getQuestionTypes()) {
                         if(!questionTypeHists.containsKey(qType)) {
                             questionTypeHists.put(qType, new int[30]);
                         }
@@ -242,7 +242,7 @@ public class CrowdFlowerDataWriterCheckbox {
         for(int i = 0; i < queryHist.length; i++) {
             if(queryHist[i] != 0) {
                 System.out.println(String.format("Number of questions with %d options: %d (%.2f gold)", i, queryHist[i], (1.0 * goldOptionHist[i])/(i * queryHist[i])));
-                for(QuestionAnswerPairReduced.QuestionType qType : questionTypeHists.keySet()) {
+                for(RawQuestionAnswerPair.QuestionType qType : questionTypeHists.keySet()) {
                     if(questionTypeHists.get(qType)[i] != 0) {
                         System.out.println(String.format("\tOf type %s: %.2f", qType, (1.0 * questionTypeHists.get(qType)[i])/queryHist[i]));
                     }

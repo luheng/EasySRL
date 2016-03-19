@@ -1,12 +1,6 @@
 package edu.uw.easysrl.qasrl;
 
-import com.google.common.collect.HashBasedTable;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Table;
-import edu.uw.easysrl.dependencies.ResolvedDependency;
-import edu.uw.easysrl.qasrl.qg.QuestionAnswerPairReduced;
-import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
-import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.qasrl.qg.RawQuestionAnswerPair;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 
 import java.util.*;
@@ -14,7 +8,7 @@ import java.util.stream.Collectors;
 
 public class MultiResponseSimulator {
     private final List<Parse> goldParses;
-    private final Map<Integer, List<QuestionAnswerPairReduced>> qaPairsForSentenceId;
+    private final Map<Integer, List<RawQuestionAnswerPair>> qaPairsForSentenceId;
 
     public MultiResponseSimulator(List<Parse> goldParses) {
         this.goldParses = goldParses;
@@ -45,7 +39,7 @@ public class MultiResponseSimulator {
         Set<String> answers = getQAPairs(sentenceId)
             .stream()
             .filter(qaPair -> qaPair.renderQuestion().equals(query.prompt))
-            .map(QuestionAnswerPairReduced::renderAnswer)
+            .map(RawQuestionAnswerPair::renderAnswer)
             .collect(Collectors.toSet());
         Set<String> checks = query.options
             .stream()
@@ -63,7 +57,7 @@ public class MultiResponseSimulator {
         Set<String> questions = getQAPairs(sentenceId)
             .stream()
             .filter(qaPair -> qaPair.renderAnswer().equals(query.prompt))
-            .map(QuestionAnswerPairReduced::renderQuestion)
+            .map(RawQuestionAnswerPair::renderQuestion)
             .collect(Collectors.toSet());
         Set<String> checks = query.options
             .stream()
@@ -80,7 +74,7 @@ public class MultiResponseSimulator {
         return query.getResponse(this);
     }
 
-    private List<QuestionAnswerPairReduced> getQAPairs(int sentenceId) {
+    private List<RawQuestionAnswerPair> getQAPairs(int sentenceId) {
         if(!qaPairsForSentenceId.containsKey(sentenceId)) {
             Parse goldParse = goldParses.get(sentenceId);
             List<String> words = goldParse.syntaxTree.getLeaves().stream().map(SyntaxTreeNode::getWord).collect(Collectors.toList());

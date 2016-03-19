@@ -14,7 +14,8 @@ import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 // TODO rename this to BasicQuestionAnswerPair or something
-public class QuestionAnswerPairReduced implements IQuestionAnswerPair {
+// Luheng: feel free to change the name ... I just feel there are too many "basic" classes ...
+public class RawQuestionAnswerPair implements IQuestionAnswerPair {
 
     public int getSentenceId() {
         return sentenceId;
@@ -75,11 +76,11 @@ public class QuestionAnswerPairReduced implements IQuestionAnswerPair {
 
     // questionMainIndex will be the predicate if we're asking a normal-style question,
     // and will be the argument if we're asking a flipped-style question.
-    public QuestionAnswerPairReduced(int parseId, int sentenceId,
-                                     int predicateIndex, Category predicateCategory, int argumentNumber,
-                                     int questionMainIndex, QuestionType questionType,
-                                     Set<ResolvedDependency> questionDeps, List<String> question,
-                                     ResolvedDependency targetDep, TextWithDependencies answer) {
+    public RawQuestionAnswerPair(int parseId, int sentenceId,
+                                 int predicateIndex, Category predicateCategory, int argumentNumber,
+                                 int questionMainIndex, QuestionType questionType,
+                                 Set<ResolvedDependency> questionDeps, List<String> question,
+                                 ResolvedDependency targetDep, TextWithDependencies answer) {
         this.predicateIndex = predicateIndex;
         this.predicateCategory = predicateCategory;
         this.argumentNumber = argumentNumber;

@@ -1,10 +1,8 @@
 package edu.uw.easysrl.qasrl;
 
 import com.google.common.collect.HashBasedTable;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Table;
-import edu.uw.easysrl.dependencies.ResolvedDependency;
-import edu.uw.easysrl.qasrl.qg.QuestionAnswerPairReduced;
+import edu.uw.easysrl.qasrl.qg.RawQuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.grammar.Category;
 
@@ -24,10 +22,10 @@ public class QueryGeneratorBothWays {
     final int numParses;
     final double logNormalizer;
 
-    public final List<QuestionAnswerPairReduced> allQAPairs;
-    public final Map<String, List<QuestionAnswerPairReduced>> questionToPairs;
-    public final Map<String, List<QuestionAnswerPairReduced>> answerToPairs;
-    public final Table<String, String, List<QuestionAnswerPairReduced>> qaStringsToQAPairs;
+    public final List<RawQuestionAnswerPair> allQAPairs;
+    public final Map<String, List<RawQuestionAnswerPair>> questionToPairs;
+    public final Map<String, List<RawQuestionAnswerPair>> answerToPairs;
+    public final Table<String, String, List<RawQuestionAnswerPair>> qaStringsToQAPairs;
     public final Table<String, String, Set<Parse>> qaStringsToParses;
 
     public QueryGeneratorBothWays(final int sentenceId,
@@ -50,8 +48,8 @@ public class QueryGeneratorBothWays {
             for(int predIndex = 0; predIndex < words.size(); predIndex++) {
                 Category predCategory = parse.categories.get(predIndex);
                 for(int argNum = 1; argNum <= predCategory.getNumberOfArguments(); argNum++) {
-                    List<QuestionAnswerPairReduced> qaPairs = QuestionGenerator.generateAllQAPairs(predIndex, argNum, words, parse);
-                    for(QuestionAnswerPairReduced qaPair : qaPairs) {
+                    List<RawQuestionAnswerPair> qaPairs = QuestionGenerator.generateAllQAPairs(predIndex, argNum, words, parse);
+                    for(RawQuestionAnswerPair qaPair : qaPairs) {
                         registerQAPair(qaPair, parse);
                     }
                 }
@@ -62,16 +60,16 @@ public class QueryGeneratorBothWays {
     public List<MultiQuery> getAllMaximalQueries() {
         List<MultiQuery> queries = new LinkedList<MultiQuery>();
         for(String question : questionToPairs.keySet()) {
-            List<QuestionAnswerPairReduced> qaPairs = questionToPairs.get(question);
+            List<RawQuestionAnswerPair> qaPairs = questionToPairs.get(question);
             Set<String> answers = qaPairs.stream()
-                .map(QuestionAnswerPairReduced::renderAnswer)
+                .map(RawQuestionAnswerPair::renderAnswer)
                 .collect(Collectors.toSet());
             queries.add(new MultiQuery.Forward(sentenceId, question, answers, qaStringsToQAPairs, qaStringsToParses));
         }
         for(String answer : answerToPairs.keySet()) {
-            List<QuestionAnswerPairReduced> qaPairs = answerToPairs.get(answer);
+            List<RawQuestionAnswerPair> qaPairs = answerToPairs.get(answer);
             Set<String> questions = qaPairs.stream()
-                .map(QuestionAnswerPairReduced::renderQuestion)
+                .map(RawQuestionAnswerPair::renderQuestion)
                 .collect(Collectors.toSet());
             queries.add(new MultiQuery.Backward(sentenceId, answer, questions, qaStringsToQAPairs, qaStringsToParses));
         }
@@ -85,7 +83,7 @@ public class QueryGeneratorBothWays {
 
     // just gets the entropy of the distribution over whether a QA pair is correct.
     // if we wish to incorporate noisy responses, this is not necessarily what we want.
-    private double getEntropy(final QuestionAnswerPairReduced qaPair) {
+    private double getEntropy(final RawQuestionAnswerPair qaPair) {
         // TODO could probably just implement this with partitioning functions below
         double prob = parses.stream()
             .filter(parse -> supports(parse, qaPair.renderQuestion(), qaPair.renderAnswer()))
@@ -97,7 +95,7 @@ public class QueryGeneratorBothWays {
 
     // used to add a "decision" to the "decision tree" of possible outcomes of QA annotation
     private List<List<Parse>> partitionParses(final List<List<Parse>> alreadyPartitioned,
-                                              final QuestionAnswerPairReduced qaPair) {
+                                              final RawQuestionAnswerPair qaPair) {
         return alreadyPartitioned
             .stream()
             .flatMap(parseSet -> {
@@ -125,8 +123,8 @@ public class QueryGeneratorBothWays {
         return -1.0 * negEntropy;
     }
 
-    private Optional<QuestionAnswerPairReduced> chooseNextQAPairFromList(final List<List<Parse>> givenPartition,
-                                                        final List<QuestionAnswerPairReduced> candidateQAPairs) {
+    private Optional<RawQuestionAnswerPair> chooseNextQAPairFromList(final List<List<Parse>> givenPartition,
+                                                        final List<RawQuestionAnswerPair> candidateQAPairs) {
         // choose the max entropy next question.
         return candidateQAPairs
             .stream()
@@ -142,20 +140,20 @@ public class QueryGeneratorBothWays {
         }
     }
 
-    private void registerQAPair(QuestionAnswerPairReduced qaPair, Parse parse) {
+    private void registerQAPair(RawQuestionAnswerPair qaPair, Parse parse) {
         allQAPairs.add(qaPair);
         final String question = qaPair.renderQuestion();
         final String answer = qaPair.renderAnswer();
         if(!questionToPairs.containsKey(question)) {
-            questionToPairs.put(question, new LinkedList<QuestionAnswerPairReduced>());
+            questionToPairs.put(question, new LinkedList<RawQuestionAnswerPair>());
         }
         questionToPairs.get(question).add(qaPair);
         if(!answerToPairs.containsKey(answer)) {
-            answerToPairs.put(answer, new LinkedList<QuestionAnswerPairReduced>());
+            answerToPairs.put(answer, new LinkedList<RawQuestionAnswerPair>());
         }
         answerToPairs.get(answer).add(qaPair);
         if(!qaStringsToQAPairs.contains(question, answer)) {
-            qaStringsToQAPairs.put(question, answer, new LinkedList<QuestionAnswerPairReduced>());
+            qaStringsToQAPairs.put(question, answer, new LinkedList<RawQuestionAnswerPair>());
         }
         qaStringsToQAPairs.get(question, answer).add(qaPair);
         if(!qaStringsToParses.contains(question, answer)) {

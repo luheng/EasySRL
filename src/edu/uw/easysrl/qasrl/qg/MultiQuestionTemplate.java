@@ -10,7 +10,6 @@ import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.TextGenerationHelper;
 import edu.uw.easysrl.qasrl.TextGenerationHelper.TextWithDependencies;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import java.util.*;
 
@@ -314,9 +313,9 @@ public class MultiQuestionTemplate {
      * because we will be trying all of the different preposition supersenses
      * that could possibly be appropriate for a preposition in question.
      */
-    public List<QuestionAnswerPairReduced> getAllQAPairsForArgument(int targetArgNum) {
+    public List<RawQuestionAnswerPair> getAllQAPairsForArgument(int targetArgNum) {
         List<Map<Integer, Optional<ResolvedDependency>>> argPaths = TextGenerationHelper.getAllArgumentChoicePaths(allArgDeps);
-        final List<QuestionAnswerPairReduced> qaPairs = new ArrayList<>();
+        final List<RawQuestionAnswerPair> qaPairs = new ArrayList<>();
         for(Map<Integer, Optional<ResolvedDependency>> chosenArgDeps : argPaths) {
             // instantiateForArgument(targetArgNum, chosenArgDeps).stream().findFirst().ifPresent(qaPairs::add);
             instantiateForArgument(targetArgNum, chosenArgDeps).forEach(qaPairs::add);
@@ -325,13 +324,13 @@ public class MultiQuestionTemplate {
         return qaPairs;
     }
 
-    private List<QuestionAnswerPairReduced> getBasicSupersenseQAPairs(int targetArgNum, Map<Integer, Optional<ResolvedDependency>> chosenArgDeps) {
+    private List<RawQuestionAnswerPair> getBasicSupersenseQAPairs(int targetArgNum, Map<Integer, Optional<ResolvedDependency>> chosenArgDeps) {
         if (cantAskQuestion(targetArgNum, chosenArgDeps)) {
-            return new LinkedList<QuestionAnswerPairReduced>();
+            return new LinkedList<RawQuestionAnswerPair>();
         }
         // for now, we will only try to do this with prepositional verb adjuncts,
         // when asking about the verb.
-        List<QuestionAnswerPairReduced> qaPairs = new LinkedList<>();
+        List<RawQuestionAnswerPair> qaPairs = new LinkedList<>();
         if(Category.valueOf("((S\\NP)\\(S\\NP))/NP").matches(predicateCategory) && targetArgNum == 2 && chosenArgDeps.get(2).isPresent()) {
             for(Supersense supersense : Supersense.getSupersensesFor(words.get(predicateIndex))) {
                 qaPairs.add(getBasicSupersenseQAPair(targetArgNum, chosenArgDeps, supersense));
@@ -340,7 +339,7 @@ public class MultiQuestionTemplate {
         return qaPairs;
     }
 
-    private QuestionAnswerPairReduced getBasicSupersenseQAPair(int targetArgNum,
+    private RawQuestionAnswerPair getBasicSupersenseQAPair(int targetArgNum,
                                                                Map<Integer, Optional<ResolvedDependency>> chosenArgDeps,
                                                                Supersense supersense) {
         final ResolvedDependency verbDep = chosenArgDeps.get(2).get();
@@ -398,22 +397,22 @@ public class MultiQuestionTemplate {
         // TODO get all of them
         final TextWithDependencies answer = TextGenerationHelper
             .getRepresentativePhrases(Optional.of(predicateIndex), Category.valueOf("(S\\NP)\\(S\\NP)"), parse).get(0);
-        return new QuestionAnswerPairReduced(sentenceId,
+        return new RawQuestionAnswerPair(sentenceId,
                                              parseId,
                                              predicateIndex,
                                              predicateCategory,
                                              targetArgNum,
                                              verbIndex,
-                                             new QuestionAnswerPairReduced.SupersenseQuestionType(supersense),
+                                             new RawQuestionAnswerPair.SupersenseQuestionType(supersense),
                                              questionDeps,
                                              question,
                                              targetDep,
                                              answer);
     }
 
-    public List<QuestionAnswerPairReduced> instantiateForArgument(int targetArgNum, Map<Integer, Optional<ResolvedDependency>> chosenArgDeps) {
+    public List<RawQuestionAnswerPair> instantiateForArgument(int targetArgNum, Map<Integer, Optional<ResolvedDependency>> chosenArgDeps) {
         if(cantAskQuestion(targetArgNum, chosenArgDeps)) {
-            return new LinkedList<QuestionAnswerPairReduced>();
+            return new LinkedList<RawQuestionAnswerPair>();
         }
         // we should never ask about unrealized arguments
         final ResolvedDependency targetDep = chosenArgDeps.get(targetArgNum).get();
@@ -553,7 +552,7 @@ public class MultiQuestionTemplate {
             currentCategory = currentCategory.getLeft();
         }
 
-        final List<QuestionAnswerPairReduced> results = new LinkedList<>();
+        final List<RawQuestionAnswerPair> results = new LinkedList<>();
 
         for(TextWithDependencies left : lefts) {
             for(TextWithDependencies right : rights) {
@@ -591,13 +590,13 @@ public class MultiQuestionTemplate {
                 List<TextWithDependencies> answers = TextGenerationHelper
                     .getRepresentativePhrases(Optional.of(targetIndex), targetCategory, parse, replaceOpt);
                 for(TextWithDependencies answer : answers) {
-                    final QuestionAnswerPairReduced qaPair = new QuestionAnswerPairReduced(sentenceId,
+                    final RawQuestionAnswerPair qaPair = new RawQuestionAnswerPair(sentenceId,
                                                                                            parseId,
                                                                                            predicateIndex,
                                                                                            predicateCategory,
                                                                                            targetArgNum,
                                                                                            predicateIndex,
-                                                                                           new QuestionAnswerPairReduced.StandardQuestionType(type),
+                                                                                           new RawQuestionAnswerPair.StandardQuestionType(type),
                                                                                            questionDeps,
                                                                                            question,
                                                                                            targetDep,

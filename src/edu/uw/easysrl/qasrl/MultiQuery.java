@@ -1,15 +1,9 @@
 package edu.uw.easysrl.qasrl;
 
-import com.google.common.collect.HashBasedTable;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Table;
-import edu.uw.easysrl.dependencies.ResolvedDependency;
-import edu.uw.easysrl.qasrl.qg.QuestionAnswerPairReduced;
-import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
-import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.qasrl.qg.RawQuestionAnswerPair;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 public abstract class MultiQuery {
 
@@ -17,14 +11,14 @@ public abstract class MultiQuery {
     public final String prompt;
     public final Set<String> options;
 
-    final Table<String, String, List<QuestionAnswerPairReduced>> qaStringsToQAPairs;
+    final Table<String, String, List<RawQuestionAnswerPair>> qaStringsToQAPairs;
     final Table<String, String, Set<Parse>> qaStringsToParses;
-    protected Set<QuestionAnswerPairReduced> allQAPairs;
+    protected Set<RawQuestionAnswerPair> allQAPairs;
     private Set<Integer> predIds;
-    private Set<QuestionAnswerPairReduced.QuestionType> questionTypes;
+    private Set<RawQuestionAnswerPair.QuestionType> questionTypes;
 
     public MultiQuery(int sentenceId, String prompt, Set<String> options,
-                      Table<String, String, List<QuestionAnswerPairReduced>> qaStringsToQAPairs,
+                      Table<String, String, List<RawQuestionAnswerPair>> qaStringsToQAPairs,
                       Table<String, String, Set<Parse>> qaStringsToParses) {
         this.sentenceId = sentenceId;
         this.prompt = prompt;
@@ -33,7 +27,7 @@ public abstract class MultiQuery {
         this.qaStringsToParses = qaStringsToParses;
         this.predIds = null; // TODO
         this.questionTypes = null;
-        this.allQAPairs = new HashSet<QuestionAnswerPairReduced>();
+        this.allQAPairs = new HashSet<RawQuestionAnswerPair>();
 
         assert this.options.size() > 0
             : "cannot have a MultiQuery with no answer options";
@@ -42,9 +36,9 @@ public abstract class MultiQuery {
     public abstract Set<String> getResponse(MultiResponseSimulator responseSimulator);
     public abstract boolean isJeopardyStyle();
 
-    public Set<QuestionAnswerPairReduced.QuestionType> getQuestionTypes() {
+    public Set<RawQuestionAnswerPair.QuestionType> getQuestionTypes() {
         if(questionTypes == null) {
-            questionTypes = new HashSet<QuestionAnswerPairReduced.QuestionType>();
+            questionTypes = new HashSet<RawQuestionAnswerPair.QuestionType>();
             allQAPairs
                 .stream()
                 .map(qaPair -> qaPair.questionType)
@@ -56,7 +50,7 @@ public abstract class MultiQuery {
     // prompt is a question, choices are answers
     public static class Forward extends MultiQuery {
         public Forward(int sentenceId, String prompt, Set<String> options,
-                       Table<String, String, List<QuestionAnswerPairReduced>> qaStringsToQAPairs,
+                       Table<String, String, List<RawQuestionAnswerPair>> qaStringsToQAPairs,
                        Table<String, String, Set<Parse>> qaStringsToParses) {
             super(sentenceId, prompt, options, qaStringsToQAPairs, qaStringsToParses);
             for(String answer : options) {
@@ -76,7 +70,7 @@ public abstract class MultiQuery {
     // prompt is an answer, choices are questions
     public static class Backward extends MultiQuery {
         public Backward(int sentenceId, String prompt, Set<String> options,
-                       Table<String, String, List<QuestionAnswerPairReduced>> qaStringsToQAPairs,
+                       Table<String, String, List<RawQuestionAnswerPair>> qaStringsToQAPairs,
                        Table<String, String, Set<Parse>> qaStringsToParses) {
             super(sentenceId, prompt, options, qaStringsToQAPairs, qaStringsToParses);
             for(String question : options) {
