@@ -399,6 +399,7 @@ public class MultiQuestionTemplate {
             .getRepresentativePhrases(Optional.of(predicateIndex), Category.valueOf("(S\\NP)\\(S\\NP)"), parse).get(0);
         return new RawQuestionAnswerPair(sentenceId,
                                              parseId,
+                                             parse,
                                              predicateIndex,
                                              predicateCategory,
                                              targetArgNum,
@@ -591,16 +592,17 @@ public class MultiQuestionTemplate {
                     .getRepresentativePhrases(Optional.of(targetIndex), targetCategory, parse, replaceOpt);
                 for(TextWithDependencies answer : answers) {
                     final RawQuestionAnswerPair qaPair = new RawQuestionAnswerPair(sentenceId,
-                                                                                           parseId,
-                                                                                           predicateIndex,
-                                                                                           predicateCategory,
-                                                                                           targetArgNum,
-                                                                                           predicateIndex,
-                                                                                           new RawQuestionAnswerPair.StandardQuestionType(type),
-                                                                                           questionDeps,
-                                                                                           question,
-                                                                                           targetDep,
-                                                                                           answer);
+                                                                                       parseId,
+                                                                                       parse,
+                                                                                       predicateIndex,
+                                                                                       predicateCategory,
+                                                                                       targetArgNum,
+                                                                                       predicateIndex,
+                                                                                       new RawQuestionAnswerPair.StandardQuestionType(type),
+                                                                                       questionDeps,
+                                                                                       question,
+                                                                                       targetDep,
+                                                                                       answer);
                     results.add(qaPair);
                 }
             }

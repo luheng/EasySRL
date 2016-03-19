@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 
 import com.google.common.collect.ImmutableSet;
 
+import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.TextGenerationHelper;
 import edu.uw.easysrl.qasrl.TextGenerationHelper.TextWithDependencies;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
@@ -35,6 +36,10 @@ public class RawQuestionAnswerPair implements IQuestionAnswerPair {
 
     public int getArgumentNumber() { return argumentNumber; }
 
+    public int getArgumentIndex() {
+        return targetDep.getArgumentIndex();
+    }
+
     // TODO: store the immutable sets as fields
     public ImmutableSet<ResolvedDependency> getQuestionDependencies() {
         return ImmutableSet.copyOf(questionDeps);
@@ -56,8 +61,13 @@ public class RawQuestionAnswerPair implements IQuestionAnswerPair {
         return renderAnswer();
     }
 
+    public Parse getParse() {
+        return parse;
+    }
+
     private final int parseId;
     private final int sentenceId;
+    private final Parse parse;
 
     public final int predicateIndex;
     public final Category predicateCategory;
@@ -76,7 +86,7 @@ public class RawQuestionAnswerPair implements IQuestionAnswerPair {
 
     // questionMainIndex will be the predicate if we're asking a normal-style question,
     // and will be the argument if we're asking a flipped-style question.
-    public RawQuestionAnswerPair(int parseId, int sentenceId,
+    public RawQuestionAnswerPair(int sentenceId, int parseId, Parse parse,
                                  int predicateIndex, Category predicateCategory, int argumentNumber,
                                  int questionMainIndex, QuestionType questionType,
                                  Set<ResolvedDependency> questionDeps, List<String> question,
@@ -93,6 +103,7 @@ public class RawQuestionAnswerPair implements IQuestionAnswerPair {
         this.answerDeps = answer.dependencies;
         this.parseId = parseId;
         this.sentenceId = sentenceId;
+        this.parse = parse;
     }
 
     public String renderQuestion() {

@@ -1,4 +1,4 @@
-package edu.uw.easysrl.qasrl.analysis;
+package edu.uw.easysrl.qasrl.qg.syntax;
 
 import com.google.common.collect.ImmutableMap;
 

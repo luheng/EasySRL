@@ -2,6 +2,7 @@ package edu.uw.easysrl.qasrl.qg;
 
 import com.google.common.collect.ImmutableSet;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
+import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 /**
@@ -18,6 +19,7 @@ public interface IQuestionAnswerPair {
     int getPredicateIndex();
     Category getPredicateCategory();
     int getArgumentNumber();
+    int getArgumentIndex();
 
     // questionMainIndex will be the predicate if we're asking a normal-style question,
     // and will be the argument if we're asking a flipped-style question.
@@ -29,4 +31,6 @@ public interface IQuestionAnswerPair {
 
     String getQuestion();
     String getAnswer();
+
+    Parse getParse();
 }
