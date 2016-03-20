@@ -1,5 +1,6 @@
 package edu.uw.easysrl.qasrl.qg;
 
+import com.google.common.collect.ImmutableSet;
 import edu.uw.easysrl.qasrl.qg.surfaceform.*;
 
 import com.google.common.collect.ImmutableList;

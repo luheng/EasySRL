@@ -44,7 +44,7 @@ public class QueryGenerators {
             .collect(toImmutableList());
     }
 
-    public static <QA extends QAPairSurfaceForm> QueryGenerator<QA, Query<QA>> checkboxQueryAggregator() {
+    public static <QA extends QAStructureSurfaceForm> QueryGenerator<QA, Query<QA>> checkboxQueryAggregator() {
         return qaPairs -> qaPairs
                 .stream()
                 .collect(groupingBy(QA::getQuestion))
@@ -69,7 +69,7 @@ public class QueryGenerators {
                 }).collect(toImmutableList());
     }
 
-    public static <QA extends QAPairSurfaceForm> QueryGenerator<QA, BasicQuery<QA>> radioButtonQueryAggregator() {
+    public static <QA extends QAStructureSurfaceForm> QueryGenerator<QA, BasicQuery<QA>> radioButtonQueryAggregator() {
         return qaPairs -> qaPairs
                 .stream()
                 .collect(groupingBy(QA::getQuestion))

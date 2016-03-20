@@ -33,4 +33,5 @@ public interface IQuestionAnswerPair {
     String getAnswer();
 
     Parse getParse();
+    double getParseScore();
 }

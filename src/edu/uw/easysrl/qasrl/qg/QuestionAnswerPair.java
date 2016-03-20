@@ -6,6 +6,7 @@ import java.util.Set;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.TextGenerationHelper;
 import edu.uw.easysrl.qasrl.TextGenerationHelper.TextWithDependencies;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
@@ -27,6 +28,10 @@ public class QuestionAnswerPair implements IQuestionAnswerPair {
     }
 
     public int getArgumentNumber() {
+        return -1; // XXX
+    }
+
+    public int getArgumentIndex() {
         return -1; // XXX
     }
 
@@ -61,6 +66,14 @@ public class QuestionAnswerPair implements IQuestionAnswerPair {
 
     public String getAnswer() {
         return renderAnswer();
+    }
+
+    public Parse getParse() {
+        return null; // XXX
+    }
+
+    public double getParseScore() {
+        return 0.0; // XXX
     }
 
     public final int predicateIndex;

@@ -9,7 +9,7 @@ import edu.uw.easysrl.qasrl.ParseData;
 import edu.uw.easysrl.qasrl.qg.IQuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregators;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
-import edu.uw.easysrl.qasrl.qg.surfaceform.QAPairSurfaceForm;
+import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.Query;
 import edu.uw.easysrl.qasrl.query.QueryGenerators;
 
@@ -41,8 +41,8 @@ public class RefactorExperiment {
             }
             ImmutableList<IQuestionAnswerPair> qaPairs1 = QuestionGenerator
                     .generateAllQAPairs(i, sentences.get(i), nBestList);
-            ImmutableList<QAPairSurfaceForm> qaPairs2 = QAPairAggregators.aggregateByString().aggregate(qaPairs1);
-            ImmutableList<Query<QAPairSurfaceForm>> queryList = QueryGenerators.checkboxQueryAggregator().aggregate(qaPairs2);
+            ImmutableList<QAStructureSurfaceForm> qaPairs2 = QAPairAggregators.aggregateForMultipleChoiceQA().aggregate(qaPairs1);
+            ImmutableList<Query<QAStructureSurfaceForm>> queryList = QueryGenerators.checkboxQueryAggregator().generate(qaPairs2);
 
             queryList.forEach(query -> {
                 System.out.println(query.toString(sentence) + "\n");

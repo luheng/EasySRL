@@ -65,6 +65,10 @@ public class RawQuestionAnswerPair implements IQuestionAnswerPair {
         return parse;
     }
 
+    public double getParseScore() {
+        return parse.score;
+    }
+
     private final int parseId;
     private final int sentenceId;
     private final Parse parse;

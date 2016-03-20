@@ -2,6 +2,7 @@ package edu.uw.easysrl.qasrl.qg.syntax;
 
 import com.google.common.collect.ImmutableMap;
 
+import com.google.common.collect.ImmutableSet;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
 
@@ -19,14 +20,23 @@ public class QuestionStructure {
     public final int predicateIndex;
     public final Category category;
     public final int targetArgNum;
-    public final ImmutableMap<Integer, Integer> otherDependencies;
+    // public final ImmutableMap<Integer, Integer> otherDependencies;
+    // For future convenience.
+    public final ImmutableSet<Integer> parseIds;
+    public final double score;
 
-    public QuestionStructure(int predId, Category category, int argNum, Collection<ResolvedDependency> otherDeps) {
+    public QuestionStructure(int predId, Category category, int argNum, Collection<ResolvedDependency> otherDeps,
+                             ImmutableSet<Integer> parseIds, double score) {
         this.predicateIndex = predId;
         this.category = category;
         this.targetArgNum = argNum;
+        // TODO: fix illegal access error
+        /*
         this.otherDependencies = ImmutableMap.copyOf(otherDeps.stream()
                 .filter(dep -> dep.getHead() == predId && dep.getArgNumber() != argNum)
                 .collect(Collectors.toMap(ResolvedDependency::getArgNumber, ResolvedDependency::getArgument)));
+                */
+        this.parseIds = parseIds;
+        this.score = score;
     }
 }

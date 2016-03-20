@@ -16,5 +16,5 @@ import com.google.common.collect.ImmutableList;
  */
 @FunctionalInterface
 public interface QueryGenerator<QA extends QAPairSurfaceForm, Q extends Query<QA>> {
-    ImmutableList<Q> aggregate(ImmutableList<QA> qaPairs);
+    ImmutableList<Q> generate(ImmutableList<QA> qaPairs);
 }
