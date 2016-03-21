@@ -175,6 +175,10 @@ public class ReparsingExperiment {
                             .stream()
                             .filter(query -> annotations.get(sentenceId).stream()
                                     .anyMatch(annot -> annot.question.equals(query.getPrompt())))
+                            .filter(query -> {
+                                query.computeScores(nBestList);
+                                return query.getPromptScore() > queryPruningParameters.minQuestionConfidence;
+                            })
                             .collect(GuavaCollectors.toImmutableList());
 
             nBestList.cacheResults(goldParses.get(sentenceId));

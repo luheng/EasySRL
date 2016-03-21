@@ -101,6 +101,10 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
         return optionScores;
     }
 
+    public double getPromptScore() {
+        return promptScore;
+    }
+
     public boolean isJeopardyStyle() { return isJeopardyStyle; }
 
     public boolean allowMultipleChoices() {
