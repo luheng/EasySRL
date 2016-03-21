@@ -61,6 +61,10 @@ public class BasicQuery<QA extends QAPairSurfaceForm> implements Query<QA> {
         return allowMultipleChoices;
     }
 
+    public String getQueryKey() {
+        return prompt;
+    }
+
     public String toString(final ImmutableList<String> sentence) {
         String result = "";
         final int predicateIndex = qaPairSurfaceForms.get(0).getQAPairs().get(0).getPredicateIndex();

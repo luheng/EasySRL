@@ -1,5 +1,7 @@
 package edu.uw.easysrl.qasrl.annotation;
 
+import com.google.common.collect.ImmutableList;
+import edu.uw.easysrl.qasrl.DebugPrinter;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.io.*;
@@ -26,12 +28,10 @@ public class RecordedAnnotation {
 
     // Answer information
     List<String> optionStrings;
-    String answer;
-    int answerId, goldAnswerId;
 
-    // Multi-answer information
-    List<String> multiAnswers;
-    List<Integer> multiAnswerIds, goldAnswerIds;
+    // Answer information, compatible with checkbox version.
+    ImmutableList<String> answers;
+    ImmutableList<Integer> answerIds, goldAnswerIds;
 
     // Current accuracy
     double rerankF1, oracleF1, onebestF1;
@@ -100,10 +100,10 @@ public class RecordedAnnotation {
                     curr.optionStrings.add(info[3]);
                     String match = info[1];
                     if (match.contains("*")) {
-                        curr.answerId = id;
+                        curr.answerIds = ImmutableList.of(id);
                     }
                     if (match.contains("G")) {
-                        curr.goldAnswerId = id;
+                        curr.goldAnswerIds = ImmutableList.of(id);
                     }
                 }
 
@@ -131,7 +131,8 @@ public class RecordedAnnotation {
                 && argumentNumber == other.argumentNumber
                 && question.equalsIgnoreCase(other.question)
                 && optionStrings.size() == other.optionStrings.size()
-                && goldAnswerId == other.goldAnswerId;
+                && goldAnswerIds.containsAll(other.goldAnswerIds)
+                && other.goldAnswerIds.containsAll(goldAnswerIds);
     }
 
     @Override
@@ -141,7 +142,8 @@ public class RecordedAnnotation {
                 + "SID=" + sentenceId + "\t" + sentenceString + "\n"
                 + "PRED=" + predicateId + "\t" + predicateString + "\t" + predicateCategory + "." + argumentNumber + "\n"
                 + "QID=" + questionId + "\t" + question + "\n"
-                + "ANS/GOLD=" + answerId + "/" + goldAnswerId + "\n";
+                + "ANS/GOLD=" + DebugPrinter.getShortListString(answerIds) + "/"
+                              + DebugPrinter.getShortListString(goldAnswerIds) + "\n";
         for (int i = 0; i < optionStrings.size(); i++) {
             result += i + "\t" + optionStrings.get(i) + "\n";
         }

@@ -293,7 +293,7 @@ public class CrowdFlowerDataWriterCheckbox {
                     int numJudgements = annot.getNumAnnotated();
                     int numOptions = annot.answerDist.length;
                     return numOptions > 3 && /* numOptions <= maxNumOptionsPerTestQuestion && */
-                            numJudgements >= 3 && annot.answerDist[annot.goldAnswerId] == numJudgements;
+                            numJudgements >= 3 && annot.answerDist[annot.goldAnswerIds.get(0)] == numJudgements;
                 }).collect(Collectors.toList());
         for (int sid : otherHeldOutSentences) {
             heldOutSentences.add(sid);
@@ -353,7 +353,7 @@ public class CrowdFlowerDataWriterCheckbox {
                 int numTestQuestions = 0;
                 for (AlignedAnnotation test : agreedAnnotations) {
                     int sentenceId = test.sentenceId;
-                    String goldAnswer = test.answerOptions.get(test.goldAnswerId).replace(" # ", " _AND_ ");
+                    String goldAnswer = test.answerOptions.get(test.goldAnswerIds.get(0)).replace(" # ", " _AND_ ");
                     List<GroupedQuery> queries = learner.getQueriesBySentenceId(sentenceId);
                     for (GroupedQuery query : queries) {
                         // TODO: remove later

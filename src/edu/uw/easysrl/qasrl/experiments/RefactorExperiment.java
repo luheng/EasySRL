@@ -16,7 +16,7 @@ import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import java.util.List;
 
 /**
- * Make sure everything works.
+ * Not doing anything other than printing the queries.
  * Created by luheng on 3/18/16.
  */
 public class RefactorExperiment {

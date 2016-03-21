@@ -32,6 +32,7 @@ public class QualityControl {
         badQuestionStrings.add("Bad question.");
     }
 
+    // FIXME: stream doesn't work here ... why?
     public static boolean queryContainsPronoun(Query query) {
         for (Object o : query.getOptions()) {
             if (optionContainsPronoun((String) o)) {
@@ -81,10 +82,8 @@ public class QualityControl {
         return agreement;
     }
 
-
     public static int[] getUserResponses(Query query, AlignedAnnotation annotation) {
-        //String qkey =query.getPredicateIndex() + "\t" + query.getQuestion();
-        String qkey = query.getPrompt();
+        String qkey = query.getQueryKey();
         int numOptions = query.getOptions().size();
         int[] optionDist = new int[numOptions];
         Arrays.fill(optionDist, 0);
@@ -104,28 +103,4 @@ public class QualityControl {
         }
         return optionDist;
     }
-
-    public static int[] getUserResponsesCheckbox(Query query, AlignedAnnotation annotation) {
-        //String qkey =query.getPredicateIndex() + "\t" + query.getQuestion();
-        String qkey = query.getPrompt();
-        int numOptions = query.getOptions().size();
-        int[] optionDist = new int[numOptions];
-        Arrays.fill(optionDist, 0);
-        String qkey2 = annotation.predicateId + "\t" + annotation.question;
-        if (qkey.equals(qkey2)) {
-            for (int i = 0; i < numOptions; i++) {
-                for (int j = 0; j < annotation.answerOptions.size(); j++) {
-                    String optionStr = (String) query.getOptions().get(i);
-                    String annotatedStr = annotation.optionStrings.get(j);
-                    if (optionStr.equals(annotatedStr) || (badQuestionStrings.contains(optionStr) &&
-                                    badQuestionStrings.contains(annotatedStr))) {
-                        optionDist[i] += annotation.answerDist[j];
-                        break;
-                    }
-                }
-            }
-        }
-        return optionDist;
-    }
-
 }

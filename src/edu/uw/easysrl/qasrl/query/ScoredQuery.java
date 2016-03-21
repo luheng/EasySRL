@@ -8,6 +8,7 @@ import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.GuavaCollectors;
 
+import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -117,6 +118,13 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
 
     public int getQueryId() {
         return queryId;
+    }
+
+    public String getQueryKey() {
+        return !isJeopardyStyle ?
+                qaPairSurfaceForms.get(0).getPredicateIndex() + "\t" + prompt :
+                qaPairSurfaceForms.get(0).getArgumentIndices().stream().map(String::valueOf)
+                        .collect(Collectors.joining(",")) + "\t" + prompt;
     }
 
     public String toString(final ImmutableList<String> sentence) {

@@ -1,18 +1,20 @@
 package edu.uw.easysrl.qasrl.experiments;
 
 import com.google.common.collect.ImmutableList;
-import com.sun.org.apache.xml.internal.resolver.helpers.Debug;
 import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
 import edu.uw.easysrl.qasrl.annotation.CrowdFlowerDataReader;
 import edu.uw.easysrl.qasrl.annotation.QualityControl;
 import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
+import edu.uw.easysrl.qasrl.experiments.ExperimentUtils.*;
 import edu.uw.easysrl.qasrl.model.Evidence;
 import edu.uw.easysrl.qasrl.qg.IQuestionAnswerPair;
+import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregators;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
+import edu.uw.easysrl.qasrl.query.QueryGenerator;
 import edu.uw.easysrl.qasrl.query.QueryGenerators;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
@@ -25,6 +27,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
+ * Replicating the reparsing results ...
  * Created by luheng on 3/20/16.
  */
 public class ReparsingExperiment {
@@ -51,7 +54,8 @@ public class ReparsingExperiment {
 
     private static final String[] annotationFiles = {
             "./Crowdflower_data/f878213.csv",
-            "./Crowdflower_data/f882410.csv"
+            "./Crowdflower_data/f882410.csv",
+            "./Crowdflower_data/all-checkbox-responses.csv"
     };
 
     static final int minAgreement = 2;
@@ -70,63 +74,18 @@ public class ReparsingExperiment {
 
     static Map<Integer, List<AlignedAnnotation>> annotations;
 
-    private static Map<Integer, List<AlignedAnnotation>> loadData(String[] fileNames) {
-        Map<Integer, List<AlignedAnnotation>> sentenceToAnnotations;
-        List<AlignedAnnotation> annotationList = new ArrayList<>();
-        try {
-            for (String fileName : fileNames) {
-                annotationList.addAll(CrowdFlowerDataReader.readAggregatedAnnotationFromFile(fileName,
-                        false /* checkbox */));
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-            return null;
-        }
-        sentenceToAnnotations = new HashMap<>();
-        annotationList.forEach(annotation -> {
-            int sentId = annotation.sentenceId;
-            if (!sentenceToAnnotations.containsKey(sentId)) {
-                sentenceToAnnotations.put(sentId, new ArrayList<>());
-            }
-            sentenceToAnnotations.get(sentId).add(annotation);
-        });
-        return sentenceToAnnotations;
-    }
-
-    private static AlignedAnnotation getAlignedAnnotation(ScoredQuery<QAStructureSurfaceForm> query,
-                                                          List<AlignedAnnotation> annotations) {
-        String qkey = query.getQAPairSurfaceForms().get(0).getPredicateIndex() + "\t" + query.getPrompt();
-        for (AlignedAnnotation annotation : annotations) {
-            String qkey2 = annotation.predicateId + "\t" + annotation.question;
-            if (qkey.equals(qkey2)) {
-                return annotation;
-            }
-        }
-        return null;
-    }
-
-    static class DebugBlock {
-        double deltaF1;
-        String block;
-        DebugBlock(double deltaF1, String block) {
-            this.deltaF1 = deltaF1;
-            this.block = block;
-        }
-    }
-
     public static void main(String[] args) {
         devData = ParseData.loadFromDevPool().get();
         sentences = devData.getSentences();
         inputSentences = devData.getSentenceInputWords();
         goldParses = devData.getGoldParses();
-        final int numSentences = goldParses.size();
         System.out.println(String.format("Read %d sentences from the dev set.", sentences.size()));
 
         String preparsedFile = "parses.100best.out";
         parser = new BaseCcgParser.MockParser(preparsedFile, nBest);
         System.err.println("Parse initialized.");
 
-        annotations = loadData(annotationFiles);
+        annotations = ExperimentUtils.loadData(annotationFiles);
         assert annotations != null;
         // Re-parsing!
         reparser = new BaseCcgParser.ConstrainedCcgParser(BaseCcgParser.modelFolder, BaseCcgParser.rootCategories,
@@ -151,7 +110,7 @@ public class ReparsingExperiment {
                 numImprovedSentences = 0,
                 numChanged = 0;
 
-        //learner.setQueryPruningParameters(queryPruningParameters);
+        // learner.setQueryPruningParameters(queryPruningParameters);
         // ResponseSimulator goldSimulator = new ResponseSimulatorGold(learner.goldParses);
 
         List<DebugBlock> debugging = new ArrayList<>();
@@ -160,19 +119,24 @@ public class ReparsingExperiment {
             if (nbestParses == null) {
                 continue;
             }
-            NBestList nBestList = new NBestList(ImmutableList.copyOf(nbestParses));
-            ImmutableList<IQuestionAnswerPair> qaPairs1 = QuestionGenerator
+            final NBestList nBestList = new NBestList(ImmutableList.copyOf(nbestParses));
+            final List<AlignedAnnotation> annotated = annotations.get(sentenceId);
+            boolean isRadioButtonVersion = annotated.stream()
+                    .anyMatch(annot -> annot.answerOptions.stream()
+                            .anyMatch(op -> op.contains(QAPairAggregatorUtils.answerDelimiter)));
+
+            final ImmutableList<IQuestionAnswerPair> rawQAPairs = QuestionGenerator
                     .generateAllQAPairs(sentenceId, sentences.get(sentenceId), nBestList);
+            final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> rawQueryList =
+                    isRadioButtonVersion ?
+                            QueryGenerators.radioButtonQueryAggregator()
+                                    .generate(QAPairAggregators.aggregateForSingleChoiceQA()
+                                            .aggregate(rawQAPairs)) :
+                            QueryGenerators.checkboxQueryAggregator()
+                                    .generate(QAPairAggregators.aggregateForMultipleChoiceQA()
+                                            .aggregate(rawQAPairs));
 
-            //ImmutableList<QAStructureSurfaceForm> qaPairs2 = QAPairAggregators.aggregateForMultipleChoiceQA().aggregate(qaPairs1);
-            //ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList = QueryGenerators.checkboxQueryAggregator().generate(qaPairs2);
-
-            ImmutableList<QAStructureSurfaceForm> qaPairs2 = QAPairAggregators.aggregateForSingleChoiceQA()
-                    .aggregate(qaPairs1);
-            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList =
-                    QueryGenerators.radioButtonQueryAggregator()
-                            .generate(qaPairs2)
-                            .stream()
+            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList = rawQueryList.stream()
                             .filter(query -> annotations.get(sentenceId).stream()
                                     .anyMatch(annot -> annot.question.equals(query.getPrompt())))
                             .filter(query -> {
@@ -199,7 +163,7 @@ public class ReparsingExperiment {
             double[] penalty = new double[numParses];
             Arrays.fill(penalty, 0);
             for (ScoredQuery<QAStructureSurfaceForm> query : queryList) {
-                AlignedAnnotation annotation = getAlignedAnnotation(query, annotations.get(sentenceId));
+                AlignedAnnotation annotation = ExperimentUtils.getAlignedAnnotation(query, annotations.get(sentenceId));
                 if (annotation == null) {
                     continue;
                 }

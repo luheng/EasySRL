@@ -1,5 +1,7 @@
 package edu.uw.easysrl.qasrl.annotation;
 
+import com.google.common.collect.ImmutableList;
+
 import java.io.IOException;
 import java.util.*;
 
@@ -7,7 +9,7 @@ import java.util.*;
  * Created by luheng on 2/13/16.
  */
 public class AlignedAnnotation extends RecordedAnnotation {
-    Map<String, Integer> annotatorToAnswerId;
+    Map<String, ImmutableList<Integer>> annotatorToAnswerIds;
     Map<String, String> annotatorToComment;
     public List<String> answerOptions;
     public int[] answerDist;
@@ -25,9 +27,9 @@ public class AlignedAnnotation extends RecordedAnnotation {
         this.questionId = annotation.questionId;
         this.question = annotation.question;
         this.optionStrings = annotation.optionStrings;
-        this.answerId = annotation.answerId;
-        this.goldAnswerId = annotation.goldAnswerId;
-        annotatorToAnswerId = new HashMap<>();
+        this.answerIds = annotation.answerIds;
+        this.goldAnswerIds = annotation.goldAnswerIds;
+        annotatorToAnswerIds = new HashMap<>();
         annotatorToComment = new HashMap<>();
         answerDist = new int[optionStrings.size()];
         answerTrust = new double[optionStrings.size()];
@@ -41,19 +43,12 @@ public class AlignedAnnotation extends RecordedAnnotation {
             answerOptions = annotation.optionStrings;
         }
         // Some annotation records may contain duplicates.
-        if (this.isSameQuestionAs(annotation) && !annotatorToAnswerId.containsKey(annotator)) {
-            if (annotation.multiAnswerIds == null) {
-                annotatorToAnswerId.put(annotator, annotation.answerId);
-                answerDist[annotation.answerId]++;
-                answerTrust[annotation.answerId] += annotation.trust;
-            } else {
-                // TODO: annotator to multi answer ids.
-                annotatorToAnswerId.put(annotator, -1);
-                for (int answerId : annotation.multiAnswerIds) {
-                    answerDist[answerId]++;
-                    answerTrust[answerId] += annotation.trust;
-                }
-            }
+        if (this.isSameQuestionAs(annotation) && !annotatorToAnswerIds.containsKey(annotator)) {
+            annotatorToAnswerIds.put(annotator, annotation.answerIds);
+            annotation.answerIds.forEach(answerId -> {
+                answerDist[answerId]++;
+                answerTrust[answerId] += annotation.trust;
+            });
             if (annotation.comment != null && !annotation.comment.isEmpty()) {
                 annotatorToComment.put(annotator, annotation.comment);
             }
@@ -63,7 +58,7 @@ public class AlignedAnnotation extends RecordedAnnotation {
     }
 
     int getNumAnnotated() {
-        return annotatorToAnswerId.size();
+        return annotatorToAnswerIds.size();
     }
 
     public static List<AlignedAnnotation> getAlignedAnnotations(Map<String, List<RecordedAnnotation>> annotations,
@@ -115,7 +110,7 @@ public class AlignedAnnotation extends RecordedAnnotation {
             for (int j = 0; j < answerDist[i]; j++) {
                 match += "*";
             }
-            if (i == goldAnswerId) {
+            if (goldAnswerIds.contains(i)) {
                 match += "G";
             }
             result += String.format("%-8s\t%d\t%s\n", match, i, optionStrings.get(i));
@@ -162,7 +157,7 @@ public class AlignedAnnotation extends RecordedAnnotation {
         }
         List<AlignedAnnotation> alignedAnnotations = AlignedAnnotation.getAlignedAnnotations(annotations, null);
         alignedAnnotations.stream()
-                .filter(r -> r.answerDist[r.goldAnswerId] == 4)
+                .filter(r -> r.answerDist[r.goldAnswerIds.get(0)] == 4)
                 .sorted((r1, r2) -> Integer.compare(r1.sentenceId, r2.sentenceId))
                 .forEach(System.out::print);
     }

@@ -1,22 +1,31 @@
 package edu.uw.easysrl.qasrl.annotation;
 
+import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.util.GuavaCollectors;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
 
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.IntStream;
 
 /**
+ * Reads AlignedAnnotation from Crowdflower.
  * Created by luheng on 2/24/16.
  */
 public class CrowdFlowerDataReader {
 
     private static int maxNumAnnotators = 10;
 
-    public static List<AlignedAnnotation> readAggregatedAnnotationFromFile(String filePath, boolean isCheckbox)
-            throws IOException {
+    /**
+     *
+     * @param filePath Annotation file.
+     * @return A list of AlignedAnnotation objects (Aggregated annotations)
+     * @throws IOException
+     */
+    public static List<AlignedAnnotation> readAggregatedAnnotationFromFile(String filePath) throws IOException {
         FileReader fileReader = new FileReader(filePath);
         Iterable<CSVRecord> records = CSVFormat.DEFAULT.withHeader().parse(fileReader);
 
@@ -27,7 +36,6 @@ public class CrowdFlowerDataReader {
             if (record.get("_golden").equals("true")) {
                 continue;
             }
-
             // TODO: move this RecordedAnnotation.
             RecordedAnnotation annotation = new RecordedAnnotation();
             annotation.iterationId = -1; // unknown
@@ -43,33 +51,15 @@ public class CrowdFlowerDataReader {
             annotation.question = record.get("question");
             String[] options = record.get("answers").split("\n");
             Collections.addAll(annotation.optionStrings, options);
-
-            if (!isCheckbox) {
-                annotation.answer = record.get("choice");
-                annotation.answerId = -1;
-                for (int i = 0; i < options.length; i++) {
-                    if (options[i].equals(annotation.answer)) {
-                        annotation.answerId = i;
-                        break;
-                    }
-                }
-                if (annotation.answerId < 0) {
-                    System.err.println(record);
-                }
-            } else {
-                annotation.multiAnswers = new ArrayList<>();
-                annotation.multiAnswerIds = new ArrayList<>();
-                Collections.addAll(annotation.multiAnswers, record.get("choice").split("\n"));
-                for (int i = 0; i < options.length; i++) {
-                    if (annotation.multiAnswers.contains(options[i])) {
-                        annotation.multiAnswerIds.add(i);
-                    }
-                }
-                if (annotation.multiAnswerIds.size() == 0) {
-                    System.err.print(record);
-                }
+            annotation.answers = ImmutableList.copyOf(record.get("choice").split("\n"));
+            annotation.answerIds = IntStream.range(0, options.length)
+                    .boxed()
+                    .filter(id -> annotation.answers.contains(options[id]))
+                    .collect(GuavaCollectors.toImmutableList());
+            if (annotation.answerIds.size() == 0) {
+                System.err.print("Unannotated:\t" + record);
             }
-            annotation.goldAnswerId = -1;
+            annotation.goldAnswerIds = ImmutableList.of(-1);
             annotation.comment = record.get("comment");
 
             // Crowdflower stuff
@@ -79,7 +69,7 @@ public class CrowdFlowerDataReader {
         }
         System.out.println("Read " + annotations.size() + " annotation records.");
 
-        // Align annotations.
+        // Align and aggregated annotations.
         List<AlignedAnnotation> alignedAnnotations = AlignedAnnotation.getAlignedAnnotations(annotations);
         System.out.println("Getting " + alignedAnnotations.size() + " aligned annotations.");
         int[] agreementCount = new int[maxNumAnnotators + 1];
@@ -99,8 +89,9 @@ public class CrowdFlowerDataReader {
             System.out.println(i + "\t" + agreementCount[i] + "\t" + 100.0 * agreementCount[i] / alignedAnnotations.size());
         }
 
-        double[] iaa = computeAgreement(alignedAnnotations, maxNumAnnotators);
-        // InterAnnotatorAgreement.printKappa(iaa);
+        // TODO: recover IAA ..
+        //double[] iaa = computeAgreement(alignedAnnotations, maxNumAnnotators);
+        //InterAnnotatorAgreement.printKappa(iaa);
         return alignedAnnotations;
     }
 
@@ -110,7 +101,7 @@ public class CrowdFlowerDataReader {
     // sent_id	sentence
 
     public static void main(String[] args) throws IOException {
-        readAggregatedAnnotationFromFile(args[0], false /* checkbox */);
+        readAggregatedAnnotationFromFile(args[0]);
     }
 
     public static double[] computeAgreement(final List<AlignedAnnotation> alignedAnnotations, int maxNumAnnotators) {

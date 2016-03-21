@@ -23,5 +23,8 @@ public interface Query<QA extends QAPairSurfaceForm> {
     boolean isJeopardyStyle();
     boolean allowMultipleChoices();
 
+    // To uniquely identify a query.
+    String getQueryKey();
+
     String toString(ImmutableList<String> sentence);
 }
