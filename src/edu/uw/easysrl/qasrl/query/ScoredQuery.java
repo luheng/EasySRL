@@ -97,6 +97,10 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
 
     }
 
+    public ImmutableList<Double> getOptionScores() {
+        return optionScores;
+    }
+
     public boolean isJeopardyStyle() { return isJeopardyStyle; }
 
     public boolean allowMultipleChoices() {

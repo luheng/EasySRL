@@ -1,6 +1,7 @@
 package edu.uw.easysrl.qasrl.experiments;
 
 import com.google.common.collect.ImmutableList;
+import com.sun.org.apache.xml.internal.resolver.helpers.Debug;
 import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
@@ -256,7 +257,8 @@ public class ReparsingExperiment {
                             .collect(Collectors.toList());
                 }
                 // Print.
-                String sentenceStr = sentences.get(sentenceId).stream().collect(Collectors.joining(" "));
+                final List<String> sentence = sentences.get(sentenceId);
+                String sentenceStr = sentence.stream().collect(Collectors.joining(" "));
                 int predId = query.getQAPairSurfaceForms().get(0).getPredicateIndex();
                 Category category = query.getQAPairSurfaceForms().get(0).getCategory();
                 int argNum = query.getQAPairSurfaceForms().get(0).getArgumentNumber();
@@ -284,17 +286,16 @@ public class ReparsingExperiment {
                         match += "U";
                     }
                     String option = query.getOptions().get(j);
-                    String headStr = "-";
+                    String headStr = "-", parseIdsStr = "-";
                     if (j < query.getQAPairSurfaceForms().size()) {
                         QAStructureSurfaceForm qa = query.getQAPairSurfaceForms().get(j);
                         final List<Integer> argList = qa.getArgumentIndices();
-                        headStr = String.format("%s:%s",
-                            DebugPrinter.getShortListString(argList,
-                            argList.stream().map(sentence::get).collect(Collectors.joining(",")));
+                        headStr = DebugPrinter.getShortListString(argList) + ":" +
+                                argList.stream().map(sentence::get).collect(Collectors.joining(","));
+                        parseIdsStr = DebugPrinter.getShortListString(qa.getAnswerStructures().get(0).parseIds);
+                    }
                     result += String.format("%-8s\t%.3f\t%-40s\t%-30s\t-\t-\t%s\n", match,
-                            query.getOptions(),
-                            option.getAnswer(), headStr,
-                            DebugHelper.getShortListString(option.getParseIds()));
+                            query.getOptionScores().get(j), option, headStr, parseIdsStr);
                 }
                 String f1Impv = " ";
                 if (rerankedF1 != null) {
