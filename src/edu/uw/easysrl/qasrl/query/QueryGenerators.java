@@ -39,12 +39,13 @@ public class QueryGenerators {
                         .distinct()
                         .collect(toImmutableList());
                 ImmutableList<QA> surfaceForms = ImmutableList.copyOf(e.getValue());
-                return new BasicQuery<>(sentenceId, question, answers, surfaceForms, true /* allow multiple */);
+                return new BasicQuery<>(sentenceId, question, answers, surfaceForms, false /* is jeopardy style */,
+                                        true /* allow multiple */);
             })
             .collect(toImmutableList());
     }
 
-    public static <QA extends QAStructureSurfaceForm> QueryGenerator<QA, Query<QA>> checkboxQueryAggregator() {
+    public static <QA extends QAStructureSurfaceForm> QueryGenerator<QA, ScoredQuery<QA>> checkboxQueryAggregator() {
         return qaPairs -> qaPairs
                 .stream()
                 .collect(groupingBy(QA::getQuestion))
@@ -61,15 +62,16 @@ public class QueryGenerators {
                             .distinct()
                             .collect(toList());
                     options.add(kBadQuestionOptionString);
-                    return new BasicQuery<>(sentenceId,
-                                            question,
-                                            ImmutableList.copyOf(options),
-                                            ImmutableList.copyOf(qaList),
-                                            true /* allow multiple */);
+                    return new ScoredQuery<>(sentenceId,
+                                             question,
+                                             ImmutableList.copyOf(options),
+                                             ImmutableList.copyOf(qaList),
+                                             false, /* is jeopardy style */
+                                             true /* allow multiple */);
                 }).collect(toImmutableList());
     }
 
-    public static <QA extends QAStructureSurfaceForm> QueryGenerator<QA, BasicQuery<QA>> radioButtonQueryAggregator() {
+    public static <QA extends QAStructureSurfaceForm> QueryGenerator<QA, ScoredQuery<QA>> radioButtonQueryAggregator() {
         return qaPairs -> qaPairs
                 .stream()
                 .collect(groupingBy(QA::getQuestion))
@@ -87,11 +89,12 @@ public class QueryGenerators {
                             .collect(toList());
                     options.add(kUnlistedAnswerOptionString);
                     options.add(kBadQuestionOptionString);
-                    return new BasicQuery<>(sentenceId,
+                    return new ScoredQuery<>(sentenceId,
                             question,
                             ImmutableList.copyOf(options),
                             ImmutableList.copyOf(qaList),
-                            false /* allow multiple */);
+                            false, /* is jeopardy style */
+                            true /* allow multiple */);
                 }).collect(toImmutableList());
     }
 

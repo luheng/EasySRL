@@ -99,6 +99,7 @@ public final class QAPairAggregators {
     public static QAPairAggregator<QAStructureSurfaceForm> aggregateForSingleChoiceQA() {
         return qaPairs -> qaPairs
                 .stream()
+                // TODO: change to QuestionKey
                 .collect(groupingBy(qa -> qa.getPredicateIndex() + "\t" + qa.getPredicateCategory() + "\t" + qa.getArgumentNumber()))
                 .entrySet()
                 .stream()

@@ -12,6 +12,9 @@ import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.Query;
 import edu.uw.easysrl.qasrl.query.QueryGenerators;
+import edu.uw.easysrl.qasrl.query.ScoredQuery;
+
+import java.util.List;
 
 /**
  * Make sure everything works.
@@ -35,15 +38,17 @@ public class RefactorExperiment {
         for (int i = 0; i < numSentences; i++) {
             ImmutableList<InputReader.InputWord> inputSentence = devData.getSentenceInputWords().get(i);
             ImmutableList<String> sentence = sentences.get(i);
-            NBestList nBestList = new NBestList(ImmutableList.copyOf(parser.parseNBest(i, inputSentence)));
-            if (nBestList.getParses() == null) {
+            List<Parse> nbestParses = parser.parseNBest(i, inputSentence);
+            if (nbestParses == null) {
                 continue;
             }
+            NBestList nBestList = new NBestList(ImmutableList.copyOf(nbestParses));
             ImmutableList<IQuestionAnswerPair> qaPairs1 = QuestionGenerator
                     .generateAllQAPairs(i, sentences.get(i), nBestList);
             ImmutableList<QAStructureSurfaceForm> qaPairs2 = QAPairAggregators.aggregateForMultipleChoiceQA().aggregate(qaPairs1);
-            ImmutableList<Query<QAStructureSurfaceForm>> queryList = QueryGenerators.checkboxQueryAggregator().generate(qaPairs2);
-
+            //ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList = QueryGenerators.checkboxQueryAggregator().generate(qaPairs2);
+            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList = QueryGenerators.radioButtonQueryAggregator().generate(qaPairs2);
+            queryList.forEach(query -> query.computeScores(nBestList));
             queryList.forEach(query -> {
                 System.out.println(query.toString(sentence) + "\n");
             });

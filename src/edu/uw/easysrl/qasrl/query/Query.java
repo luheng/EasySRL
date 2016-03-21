@@ -20,6 +20,7 @@ public interface Query<QA extends QAPairSurfaceForm> {
     String getPrompt();
     ImmutableList<String> getOptions();
     ImmutableList<QA> getQAPairSurfaceForms();
+    boolean isJeopardyStyle();
     boolean allowMultipleChoices();
 
     String toString(ImmutableList<String> sentence);
