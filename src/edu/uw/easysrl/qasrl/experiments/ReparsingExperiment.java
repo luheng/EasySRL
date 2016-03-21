@@ -2,13 +2,12 @@ package edu.uw.easysrl.qasrl.experiments;
 
 import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.main.InputReader;
-import edu.uw.easysrl.qasrl.BaseCcgParser;
-import edu.uw.easysrl.qasrl.Parse;
+import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
 import edu.uw.easysrl.qasrl.annotation.CrowdFlowerDataReader;
 import edu.uw.easysrl.qasrl.annotation.QualityControl;
 import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
-import edu.uw.easysrl.qasrl.pomdp.Evidence;
+import edu.uw.easysrl.qasrl.model.Evidence;
 import edu.uw.easysrl.qasrl.qg.IQuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregators;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
@@ -16,8 +15,6 @@ import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.QueryGenerators;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
-import edu.uw.easysrl.qasrl.NBestList;
-import edu.uw.easysrl.qasrl.ParseData;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.GuavaCollectors;
@@ -125,7 +122,7 @@ public class ReparsingExperiment {
         System.out.println(String.format("Read %d sentences from the dev set.", sentences.size()));
 
         String preparsedFile = "parses.100best.out";
-        BaseCcgParser parser = new BaseCcgParser.MockParser(preparsedFile, nBest);
+        parser = new BaseCcgParser.MockParser(preparsedFile, nBest);
         System.err.println("Parse initialized.");
 
         annotations = loadData(annotationFiles);
@@ -133,6 +130,8 @@ public class ReparsingExperiment {
         // Re-parsing!
         reparser = new BaseCcgParser.ConstrainedCcgParser(BaseCcgParser.modelFolder, BaseCcgParser.rootCategories,
                 maxTagsPerWord, 1 /* nbest */);
+
+        runExperiment();
     }
 
     private static void runExperiment() {
@@ -164,8 +163,8 @@ public class ReparsingExperiment {
             ImmutableList<IQuestionAnswerPair> qaPairs1 = QuestionGenerator
                     .generateAllQAPairs(sentenceId, sentences.get(sentenceId), nBestList);
 
-                //ImmutableList<QAStructureSurfaceForm> qaPairs2 = QAPairAggregators.aggregateForMultipleChoiceQA().aggregate(qaPairs1);
-                //ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList = QueryGenerators.checkboxQueryAggregator().generate(qaPairs2);
+            //ImmutableList<QAStructureSurfaceForm> qaPairs2 = QAPairAggregators.aggregateForMultipleChoiceQA().aggregate(qaPairs1);
+            //ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList = QueryGenerators.checkboxQueryAggregator().generate(qaPairs2);
 
             ImmutableList<QAStructureSurfaceForm> qaPairs2 = QAPairAggregators.aggregateForSingleChoiceQA()
                     .aggregate(qaPairs1);
@@ -285,16 +284,17 @@ public class ReparsingExperiment {
                         match += "U";
                     }
                     String option = query.getOptions().get(j);
-                    /*
+                    String headStr = "-";
                     if (j < query.getQAPairSurfaceForms().size()) {
-                    String headStr = option.isNAOption() ? "-" : String.format("%s:%s",
-                            DebugHelper.getShortListString(option.getArgumentIds()),
-                            option.getArgumentIds().stream().map(sentence::get).collect(Collectors.joining(",")));
+                        QAStructureSurfaceForm qa = query.getQAPairSurfaceForms().get(j);
+                        final List<Integer> argList = qa.getArgumentIndices();
+                        headStr = String.format("%s:%s",
+                            DebugPrinter.getShortListString(argList,
+                            argList.stream().map(sentence::get).collect(Collectors.joining(",")));
                     result += String.format("%-8s\t%.3f\t%-40s\t%-30s\t-\t-\t%s\n", match,
                             query.getOptions(),
                             option.getAnswer(), headStr,
                             DebugHelper.getShortListString(option.getParseIds()));
-                     */
                 }
                 String f1Impv = " ";
                 if (rerankedF1 != null) {

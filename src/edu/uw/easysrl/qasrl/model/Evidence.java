@@ -1,13 +1,9 @@
-package edu.uw.easysrl.qasrl.pomdp;
+package edu.uw.easysrl.qasrl.model;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
-import edu.uw.easysrl.qasrl.GroupedQuery;
 import edu.uw.easysrl.qasrl.Parse;
-import edu.uw.easysrl.qasrl.Response;
 import edu.uw.easysrl.qasrl.corpora.PronounList;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
-import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.QueryGenerators;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;

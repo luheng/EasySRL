@@ -3,7 +3,7 @@ package edu.uw.easysrl.qasrl;
 import edu.uw.easysrl.dependencies.*;
 import edu.uw.easysrl.main.EasySRL;
 import edu.uw.easysrl.main.InputReader;
-import edu.uw.easysrl.qasrl.pomdp.Evidence;
+import edu.uw.easysrl.qasrl.model.Evidence;
 import edu.uw.easysrl.qasrl.corpora.CountDictionary;
 import edu.uw.easysrl.syntax.evaluation.CCGBankEvaluation;
 import edu.uw.easysrl.syntax.grammar.Category;
