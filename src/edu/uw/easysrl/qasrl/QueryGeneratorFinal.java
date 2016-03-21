@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
  * Query generator.
  * Created by luheng on 1/17/16.
  */
+@Deprecated
 public class QueryGeneratorFinal {
 
     /**

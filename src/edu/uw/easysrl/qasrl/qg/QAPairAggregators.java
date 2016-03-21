@@ -1,15 +1,11 @@
 package edu.uw.easysrl.qasrl.qg;
 
 import com.google.common.collect.*;
-import edu.stanford.nlp.util.Triple;
-import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.qg.surfaceform.*;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 
 import edu.uw.easysrl.qasrl.qg.syntax.AnswerStructure;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
-import edu.uw.easysrl.syntax.grammar.Category;
-import gnu.trove.map.hash.TObjectDoubleHashMap;
 
 import static edu.uw.easysrl.util.GuavaCollectors.*;
 import static java.util.stream.Collectors.*;

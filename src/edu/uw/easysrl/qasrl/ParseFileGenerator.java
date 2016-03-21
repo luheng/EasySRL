@@ -3,6 +3,10 @@ package edu.uw.easysrl.qasrl;
 import edu.uw.easysrl.main.EasySRL;
 import edu.uw.easysrl.main.InputReader;
 
+import edu.uw.easysrl.qasrl.BaseCcgParser;
+import edu.uw.easysrl.qasrl.DataLoader;
+import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
+import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
 import uk.co.flamingpenguin.jewel.cli.CliFactory;

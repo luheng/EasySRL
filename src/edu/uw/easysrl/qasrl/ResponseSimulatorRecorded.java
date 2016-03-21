@@ -22,8 +22,9 @@ public class ResponseSimulatorRecorded extends ResponseSimulator {
     public ResponseSimulatorRecorded(final List<AlignedAnnotation> alignedAnnotationList) {
         alignedAnnotations = new HashMap<>();
         alignedAnnotationList.forEach(annotation -> {
-                String qkey = annotation.annotationKey;
-                alignedAnnotations.put(qkey, annotation);
+            String qkey = annotation.sentenceId + "\t" + annotation.predicateId + "\t" + annotation.predicateCategory
+                    + "\t" + annotation.argumentNumber + "\t" + annotation.question;
+            alignedAnnotations.put(qkey, annotation);
         });
     }
 
@@ -57,7 +58,7 @@ public class ResponseSimulatorRecorded extends ResponseSimulator {
         String majorityAnswer = "";
         double maxTrust = -1.0;
         for (int i = 0; i < annotation.answerDist.length; i++) {
-           // if (annotation.answerDist[i] == 5) {
+            // if (annotation.answerDist[i] == 5) {
             // Tie-breaking by worker trust.
             if (annotation.answerTrust[i] > maxTrust) {
                 majorityAnswerIndex = i;
@@ -87,10 +88,9 @@ public class ResponseSimulatorRecorded extends ResponseSimulator {
         if (response.chosenOptions.size() == 0) {
             return response;
         } else {
-           // response.add(badQuestionOptionId);
+            // response.add(badQuestionOptionId);
         }
 
         return response;
     }
 }
-

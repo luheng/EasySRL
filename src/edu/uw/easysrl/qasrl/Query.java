@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
  * A wrapper around QuestionAnswerPair.
  * Created by luheng on 1/20/16.
  */
+@Deprecated
 public class Query {
     // < p, c, n, a, k, Q, A >
     int predicateIndex;

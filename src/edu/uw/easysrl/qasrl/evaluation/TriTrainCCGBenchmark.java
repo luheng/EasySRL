@@ -1,9 +1,12 @@
-package edu.uw.easysrl.qasrl;
+package edu.uw.easysrl.qasrl.evaluation;
 
 import edu.stanford.nlp.util.StringUtils;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.main.EasySRL;
 import edu.uw.easysrl.main.InputReader;
+import edu.uw.easysrl.qasrl.BaseCcgParser;
+import edu.uw.easysrl.qasrl.DataLoader;
+import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import uk.co.flamingpenguin.jewel.cli.CliFactory;
 

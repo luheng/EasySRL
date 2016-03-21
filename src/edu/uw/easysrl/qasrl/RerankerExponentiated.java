@@ -7,6 +7,7 @@ import java.util.Map;
 /**
  * Created by luheng on 1/29/16.
  */
+@Deprecated
 public class RerankerExponentiated implements Reranker {
     Map<Integer, List<Parse>> allParses;
     Map<Integer, double[]> expScores;

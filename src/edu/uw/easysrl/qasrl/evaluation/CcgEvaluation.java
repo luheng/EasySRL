@@ -1,6 +1,7 @@
-package edu.uw.easysrl.qasrl;
+package edu.uw.easysrl.qasrl.evaluation;
 
 import edu.uw.easysrl.dependencies.ResolvedDependency;
+import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
 

@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 /**
  * Created by luheng on 3/1/16.
  */
+@Deprecated
 public class QueryGeneratorByKey {
 
     /**

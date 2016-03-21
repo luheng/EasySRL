@@ -2,7 +2,10 @@ package edu.uw.easysrl.qasrl.annotation;
 
 import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.*;
+import edu.uw.easysrl.qasrl.BaseCcgParser;
+import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
+import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
 

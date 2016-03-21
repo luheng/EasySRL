@@ -1,4 +1,4 @@
-package edu.uw.easysrl.qasrl;
+package edu.uw.easysrl.qasrl.corpora;
 
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.hash.TObjectIntHashMap;

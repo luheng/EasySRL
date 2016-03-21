@@ -1,8 +1,6 @@
 package edu.uw.easysrl.qasrl;
 
-import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
-import gnu.trove.map.hash.TObjectDoubleHashMap;
 
 import java.util.*;
 
@@ -10,6 +8,7 @@ import java.util.*;
  * Experimental reranker. Not used now.
  * Created by luheng on 1/28/16.
  */
+@Deprecated
 public class RerankerDependencyFactored implements Reranker {
     // Dependency-factored scoring function for each sentence.
     final Map<Integer, List<Parse>> allParses;

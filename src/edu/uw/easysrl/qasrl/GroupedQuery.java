@@ -12,6 +12,7 @@ import java.util.stream.IntStream;
  * Grouped query ...
  * Created by luheng on 1/21/16.
  */
+@Deprecated
 public class GroupedQuery {
     public class AnswerOption {
         protected ImmutableList<Integer> argumentIds;

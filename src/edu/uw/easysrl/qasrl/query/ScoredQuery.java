@@ -1,22 +1,18 @@
 package edu.uw.easysrl.qasrl.query;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
-import edu.stanford.nlp.objectbank.IdentityFunction;
 import edu.uw.easysrl.qasrl.DebugPrinter;
 import edu.uw.easysrl.qasrl.NBestList;
 import edu.uw.easysrl.qasrl.qg.QuestionKey;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
-import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.GuavaCollectors;
 
-import java.util.Set;
-import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
+ * Query with Scores. Just more convenient.
  * Created by luheng on 3/20/16.
  */
 public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA> {
@@ -43,6 +39,7 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
     private final ImmutableList<QA> qaPairSurfaceForms;
     private boolean isJeopardyStyle, allowMultipleChoices;
 
+    private int queryId;
     private double promptScore, optionEntropy;
     private ImmutableList<Double> optionScores;
 
@@ -101,8 +98,17 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
     }
 
     public boolean isJeopardyStyle() { return isJeopardyStyle; }
+
     public boolean allowMultipleChoices() {
         return allowMultipleChoices;
+    }
+
+    public void setQueryId(int queryId) {
+        this.queryId = queryId;
+    }
+
+    public int getQueryId() {
+        return queryId;
     }
 
     public String toString(final ImmutableList<String> sentence) {

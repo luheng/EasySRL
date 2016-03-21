@@ -1,6 +1,6 @@
 package edu.uw.easysrl.qasrl.pomdp;
 
-import edu.uw.easysrl.qasrl.GroupedQuery;
+import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.syntax.evaluation.Results;
 
@@ -22,7 +22,7 @@ public class RewardFunction {
         this.moneyPenalty = moneyPenalty;
     }
 
-    public double getReward(Optional<GroupedQuery> action, BeliefModel beliefModel, History history) {
+    public double getReward(Optional<ScoredQuery> action, BeliefModel beliefModel, History history) {
         return action.isPresent() ? -moneyPenalty : result.get(beliefModel.getBestState()).getF1();
     }
 }

@@ -16,6 +16,7 @@ import java.util.stream.Collectors;
  * Just to look at the queries.
  * Created by luheng on 2/17/16.
  */
+@Deprecated
 public class QueryGeneratorAnalysis {
     TIntIntHashMap answerSpanConfusion;
     double avgQuestionConfusion, avgAnswerConfusion;

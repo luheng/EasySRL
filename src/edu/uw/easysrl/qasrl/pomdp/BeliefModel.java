@@ -1,6 +1,6 @@
 package edu.uw.easysrl.qasrl.pomdp;
 
-import edu.uw.easysrl.qasrl.GroupedQuery;
+import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.Response;
 
@@ -45,7 +45,7 @@ public class BeliefModel {
         }
     }
 
-    public void update(ObservationModel obs, GroupedQuery query, Response response) {
+    public void update(ObservationModel obs, ScoredQuery query, Response response) {
         for (int i = 0; i < parses.size(); i++) {
             double p = obs.getObservationProbability(query, response, i, parses.get(i));
             if (Double.isNaN(p)) {

@@ -1,7 +1,11 @@
 package edu.uw.easysrl.qasrl;
 
 import com.google.common.collect.ImmutableList;
-import edu.uw.easysrl.qasrl.Parse;
+import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
+import edu.uw.easysrl.syntax.evaluation.Results;
+
+import java.util.List;
+
 import static edu.uw.easysrl.util.GuavaCollectors.*;
 
 /**
@@ -17,6 +21,8 @@ import static edu.uw.easysrl.util.GuavaCollectors.*;
 public final class NBestList {
     private final ImmutableList<Parse> parses;
     private final ImmutableList<Double> scores;
+    private ImmutableList<Results> results;
+    private int oracleId;
 
     public int getN() {
         return parses.size();
@@ -41,6 +47,24 @@ public final class NBestList {
     public NBestList(ImmutableList<Parse> parses, ImmutableList<Double> scores) {
         this.parses = parses;
         this.scores = scores;
+    }
+
+    public void cacheResults(final Parse goldParse) {
+        results = ImmutableList.copyOf(CcgEvaluation.evaluateNBest(parses, goldParse.dependencies));
+        oracleId = 0;
+        for (int k = 1; k < parses.size(); k++) {
+            if (results.get(k).getF1() > results.get(oracleId).getF1()) {
+                oracleId = k;
+            }
+        }
+    }
+
+    public int getOracleId() {
+        return oracleId;
+    }
+
+    public Results getResults(int parseId) {
+        return results.get(parseId);
     }
 
     /**

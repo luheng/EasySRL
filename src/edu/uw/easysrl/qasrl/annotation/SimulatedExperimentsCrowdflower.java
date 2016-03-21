@@ -1,6 +1,7 @@
 package edu.uw.easysrl.qasrl.annotation;
 
 import edu.uw.easysrl.qasrl.*;
+import edu.uw.easysrl.qasrl.evaluation.Accuracy;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
 
@@ -36,7 +37,7 @@ public class SimulatedExperimentsCrowdflower {
         // Read annotations.
         List<AlignedAnnotation> annotations;
         try {
-            annotations = CrowdFlowerDataReader.readAggregatedAnnotationFromFile(annotationFilePath);
+            annotations = CrowdFlowerDataReader.readAggregatedAnnotationFromFile(annotationFilePath, false);
         } catch (IOException e) {
             e.printStackTrace();
             return;

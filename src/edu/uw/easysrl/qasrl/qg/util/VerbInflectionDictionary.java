@@ -1,7 +1,7 @@
 package edu.uw.easysrl.qasrl.qg.util;
 
 import edu.uw.easysrl.corpora.ParallelCorpusReader;
-import edu.uw.easysrl.qasrl.CountDictionary;
+import edu.uw.easysrl.qasrl.corpora.CountDictionary;
 import edu.uw.easysrl.util.Util;
 
 import java.io.*;

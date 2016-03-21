@@ -2,6 +2,8 @@ package edu.uw.easysrl.qasrl;
 
 import edu.uw.easysrl.main.EasySRL;
 import edu.uw.easysrl.main.InputReader.InputWord;
+import edu.uw.easysrl.qasrl.evaluation.Accuracy;
+import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
@@ -23,6 +25,7 @@ import java.util.stream.IntStream;
  * New - Active Learning experiments (n-best reranking).
  * Created by luheng on 1/5/16.
  */
+@Deprecated
 public class MTurkDataWriter {
     final List<List<InputWord>> sentences;
     final List<Parse> goldParses;

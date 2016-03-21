@@ -1,26 +1,33 @@
 package edu.uw.easysrl.qasrl.pomdp;
 
+import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.main.InputReader;
+
 import edu.uw.easysrl.qasrl.*;
-import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
+import edu.uw.easysrl.qasrl.qg.QAPairAggregators;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
+import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
+import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
+import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
+import edu.uw.easysrl.qasrl.query.QueryGenerators;
+import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * POMDP prototype.
  * Created by luheng on 2/27/16.
  */
 public class POMDP {
-    public final List<List<InputReader.InputWord>> sentences;
-    public final List<Parse> goldParses;
+    public final ImmutableList<ImmutableList<InputReader.InputWord>> inputSentences;
+    public final ImmutableList<ImmutableList<String>> sentences;
+    public final ImmutableList<Parse> goldParses;
     final BaseCcgParser parser;
 
     // The action space.
-    private List<GroupedQuery> queryPool;
+    private List<ScoredQuery<QAStructureSurfaceForm>> queryPool;
 
     public BeliefModel beliefModel;
     private ObservationModel observationModel, baseObservationModel;
@@ -30,7 +37,7 @@ public class POMDP {
     private int timeStep;
 
     // The state space.
-    public Map<Integer, List<Parse>> allParses;
+    public Map<Integer, NBestList> allParses;
     private Map<Integer, List<Results>> allResults;
     private Map<Integer, Integer> oracleParseIds;
 
@@ -50,9 +57,12 @@ public class POMDP {
         this.nBest = nBest;
         this.horizon = horizon;
         this.moneyPenalty = moneyPenalty;
-        sentences = new ArrayList<>();
-        goldParses = new ArrayList<>();
-        DataLoader.readDevPool(sentences, goldParses);
+
+        ParseData parseData = ParseData.loadFromDevPool().get();
+        sentences = parseData.getSentences();
+        inputSentences = parseData.getSentenceInputWords();
+        goldParses = parseData.getGoldParses();
+
         if (nBest <= 10) {
             preparsedFile = "parses.10best.out";
         } else if (nBest <= 50) {
@@ -70,6 +80,7 @@ public class POMDP {
     }
 
     public POMDP(POMDP other) {
+        this.inputSentences = other.inputSentences;
         this.sentences = other.sentences;
         this.goldParses = other.goldParses;
         this.parser = other.parser;
@@ -90,7 +101,7 @@ public class POMDP {
         allResults = new HashMap<>();
         oracleParseIds = new HashMap<>();
         for (int sentIdx = 0; sentIdx < sentences.size(); sentIdx ++) {
-            List<Parse> parses = parser.parseNBest(sentIdx, sentences.get(sentIdx));
+            List<Parse> parses = parser.parseNBest(sentIdx, inputSentences.get(sentIdx));
             if (parses == null) {
                 continue;
             }
@@ -101,7 +112,7 @@ public class POMDP {
                     oracleK = k;
                 }
             }
-            allParses.put(sentIdx, parses);
+            allParses.put(sentIdx, new NBestList(ImmutableList.copyOf(parses)));
             allResults.put(sentIdx, results);
             oracleParseIds.put(sentIdx, oracleK);
             if (allParses.size() % 500 == 0) {
@@ -112,22 +123,27 @@ public class POMDP {
 
     public void initializeForSentence(int sentIdx) {
         queryPool = new ArrayList<>();
-        beliefModel = new BeliefModel(allParses.get(sentIdx));
+        beliefModel = new BeliefModel(allParses.get(sentIdx).getParses());
         observationModel = baseObservationModel == null ? new ObservationModel() :
                                                           new ObservationModel(baseObservationModel);
         history = new History();
-        policy = new Policy(queryPool, history, beliefModel, horizon);
-        rewardFunction = new RewardFunction(allParses.get(sentIdx), allResults.get(sentIdx), moneyPenalty);
+        //policy = new Policy(queryPool, history, beliefModel, horizon);
+        rewardFunction = new RewardFunction(allParses.get(sentIdx).getParses(), allResults.get(sentIdx), moneyPenalty);
         timeStep = 0;
-        List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
-        List<Parse> parses = allParses.get(sentIdx);
-        List<GroupedQuery> queries = QueryGeneratorByKey.generateQueries(sentIdx, words, parses);
+
+        List<ScoredQuery<QAStructureSurfaceForm>> queries =
+                QueryGenerators.checkboxQueryAggregator().generate(
+                        QAPairAggregators.aggregateForMultipleChoiceQA().aggregate(
+                                QuestionGenerator.generateAllQAPairs(sentIdx,
+                                                                     sentences.get(sentIdx),
+                                                                     allParses.get(sentIdx))));
+
         queries.stream().forEach(query -> {
-            query.computeProbabilities(beliefModel.belief);
+            query.computeScores(allParses.get(sentIdx));
             query.setQueryId(queryPool.size());
             queryPool.add(query);
         });
-        //System.out.println("Total number of queries:\t" + queryPool.size());
+        System.out.println("Total number of queries:\t" + queryPool.size());
     }
 
     /**
@@ -137,29 +153,34 @@ public class POMDP {
      */
     public void initializeForSentence(int sentIdx, List<AlignedAnnotation> annotations) {
         queryPool = new ArrayList<>();
-        beliefModel = new BeliefModel(allParses.get(sentIdx));
+        beliefModel = new BeliefModel(allParses.get(sentIdx).getParses());
         observationModel = baseObservationModel == null ? new ObservationModel() :
                                                           new ObservationModel(baseObservationModel);
         history = new History();
-        policy = new Policy(queryPool, history, beliefModel, horizon);
-        rewardFunction = new RewardFunction(allParses.get(sentIdx), allResults.get(sentIdx), moneyPenalty);
+        //policy = new Policy(queryPool, history, beliefModel, horizon);
+        rewardFunction = new RewardFunction(allParses.get(sentIdx).getParses(), allResults.get(sentIdx), moneyPenalty);
         timeStep = 0;
-        List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
-        List<Parse> parses = allParses.get(sentIdx);
-        List<GroupedQuery> queries = QueryGeneratorSurfaceForm.generateQueries(sentIdx, words, parses);
+
+        List<ScoredQuery<QAStructureSurfaceForm>> queries =
+                QueryGenerators.checkboxQueryAggregator().generate(
+                        QAPairAggregators.aggregateForMultipleChoiceQA().aggregate(
+                                QuestionGenerator.generateAllQAPairs(sentIdx,
+                                        sentences.get(sentIdx),
+                                        allParses.get(sentIdx))));
+
         queries.stream().forEach(query -> {
-            query.computeProbabilities(beliefModel.belief);
+            query.computeScores(allParses.get(sentIdx));
             if (annotations.stream().anyMatch(annotation -> annotation.sentenceId == sentIdx
-                    && annotation.question.equals(query.getQuestion()))) {
+                    && annotation.question.equals(query.getPrompt()))) {
                 query.setQueryId(queryPool.size());
                 queryPool.add(query);
             }
         });
-        //System.out.println("Total number of queries:\t" + queryPool.size());
+        System.out.println("Total number of queries:\t" + queryPool.size());
     }
 
-    public Optional<GroupedQuery> generateAction() {
-        Optional<GroupedQuery> action = policy.getAction();
+    public Optional<ScoredQuery> generateAction() {
+        Optional<ScoredQuery> action = policy.getAction();
         if (action.isPresent()) {
             history.addAction(action.get());
         }
@@ -174,7 +195,7 @@ public class POMDP {
         beliefModel.resetToPrior();
     }
 
-    public List<GroupedQuery> getQueryPool() {
+    public List<ScoredQuery<QAStructureSurfaceForm>> getQueryPool() {
         return queryPool;
     }
 
@@ -183,12 +204,12 @@ public class POMDP {
         history.addObservation(response);
     }
 
-    public void receiveObservationForQuery(GroupedQuery query, Response response) {
+    public void receiveObservationForQuery(ScoredQuery query, Response response) {
         beliefModel.update(observationModel, query, response);
     }
 
     public List<String> getSentenceById(int sentenceId) {
-        return sentences.get(sentenceId).stream().map(w -> w.word).collect(Collectors.toList());
+        return sentences.get(sentenceId);
     }
 
     public Results getRerankedF1(int sid) {

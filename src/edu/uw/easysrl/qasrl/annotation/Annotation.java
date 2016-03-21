@@ -1,7 +1,5 @@
 package edu.uw.easysrl.qasrl.annotation;
 
-import java.io.*;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -9,7 +7,6 @@ import java.util.List;
  * Created by luheng on 2/12/16.
  */
 public abstract class Annotation {
-
     public int sentenceId;
     public String sentenceString;
     public String comment;

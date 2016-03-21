@@ -217,6 +217,7 @@ public class RecordedCheckboxAnnotation extends Annotation {
         return result;
     }
 
+    /*
     public static void main(String[] args) {
         String fileName = args[0];
         try {
@@ -230,7 +231,7 @@ public class RecordedCheckboxAnnotation extends Annotation {
             e.printStackTrace();
         }
     }
-
+*/
     private static boolean goldSupportsAnnotation(List<RawQuestionAnswerPair> goldQAPairs, RecordedCheckboxAnnotation candidate) {
         switch(goldSupport) {
         case GOLD_BY_STRING: return goldSupportsAnnotationByString(goldQAPairs, candidate);

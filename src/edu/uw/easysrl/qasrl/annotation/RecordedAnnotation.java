@@ -10,9 +10,10 @@ import java.util.List;
  * Annotation record from a single annotator.
  * Created by luheng on 2/12/16.
  */
-public class RecordedAnnotation extends Annotation {
+public class RecordedAnnotation {
     // Number of iteration in user session.
-    public int iterationId;
+    public int iterationId, sentenceId;
+    public String sentenceString;
 
     // Predicate information
     public int predicateId, argumentNumber;
@@ -24,17 +25,26 @@ public class RecordedAnnotation extends Annotation {
     public String question;
 
     // Answer information
-    List<String> answerStrings;
+    List<String> optionStrings;
     String answer;
     int answerId, goldAnswerId;
+
+    // Multi-answer information
+    List<String> multiAnswers;
+    List<Integer> multiAnswerIds, goldAnswerIds;
 
     // Current accuracy
     double rerankF1, oracleF1, onebestF1;
 
+    // Crowdflower computed stuff.
+    double trust;
+
+    // Other
+    public String annotatorId;
+    public String comment;
 
     protected RecordedAnnotation() {
-        super();
-        answerStrings = new ArrayList<>();
+        optionStrings = new ArrayList<>();
     }
 
     public static List<RecordedAnnotation> loadAnnotationRecordsFromFile(String fileName) throws IOException {
@@ -86,8 +96,8 @@ public class RecordedAnnotation extends Annotation {
                     }
                     info = line.split("\\t");
                     int id = Integer.parseInt(info[0]);
-                    assert (id == curr.answerStrings.size());
-                    curr.answerStrings.add(info[3]);
+                    assert (id == curr.optionStrings.size());
+                    curr.optionStrings.add(info[3]);
                     String match = info[1];
                     if (match.contains("*")) {
                         curr.answerId = id;
@@ -115,44 +125,13 @@ public class RecordedAnnotation extends Annotation {
         return annotations;
     }
 
-    public List<String> getAnswerOptions() {
-        return answerStrings;
-    }
-
-    public boolean isCorrect() {
-        return answerId == goldAnswerId;
-    }
-
-    public int getAnswerId() {
-        return answerId;
-    }
-
-    public int getGoldAnswerId() {
-        return goldAnswerId;
-    }
-
-    public boolean isSameQuestionAs(Annotation o) {
-        if(!(o instanceof RecordedAnnotation)) {
-            return false;
-        }
-        RecordedAnnotation other = (RecordedAnnotation) o;
+    public boolean isSameQuestionAs(final RecordedAnnotation other) {
         return sentenceId == other.sentenceId
                 && predicateId == other.predicateId
                 && argumentNumber == other.argumentNumber
                 && question.equalsIgnoreCase(other.question)
-                && answerStrings.size() == other.answerStrings.size()
+                && optionStrings.size() == other.optionStrings.size()
                 && goldAnswerId == other.goldAnswerId;
-    }
-
-    public String getAnnotationKey() {
-        return String.format("%s\n%d\n%d\n%d\n%s\n%d\n%d",
-                             "RecordedAnnotation",
-                             sentenceId,
-                             predicateId,
-                             argumentNumber,
-                             question,
-                             answerStrings.size(),
-                             goldAnswerId);
     }
 
     @Override
@@ -163,8 +142,8 @@ public class RecordedAnnotation extends Annotation {
                 + "PRED=" + predicateId + "\t" + predicateString + "\t" + predicateCategory + "." + argumentNumber + "\n"
                 + "QID=" + questionId + "\t" + question + "\n"
                 + "ANS/GOLD=" + answerId + "/" + goldAnswerId + "\n";
-        for (int i = 0; i < answerStrings.size(); i++) {
-            result += i + "\t" + answerStrings.get(i) + "\n";
+        for (int i = 0; i < optionStrings.size(); i++) {
+            result += i + "\t" + optionStrings.get(i) + "\n";
         }
         result += String.format("1B=%.3f\tRR=%.3f\tOR=%.3f", onebestF1, rerankF1, oracleF1) + "\n";
         return result;
@@ -173,8 +152,11 @@ public class RecordedAnnotation extends Annotation {
     public static void main(String[] args) {
         String fileName = args[0];
         try {
-            List<Annotation> annotations = new ArrayList<>(loadAnnotationRecordsFromFile(fileName));
-            annotations.forEach(r -> System.out.println(r.toString()));
+            List<RecordedAnnotation> annotations = loadAnnotationRecordsFromFile(fileName);
+            annotations.forEach(r -> {
+                System.out.println(r.toString()
+                );
+            });
         } catch (IOException e) {
             e.printStackTrace();
         }

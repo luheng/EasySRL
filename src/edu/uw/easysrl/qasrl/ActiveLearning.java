@@ -1,6 +1,7 @@
 package edu.uw.easysrl.qasrl;
 
 import edu.uw.easysrl.main.InputReader;
+import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
@@ -12,6 +13,7 @@ import java.util.stream.Collectors;
  * Separating ResponseSimulator and the other modules. Useful for Web Interface logic.
  * Created by luheng on 2/1/16.
  */
+@Deprecated
 public class ActiveLearning {
     public final List<List<InputReader.InputWord>> sentences;
     public final List<Parse> goldParses;

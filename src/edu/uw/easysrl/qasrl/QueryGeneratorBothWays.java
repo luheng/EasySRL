@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
  * Latest query generator.
  * Created by luheng on 2/18/16.
  */
+@Deprecated
 public class QueryGeneratorBothWays {
 
     final int sentenceId;

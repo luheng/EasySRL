@@ -1,4 +1,4 @@
-package edu.uw.easysrl.qasrl;
+package edu.uw.easysrl.qasrl.evaluation;
 
 /**
  * Siimilar to tic() toc() in Matlab...

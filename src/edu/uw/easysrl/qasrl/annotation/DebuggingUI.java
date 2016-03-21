@@ -1,15 +1,9 @@
 package edu.uw.easysrl.qasrl.annotation;
 
-import edu.uw.easysrl.main.EasySRL;
 import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.main.ParsePrinter;
-import edu.uw.easysrl.main.WebDemo;
 import edu.uw.easysrl.qasrl.DataLoader;
 import edu.uw.easysrl.qasrl.Parse;
-import edu.uw.easysrl.semantics.lexicon.CompositeLexicon;
-import edu.uw.easysrl.syntax.parser.SRLParser;
-import edu.uw.easysrl.syntax.tagger.POSTagger;
-import edu.uw.easysrl.util.Util;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.handler.AbstractHandler;
@@ -17,12 +11,10 @@ import org.eclipse.jetty.server.handler.AbstractHandler;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**

@@ -3,6 +3,7 @@ package edu.uw.easysrl.qasrl.annotation;
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.qasrl.qg.RawQuestionAnswerPair;
+import edu.uw.easysrl.qasrl.Parse;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 

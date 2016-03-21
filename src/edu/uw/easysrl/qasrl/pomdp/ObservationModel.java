@@ -1,15 +1,15 @@
 package edu.uw.easysrl.qasrl.pomdp;
 
 import edu.uw.easysrl.qasrl.*;
-import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.qasrl.query.ScoredQuery;
+import edu.uw.easysrl.qasrl.Parse;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Created by luheng on 2/27/16.
  */
+@Deprecated
 public class ObservationModel {
     final double fixedErrorRate = 0.0;
 
@@ -22,7 +22,7 @@ public class ObservationModel {
     /**
      * Training an observation model from annotations.
      */
-    public ObservationModel(List<GroupedQuery> queries, List<Parse> goldParses, ResponseSimulator userModel,
+    public ObservationModel(List<ScoredQuery> queries, List<Parse> goldParses, ResponseSimulator userModel,
                             ResponseSimulator goldModel) {
         // (0, 0, 0) adjunct questions, gold is NA and answer is "question not valid".
         // (0, 0, 1) adjunct questions, gold is NA and answer is "answer not listed".
@@ -32,7 +32,8 @@ public class ObservationModel {
         observation = new double[2][2][5];
         counts = new double[2][2];
 
-        for (GroupedQuery query : queries) {
+        /*
+        for (ScoredQuery query : queries) {
             Response userResponse = userModel.answerQuestion(query);
             if (userResponse.chosenOptions.size() == 0) {
                 continue;
@@ -87,6 +88,7 @@ public class ObservationModel {
         System.out.println("Adjunct, gold valid:\t" + counts[0][1] + "\t" + observation[0][1][0] + "\t" + observation[0][1][1] + "\t" + observation[0][1][2] + "\t" + observation[0][1][3]);
         System.out.println("Core, gold NA:\t"       + counts[1][0] + "\t" + observation[1][0][0] + "\t" + observation[1][0][1] + "\t" + observation[1][0][2] + "\t" + observation[1][0][3]);
         System.out.println("Core, gold valid:\t"    + counts[1][1] + "\t" + observation[1][1][0] + "\t" + observation[1][1][1] + "\t" + observation[1][1][2] + "\t" + observation[1][1][3]);
+        */
     }
 
     public ObservationModel(ObservationModel baseModel) {
@@ -108,7 +110,8 @@ public class ObservationModel {
      * @param parse
      * @return
      */
-    public double getObservationProbability(GroupedQuery query, Response response, int parseId, Parse parse) {
+    public double getObservationProbability(ScoredQuery query, Response response, int parseId, Parse parse) {
+        /*
         int user = response.chosenOptions.get(0);
         GroupedQuery.AnswerOption userOption = query.getAnswerOptions().get(user);
         if (observation == null) {
@@ -163,14 +166,13 @@ public class ObservationModel {
                 if (K <= 0) {
                     K = 1;
                 }
-                /* if (numOtherOptions > 2) {
-                    System.out.println(query.getDebuggingInfo(response));
-                }
-                */
+
                 //System.out.println("Num other:\t" + K);
                 return observation[questionType][parseType][4] / K;
             }
         }
+        */
+        return 1.0;
     }
 
     /**

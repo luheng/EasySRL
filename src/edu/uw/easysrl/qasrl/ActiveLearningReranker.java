@@ -2,14 +2,11 @@ package edu.uw.easysrl.qasrl;
 
 import edu.uw.easysrl.main.EasySRL;
 import edu.uw.easysrl.main.InputReader.InputWord;
-import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
-import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
+import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
-import edu.uw.easysrl.dependencies.ResolvedDependency;
 
 import gnu.trove.map.hash.TIntIntHashMap;
-import gnu.trove.map.hash.TObjectIntHashMap;
 import uk.co.flamingpenguin.jewel.cli.CliFactory;
 
 import java.util.*;

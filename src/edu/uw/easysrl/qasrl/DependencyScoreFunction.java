@@ -9,6 +9,7 @@ import java.util.List;
 /**
  * Created by luheng on 2/10/16.
  */
+@Deprecated
 public class DependencyScoreFunction {
     TObjectDoubleHashMap<String> labeledDependencyFunction;
     TObjectDoubleHashMap<String> unlabeledDependencyFunction;

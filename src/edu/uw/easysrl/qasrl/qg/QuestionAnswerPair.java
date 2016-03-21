@@ -1,9 +1,7 @@
 package edu.uw.easysrl.qasrl.qg;
 
 import java.util.List;
-import java.util.HashSet;
 import java.util.Set;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 import edu.uw.easysrl.qasrl.Parse;

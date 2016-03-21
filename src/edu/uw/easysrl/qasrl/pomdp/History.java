@@ -2,6 +2,7 @@ package edu.uw.easysrl.qasrl.pomdp;
 
 import edu.uw.easysrl.qasrl.GroupedQuery;
 import edu.uw.easysrl.qasrl.Response;
+import edu.uw.easysrl.qasrl.query.ScoredQuery;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -13,7 +14,7 @@ import java.util.Set;
  * Created by luheng on 2/27/16.
  */
 public class History {
-    List<GroupedQuery> queries;
+    List<ScoredQuery> queries;
     List<Response> responses;
     Set<Integer> playedQueryIds;
 
@@ -23,7 +24,7 @@ public class History {
         playedQueryIds = new HashSet<>();
     }
 
-    public void addAction(GroupedQuery query) {
+    public void addAction(ScoredQuery query) {
         queries.add(query);
         playedQueryIds.add(query.getQueryId());
     }
@@ -32,7 +33,7 @@ public class History {
         responses.add(response);
     }
 
-    public GroupedQuery getLastAction() {
+    public ScoredQuery getLastAction() {
         return queries.get(length() - 1);
     }
 
