@@ -59,7 +59,6 @@ public class QueryGenerators {
                     List<String> options = qaList
                             .stream()
                             .map(QA::getAnswer)
-                            .distinct()
                             .collect(toList());
                     options.add(kBadQuestionOptionString);
                     return new ScoredQuery<>(sentenceId,
@@ -85,7 +84,6 @@ public class QueryGenerators {
                     List<String> options = qaList
                             .stream()
                             .map(QA::getAnswer)
-                            .distinct()
                             .collect(toList());
                     options.add(kUnlistedAnswerOptionString);
                     options.add(kBadQuestionOptionString);
@@ -94,7 +92,7 @@ public class QueryGenerators {
                             ImmutableList.copyOf(options),
                             ImmutableList.copyOf(qaList),
                             false, /* is jeopardy style */
-                            true /* allow multiple */);
+                            false /* allow multiple */);
                 }).collect(toImmutableList());
     }
 

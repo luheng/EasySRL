@@ -4,9 +4,12 @@ import com.google.common.collect.ImmutableMap;
 
 import com.google.common.collect.ImmutableSet;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
+import edu.uw.easysrl.qasrl.qg.IQuestionAnswerPair;
+import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.stream.Collectors;
 
 /**
@@ -38,5 +41,23 @@ public class QuestionStructure {
                 */
         this.parseIds = parseIds;
         this.score = score;
+    }
+
+    /**
+     * For convenience.
+     * @param qaList: Q/A pairs sharing the same question structure.
+     */
+    public QuestionStructure(final List<IQuestionAnswerPair> qaList) {
+        this.predicateIndex = qaList.get(0).getPredicateIndex();
+        this.category = qaList.get(0).getPredicateCategory();
+        this.targetArgNum = qaList.get(0).getArgumentNumber();
+        // TODO: fix illegal access error
+        /*
+        this.otherDependencies = ImmutableMap.copyOf(otherDeps.stream()
+                .filter(dep -> dep.getHead() == predId && dep.getArgNumber() != argNum)
+                .collect(Collectors.toMap(ResolvedDependency::getArgNumber, ResolvedDependency::getArgument)));
+                */
+        this.parseIds = QAPairAggregatorUtils.getParseIds(qaList);
+        this.score = QAPairAggregatorUtils.getScore(qaList);
     }
 }

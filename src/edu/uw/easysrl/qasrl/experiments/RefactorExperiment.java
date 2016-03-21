@@ -45,9 +45,13 @@ public class RefactorExperiment {
             NBestList nBestList = new NBestList(ImmutableList.copyOf(nbestParses));
             ImmutableList<IQuestionAnswerPair> qaPairs1 = QuestionGenerator
                     .generateAllQAPairs(i, sentences.get(i), nBestList);
-            ImmutableList<QAStructureSurfaceForm> qaPairs2 = QAPairAggregators.aggregateForMultipleChoiceQA().aggregate(qaPairs1);
+
+            //ImmutableList<QAStructureSurfaceForm> qaPairs2 = QAPairAggregators.aggregateForMultipleChoiceQA().aggregate(qaPairs1);
             //ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList = QueryGenerators.checkboxQueryAggregator().generate(qaPairs2);
+
+            ImmutableList<QAStructureSurfaceForm> qaPairs2 = QAPairAggregators.aggregateForSingleChoiceQA().aggregate(qaPairs1);
             ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList = QueryGenerators.radioButtonQueryAggregator().generate(qaPairs2);
+
             queryList.forEach(query -> query.computeScores(nBestList));
             queryList.forEach(query -> {
                 System.out.println(query.toString(sentence) + "\n");

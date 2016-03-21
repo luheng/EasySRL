@@ -112,10 +112,10 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
         final Category category  = questionKeys.get(0).predicateCategory;
         final int argumentNumber = questionKeys.get(0).argumentNumber;
 
-        result += sentence.stream().collect(Collectors.joining(" ")) + "\n";
+        result += String.format("SID=%d\t%s\n", sentenceId, sentence.stream().collect(Collectors.joining(" ")));
         result += String.format("%d:%s\t%s\t%d\n", predicateIndex, sentence.get(predicateIndex), category, argumentNumber);
 
-        System.out.println(String.format("%.2f\t%s", promptScore, prompt));
+        result += String.format("%.2f\t%s\n", promptScore, prompt);
 
         for (int i = 0; i < options.size(); i++) {
             String optionString = "";
