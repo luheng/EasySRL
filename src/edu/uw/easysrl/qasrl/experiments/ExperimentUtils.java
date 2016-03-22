@@ -1,9 +1,20 @@
 package edu.uw.easysrl.qasrl.experiments;
 
+import com.google.common.collect.ImmutableList;
+import edu.uw.easysrl.main.InputReader;
+import edu.uw.easysrl.qasrl.BaseCcgParser;
+import edu.uw.easysrl.qasrl.NBestList;
+import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
 import edu.uw.easysrl.qasrl.annotation.CrowdFlowerDataReader;
+import edu.uw.easysrl.qasrl.qg.IQuestionAnswerPair;
+import edu.uw.easysrl.qasrl.qg.QAPairAggregators;
+import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
+import edu.uw.easysrl.qasrl.query.QueryGenerators;
+import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
+import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -14,7 +25,7 @@ import java.util.Map;
 /**
  * Created by luheng on 3/21/16.
  */
-class ExperimentUtils {
+public class ExperimentUtils {
 
     static class DebugBlock {
         double deltaF1;
@@ -23,6 +34,55 @@ class ExperimentUtils {
             this.deltaF1 = deltaF1;
             this.block = block;
         }
+    }
+
+    public static ImmutableList<ScoredQuery<QAStructureSurfaceForm>> generateAllRadioButtonQueries(
+            final int sentenceId,
+            final ImmutableList<String> sentence,
+            final NBestList nBestList,
+            final QueryPruningParameters queryPruningParameters) {
+        final ImmutableList<IQuestionAnswerPair> rawQAPairs = QuestionGenerator
+                .generateAllQAPairs(sentenceId, sentence, nBestList);
+        final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> rawQueryList =
+                QueryGenerators.radioButtonQueryAggregator()
+                                .generate(QAPairAggregators.aggregateForSingleChoiceQA()
+                                        .aggregate(rawQAPairs));
+        return rawQueryList.stream()
+                .filter(query -> {
+                    query.computeScores(nBestList);
+                    return (query.getPromptScore() > queryPruningParameters.minQuestionConfidence) &&
+                            !(queryPruningParameters.filterBinary && query.getOptions().size() <= 3);
+                })
+                .collect(GuavaCollectors.toImmutableList());
+    }
+
+    public static ImmutableList<ScoredQuery<QAStructureSurfaceForm>> generateAllCheckboxQueries(
+            final int sentenceId,
+            final ImmutableList<String> sentence,
+            final NBestList nBestList,
+            final QueryPruningParameters queryPruningParameters) {
+        final ImmutableList<IQuestionAnswerPair> rawQAPairs = QuestionGenerator
+                .generateAllQAPairs(sentenceId, sentence, nBestList);
+        final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> rawQueryList =
+                QueryGenerators.checkboxQueryAggregator()
+                                .generate(QAPairAggregators.aggregateForMultipleChoiceQA()
+                                        .aggregate(rawQAPairs));
+        return rawQueryList.stream()
+                .filter(query -> {
+                    query.computeScores(nBestList);
+                    return (query.getPromptScore() > queryPruningParameters.minQuestionConfidence) &&
+                            !(queryPruningParameters.filterBinary && query.getOptions().size() <= 2);
+                })
+                .collect(GuavaCollectors.toImmutableList());
+    }
+
+    public static NBestList getNBestList(final BaseCcgParser parser, int sentenceId,
+                                         final List<InputReader.InputWord> inputSentence) {
+        List<Parse> nbestParses = parser.parseNBest(sentenceId, inputSentence);
+        if (nbestParses == null) {
+            return null;
+        }
+        return new NBestList(ImmutableList.copyOf(nbestParses));
     }
 
     static Map<Integer, List<AlignedAnnotation>> loadData(String[] fileNames) {

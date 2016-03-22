@@ -10,6 +10,8 @@ public class QueryPruningParameters {
     public double minAnswerConfidence = 0.01;
     public double minAnswerEntropy = 0.1;
 
+    public boolean filterBinary = true;
+
     public QueryPruningParameters() {
     }
 

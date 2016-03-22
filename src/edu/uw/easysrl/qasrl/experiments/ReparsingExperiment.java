@@ -115,11 +115,10 @@ public class ReparsingExperiment {
 
         List<DebugBlock> debugging = new ArrayList<>();
         for (int sentenceId : sentenceIds) {
-            List<Parse> nbestParses = parser.parseNBest(sentenceId, inputSentences.get(sentenceId));
-            if (nbestParses == null) {
+            final NBestList nBestList = ExperimentUtils.getNBestList(parser, sentenceId, inputSentences.get(sentenceId));
+            if (nBestList == null) {
                 continue;
             }
-            final NBestList nBestList = new NBestList(ImmutableList.copyOf(nbestParses));
             final List<AlignedAnnotation> annotated = annotations.get(sentenceId);
             boolean isRadioButtonVersion = annotated.stream()
                     .anyMatch(annot -> annot.answerOptions.stream()

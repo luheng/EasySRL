@@ -5,6 +5,7 @@ import edu.uw.easysrl.qasrl.qg.RawQuestionAnswerPair;
 
 import java.util.*;
 
+@Deprecated
 public abstract class MultiQuery {
 
     public final int sentenceId;

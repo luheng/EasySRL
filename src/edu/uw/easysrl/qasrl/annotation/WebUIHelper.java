@@ -32,20 +32,20 @@ public class WebUIHelper {
 
     public static String printInstructions() {
         return "<div class=\"row col-xs-12 col-md-12\"><!-- Instructions -->"
-        + "<div class=\"panel panel-default\">"
-        + "<div class=\"panel-heading\"> <h3 class=\"panel-title\"> Instructions </h3></div>"
-        + "<div class=\"panel-body\"><ul>"
-        + "<li>Before answering the question, please read the sentence and make sure you understand the sentence correctly.</li>"
-        + "<li>Choose the best answer for the given question. </li>"
-        + "</ul></div></div> ";
+                + "<div class=\"panel panel-default\">"
+                + "<div class=\"panel-heading\"> <h3 class=\"panel-title\"> Instructions </h3></div>"
+                + "<div class=\"panel-body\"><ul>"
+                + "<li>Before answering the question, please read the sentence and make sure you understand the sentence correctly.</li>"
+                + "<li>Choose the best answer for the given question. </li>"
+                + "</ul></div></div> ";
     }
 
     public static String printProgressBar(int numAnswered, int numSkipped, int numTotal) {
-        int w1 = (int) Math.ceil(1.0 * numAnswered / numTotal);
-        int w2 = (int) Math.ceil(1.0 * numSkipped / numTotal);
+        int w1 = (int) Math.ceil(100.0 * numAnswered / numTotal);
+        int w2 = (int) Math.ceil(100.0 * numSkipped / numTotal);
 
         return String.format("<span class=\"label label-info\" for=\"progress\">%d annotated. %d skipped. %d remaining.</span>\n",
-                        numAnswered, numSkipped, numTotal - numAnswered - numSkipped)
+                numAnswered, numSkipped, numTotal - numAnswered - numSkipped)
                 + "<div class=\"progress\" id=\"progress\">"
                 + String.format("<div class=\"progress-bar progress-bar-success\" style=\"width: %d%%\">", w1)
                 + String.format("<span class=\"sr-only\">%d Annotated</span>", numAnswered)
@@ -66,7 +66,7 @@ public class WebUIHelper {
 
     public static String printDebuggingInfo(final ActiveLearningHistory history) {
         String result = "<button type=\"button\" class=\"btn btn-info\" data-toggle=\"collapse\" data-target=\"#debugging\">Debug Last Query</button>"
-                        + "<div id=\"debugging\" class=\"collapse\">";
+                + "<div id=\"debugging\" class=\"collapse\">";
         result += "<p>" + history.printLatestHistory().replace("\n", "<br>").replace("\t", "&nbsp&nbsp") + "</p>";
         result += "</div>";
         return result;
@@ -76,8 +76,8 @@ public class WebUIHelper {
         String result = "<button type=\"button\" class=\"btn btn-info\" data-toggle=\"collapse\" data-target=\"#debugsent\">Debug Sentences</button>"
                 + "<div id=\"debugsent\" class=\"collapse\">";
         result += "<table class=\"table\">\n<thead>\n<tr>\n" +
-                    "<th>SID</th>\n<th>#Q</th>\n<th>Acc.</th>\n<th>1-Best</th>\n<th>Re-Rank</th>\n<th>Oracle</th>\n" +
-                    "</tr>\n</thead>\n" + "<tbody>\n";
+                "<th>SID</th>\n<th>#Q</th>\n<th>Acc.</th>\n<th>1-Best</th>\n<th>Re-Rank</th>\n<th>Oracle</th>\n" +
+                "</tr>\n</thead>\n" + "<tbody>\n";
         for (int sentId : history.sentenceIds) {
             int numAnnotated = history.numQueriesPerSentence.get(sentId);
             int numCorrect = history.numCorrectPerSentence.get(sentId);
