@@ -59,7 +59,7 @@ public class CrowdFlowerDataReader {
             if (annotation.answerIds.size() == 0) {
                 System.err.print("Unannotated:\t" + record);
             }
-            annotation.goldAnswerIds = ImmutableList.of(-1);
+            annotation.goldAnswerIds = null; /* no gold */
             annotation.comment = record.get("comment");
 
             // Crowdflower stuff

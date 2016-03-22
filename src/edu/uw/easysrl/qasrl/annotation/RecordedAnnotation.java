@@ -131,8 +131,8 @@ public class RecordedAnnotation {
                 && argumentNumber == other.argumentNumber
                 && question.equalsIgnoreCase(other.question)
                 && optionStrings.size() == other.optionStrings.size()
-                && goldAnswerIds.containsAll(other.goldAnswerIds)
-                && other.goldAnswerIds.containsAll(goldAnswerIds);
+                && (goldAnswerIds == null || (goldAnswerIds.containsAll(other.goldAnswerIds)
+                                                && other.goldAnswerIds.containsAll(goldAnswerIds)));
     }
 
     @Override

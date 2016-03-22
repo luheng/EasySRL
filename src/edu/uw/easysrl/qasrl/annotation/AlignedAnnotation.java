@@ -110,7 +110,7 @@ public class AlignedAnnotation extends RecordedAnnotation {
             for (int j = 0; j < answerDist[i]; j++) {
                 match += "*";
             }
-            if (goldAnswerIds.contains(i)) {
+            if (goldAnswerIds != null && goldAnswerIds.contains(i)) {
                 match += "G";
             }
             result += String.format("%-8s\t%d\t%s\n", match, i, optionStrings.get(i));

@@ -1,12 +1,10 @@
 package edu.uw.easysrl.qasrl.annotation;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.experiments.DebugPrinter;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
-import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.QueryGenerators;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
@@ -21,8 +19,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.IntBinaryOperator;
-import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
 /**
@@ -132,6 +128,7 @@ public class CrowdFlowerDataWriter {
                                 queryPruningParameters);
                 final NBestList nbestList = nbestLists.get(sentenceId);
                 final int oracleId = nbestList.getOracleId();
+                nbestList.cacheResults(parseData.getGoldParses().get(sentenceId));
 
                 // Print query to .csv file.
                 if (r == 0 && annotatedSentences.size() < maxNumSentences) {
@@ -144,7 +141,7 @@ public class CrowdFlowerDataWriter {
                         // Create a new CSV file.
                         if (numSentences < maxNumSentences) {
                             csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter(
-                                    String.format("%s_%03d.csv", csvOutputFilePrefix, fileCounter))),
+                                    String.format("%s_%03d.csv", csvOutputFilePrefix, fileCounter.get()))),
                                     CSVFormat.EXCEL.withRecordSeparator("\n"));
                             csvPrinter.printRecord((Object[]) csvHeader);
                             fileCounter.getAndIncrement();
@@ -282,19 +279,18 @@ public class CrowdFlowerDataWriter {
                 if (query.getPredicateId().getAsInt() == test.predicateId &&
                         query.getPrompt().equalsIgnoreCase(test.question)) {
                     final ImmutableList<String> options = query.getOptions();
-                    final ImmutableList<Integer> goldOptionIds = goldSimulator.respondToQuery(query);
-                    final ImmutableList<String> goldOptions = goldOptionIds.stream()
-                            .map(options::get)
-                            .collect(GuavaCollectors.toImmutableList());
+                    final int goldOptionId = goldSimulator.respondToQuery(query).get(0);
+                    final String goldOptionStr = options.get(goldOptionId);
 
-                    boolean agreedMatchesGold = goldOptions.contains(agreedAnswer) ||
-                            (goldOptions.contains(QueryGenerators.kBadQuestionOptionString) &&
+                    boolean agreedMatchesGold = goldOptionStr.equalsIgnoreCase(agreedAnswer) ||
+                            (goldOptionStr.equals(QueryGenerators.kBadQuestionOptionString) &&
                                     agreedAnswer.startsWith("Question is not"));
                     if (agreedMatchesGold) {
-                        printQueryToCSVFile(query, goldOptionIds, 10000 + numTestQuestions /* lineCounter */, csvPrinter);
+                        printQueryToCSVFile(query, ImmutableList.of(goldOptionId),
+                                10000 + numTestQuestions /* lineCounter */, csvPrinter);
                         numTestQuestions ++;
                     } else {
-                        System.err.println(test.toString() + "---\n" + query.toString(sentence));
+                        System.err.println(test.toString() + "---\n" + query.toString(sentence) + "---\n" + goldOptionStr);
                     }
                 }
             }

@@ -3,6 +3,7 @@ package edu.uw.easysrl.qasrl.query;
 import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.qasrl.experiments.DebugPrinter;
 import edu.uw.easysrl.qasrl.NBestList;
+import edu.uw.easysrl.qasrl.qg.IQuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QuestionKey;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.syntax.grammar.Category;
@@ -162,7 +163,6 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
 
         result += String.format("SID=%d\t%s\n", sentenceId, sentence.stream().collect(Collectors.joining(" ")));
         result += String.format("%d:%s\t%s\t%d\n", predicateIndex, sentence.get(predicateIndex), category, argumentNumber);
-
         result += String.format("%.2f\t%s\n", promptScore, prompt);
 
         for (int i = 0; i < options.size(); i++) {
@@ -173,6 +173,11 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
                 String argIdsStr = argList.stream().map(String::valueOf).collect(Collectors.joining(","));
                 String argHeadsStr = argList.stream().map(sentence::get).collect(Collectors.joining(","));
                 String parseIdsStr = DebugPrinter.getShortListString(qa.getAnswerStructures().get(0).parseIds);
+
+                /*String allArgIdsStr = qa.getQAPairs().stream().map(IQuestionAnswerPair::getArgumentIndex)
+                        .distinct()
+                        .map(String::valueOf)
+                        .collect(Collectors.joining(","));*/
                 optionString += String.format("%.2f\t%d\t%s\t%s:%s\t%s", optionScores.get(i), i, options.get(i),
                         argIdsStr, argHeadsStr,  parseIdsStr);
             } else {

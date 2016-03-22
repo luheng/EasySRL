@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.Ints;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
+import edu.uw.easysrl.qasrl.experiments.DebugPrinter;
 import edu.uw.easysrl.qasrl.qg.*;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAPairSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
@@ -122,12 +123,16 @@ public class ResponseSimulatorGold extends ResponseSimulator {
          Set<Integer> chosenOptions = new HashSet<>();
          if (!query.isJeopardyStyle()) {
              final ImmutableList<QAPairSurfaceForm> qaOptions = query.getQAPairSurfaceForms();
-             final int predicateId = query.getPredicateId().getAsInt();
+             // The gold considers labeled dependency. If the dependency labels don't match, gold outputs "bad question".
+             // So the gold outputs "bad question" in case of dropped pp argument.
              final ImmutableSet<Integer> goldArgIds = goldParse.dependencies.stream()
-                     .filter(dep -> dep.getHead() == predicateId)
+                     .filter(dep -> dep.getHead() == query.getPredicateId().getAsInt()
+                             && dep.getCategory() == query.getPredicateCategory().get()
+                             && dep.getArgNumber() == query.getArgumentNumber().getAsInt())
                      .map(ResolvedDependency::getArgument)
                      .distinct()
                      .collect(GuavaCollectors.toImmutableSet());
+             // Checkbox version.
              if (query.allowMultipleChoices()) {
                  IntStream.range(0, qaOptions.size())
                          .filter(optionId -> {
@@ -135,14 +140,16 @@ public class ResponseSimulatorGold extends ResponseSimulator {
                              return goldArgIds.contains(argId);
                          })
                          .forEach(chosenOptions::add);
-             } else {
+             }
+             // Radio Button version.
+             else {
                  IntStream.range(0, qaOptions.size())
                          .filter(optionId -> {
-                                     final ImmutableList<Integer> argIds = qaOptions.get(optionId).getQAPairs().stream()
+                                     final ImmutableSet<Integer> argIds = qaOptions.get(optionId).getQAPairs().stream()
                                              .map(IQuestionAnswerPair::getArgumentIndex)
                                              .distinct()
-                                             .collect(GuavaCollectors.toImmutableList());
-                                     return goldArgIds.containsAll(argIds);
+                                             .collect(GuavaCollectors.toImmutableSet());
+                                     return goldArgIds.containsAll(argIds) && argIds.containsAll(goldArgIds);
                                  })
                          .forEach(chosenOptions::add);
              }
