@@ -22,9 +22,6 @@ import static java.util.stream.Collectors.*;
  */
 public class QueryGenerators {
 
-    public static String kBadQuestionOptionString = "Bad question.";
-    public static String kUnlistedAnswerOptionString = "Answer is not listed.";
-
     public static <QA extends QAPairSurfaceForm> QueryGenerator<QA, Query<QA>> maximalForwardAggregator() {
         return qaPairs -> qaPairs
             .stream()
@@ -68,7 +65,7 @@ public class QueryGenerators {
                             .stream()
                             .map(QA::getAnswer)
                             .collect(toList());
-                    options.add(kBadQuestionOptionString);
+                    options.add(QueryGeneratorUtils.kBadQuestionOptionString);
 
                     return new ScoredQuery<>(sentenceId,
                                              question,
@@ -94,8 +91,8 @@ public class QueryGenerators {
                             .stream()
                             .map(QA::getAnswer)
                             .collect(toList());
-                    options.add(kUnlistedAnswerOptionString);
-                    options.add(kBadQuestionOptionString);
+                    options.add(QueryGeneratorUtils.kUnlistedAnswerOptionString);
+                    options.add(QueryGeneratorUtils.kBadQuestionOptionString);
                     return new ScoredQuery<>(sentenceId,
                             question,
                             ImmutableList.copyOf(options),

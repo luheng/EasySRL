@@ -90,14 +90,13 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
                                 .distinct()
                                 .mapToDouble(nbestList::getScore)
                                 .sum() / totalScore;
-                    } else if (options.get(i).equals(QueryGenerators.kBadQuestionOptionString)) {
+                    } else if (options.get(i).equals(QueryGeneratorUtils.kBadQuestionOptionString)) {
                         optionScore = 1.0 - promptScore;
                     }
                     return optionScore;
                 }).collect(GuavaCollectors.toImmutableList());
 
-        // TODO: compute entropy.
-
+        optionEntropy = QueryGeneratorUtils.computeEntropy(optionScores);
     }
 
     public ImmutableList<Double> getOptionScores() {
@@ -106,6 +105,10 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
 
     public double getPromptScore() {
         return promptScore;
+    }
+
+    public double getOptionEntropy() {
+        return optionEntropy;
     }
 
     public boolean isJeopardyStyle() { return isJeopardyStyle; }
@@ -131,13 +134,13 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
 
     public OptionalInt getBadQuestionOptionId() {
         return IntStream.range(0, options.size())
-                .filter(i -> options.get(i).equals(QueryGenerators.kBadQuestionOptionString))
+                .filter(i -> options.get(i).equals(QueryGeneratorUtils.kBadQuestionOptionString))
                 .findFirst();
     }
 
     public OptionalInt getUnlistedAnswerOptionId() {
         return IntStream.range(0, options.size())
-                .filter(i -> options.get(i).equals(QueryGenerators.kUnlistedAnswerOptionString))
+                .filter(i -> options.get(i).equals(QueryGeneratorUtils.kUnlistedAnswerOptionString))
                 .findFirst();
     }
 

@@ -7,6 +7,7 @@ import edu.uw.easysrl.qasrl.ResponseSimulatorGold;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
+import edu.uw.easysrl.qasrl.query.QueryGeneratorUtils;
 import edu.uw.easysrl.qasrl.query.QueryGenerators;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
@@ -99,7 +100,7 @@ public class CrowdFlowerTestQuestionGenerator {
                     if (test.answerDist[i] >= 4) {
                         // Handle inconsistency of bad question option strings.
                         agreedAnswers.add(test.answerOptions.get(i).startsWith("Question is not") ?
-                                QueryGenerators.kBadQuestionOptionString :
+                                QueryGeneratorUtils.kBadQuestionOptionString :
                                 test.answerOptions.get(i));
                         break;
                     }
