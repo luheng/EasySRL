@@ -26,20 +26,20 @@ public class QuestionGenerator {
     }
 
     @Deprecated
-    public static List<RawQuestionAnswerPair> generateAllQAPairs(int predicateIdx,
-                                                                     int argumentNumber,
-                                                                     List<String> words,
-                                                                     Parse parse) {
+    public static List<QuestionAnswerPair> generateAllQAPairs(int predicateIdx,
+                                                              int argumentNumber,
+                                                              List<String> words,
+                                                              Parse parse) {
         MultiQuestionTemplate template = new MultiQuestionTemplate(-1, -1, predicateIdx, words, parse);
         return template.getAllQAPairsForArgument(argumentNumber);
     }
 
-    public static List<RawQuestionAnswerPair> generateAllQAPairs(int sentenceId,
-                                                                     int parseId,
-                                                                     int predicateIdx,
-                                                                     int argumentNumber,
-                                                                     List<String> words,
-                                                                     Parse parse) {
+    public static List<QuestionAnswerPair> generateAllQAPairs(int sentenceId,
+                                                              int parseId,
+                                                              int predicateIdx,
+                                                              int argumentNumber,
+                                                              List<String> words,
+                                                              Parse parse) {
         MultiQuestionTemplate template = new MultiQuestionTemplate(sentenceId, parseId, predicateIdx, words, parse);
         return template.getAllQAPairsForArgument(argumentNumber);
     }

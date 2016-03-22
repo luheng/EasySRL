@@ -1,9 +1,5 @@
 package edu.uw.easysrl.qasrl.experiments;
 
-import edu.uw.easysrl.qasrl.GroupedQuery;
-import edu.uw.easysrl.qasrl.Parse;
-import edu.uw.easysrl.qasrl.Response;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;

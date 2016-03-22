@@ -2,7 +2,8 @@ package edu.uw.easysrl.qasrl.qg;
 
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
+
+import com.google.common.collect.ImmutableSet;
 
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.TextGenerationHelper;
@@ -10,27 +11,15 @@ import edu.uw.easysrl.qasrl.TextGenerationHelper.TextWithDependencies;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
 
-import static edu.uw.easysrl.util.GuavaCollectors.*;
-
-import com.google.common.collect.ImmutableSet;
-
-@Deprecated
+// Replacing the old QuestionAnswerPair.
 public class QuestionAnswerPair implements IQuestionAnswerPair {
 
     public int getSentenceId() {
-        return -1; // XXX
+        return sentenceId;
     }
 
     public int getParseId() {
-        return -1; // XXX
-    }
-
-    public int getArgumentNumber() {
-        return -1; // XXX
-    }
-
-    public int getArgumentIndex() {
-        return -1; // XXX
+        return parseId;
     }
 
     public int getPredicateIndex() {
@@ -41,21 +30,23 @@ public class QuestionAnswerPair implements IQuestionAnswerPair {
         return predicateCategory;
     }
 
+    public int getArgumentNumber() { return argumentNumber; }
+
+    public int getArgumentIndex() {
+        return targetDep.getArgumentIndex();
+    }
+
+    // TODO: store the immutable sets as fields
     public ImmutableSet<ResolvedDependency> getQuestionDependencies() {
         return ImmutableSet.copyOf(questionDeps);
     }
 
     public ResolvedDependency getTargetDependency() {
-        assert targetDeps.size() > 0
-            : "pretty sure we shouldn't have a QA pair with no target deps";
-        return targetDeps.get(0);
+        return targetDep;
     }
 
     public ImmutableSet<ResolvedDependency> getAnswerDependencies() {
-        return answerDeps
-            .stream()
-            .flatMap(x -> x.stream())
-            .collect(toImmutableSet());
+        return ImmutableSet.copyOf(answerDeps);
     }
 
     public String getQuestion() {
@@ -67,64 +58,115 @@ public class QuestionAnswerPair implements IQuestionAnswerPair {
     }
 
     public Parse getParse() {
-        return null; // XXX
+        return parse;
     }
 
     public double getParseScore() {
-        return 0.0; // XXX
+        return parse.score;
     }
+
+    private final int parseId;
+    private final int sentenceId;
+    private final Parse parse;
 
     public final int predicateIndex;
     public final Category predicateCategory;
-    public final List<ResolvedDependency> questionDeps;
+    public final int argumentNumber;
+    public final int questionMainIndex;
+    public final QuestionType questionType;
     public final List<String> question;
-    public final List<ResolvedDependency> targetDeps;
-    public final List<List<String>> answers;
-    public final List<Set<ResolvedDependency>> answerDeps;
-;
-    public final List<Integer> answerWordIndices;
-    public static final String answerDelimiter = " _AND_ ";
+    public final Set<ResolvedDependency> questionDeps;
+    public final ResolvedDependency targetDep;
+    public final List<String> answer;
+    public final Set<ResolvedDependency> answerDeps;
 
-    public QuestionAnswerPair(int predicateIndex, Category predicateCategory,
-                              List<ResolvedDependency> questionDeps, List<String> question,
-                              List<ResolvedDependency> targetDeps, List<TextWithDependencies> answers) {
+    // these are lazily loaded by the render methods
+    private String questionString = null;
+    private String answerString = null;
+
+    // questionMainIndex will be the predicate if we're asking a normal-style question,
+    // and will be the argument if we're asking a flipped-style question.
+    public QuestionAnswerPair(int sentenceId, int parseId, Parse parse,
+                              int predicateIndex, Category predicateCategory, int argumentNumber,
+                              int questionMainIndex, QuestionType questionType,
+                              Set<ResolvedDependency> questionDeps, List<String> question,
+                              ResolvedDependency targetDep, TextWithDependencies answer) {
         this.predicateIndex = predicateIndex;
         this.predicateCategory = predicateCategory;
+        this.argumentNumber = argumentNumber;
+        this.questionMainIndex = questionMainIndex;
+        this.questionType = questionType;
         this.questionDeps = questionDeps;
         this.question = question;
-        this.targetDeps = targetDeps;
-        this.answers = answers.stream()
-                .map(twd -> twd.tokens)
-                .collect(Collectors.toList());
-        this.answerDeps = answers.stream()
-                .map(twd -> twd.dependencies)
-                .collect(Collectors.toList());
-        this.answerWordIndices = answers.stream()
-                .flatMap(twd -> twd.dependencies.stream()
-                .map(ResolvedDependency::getArgumentIndex))
-                .collect(Collectors.toSet())
-                .stream()
-                .sorted()
-                .collect(Collectors.toList());
+        this.targetDep = targetDep;
+        this.answer = answer.tokens;
+        this.answerDeps = answer.dependencies;
+        this.parseId = parseId;
+        this.sentenceId = sentenceId;
+        this.parse = parse;
     }
 
     public String renderQuestion() {
-        String str = TextGenerationHelper.renderString(question);
-        if(!str.isEmpty()) {
-            str = Character.toUpperCase(str.charAt(0)) + str.substring(1);
-            return str+ "?";
-        } else {
-            return str;
+        if(questionString == null) {
+            String str = TextGenerationHelper.renderString(question);
+            if(!str.isEmpty()) {
+                str = Character.toUpperCase(str.charAt(0)) + str.substring(1) + "?";
+            }
+            questionString = str;
         }
+        return questionString;
     }
 
     public String renderAnswer() {
-        if (answers.size() == 1) {
-            return TextGenerationHelper.renderString(answers.get(0));
-        } else {
-            return answers.stream()
-                    .map(TextGenerationHelper::renderString)
-                    .collect(Collectors.joining(answerDelimiter));
+        if(answerString == null) {
+            answerString = TextGenerationHelper.renderString(answer);
+        }
+        return answerString;
+    }
+
+    // sheesh, so much effort just for a sane ADT...
+    public static interface QuestionType {}
+
+    public static class SupersenseQuestionType implements QuestionType {
+        public final MultiQuestionTemplate.Supersense supersense;
+        public SupersenseQuestionType(MultiQuestionTemplate.Supersense supersense) {
+            this.supersense = supersense;
+        }
+        public String toString() {
+            return supersense.toString();
+        }
+
+        public boolean equals(Object o) {
+            if(!(o instanceof SupersenseQuestionType)) {
+                return false;
+            } else {
+                return this.toString().equals(o.toString());
+            }
+        }
+
+        public int hashCode() {
+            return toString().hashCode();
+        }
+    }
+
+    public static class StandardQuestionType implements QuestionType {
+        public final MultiQuestionTemplate.QuestionType type;
+        public StandardQuestionType(MultiQuestionTemplate.QuestionType type) {
+            this.type = type;
+        }
+        public String toString() {
+            return type.toString();
+        }
+        public boolean equals(Object o) {
+            if(!(o instanceof StandardQuestionType)) {
+                return false;
+            } else {
+                return this.toString().equals(o.toString());
+            }
+        }
+
+        public int hashCode() {
+            return toString().hashCode();
         }
     }
 }
