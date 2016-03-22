@@ -5,21 +5,17 @@ package edu.uw.easysrl.qasrl.query;
  */
 public class QueryPruningParameters {
 
-    public int questionSurfaceFormTopK = 3;
+    public int questionSurfaceFormTopK = 1;
     public double minQuestionConfidence = 0.1;
-    public double minAnswerConfidence = 0.01;
-    public double minAnswerEntropy = 0.1;
+    public double minAnswerConfidence = 0.05;
+    public double minAnswerEntropy = 0.05;
 
-    public boolean filterBinary = true;
+    private static final int maxNumOptionsPerQuestion = 8;
+
+    public boolean skipBinaryQueries = true;
+    public boolean skipPPQuestions = true;
+    public boolean skipQueriesWithPronounOptions = false;
 
     public QueryPruningParameters() {
-    }
-
-    public QueryPruningParameters(int questionSurfaceFormTopK, double minQuestionConfidence, double minAnswerConfidence,
-                                  double minAnswerEntropy) {
-        this.questionSurfaceFormTopK = questionSurfaceFormTopK;
-        this.minQuestionConfidence = minQuestionConfidence;
-        this.minAnswerEntropy = minAnswerEntropy;
-        this.minAnswerConfidence = minAnswerConfidence;
     }
 }

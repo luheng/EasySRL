@@ -1,7 +1,6 @@
 package edu.uw.easysrl.qasrl.experiments;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.BaseCcgParser;
 import edu.uw.easysrl.qasrl.NBestList;
@@ -19,7 +18,6 @@ import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.AbstractMap.SimpleEntry;
 import java.util.stream.IntStream;
 
 /**
@@ -51,7 +49,7 @@ public class ExperimentUtils {
                 .filter(query -> {
                     query.computeScores(nBestList);
                     return (query.getPromptScore() > queryPruningParameters.minQuestionConfidence) &&
-                            !(queryPruningParameters.filterBinary && query.getOptions().size() <= 3);
+                            !(queryPruningParameters.skipBinaryQueries && query.getOptions().size() <= 3);
                 })
                 .collect(GuavaCollectors.toImmutableList());
     }
@@ -71,7 +69,7 @@ public class ExperimentUtils {
                 .filter(query -> {
                     query.computeScores(nBestList);
                     return (query.getPromptScore() > queryPruningParameters.minQuestionConfidence) &&
-                            !(queryPruningParameters.filterBinary && query.getOptions().size() <= 2);
+                            !(queryPruningParameters.skipBinaryQueries && query.getOptions().size() <= 2);
                 })
                 .collect(GuavaCollectors.toImmutableList());
     }

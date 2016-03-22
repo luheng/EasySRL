@@ -4,7 +4,6 @@ import java.io.*;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import javax.servlet.ServletException;
@@ -179,14 +178,9 @@ public class WebAnnotationUI {
                 activeLearningHistoryMap.put(userName, new ArrayList<>());
 
                 // Query pruning parameters.
-                parametersMap.put(userName, new QueryPruningParameters(
-                        1,     /* top K */
-                        0.1,   /* min question confidence */
-                        0.05,  /* min answer confidence */
-                        0.05   /* min attachment entropy */
-                ));
+                parametersMap.put(userName, new QueryPruningParameters());
                 if (request.getParameter("KeepBinary") != null && !request.getParameter("KeepBinary").equals("True")) {
-                    parametersMap.get(userName).filterBinary = false;
+                    parametersMap.get(userName).skipBinaryQueries = false;
                 }
                 initializeForUserAndSentence(userName, sentIds.get(0));
             }

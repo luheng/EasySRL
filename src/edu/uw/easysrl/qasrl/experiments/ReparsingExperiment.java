@@ -42,12 +42,7 @@ public class ReparsingExperiment {
     static ImmutableList<Parse> goldParses;
 
     // Query pruning parameters.
-    private static QueryPruningParameters queryPruningParameters = new QueryPruningParameters(
-            1,     /* top K */
-            0.1,   /* min question confidence */
-            0.05,  /* min answer confidence */
-            0.05   /* min attachment entropy */
-    );
+    private static QueryPruningParameters queryPruningParameters = new QueryPruningParameters();
 
     private static final String[] annotationFiles = {
             "./Crowdflower_data/f878213.csv",

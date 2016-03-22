@@ -3,8 +3,11 @@ package edu.uw.easysrl.qasrl.query;
 import edu.uw.easysrl.qasrl.qg.surfaceform.*;
 
 import com.google.common.collect.ImmutableList;
+import edu.uw.easysrl.util.GuavaCollectors;
 
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static edu.uw.easysrl.util.GuavaCollectors.*;
 import static java.util.stream.Collectors.*;
@@ -56,15 +59,21 @@ public class QueryGenerators {
                     assert qaList.size() > 0 : "grouped list should always be nonempty";
                     final int sentenceId = e.getValue().get(0).getSentenceId();
                     final String question = e.getKey();
-                    List<String> options = qaList
+                    ImmutableList<QA> sortedQAList = qaList
+                            .stream()
+                            .sorted((qa1, qa2) -> Integer.compare(qa1.getArgumentIndices().get(0),
+                                                                  qa2.getArgumentIndices().get(0)))
+                            .collect(GuavaCollectors.toImmutableList());
+                    List<String> options = sortedQAList
                             .stream()
                             .map(QA::getAnswer)
                             .collect(toList());
                     options.add(kBadQuestionOptionString);
+
                     return new ScoredQuery<>(sentenceId,
                                              question,
                                              ImmutableList.copyOf(options),
-                                             ImmutableList.copyOf(qaList),
+                                             sortedQAList,
                                              false, /* is jeopardy style */
                                              true /* allow multiple */);
                 }).collect(toImmutableList());

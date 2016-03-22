@@ -33,30 +33,11 @@ public class CrowdFlowerDataWriter {
     static final int randomSeed = 104743;
 
     static final int countEvery = 100;
-    static final boolean skipPPQuestions = true;
-    static final boolean skipPronounQuestions = false;
-    private static boolean highlightPredicate = false;
-    private static int minAgreementForTestQuestions = 4;
 
-    // Option pruning.
-    private static final int maxNumOptionsPerQuestion = 8;
+    private static boolean isCheckboxVersion = true;
+    private static boolean highlightPredicates = false;
 
-    // Query pruning parameters.
-    private static QueryPruningParameters queryPruningParameters = new QueryPruningParameters(
-            1,    /* top K */
-            0.1,  /* min question confidence */
-            0.05, /* min answer confidence */
-            0.05  /* min attachment entropy */
-    );
-
-    // Fields for Crowdflower test questions.
-    private static final String[] csvHeader = {
-            "query_id", "question_confidence", "question_uncertainty", "sent_id", "sentence", "pred_id", "pred_head",
-            "question_key", "question", "answers", "_golden ", "choice_gold", "choice_gold_reason"};
-
-    private static final String answerDelimiter = " ### ";
-
-    private static final String cfRound1AnnotationFilePath = "./Crowdflower_data/f878213.csv";
+    private static final String[] cfRound1AnnotationFiles = new String[] { "./Crowdflower_data/f878213.csv" };
 
     private static final String csvOutputFilePrefix = "./Crowdflower_temp/crowdflower_dev_100best";
 
@@ -70,6 +51,8 @@ public class CrowdFlowerDataWriter {
     private static Map<Integer, NBestList> nbestLists;
     private static ResponseSimulatorGold goldSimulator;
 
+    private static QueryPruningParameters queryPruningParameters = new QueryPruningParameters();
+
     public static void main(String[] args) throws IOException {
         // Initialize data.
         parseData = ParseData.loadFromDevPool().get();
@@ -80,10 +63,17 @@ public class CrowdFlowerDataWriter {
         Set<Integer> heldOutSentences = new HashSet<>();
         // Print test questions.
         try {
-            printTestQuestions(heldOutSentences);
+            CrowdFlowerTestQuestionGenerator.printTestQuestions(heldOutSentences, parseData, nbestLists,
+                    new QueryPruningParameters(), goldSimulator, cfRound1AnnotationFiles,
+                    String.format("%s_test.csv", csvOutputFilePrefix),
+                    isCheckboxVersion, highlightPredicates);
         } catch (IOException e) {
             e.printStackTrace();
         }
+        for (int sid : otherHeldOutSentences) {
+            heldOutSentences.add(sid);
+        }
+
         List<double[]> avgNumQueries = new ArrayList<>(),
                 avgOptionsPerQuery = new ArrayList<>(),
                 avgNumGoldNAQueries = new ArrayList<>(),
@@ -106,7 +96,6 @@ public class CrowdFlowerDataWriter {
                 gainF1.add(new double[numRandomSamples]);
             }
         }
-        assert maxNumSentences % maxNumSentencesPerFile == 0;
         CSVPrinter csvPrinter = null;
         for (int r = 0; r < numRandomSamples; r++) {
             Collections.shuffle(sentenceIds, random);
@@ -123,8 +112,10 @@ public class CrowdFlowerDataWriter {
             // Process questions.
             for (int sentenceId : sentenceIds) {
                 final ImmutableList<String> sentence = parseData.getSentences().get(sentenceId);
-                final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries =
+                final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries = isCheckboxVersion ?
                         ExperimentUtils.generateAllCheckboxQueries(sentenceId, sentence, nbestLists.get(sentenceId),
+                                queryPruningParameters) :
+                        ExperimentUtils.generateAllRadioButtonQueries(sentenceId, sentence, nbestLists.get(sentenceId),
                                 queryPruningParameters);
                 final NBestList nbestList = nbestLists.get(sentenceId);
                 final int oracleId = nbestList.getOracleId();
@@ -143,13 +134,18 @@ public class CrowdFlowerDataWriter {
                             csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter(
                                     String.format("%s_%03d.csv", csvOutputFilePrefix, fileCounter.get()))),
                                     CSVFormat.EXCEL.withRecordSeparator("\n"));
-                            csvPrinter.printRecord((Object[]) csvHeader);
+                            csvPrinter.printRecord((Object[]) CrowdFlowerDataUtils.csvHeader);
                             fileCounter.getAndIncrement();
                         }
                     }
                     // Write query to file.
                     for (ScoredQuery<QAStructureSurfaceForm> query : queries) {
-                        printQueryToCSVFile(query, null /* gold options */, lineCounter.getAndIncrement(), csvPrinter);
+                        CrowdFlowerDataUtils.printQueryToCSVFile(query,
+                                parseData.getSentences().get(sentenceId),
+                                null /* gold options */,
+                                lineCounter.getAndIncrement(),
+                                highlightPredicates,
+                                csvPrinter);
                     }
                 }
                 // Simulation and count.
@@ -215,122 +211,6 @@ public class CrowdFlowerDataWriter {
             System.out.println(String.format("Avg. F1 gain  :\t%.3f%%\t%.3f%%",
                     getAverage(gainF1.get(k)), getStd(gainF1.get(k))));
         }
-    }
-
-    private static void printTestQuestions(Set<Integer> heldOutSentences) throws IOException {
-        // Load test questions from pilot study.
-        List<AlignedAnnotation> pilotAnnotations = AlignedAnnotation.getAllAlignedAnnotationsFromPilotStudy();
-        // Load test questions from previous annotation.
-        List<AlignedAnnotation> cfRound1Annotations = CrowdFlowerDataReader.readAggregatedAnnotationFromFile(
-                cfRound1AnnotationFilePath);
-        pilotAnnotations.stream().forEach(a -> heldOutSentences.add(a.sentenceId));
-        cfRound1Annotations.stream().forEach(a -> heldOutSentences.add(a.sentenceId));
-        for (int sid : otherHeldOutSentences) {
-            heldOutSentences.add(sid);
-        }
-        // Extract high-agreement questions from pilot study.
-        List<AlignedAnnotation> agreedAnnotations = new ArrayList<>();
-        pilotAnnotations.stream()
-                .filter(a -> {
-                    int numJudgements = a.getNumAnnotated();
-                    int numOptions = a.answerDist.length;
-                    return numOptions > 3 && numJudgements >= 3 && a.answerDist[a.goldAnswerIds.get(0)] == numJudgements;
-                })
-                .forEach(agreedAnnotations::add);
-        cfRound1Annotations.stream()
-                .filter(a -> {
-                    boolean highAgreement = false;
-                    for (int i = 0; i < a.answerDist.length; i++) {
-                        highAgreement |= (a.answerDist[i] >= 4);
-                    }
-                    return highAgreement;
-                })
-                .forEach(agreedAnnotations::add);
-        System.out.println("Number of held-out sentences:\t" + heldOutSentences.size());
-        System.out.println("Number of high-agreement annotations:\t" + agreedAnnotations.size());
-
-        // Initialize CSV printer.
-        CSVPrinter csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter(
-                String.format("%s_test.csv", csvOutputFilePrefix))), CSVFormat.EXCEL.withRecordSeparator("\n"));
-        csvPrinter.printRecord((Object[]) csvHeader);
-        // Write test questions.
-        int numTestQuestions = 0;
-        for (AlignedAnnotation test : agreedAnnotations) {
-            final int sentenceId = test.sentenceId;
-            final ImmutableList<String> sentence = parseData.getSentences().get(sentenceId);
-            String agreedAnswer = "";
-            if (test.goldAnswerIds != null) {
-                // Inconsistency of answer delimiter..
-                agreedAnswer = test.answerOptions.get(test.goldAnswerIds.get(0))
-                        .replace(" # ", QAPairAggregatorUtils.answerDelimiter);
-            } else {
-                for (int i = 0; i < test.answerOptions.size(); i++) {
-                    if (test.answerDist[i] >= minAgreementForTestQuestions) {
-                        agreedAnswer = test.answerOptions.get(i);
-                        break;
-                    }
-                }
-            }
-            for (ScoredQuery<QAStructureSurfaceForm> query : ExperimentUtils.generateAllRadioButtonQueries(
-                    sentenceId,
-                    sentence,
-                    nbestLists.get(sentenceId),
-                    queryPruningParameters)) {
-                if (query.getPredicateId().getAsInt() == test.predicateId &&
-                        query.getPrompt().equalsIgnoreCase(test.question)) {
-                    final ImmutableList<String> options = query.getOptions();
-                    final int goldOptionId = goldSimulator.respondToQuery(query).get(0);
-                    final String goldOptionStr = options.get(goldOptionId);
-
-                    boolean agreedMatchesGold = goldOptionStr.equalsIgnoreCase(agreedAnswer) ||
-                            (goldOptionStr.equals(QueryGenerators.kBadQuestionOptionString) &&
-                                    agreedAnswer.startsWith("Question is not"));
-                    if (agreedMatchesGold) {
-                        printQueryToCSVFile(query, ImmutableList.of(goldOptionId),
-                                10000 + numTestQuestions /* lineCounter */, csvPrinter);
-                        numTestQuestions ++;
-                    } else {
-                        System.err.println(test.toString() + "---\n" + query.toString(sentence) + "---\n" + goldOptionStr);
-                    }
-                }
-            }
-        }
-        System.out.println("Wrote " + numTestQuestions + " test questions to file.");
-        csvPrinter.close();
-    }
-
-    private static void printQueryToCSVFile(final ScoredQuery<QAStructureSurfaceForm> query,
-                                            ImmutableList<Integer> goldOptionIds, int lineCounter,
-                                            final CSVPrinter csvPrinter) throws IOException {
-        // Print to CSV files.
-        // "query_id", "question_confidence", "question_uncertainty", "sent_id", "sentence", "pred_id", "pred_head",
-        // "question_key", "question", "answers", "_golden ", "choice_gold", "choice_gold_reason"
-        int predicateIndex = query.getPredicateId().getAsInt();
-        int sentenceId = query.getSentenceId();
-        final List<String> sentence = parseData.getSentences().get(query.getSentenceId());
-        final String sentenceStr = TextGenerationHelper.renderHTMLSentenceString(sentence, predicateIndex, highlightPredicate);
-        final ImmutableList<String> options = query.getOptions();
-        List<String> csvRow = new ArrayList<>();
-        csvRow.add(String.valueOf(lineCounter));
-        csvRow.add(String.format("%.3f", query.getPromptScore()));
-        csvRow.add(String.format("%.3f", 0.0)); // TODO: answer entropy
-        csvRow.add(String.valueOf(sentenceId));
-        csvRow.add(String.valueOf(sentenceStr));
-        csvRow.add(String.valueOf(predicateIndex));
-        csvRow.add(sentence.get(predicateIndex));
-        csvRow.add(query.getQueryKey());
-        csvRow.add(query.getPrompt());
-        csvRow.add(options.stream().collect(Collectors.joining(answerDelimiter)));
-        if (goldOptionIds == null) {
-            csvRow.add(""); // _gold
-            csvRow.add(""); // choice_gold
-            csvRow.add(""); // choice_gold_reason
-        } else {
-            csvRow.add("TRUE");
-            csvRow.add(goldOptionIds.stream().map(options::get).collect(Collectors.joining("\n")));
-            csvRow.add("Based on high-agreement of workers.");
-        }
-        csvPrinter.printRecord(csvRow);
     }
 
     private static double getAverage(final double[] arr) {
