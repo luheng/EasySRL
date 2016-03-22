@@ -1,6 +1,5 @@
 package edu.uw.easysrl.qasrl.query;
 
-import edu.uw.easysrl.qasrl.DebugPrinter;
 import edu.uw.easysrl.qasrl.qg.surfaceform.*;
 
 import com.google.common.collect.ImmutableList;

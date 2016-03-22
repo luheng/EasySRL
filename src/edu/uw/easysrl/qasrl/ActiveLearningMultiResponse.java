@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
  * This is currently just a stand-in... doesn't actually do any reranking.
  * Created by julianmichael on 3/2/16.
  */
+@Deprecated
 public class ActiveLearningMultiResponse {
     public final List<List<InputReader.InputWord>> sentences;
     public final List<List<String>> sentencesWords;

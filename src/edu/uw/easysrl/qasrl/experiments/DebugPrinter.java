@@ -1,4 +1,8 @@
-package edu.uw.easysrl.qasrl;
+package edu.uw.easysrl.qasrl.experiments;
+
+import edu.uw.easysrl.qasrl.GroupedQuery;
+import edu.uw.easysrl.qasrl.Parse;
+import edu.uw.easysrl.qasrl.Response;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -11,20 +15,6 @@ import java.util.stream.Collectors;
  * Created by luheng on 1/17/16.
  */
 public class DebugPrinter {
-    public static void printQueryInfo(List<String> words, GroupedQuery query, int response, final Parse goldParse) {
-        System.out.println(String.format("S[%d]:\t", query.sentenceId) + words.stream()
-                .collect(Collectors.joining(" ")));
-        query.printWithGoldDependency(words, response, goldParse);
-    }
-
-    public static void printQueryInfo(List<String> words, GroupedQuery query, Response response, Response goldResponse) {
-        System.out.println(String.format("S[%d]:\t", query.sentenceId) + words.stream()
-                .collect(Collectors.joining(" ")));
-        query.print(words, response);
-        System.out.println("[gold]");
-        query.print(words, goldResponse);
-    }
-
     /**
      * Summarize a list of ids into spans for better printing.
      * @param inputList: a list of ids, i.e. 1 2 3 5 8

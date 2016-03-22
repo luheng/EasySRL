@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
  * Group questions by sentences and predicates.
  * Created by luheng on 2/1/16.
  */
+@Deprecated
 public class ActiveLearningBySentence {
     public final List<List<InputReader.InputWord>> sentences;
     public final List<Parse> goldParses;

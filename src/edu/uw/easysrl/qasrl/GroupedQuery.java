@@ -2,6 +2,7 @@ package edu.uw.easysrl.qasrl;
 
 import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
+import edu.uw.easysrl.qasrl.experiments.DebugPrinter;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.*;

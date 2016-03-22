@@ -9,6 +9,7 @@ import java.util.*;
 /**
  * Created by luheng on 2/5/16.
  */
+@Deprecated
 public class ActiveLearningHistory {
     final public List<GroupedQuery> queries;
     final public List<Response> responses, goldResponses;

@@ -1,7 +1,7 @@
 package edu.uw.easysrl.qasrl.annotation;
 
 import com.google.common.collect.ImmutableList;
-import edu.uw.easysrl.qasrl.DebugPrinter;
+import edu.uw.easysrl.qasrl.experiments.DebugPrinter;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.io.*;

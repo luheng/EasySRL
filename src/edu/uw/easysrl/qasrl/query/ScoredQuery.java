@@ -1,14 +1,13 @@
 package edu.uw.easysrl.qasrl.query;
 
 import com.google.common.collect.ImmutableList;
-import edu.uw.easysrl.qasrl.DebugPrinter;
+import edu.uw.easysrl.qasrl.experiments.DebugPrinter;
 import edu.uw.easysrl.qasrl.NBestList;
 import edu.uw.easysrl.qasrl.qg.QuestionKey;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.GuavaCollectors;
 
-import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
