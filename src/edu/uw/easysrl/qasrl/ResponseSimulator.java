@@ -1,5 +1,9 @@
 package edu.uw.easysrl.qasrl;
 
+import com.google.common.collect.ImmutableList;
+
+import edu.uw.easysrl.qasrl.query.Query;
+
 /**
  * Simulates user response to a query.
  * Created by luheng on 1/17/16.
@@ -12,5 +16,9 @@ public abstract class ResponseSimulator {
      * @return a single number from 0-(n-1), denoting the option in the query.
      *          return -1 if none of the chosenOptions are chosen.
      */
+    @Deprecated
     public abstract Response answerQuestion(GroupedQuery query);
+
+
+    public abstract ImmutableList<Integer> respondToQuery(Query query);
 }

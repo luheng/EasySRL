@@ -9,6 +9,7 @@ import java.util.List;
  * Simulated response.
  * Created by luheng on 1/29/16.
  */
+@Deprecated
 public class Response {
     public List<Integer> chosenOptions;
     public double trust = 1.0;

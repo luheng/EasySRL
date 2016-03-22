@@ -1,9 +1,5 @@
 package edu.uw.easysrl.qasrl.annotation;
 
-import edu.uw.easysrl.qasrl.ActiveLearningHistory;
-import edu.uw.easysrl.qasrl.GroupedQuery;
-import edu.uw.easysrl.qasrl.Response;
-
 /**
  * Created by luheng on 2/1/16.
  */
@@ -54,44 +50,5 @@ public class WebUIHelper {
                 + String.format("<span class=\"sr-only\">%d Skipped</span>", numSkipped)
                 + "</div>"
                 + "</div>\n</div>";
-    }
-
-    public static String printGoldInfo(final GroupedQuery query, final Response goldResponse) {
-        String result = "<button type=\"button\" class=\"btn btn-info\" data-toggle=\"collapse\" data-target=\"#goldinfo\">Sneak Peek Gold</button>"
-                + "<div id=\"goldinfo\" class=\"collapse\">";
-        result += "<p>[gold]:<br>" + query.getDebuggingInfo(goldResponse).replace("\n", "<br>").replace("\t", "&nbsp&nbsp") + "</p>";
-        result += "</div>";
-        return result;
-    }
-
-    public static String printDebuggingInfo(final ActiveLearningHistory history) {
-        String result = "<button type=\"button\" class=\"btn btn-info\" data-toggle=\"collapse\" data-target=\"#debugging\">Debug Last Query</button>"
-                + "<div id=\"debugging\" class=\"collapse\">";
-        result += "<p>" + history.printLatestHistory().replace("\n", "<br>").replace("\t", "&nbsp&nbsp") + "</p>";
-        result += "</div>";
-        return result;
-    }
-
-    public static String printSentenceDebuggingInfo(final ActiveLearningHistory history) {
-        String result = "<button type=\"button\" class=\"btn btn-info\" data-toggle=\"collapse\" data-target=\"#debugsent\">Debug Sentences</button>"
-                + "<div id=\"debugsent\" class=\"collapse\">";
-        result += "<table class=\"table\">\n<thead>\n<tr>\n" +
-                "<th>SID</th>\n<th>#Q</th>\n<th>Acc.</th>\n<th>1-Best</th>\n<th>Re-Rank</th>\n<th>Oracle</th>\n" +
-                "</tr>\n</thead>\n" + "<tbody>\n";
-        for (int sentId : history.sentenceIds) {
-            int numAnnotated = history.numQueriesPerSentence.get(sentId);
-            int numCorrect = history.numCorrectPerSentence.get(sentId);
-            double acc = numAnnotated > 0 ? 100.0 * numCorrect / numAnnotated : .0;
-            result += "<tr>\n" +
-                    "<td>" + sentId + "</td>\n" +
-                    "<td>" + numAnnotated + "</td>\n" +
-                    "<td>" + String.format("%d (%.3f%%)", numCorrect, acc) + "</td>\n" +
-                    "<td>" + String.format("%.3f", history.oneBestResults.get(sentId).getF1()) + "</td>\n" +
-                    "<td>" + String.format("%.3f", history.rerankedResults.get(sentId).getF1()) + "</td>\n" +
-                    "<td>" + String.format("%.3f", history.oracleResults.get(sentId).getF1()) + "</td>\n" +
-                    "</tr>";
-        }
-        result += "</tbody></table>\n</div>";
-        return result;
     }
 }

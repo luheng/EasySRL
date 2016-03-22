@@ -1,6 +1,7 @@
 package edu.uw.easysrl.qasrl.experiments;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.BaseCcgParser;
 import edu.uw.easysrl.qasrl.NBestList;
@@ -17,10 +18,9 @@ import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.AbstractMap.SimpleEntry;
+import java.util.stream.IntStream;
 
 /**
  * Created by luheng on 3/21/16.
@@ -85,7 +85,21 @@ public class ExperimentUtils {
         return new NBestList(ImmutableList.copyOf(nbestParses));
     }
 
-    static Map<Integer, List<AlignedAnnotation>> loadData(String[] fileNames) {
+    public static Map<Integer, NBestList> getAllNBestLists(
+            final BaseCcgParser parser,
+            final ImmutableList<ImmutableList<InputReader.InputWord>> inputSentence) {
+        Map<Integer, NBestList> allParses = new HashMap<>();
+        IntStream.range(0, inputSentence.size()).boxed()
+                .forEach(sentenceId -> {
+                    List<Parse> nbestParses = parser.parseNBest(sentenceId, inputSentence.get(sentenceId));
+                    if (nbestParses != null) {
+                        allParses.put(sentenceId, new NBestList(ImmutableList.copyOf(nbestParses)));
+                    }
+                });
+        return allParses;
+    }
+
+    static Map<Integer, List<AlignedAnnotation>> loadCrowdflowerAnnotation(String[] fileNames) {
         Map<Integer, List<AlignedAnnotation>> sentenceToAnnotations;
         List<AlignedAnnotation> annotationList = new ArrayList<>();
         try {

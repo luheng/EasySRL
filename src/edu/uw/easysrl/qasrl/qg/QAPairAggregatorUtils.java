@@ -1,6 +1,5 @@
 package edu.uw.easysrl.qasrl.qg;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import edu.uw.easysrl.qasrl.qg.syntax.AnswerStructure;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
@@ -8,7 +7,6 @@ import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
 import java.util.AbstractMap;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.List;
 
 import static edu.uw.easysrl.util.GuavaCollectors.*;
 import static java.util.stream.Collectors.*;

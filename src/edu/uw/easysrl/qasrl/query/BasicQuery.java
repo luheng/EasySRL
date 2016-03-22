@@ -5,7 +5,10 @@ import edu.uw.easysrl.qasrl.qg.surfaceform.*;
 import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.syntax.grammar.Category;
 
+import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * Most basic implementation of the QAPairSurfaceForm interface;
@@ -58,6 +61,30 @@ public class BasicQuery<QA extends QAPairSurfaceForm> implements Query<QA> {
 
     public boolean allowMultipleChoices() {
         return allowMultipleChoices;
+    }
+
+    public OptionalInt getBadQuestionOptionId() {
+        return IntStream.range(0, options.size())
+                .filter(i -> options.get(i).equals(QueryGenerators.kBadQuestionOptionString))
+                .findFirst();
+    }
+
+    public OptionalInt getUnlistedAnswerOptionId() {
+        return IntStream.range(0, options.size())
+                .filter(i -> options.get(i).equals(QueryGenerators.kUnlistedAnswerOptionString))
+                .findFirst();
+    }
+
+    public OptionalInt getPredicateId() {
+        return OptionalInt.empty();
+    }
+
+    public Optional<Category> getPredicateCategory() {
+        return Optional.empty();
+    }
+
+    public OptionalInt getArgumentNumber() {
+        return OptionalInt.empty();
     }
 
     public String getQueryKey() {

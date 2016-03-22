@@ -52,12 +52,11 @@ public abstract class BaseCcgParser {
     private static void initializeFilter() {
         badDependenciesSet = new HashSet<>();
         badDependenciesSet.addAll(Arrays.asList(dependencyFilter));
-        CountDictionary dependencyDict = new CountDictionary();
-        List<List<InputReader.InputWord>> sentences = new ArrayList<>();
-        List<Parse> goldParses = new ArrayList<>();
-        DataLoader.readTrainingPool(sentences, goldParses);
-        goldParses.forEach(parse -> parse.dependencies.forEach(dep ->
-                dependencyDict.addString(dep.getCategory() + "." + dep.getArgNumber())));
+        final CountDictionary dependencyDict = new CountDictionary();
+        final ParseData parseData = ParseData.loadFromTrainingPool().get();
+        parseData.getGoldParses()
+                .forEach(parse -> parse.dependencies
+                        .forEach(dep -> dependencyDict.addString(dep.getCategory() + "." + dep.getArgNumber())));
         frequentDependenciesSet = IntStream.range(0, dependencyDict.size())
                 .filter(i -> dependencyDict.getCount(i) >= minDependencyCount)
                 .mapToObj(dependencyDict::getString)

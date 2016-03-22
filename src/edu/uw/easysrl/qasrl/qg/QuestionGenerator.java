@@ -54,13 +54,15 @@ public class QuestionGenerator {
         return template.getAllQAPairsForArgument(argumentNumber);
     }
 
-    public static ImmutableList<IQuestionAnswerPair> generateAllQAPairs(int sentenceId, int parseId,
-                                                                        ImmutableList<String> words, Parse parse) {
+    public static ImmutableList<IQuestionAnswerPair> generateAllQAPairs(int sentenceId, ImmutableList<String> words,
+                                                                        int parseId, Parse parse) {
         return IntStream.range(0, words.size())
             .mapToObj(Integer::new)
             .flatMap(predIndex -> IntStream.range(1, parse.categories.get(predIndex).getNumberOfArguments() + 1)
                     .mapToObj(Integer::new)
-                    .flatMap(argNum -> QuestionGenerator.generateAllQAPairs(sentenceId, parseId, predIndex, argNum, words, parse).stream()))
+                    .flatMap(argNum -> QuestionGenerator
+                            .generateAllQAPairs(sentenceId, parseId, predIndex, argNum, words, parse)
+                            .stream()))
             .collect(toImmutableList());
     }
 

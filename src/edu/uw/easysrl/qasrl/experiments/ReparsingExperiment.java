@@ -82,7 +82,7 @@ public class ReparsingExperiment {
         parser = new BaseCcgParser.MockParser(preparsedFile, nBest);
         System.err.println("Parse initialized.");
 
-        annotations = ExperimentUtils.loadData(annotationFiles);
+        annotations = ExperimentUtils.loadCrowdflowerAnnotation(annotationFiles);
         assert annotations != null;
         // Re-parsing!
         reparser = new BaseCcgParser.ConstrainedCcgParser(BaseCcgParser.modelFolder, BaseCcgParser.rootCategories,

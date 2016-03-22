@@ -8,6 +8,8 @@ import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.GuavaCollectors;
 
+import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -125,6 +127,31 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
                 qaPairSurfaceForms.get(0).getArgumentIndices().stream().map(String::valueOf)
                         .collect(Collectors.joining(",")) + "\t" + prompt;
     }
+
+    public OptionalInt getBadQuestionOptionId() {
+        return IntStream.range(0, options.size())
+                .filter(i -> options.get(i).equals(QueryGenerators.kBadQuestionOptionString))
+                .findFirst();
+    }
+
+    public OptionalInt getUnlistedAnswerOptionId() {
+        return IntStream.range(0, options.size())
+                .filter(i -> options.get(i).equals(QueryGenerators.kUnlistedAnswerOptionString))
+                .findFirst();
+    }
+
+    public OptionalInt getPredicateId() {
+        return isJeopardyStyle ? OptionalInt.empty() : OptionalInt.of(qaPairSurfaceForms.get(0).getPredicateIndex());
+    }
+
+    public Optional<Category> getPredicateCategory() {
+        return isJeopardyStyle ? Optional.empty() : Optional.of(qaPairSurfaceForms.get(0).getCategory());
+    }
+
+    public OptionalInt getArgumentNumber() {
+        return isJeopardyStyle ? OptionalInt.empty() : OptionalInt.of(qaPairSurfaceForms.get(0).getArgumentNumber());
+    }
+
 
     public String toString(final ImmutableList<String> sentence) {
         // TODO: handle jeopardy style.
