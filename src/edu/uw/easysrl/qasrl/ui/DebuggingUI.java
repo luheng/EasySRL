@@ -1,4 +1,4 @@
-package edu.uw.easysrl.qasrl.annotation;
+package edu.uw.easysrl.qasrl.ui;
 
 import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.main.InputReader;

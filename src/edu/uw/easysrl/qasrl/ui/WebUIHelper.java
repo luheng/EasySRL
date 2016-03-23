@@ -1,4 +1,4 @@
-package edu.uw.easysrl.qasrl.annotation;
+package edu.uw.easysrl.qasrl.ui;
 
 /**
  * Created by luheng on 2/1/16.

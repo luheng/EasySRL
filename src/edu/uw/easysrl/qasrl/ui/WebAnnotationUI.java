@@ -1,4 +1,4 @@
-package edu.uw.easysrl.qasrl.annotation;
+package edu.uw.easysrl.qasrl.ui;
 
 import java.io.*;
 import java.text.DateFormat;
@@ -53,7 +53,7 @@ public class WebAnnotationUI {
     private static Map<String, BufferedWriter> annotationFileWriterMap;
     private static Map<String, String> annotationFileNameMap;
     // user name -> parameters
-    private static Map<String, QueryPruningParameters> parametersMap;
+    // private static Map<String, QueryPruningParameters> parametersMap;
 
     private static final DateFormat dateFormat = new SimpleDateFormat("yyyyMMdd-HHmm");
     private static final String annotationPath  = "./webapp/annotation_files/";
@@ -64,6 +64,16 @@ public class WebAnnotationUI {
             1232, 1261, 1304, 1305, 1489, 1495, 1516, 1564, 1674, 1695
     };
 
+
+    private static boolean isJeopardyStyle = true;
+    private static boolean isCheckboxVersion = true;
+    private static QueryPruningParameters queryPruningParameters;
+    static {
+        queryPruningParameters = new QueryPruningParameters();
+        queryPruningParameters.skipPPQuestions = false;
+        queryPruningParameters.skipBinaryQueries = false;
+    }
+
     private static void initializeData() {
         activeLearningMap = new HashMap<>();
         activeLearningHistoryMap = new HashMap<>();
@@ -71,7 +81,6 @@ public class WebAnnotationUI {
         annotationFileNameMap = new HashMap<>();
         queryIdMap = new HashMap<>();
         sentenceIdsMap = new HashMap<>();
-        parametersMap = new HashMap<>();
 
         // Load parseData and nBestLists;
         parseData = ParseData.loadFromDevPool().get();
@@ -83,15 +92,7 @@ public class WebAnnotationUI {
         reparser = new BaseCcgParser.ConstrainedCcgParser(BaseCcgParser.modelFolder, BaseCcgParser.rootCategories,
                 maxTagsPerWord, 1 /* nbest */);
 
-        allParses = new HashMap<>();
-        IntStream.range(0, parseData.getSentences().size())
-                .forEach(sentId -> {
-                    final NBestList nBestList = ExperimentUtils.getNBestList(parser, sentId,
-                            parseData.getSentenceInputWords().get(sentId));
-                    if (nBestList != null) {
-                        allParses.put(sentId, nBestList);
-                    }
-                });
+        allParses = ExperimentUtils.getAllNBestLists(parser, parseData.getSentenceInputWords());
     }
 
     public static void main(final String[] args) throws Exception {
@@ -146,7 +147,7 @@ public class WebAnnotationUI {
                         + "<label for=\"UserName\">Please enter your name here: </label>\n"
                         + "<input type=\"text\" input name=\"UserName\"/>\n"
                         + "<br/>"
-                        + "<input name=\"KeepBinary\" type=\"checkbox\" value=\"True\" />&nbsp Keep binary queries. <br/>"
+                        //+ "<input name=\"KeepBinary\" type=\"checkbox\" value=\"True\" />&nbsp Keep binary queries. <br/>"
                         + "<br/><button class=\"btn btn-primary\" type=\"submit\" class=\"btn btn-primary\">Go!</button>\n"
                         + "</form>");
                 httpWriter.println("</body>");
@@ -177,11 +178,6 @@ public class WebAnnotationUI {
                 sentenceIdsMap.put(userName, sentIds);
                 activeLearningHistoryMap.put(userName, new ArrayList<>());
 
-                // Query pruning parameters.
-                parametersMap.put(userName, new QueryPruningParameters());
-                if (request.getParameter("KeepBinary") != null && !request.getParameter("KeepBinary").equals("True")) {
-                    parametersMap.get(userName).skipBinaryQueries = false;
-                }
                 initializeForUserAndSentence(userName, sentIds.get(0));
             }
 
@@ -224,11 +220,13 @@ public class WebAnnotationUI {
         }
 
         private void initializeForUserAndSentence(String userName, int sentenceId) {
-            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList = ExperimentUtils
-                    .generateAllCheckboxQueries(sentenceId,
-                            parseData.getSentences().get(sentenceId),
-                            allParses.get(sentenceId),
-                            parametersMap.get(userName));
+            final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList = ExperimentUtils.generateAllQueries(
+                    sentenceId,
+                    parseData.getSentences().get(sentenceId),
+                    allParses.get(sentenceId),
+                    isJeopardyStyle,
+                    isCheckboxVersion,
+                    queryPruningParameters);
             activeLearningMap.put(userName, queryList);
             System.err.println("sentence " + sentenceId + " has " + queryList.size() + " queries.");
             activeLearningMap.put(userName, queryList);
