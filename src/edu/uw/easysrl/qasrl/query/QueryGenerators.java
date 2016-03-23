@@ -5,9 +5,7 @@ import edu.uw.easysrl.qasrl.qg.surfaceform.*;
 import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.util.GuavaCollectors;
 
-import java.util.Comparator;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static edu.uw.easysrl.util.GuavaCollectors.*;
 import static java.util.stream.Collectors.*;

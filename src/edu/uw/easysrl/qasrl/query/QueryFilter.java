@@ -29,6 +29,7 @@ public class QueryFilter {
                         final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries,
                         final NBestList nBestList,
                         final QueryPruningParameters queryPruningParameters) {
+        // FIXME
         return queries.stream()
                 .map(query -> {
                     query.computeScores(nBestList);

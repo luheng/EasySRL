@@ -9,6 +9,5 @@ import edu.uw.easysrl.qasrl.query.Query;
  * Created by luheng on 1/17/16.
  */
 public abstract class ResponseSimulator {
-
     public abstract ImmutableList<Integer> respondToQuery(Query query);
 }

@@ -13,7 +13,7 @@ public class QueryPruningParameters {
     private static final int maxNumOptionsPerQuery = 6;
 
     public boolean skipBinaryQueries = true;
-    public boolean skipPPQuestions = true;
+    public boolean skipPPQuestions = false;
     public boolean skipQueriesWithPronounOptions = false;
 
     public QueryPruningParameters() {

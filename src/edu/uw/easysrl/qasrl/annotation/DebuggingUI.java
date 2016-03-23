@@ -1,9 +1,10 @@
 package edu.uw.easysrl.qasrl.annotation;
 
+import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.main.ParsePrinter;
-import edu.uw.easysrl.qasrl.DataLoader;
 import edu.uw.easysrl.qasrl.Parse;
+import edu.uw.easysrl.qasrl.ParseData;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.handler.AbstractHandler;
@@ -13,8 +14,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.stream.Collectors;
 
 /**
@@ -24,10 +23,11 @@ import java.util.stream.Collectors;
 public class DebuggingUI extends AbstractHandler {
 
     private final ParsePrinter printer = ParsePrinter.HTML_PRINTER;
-    private final List<List<InputReader.InputWord>> sentences;
-    private final List<Parse> goldParses;
+    private final ImmutableList<ImmutableList<InputReader.InputWord>> sentences;
+    private final ImmutableList<Parse> goldParses;
 
-    private DebuggingUI(List<List<InputReader.InputWord>> sentences, List<Parse> goldParses) throws IOException {
+    private DebuggingUI(ImmutableList<ImmutableList<InputReader.InputWord>> sentences,
+                        ImmutableList<Parse> goldParses) throws IOException {
         this.sentences = sentences;
         this.goldParses = goldParses;
     }
@@ -47,10 +47,8 @@ public class DebuggingUI extends AbstractHandler {
 
     public static void main(final String[] args) throws Exception {
         final Server server = new Server(Integer.valueOf(args[0]));
-        List<List<InputReader.InputWord>> sentences = new ArrayList<>();
-        List<Parse> goldParses = new ArrayList<>();
-        DataLoader.readDevPool(sentences, goldParses);
-        server.setHandler(new DebuggingUI(sentences, goldParses));
+        final ParseData dev = ParseData.loadFromDevPool().get();
+        server.setHandler(new DebuggingUI(dev.getSentenceInputWords(), dev.getGoldParses()));
         server.start();
         server.join();
     }

@@ -1,12 +1,10 @@
 package edu.uw.easysrl.qasrl;
 
+import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.main.EasySRL;
 import edu.uw.easysrl.main.InputReader;
 
-import edu.uw.easysrl.qasrl.BaseCcgParser;
-import edu.uw.easysrl.qasrl.DataLoader;
 import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
-import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
 import uk.co.flamingpenguin.jewel.cli.CliFactory;
@@ -30,10 +28,11 @@ public class ParseFileGenerator {
             e.printStackTrace();
             return;
         }
-        List<List<InputReader.InputWord>> sentences = new ArrayList<>();
-        List<Parse> goldParses = new ArrayList<>();
+
         Map<Integer, List<Parse>> allParses = new HashMap<>();
-        DataLoader.readDevPool(sentences, goldParses);
+        final ParseData dev = ParseData.loadFromDevPool().get();
+        ImmutableList<ImmutableList<InputReader.InputWord>> sentences = dev.getSentenceInputWords();
+        ImmutableList<Parse> goldParses = dev.getGoldParses();
 
         String modelFolder = commandLineOptions.getModel();
         List<Category> rootCategories = commandLineOptions.getRootCategories();

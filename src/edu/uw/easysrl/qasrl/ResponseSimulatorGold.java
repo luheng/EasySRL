@@ -9,7 +9,6 @@ import edu.uw.easysrl.qasrl.query.Query;
 import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.stream.IntStream;
 
