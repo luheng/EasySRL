@@ -8,6 +8,7 @@ import java.util.Collection;
 public class QueryGeneratorUtils {
     public static String kBadQuestionOptionString = "Bad question.";
     public static String kUnlistedAnswerOptionString = "Answer is not listed.";
+    public static String kNoneApplicableString = "None of the above.";
 
     public static double computeEntropy(Collection<Double> scores) {
         final double sum = scores.stream().mapToDouble(s -> s).sum();

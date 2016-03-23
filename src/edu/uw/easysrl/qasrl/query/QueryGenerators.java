@@ -21,7 +21,7 @@ import static java.util.stream.Collectors.*;
 public class QueryGenerators {
 
     @Deprecated
-    public static <QA extends QAPairSurfaceForm> QueryGenerator<QA, Query<QA>> maximalForwardAggregator() {
+    public static <QA extends QAPairSurfaceForm> QueryGenerator<QA, Query<QA>> maximalForwardGenerator() {
         return qaPairs -> qaPairs
             .stream()
             .collect(groupingBy(QA::getQuestion))
@@ -44,30 +44,21 @@ public class QueryGenerators {
             .collect(toImmutableList());
     }
 
-    public static <QA extends QAStructureSurfaceForm> QueryGenerator<QA, ScoredQuery<QA>> checkboxQueryAggregator() {
+    public static <QA extends QAStructureSurfaceForm> QueryGenerator<QA, ScoredQuery<QA>> checkboxQueryGenerator() {
         return qaPairs -> qaPairs
                 .stream()
                 .collect(groupingBy(QA::getQuestion))
-                .entrySet()
+                .values()
                 .stream()
-                .map(e -> {
-                    final List<QA> qaList = e.getValue();
-                    assert qaList.size() > 0 : "grouped list should always be nonempty";
-                    final int sentenceId = e.getValue().get(0).getSentenceId();
-                    final String question = e.getKey();
-                    ImmutableList<QA> sortedQAList = qaList
-                            .stream()
+                .map(qaList -> {
+                    ImmutableList<QA> sortedQAList = qaList.stream()
                             .sorted((qa1, qa2) -> Integer.compare(qa1.getArgumentIndices().get(0),
                                                                   qa2.getArgumentIndices().get(0)))
                             .collect(GuavaCollectors.toImmutableList());
-                    List<String> options = sortedQAList
-                            .stream()
-                            .map(QA::getAnswer)
-                            .collect(toList());
+                    List<String> options = sortedQAList.stream().map(QA::getAnswer).collect(toList());
                     options.add(QueryGeneratorUtils.kBadQuestionOptionString);
-
-                    return new ScoredQuery<>(sentenceId,
-                                             question,
+                    return new ScoredQuery<>(qaList.get(0).getSentenceId(),
+                                             qaList.get(0).getQuestion(),
                                              ImmutableList.copyOf(options),
                                              sortedQAList,
                                              false, /* is jeopardy style */
@@ -75,30 +66,46 @@ public class QueryGenerators {
                 }).collect(toImmutableList());
     }
 
-    public static <QA extends QAStructureSurfaceForm> QueryGenerator<QA, ScoredQuery<QA>> radioButtonQueryAggregator() {
+    public static <QA extends QAStructureSurfaceForm> QueryGenerator<QA, ScoredQuery<QA>> radioButtonQueryGenerator() {
         return qaPairs -> qaPairs
                 .stream()
                 .collect(groupingBy(QA::getQuestion))
-                .entrySet()
+                .values()
                 .stream()
-                .map(e -> {
-                    final List<QA> qaList = e.getValue();
-                    assert qaList.size() > 0 : "grouped list should always be nonempty";
-                    final int sentenceId = e.getValue().get(0).getSentenceId();
-                    final String question = e.getKey();
-                    List<String> options = qaList
-                            .stream()
-                            .map(QA::getAnswer)
-                            .collect(toList());
+                .map(qaList -> {
+                    List<String> options = qaList.stream().map(QA::getAnswer).collect(toList());
                     options.add(QueryGeneratorUtils.kUnlistedAnswerOptionString);
                     options.add(QueryGeneratorUtils.kBadQuestionOptionString);
-                    // TODO: prune options.
-                    return new ScoredQuery<>(sentenceId,
-                            question,
+                    return new ScoredQuery<>(
+                            qaList.get(0).getSentenceId(),
+                            qaList.get(0).getQuestion(),
                             ImmutableList.copyOf(options),
                             ImmutableList.copyOf(qaList),
                             false, /* is jeopardy style */
                             false /* allow multiple */);
+                }).collect(toImmutableList());
+    }
+
+    /**
+     * Generate all jeopardy-style checkbox queries.
+     */
+    public static <QA extends QAStructureSurfaceForm> QueryGenerator<QA, ScoredQuery<QA>> jeopardyCheckboxQueryGenerator() {
+        return qaPairs -> qaPairs
+                .stream()
+                .collect(groupingBy(QA::getAnswer))
+                .values()
+                .stream()
+                .map(qaList -> {
+                    List<String> options = qaList.stream().map(QA::getQuestion).collect(toList());
+                    options.add(QueryGeneratorUtils.kNoneApplicableString);
+
+                    return new ScoredQuery<>(
+                            qaList.get(0).getSentenceId(),
+                            qaList.get(0).getAnswer(),
+                            ImmutableList.copyOf(options),
+                            ImmutableList.copyOf(qaList),
+                            true, /* is jeopardy style */
+                            true /* allow multiple */);
                 }).collect(toImmutableList());
     }
 

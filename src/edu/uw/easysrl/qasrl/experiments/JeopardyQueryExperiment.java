@@ -11,15 +11,17 @@ import edu.uw.easysrl.qasrl.qg.QAPairAggregators;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.QueryGenerators;
+import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 
 import java.util.List;
+import java.util.Map;
 
 /**
- * Not doing anything other than printing the queries.
- * Created by luheng on 3/18/16.
+ * Output jeopardy queries.
+ * Created by luheng on 3/22/16.
  */
-public class RefactorExperiment {
+public class JeopardyQueryExperiment {
     private static int nBest = 100;
 
     public static void main(String[] args) {
@@ -27,29 +29,28 @@ public class RefactorExperiment {
         final ImmutableList<ImmutableList<String>> sentences = devData.getSentences();
         final ImmutableList<Parse> goldParses = devData.getGoldParses();
         final int numSentences = goldParses.size();
+
         System.out.println(String.format("Read %d sentences from the dev set.", sentences.size()));
 
         String preparsedFile = "parses.100best.out";
         BaseCcgParser parser = new BaseCcgParser.MockParser(preparsedFile, nBest);
         System.err.println("Parse initialized.");
+        final Map<Integer, NBestList> nbestLists = ExperimentUtils.getAllNBestLists(parser, devData.getSentenceInputWords());
+
+        QueryPruningParameters queryPruningParameters = new QueryPruningParameters();
+
+        // TODO: test gold simulator
 
         // Initialize parses.
-        for (int i = 0; i < numSentences; i++) {
-            ImmutableList<InputReader.InputWord> inputSentence = devData.getSentenceInputWords().get(i);
-            ImmutableList<String> sentence = sentences.get(i);
-            List<Parse> nbestParses = parser.parseNBest(i, inputSentence);
-            if (nbestParses == null) {
-                continue;
-            }
-            NBestList nBestList = new NBestList(ImmutableList.copyOf(nbestParses));
-            ImmutableList<IQuestionAnswerPair> qaPairs1 = QuestionGenerator
-                    .generateAllQAPairs(i, sentences.get(i), nBestList);
-
-            //ImmutableList<QAStructureSurfaceForm> qaPairs2 = QAPairAggregators.aggregateForMultipleChoiceQA().aggregate(qaPairs1);
-            //ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList = QueryGenerators.checkboxQueryAggregator().generate(qaPairs2);
-
-            ImmutableList<QAStructureSurfaceForm> qaPairs2 = QAPairAggregators.aggregateForSingleChoiceQA().aggregate(qaPairs1);
-            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList = QueryGenerators.radioButtonQueryAggregator().generate(qaPairs2);
+        for (int sentId = 0; sentId < numSentences; sentId++) {
+            final ImmutableList<String> sentence = sentences.get(sentId);
+            final NBestList nBestList = nbestLists.get(sentId);
+            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList =
+                    ExperimentUtils.generateAllQueries(sentId, sentence, nBestList,
+                            true /* jeopardy */,
+                            true /* checkbox */,
+                            queryPruningParameters
+                    );
 
             queryList.forEach(query -> query.computeScores(nBestList));
             queryList.forEach(query -> {

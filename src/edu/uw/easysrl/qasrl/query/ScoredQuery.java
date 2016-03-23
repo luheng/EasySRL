@@ -145,13 +145,16 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
 
     public String toString(final ImmutableList<String> sentence) {
         // TODO: handle jeopardy style.
-        String result = "";
-        final int predicateIndex = getPredicateId().getAsInt();
-        final Category category  = getPredicateCategory().get();
-        final int argumentNumber = getArgumentNumber().getAsInt();
+        String result = String.format("SID=%d\t%s\n", sentenceId, sentence.stream().collect(Collectors.joining(" ")));
 
-        result += String.format("SID=%d\t%s\n", sentenceId, sentence.stream().collect(Collectors.joining(" ")));
-        result += String.format("%d:%s\t%s\t%d\n", predicateIndex, sentence.get(predicateIndex), category, argumentNumber);
+        if (!isJeopardyStyle) {
+            final int predicateIndex = getPredicateId().getAsInt();
+            final Category category = getPredicateCategory().get();
+            final int argumentNumber = getArgumentNumber().getAsInt();
+            result += String.format("%d:%s\t%s\t%d\n", predicateIndex, sentence.get(predicateIndex), category, argumentNumber);
+        }
+
+        // Prompt.
         result += String.format("%.2f\t%s\n", promptScore, prompt);
 
         for (int i = 0; i < options.size(); i++) {
@@ -162,11 +165,7 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
                 String argIdsStr = argList.stream().map(String::valueOf).collect(Collectors.joining(","));
                 String argHeadsStr = argList.stream().map(sentence::get).collect(Collectors.joining(","));
                 String parseIdsStr = DebugPrinter.getShortListString(qa.getAnswerStructures().get(0).parseIds);
-
-                /*String allArgIdsStr = qa.getQAPairs().stream().map(IQuestionAnswerPair::getArgumentIndex)
-                        .distinct()
-                        .map(String::valueOf)
-                        .collect(Collectors.joining(","));*/
+                // Option info.
                 optionString += String.format("%.2f\t%d\t%s\t%s:%s\t%s", optionScores.get(i), i, options.get(i),
                         argIdsStr, argHeadsStr,  parseIdsStr);
             } else {

@@ -8,13 +8,12 @@ import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
 import edu.uw.easysrl.qasrl.annotation.CrowdFlowerDataReader;
 import edu.uw.easysrl.qasrl.qg.IQuestionAnswerPair;
+import edu.uw.easysrl.qasrl.qg.QAPairAggregator;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregators;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
-import edu.uw.easysrl.qasrl.query.QueryFilter;
-import edu.uw.easysrl.qasrl.query.QueryGenerators;
-import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
-import edu.uw.easysrl.qasrl.query.ScoredQuery;
+import edu.uw.easysrl.qasrl.query.*;
+import edu.uw.easysrl.util.Util;
 
 import java.io.IOException;
 import java.util.*;
@@ -41,7 +40,7 @@ public class ExperimentUtils {
             final QueryPruningParameters queryPruningParameters) {
         final ImmutableList<IQuestionAnswerPair> rawQAPairs = QuestionGenerator
                 .generateAllQAPairs(sentenceId, sentence, nBestList);
-        return QueryFilter.filter(QueryGenerators.radioButtonQueryAggregator()
+        return QueryFilter.filter(QueryGenerators.radioButtonQueryGenerator()
                                     .generate(QAPairAggregators.aggregateForSingleChoiceQA().aggregate(rawQAPairs)),
                                   nBestList,
                                   queryPruningParameters);
@@ -54,10 +53,43 @@ public class ExperimentUtils {
             final QueryPruningParameters queryPruningParameters) {
         final ImmutableList<IQuestionAnswerPair> rawQAPairs = QuestionGenerator
                 .generateAllQAPairs(sentenceId, sentence, nBestList);
-        return QueryFilter.filter(QueryGenerators.checkboxQueryAggregator().generate(
+        return QueryFilter.filter(QueryGenerators.checkboxQueryGenerator().generate(
                                         QAPairAggregators.aggregateForMultipleChoiceQA().aggregate(rawQAPairs)),
                                   nBestList,
                                   queryPruningParameters);
+    }
+
+    public static ImmutableList<ScoredQuery<QAStructureSurfaceForm>> generateAllQueries(
+            final int sentenceId,
+            final ImmutableList<String> sentence,
+            final NBestList nBestList,
+            final boolean isJeopardyStyle,
+            final boolean isCheckbox,
+            final QueryPruningParameters queryPruningParameters) {
+        return generateAllQueries(
+                isCheckbox ?
+                        QAPairAggregators.aggregateForMultipleChoiceQA() :
+                        QAPairAggregators.aggregateForSingleChoiceQA(),
+                isJeopardyStyle ?
+                        QueryGenerators.jeopardyCheckboxQueryGenerator() :
+                        (isCheckbox ?
+                                QueryGenerators.checkboxQueryGenerator() :
+                                QueryGenerators.radioButtonQueryGenerator()),
+                sentenceId, sentence, nBestList, queryPruningParameters);
+    }
+
+    public static ImmutableList<ScoredQuery<QAStructureSurfaceForm>> generateAllQueries(
+            QAPairAggregator<QAStructureSurfaceForm> qaPairAggregator,
+            QueryGenerator<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> queryGenerator,
+            final int sentenceId,
+            final ImmutableList<String> sentence,
+            final NBestList nBestList,
+            final QueryPruningParameters queryPruningParameters) {
+        return QueryFilter.filter(
+                    queryGenerator.generate(
+                            qaPairAggregator.aggregate(
+                                    QuestionGenerator.generateAllQAPairs(sentenceId, sentence, nBestList))),
+                nBestList, queryPruningParameters);
     }
 
     public static NBestList getNBestList(final BaseCcgParser parser, int sentenceId,

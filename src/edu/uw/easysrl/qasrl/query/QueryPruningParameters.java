@@ -19,4 +19,9 @@ public class QueryPruningParameters {
     public QueryPruningParameters() {
     }
 
+    public String toString() {
+        // TODO
+        return "";
+    }
+
 }
