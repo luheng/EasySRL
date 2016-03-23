@@ -27,12 +27,12 @@ public final class QAPairAggregators {
     public static QAPairAggregator<QAPairSurfaceForm> aggregateByString() {
         return qaPairs -> qaPairs
             .stream()
-            .collect(groupingBy(IQuestionAnswerPair::getQuestion))
+            .collect(groupingBy(QuestionAnswerPair::getQuestion))
             .entrySet()
             .stream()
             .flatMap(eQuestion -> eQuestion.getValue()
                     .stream()
-                    .collect(groupingBy(IQuestionAnswerPair::getAnswer))
+                    .collect(groupingBy(QuestionAnswerPair::getAnswer))
                     .entrySet()
                     .stream()
                     .map(eAnswer -> {
@@ -50,19 +50,19 @@ public final class QAPairAggregators {
     public static QAPairAggregator<TargetDependencySurfaceForm> aggregateByTargetDependency() {
         return qaPairs -> qaPairs
             .stream()
-            .collect(groupingBy(IQuestionAnswerPair::getTargetDependency))
+            .collect(groupingBy(QuestionAnswerPair::getTargetDependency))
             .entrySet()
             .stream()
             .map(e -> {
                 final ResolvedDependency targetDep = e.getKey();
-                final Collection<IQuestionAnswerPair> qaList = e.getValue();
+                final Collection<QuestionAnswerPair> qaList = e.getValue();
                 assert qaList.size() > 0
                         : "list in group should always be nonempty";
                 int sentenceId = e.getValue().get(0).getSentenceId();
                 // plurality vote on question and answer
                 String pluralityQuestion = HashMultiset
                         .create(qaList.stream()
-                                .map(IQuestionAnswerPair::getQuestion)
+                                .map(QuestionAnswerPair::getQuestion)
                                 .collect(toList()))
                         .entrySet()
                         .stream()
@@ -71,7 +71,7 @@ public final class QAPairAggregators {
                         .get(); // there should always be one because our list is nonempty
                 String pluralityAnswer = HashMultiset
                         .create(qaList.stream()
-                                .map(IQuestionAnswerPair::getAnswer)
+                                .map(QuestionAnswerPair::getAnswer)
                                 .collect(toList()))
                         .entrySet()
                         .stream()
@@ -109,16 +109,16 @@ public final class QAPairAggregators {
                             .map(qsts -> qsts.structure)
                             .collect(toImmutableList());
                     // All the QAPairs sharing the same surface form.
-                    final ImmutableList<IQuestionAnswerPair> qaList = qsList.stream()
+                    final ImmutableList<QuestionAnswerPair> qaList = qsList.stream()
                             .flatMap(qs -> qs.qaList.stream())
                             .collect(toImmutableList());
                     final int sentenceId = qaList.get(0).getSentenceId();
 
                     // Get answer indices list.
                     Table<ImmutableList<Integer>, String, Double> argListToAnswerToScore = HashBasedTable.create();
-                    Table<ImmutableList<Integer>, IQuestionAnswerPair, Boolean> argListToQAs = HashBasedTable.create();
+                    Table<ImmutableList<Integer>, QuestionAnswerPair, Boolean> argListToQAs = HashBasedTable.create();
                     qaList.stream()
-                            .collect(groupingBy(IQuestionAnswerPair::getParseId))
+                            .collect(groupingBy(QuestionAnswerPair::getParseId))
                             .values().stream()
                             .forEach(qaList2 -> {
                                 Map<Integer, String> argIdToSpan = new HashMap<>();
@@ -142,7 +142,7 @@ public final class QAPairAggregators {
                                 String bestAnswerString = argListToAnswerToScore.row(argList).entrySet().stream()
                                         .max(Comparator.comparing(Entry::getValue))
                                         .get().getKey();
-                                final Collection<IQuestionAnswerPair> qaList2 = argListToQAs.row(argList).keySet();
+                                final Collection<QuestionAnswerPair> qaList2 = argListToQAs.row(argList).keySet();
                                 return new QAPairAggregatorUtils.AnswerSurfaceFormToStructure<>(
                                         bestAnswerString,
                                         new AnswerStructure(argList, qaList2),
@@ -151,7 +151,7 @@ public final class QAPairAggregators {
                             .collect(groupingBy(asts -> asts.answer))
                             .values().stream()
                             .map(asList -> {
-                                final ImmutableList<IQuestionAnswerPair> qaList2 = asList.stream()
+                                final ImmutableList<QuestionAnswerPair> qaList2 = asList.stream()
                                         .flatMap(asts -> asts.qaList.stream())
                                         .collect(toImmutableList());
                                 return new QAStructureSurfaceForm(sentenceId,
@@ -186,18 +186,18 @@ public final class QAPairAggregators {
                             .map(qs -> qs.structure)
                             .collect(toImmutableList());
                     // All the QAPairs sharing the same surface form.
-                    final ImmutableList<IQuestionAnswerPair> qaList = qsList.stream()
+                    final ImmutableList<QuestionAnswerPair> qaList = qsList.stream()
                             .flatMap(qs -> qs.qaList.stream())
                             .collect(toImmutableList());
                     final int sentenceId = qaList.get(0).getSentenceId();
 
                     // Get best answer surface forms for each argument head.
                     return qaList.stream()
-                            .collect(groupingBy(IQuestionAnswerPair::getArgumentIndex))
+                            .collect(groupingBy(QuestionAnswerPair::getArgumentIndex))
                             .entrySet()
                             .stream()
                             .map(argIdGroup -> {
-                                final List<IQuestionAnswerPair> qaList2 = argIdGroup.getValue();
+                                final List<QuestionAnswerPair> qaList2 = argIdGroup.getValue();
                                 final AnswerStructure answerStructure = new AnswerStructure(
                                         ImmutableList.of(argIdGroup.getKey()),
                                         QAPairAggregatorUtils.getParseIds(qaList2),
@@ -211,7 +211,7 @@ public final class QAPairAggregators {
                             .collect(groupingBy(asts -> asts.answer))
                             .values().stream()
                             .map(asList -> {
-                                final ImmutableList<IQuestionAnswerPair> qaList2 = asList.stream()
+                                final ImmutableList<QuestionAnswerPair> qaList2 = asList.stream()
                                         .flatMap(asts -> asts.qaList.stream())
                                         .collect(toImmutableList());
                                 return new QAStructureSurfaceForm(sentenceId,

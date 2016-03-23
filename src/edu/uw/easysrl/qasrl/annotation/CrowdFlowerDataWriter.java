@@ -1,6 +1,8 @@
 package edu.uw.easysrl.qasrl.annotation;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.experiments.DebugPrinter;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
@@ -48,7 +50,7 @@ public class CrowdFlowerDataWriter {
     private static final String preparsedFile = "parses.100best.out";
     private static ParseData parseData;
     private static BaseCcgParser parser;
-    private static Map<Integer, NBestList> nbestLists;
+    private static ImmutableMap<Integer, NBestList> nbestLists;
     private static ResponseSimulatorGold goldSimulator;
 
     private static QueryPruningParameters queryPruningParameters = new QueryPruningParameters();
@@ -57,7 +59,7 @@ public class CrowdFlowerDataWriter {
         // Initialize data.
         parseData = ParseData.loadFromDevPool().get();
         parser = new BaseCcgParser.MockParser(preparsedFile, nBest);
-        nbestLists = ExperimentUtils.getAllNBestLists(parser, parseData.getSentenceInputWords());
+        nbestLists = NBestList.getAllNBestLists(parser, parseData.getSentenceInputWords());
         goldSimulator = new ResponseSimulatorGold(parseData);
 
         Set<Integer> heldOutSentences = new HashSet<>();

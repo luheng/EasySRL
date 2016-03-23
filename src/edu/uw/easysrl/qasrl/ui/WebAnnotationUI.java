@@ -12,6 +12,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import edu.uw.easysrl.qasrl.*;
 
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
@@ -36,7 +37,7 @@ public class WebAnnotationUI {
 
     // Shared data: nBestList, sentences, etc.
     private static ParseData parseData;
-    private static Map<Integer, NBestList> allParses;
+    private static ImmutableMap<Integer, NBestList> allParses;
     private static BaseCcgParser parser;
     private static BaseCcgParser.ConstrainedCcgParser reparser;
     private static int maxTagsPerWord = 50;
@@ -92,7 +93,7 @@ public class WebAnnotationUI {
         reparser = new BaseCcgParser.ConstrainedCcgParser(BaseCcgParser.modelFolder, BaseCcgParser.rootCategories,
                 maxTagsPerWord, 1 /* nbest */);
 
-        allParses = ExperimentUtils.getAllNBestLists(parser, parseData.getSentenceInputWords());
+        allParses = NBestList.getAllNBestLists(parser, parseData.getSentenceInputWords());
     }
 
     public static void main(final String[] args) throws Exception {

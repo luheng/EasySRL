@@ -1,12 +1,14 @@
 package edu.uw.easysrl.qasrl.experiments;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+
 import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.BaseCcgParser;
 import edu.uw.easysrl.qasrl.NBestList;
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.ParseData;
-import edu.uw.easysrl.qasrl.qg.IQuestionAnswerPair;
+import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregators;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
@@ -35,7 +37,7 @@ public class JeopardyQueryExperiment {
         String preparsedFile = "parses.100best.out";
         BaseCcgParser parser = new BaseCcgParser.MockParser(preparsedFile, nBest);
         System.err.println("Parse initialized.");
-        final Map<Integer, NBestList> nbestLists = ExperimentUtils.getAllNBestLists(parser, devData.getSentenceInputWords());
+        final ImmutableMap<Integer, NBestList> nbestLists = NBestList.getAllNBestLists(parser, devData.getSentenceInputWords());
 
         QueryPruningParameters queryPruningParameters = new QueryPruningParameters();
 

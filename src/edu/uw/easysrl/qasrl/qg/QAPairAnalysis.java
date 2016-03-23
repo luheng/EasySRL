@@ -33,25 +33,25 @@ import java.util.stream.Stream;
  */
 public class QAPairAnalysis {
 
-    // TODO methods to extract interesting information from IQuestionAnswerPairs and QAPairSurfaceForms.
+    // TODO methods to extract interesting information from QuestionAnswerPairs and QAPairSurfaceForms.
 
     // maybe this can be useful in calculating question confidence?
     public static ImmutableSet<Integer> parseIdsSupportingQuestionString(String question,
-                                                                         ImmutableList<IQuestionAnswerPair> qaPairs) {
+                                                                         ImmutableList<QuestionAnswerPair> qaPairs) {
         return qaPairs.stream()
             .filter(qaPair -> qaPair.getQuestion().equals(question))
-            .map(IQuestionAnswerPair::getParseId)
+            .map(QuestionAnswerPair::getParseId)
             .collect(toImmutableSet());
     }
 
     /**
      * This method will probably serve most of our needs; example would be
-     *   getAll(surfaceForm, IQuestionAnswerPair::getPredicateCategory).collect(toImmutableSet())
+     *   getAll(surfaceForm, QuestionAnswerPair::getPredicateCategory).collect(toImmutableSet())
      * to get us a set of all predicate categories aggregated into the surface form.
      * These are simple and varied enough to do inline instead of preparing a bunch of helper methods for them.
      * Returning a stream because depending on the situation we might want a list or set (or to map it some more).
      */
-    public static <T> Stream<T> getAll(QAPairSurfaceForm surfaceForm, Function<IQuestionAnswerPair, T> mapper) {
+    public static <T> Stream<T> getAll(QAPairSurfaceForm surfaceForm, Function<QuestionAnswerPair, T> mapper) {
         return surfaceForm.getQAPairs()
             .stream()
             .map(mapper);
@@ -62,7 +62,7 @@ public class QAPairAnalysis {
 
     // TODO useful, complex predicates on question answer pairs go here as static methods
 
-    public static boolean forAny(QAPairSurfaceForm surfaceForm, Predicate<IQuestionAnswerPair> pred) {
+    public static boolean forAny(QAPairSurfaceForm surfaceForm, Predicate<QuestionAnswerPair> pred) {
         return surfaceForm.getQAPairs()
             .stream()
             .anyMatch(pred);

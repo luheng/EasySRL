@@ -54,7 +54,7 @@ public class ResponseSimulatorGold extends ResponseSimulator {
                  IntStream.range(0, qaOptions.size())
                          .filter(optionId -> {
                                      final ImmutableSet<Integer> argIds = qaOptions.get(optionId).getQAPairs().stream()
-                                             .map(IQuestionAnswerPair::getArgumentIndex)
+                                             .map(QuestionAnswerPair::getArgumentIndex)
                                              .distinct()
                                              .collect(GuavaCollectors.toImmutableSet());
                                      return goldArgIds.containsAll(argIds) && argIds.containsAll(goldArgIds);

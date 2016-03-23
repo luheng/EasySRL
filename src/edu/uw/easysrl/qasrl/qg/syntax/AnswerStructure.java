@@ -2,7 +2,7 @@ package edu.uw.easysrl.qasrl.qg.syntax;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import edu.uw.easysrl.qasrl.qg.IQuestionAnswerPair;
+import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
 
 import java.util.Collection;
@@ -24,7 +24,7 @@ public class AnswerStructure {
         this.score = score;
     }
 
-    public AnswerStructure(Collection<Integer> argIds, Collection<IQuestionAnswerPair> qaList) {
+    public AnswerStructure(Collection<Integer> argIds, Collection<QuestionAnswerPair> qaList) {
         this.argumentIndices = ImmutableList.copyOf(argIds.stream().sorted().collect(Collectors.toList()));
         this.parseIds = QAPairAggregatorUtils.getParseIds(qaList);
         this.score = QAPairAggregatorUtils.getScore(qaList);

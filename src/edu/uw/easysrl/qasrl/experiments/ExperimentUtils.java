@@ -7,7 +7,7 @@ import edu.uw.easysrl.qasrl.NBestList;
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
 import edu.uw.easysrl.qasrl.annotation.CrowdFlowerDataReader;
-import edu.uw.easysrl.qasrl.qg.IQuestionAnswerPair;
+import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregator;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregators;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
@@ -38,7 +38,7 @@ public class ExperimentUtils {
             final ImmutableList<String> sentence,
             final NBestList nBestList,
             final QueryPruningParameters queryPruningParameters) {
-        final ImmutableList<IQuestionAnswerPair> rawQAPairs = QuestionGenerator
+        final ImmutableList<QuestionAnswerPair> rawQAPairs = QuestionGenerator
                 .generateAllQAPairs(sentenceId, sentence, nBestList);
         return QueryFilter.filter(QueryGenerators.radioButtonQueryGenerator()
                                     .generate(QAPairAggregators.aggregateForSingleChoiceQA().aggregate(rawQAPairs)),
@@ -51,7 +51,7 @@ public class ExperimentUtils {
             final ImmutableList<String> sentence,
             final NBestList nBestList,
             final QueryPruningParameters queryPruningParameters) {
-        final ImmutableList<IQuestionAnswerPair> rawQAPairs = QuestionGenerator
+        final ImmutableList<QuestionAnswerPair> rawQAPairs = QuestionGenerator
                 .generateAllQAPairs(sentenceId, sentence, nBestList);
         return QueryFilter.filter(QueryGenerators.checkboxQueryGenerator().generate(
                                         QAPairAggregators.aggregateForMultipleChoiceQA().aggregate(rawQAPairs)),
@@ -90,29 +90,6 @@ public class ExperimentUtils {
                             qaPairAggregator.aggregate(
                                     QuestionGenerator.generateAllQAPairs(sentenceId, sentence, nBestList))),
                 nBestList, queryPruningParameters);
-    }
-
-    public static NBestList getNBestList(final BaseCcgParser parser, int sentenceId,
-                                         final List<InputReader.InputWord> inputSentence) {
-        List<Parse> nbestParses = parser.parseNBest(sentenceId, inputSentence);
-        if (nbestParses == null) {
-            return null;
-        }
-        return new NBestList(ImmutableList.copyOf(nbestParses));
-    }
-
-    public static Map<Integer, NBestList> getAllNBestLists(
-            final BaseCcgParser parser,
-            final ImmutableList<ImmutableList<InputReader.InputWord>> inputSentence) {
-        Map<Integer, NBestList> allParses = new HashMap<>();
-        IntStream.range(0, inputSentence.size()).boxed()
-                .forEach(sentenceId -> {
-                    List<Parse> nbestParses = parser.parseNBest(sentenceId, inputSentence.get(sentenceId));
-                    if (nbestParses != null) {
-                        allParses.put(sentenceId, new NBestList(ImmutableList.copyOf(nbestParses)));
-                    }
-                });
-        return allParses;
     }
 
     static Map<Integer, List<AlignedAnnotation>> loadCrowdflowerAnnotation(String[] fileNames) {

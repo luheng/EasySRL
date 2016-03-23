@@ -28,5 +28,5 @@ public interface QAPairSurfaceForm {
     int getSentenceId();
     String getQuestion();
     String getAnswer();
-    ImmutableList<IQuestionAnswerPair> getQAPairs();
+    ImmutableList<QuestionAnswerPair> getQAPairs();
 }

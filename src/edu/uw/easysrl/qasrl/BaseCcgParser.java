@@ -233,7 +233,12 @@ public abstract class BaseCcgParser {
 
     /**
      * Reads pre-parsed n-best list from file.
+     *
+     * NOTE: this isn't needed if all you want is an n-best list from a file... see NBestList.loadNBestListsFromFile
+     * I personally like that way better so I deprecated this.
+     * but feel free to un-deprecate it if you think it's still good. --julian
      */
+    @Deprecated
     public static class MockParser extends BaseCcgParser {
         private Map<Integer, List<Parse>> allParses;
 

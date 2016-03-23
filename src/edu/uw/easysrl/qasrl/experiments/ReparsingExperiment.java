@@ -8,7 +8,7 @@ import edu.uw.easysrl.qasrl.annotation.QualityControl;
 import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils.*;
 import edu.uw.easysrl.qasrl.model.Evidence;
-import edu.uw.easysrl.qasrl.qg.IQuestionAnswerPair;
+import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregators;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
@@ -45,8 +45,8 @@ public class ReparsingExperiment {
     private static QueryPruningParameters queryPruningParameters = new QueryPruningParameters();
 
     private static final String[] annotationFiles = {
-            "./Crowdflower_data/f878213.csv",
-            "./Crowdflower_data/f882410.csv",
+            // "./Crowdflower_data/f878213.csv",
+            // "./Crowdflower_data/f882410.csv",
             "./Crowdflower_data/all-checkbox-responses.csv"
     };
 
@@ -108,10 +108,11 @@ public class ReparsingExperiment {
         List<DebugBlock> debugging = new ArrayList<>();
         for (int sentenceId : sentenceIds) {
             final ImmutableList<String> sentence = sentences.get(sentenceId);
-            final NBestList nBestList = ExperimentUtils.getNBestList(parser, sentenceId, inputSentences.get(sentenceId));
-            if (nBestList == null) {
+            final Optional<NBestList> nBestListOpt = NBestList.getNBestList(parser, sentenceId, inputSentences.get(sentenceId));
+            if (!nBestListOpt.isPresent()) {
                 continue;
             }
+            final NBestList nBestList = nBestListOpt.get();
             final List<AlignedAnnotation> annotated = annotations.get(sentenceId);
             boolean isRadioButtonVersion = annotated.stream()
                     .anyMatch(annot -> annot.answerOptions.stream()

@@ -287,11 +287,10 @@ public class ParallelCorpusReader {
 
 	public static Collection<SRLParse> getPropBank23() throws IOException {
 		return getPropbankSection("23");
-
 	}
 
 	public Iterator<Sentence> readCcgCorpus(final boolean isDev) throws IOException {
-		System.err.println("I am reading the CcgBank.");
+		System.err.println("Reading CcgBank...");
 		synchronized (this) {
 			if (PTB == null) {
 				PTB = new PennTreebank().readCorpus(treebank);

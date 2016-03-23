@@ -17,45 +17,6 @@ import java.util.stream.IntStream;
  */
 public class QuestionGenerator {
 
-    @Deprecated
-    public static Optional<QuestionAnswerPair> generateQuestion(ResolvedDependency targetDependency,
-                                                                List<String> words,
-                                                                Parse parse) {
-        assert false;
-        return null;
-    }
-
-    @Deprecated
-    public static List<QuestionAnswerPair> generateAllQAPairs(int predicateIdx,
-                                                              int argumentNumber,
-                                                              List<String> words,
-                                                              Parse parse) {
-        MultiQuestionTemplate template = new MultiQuestionTemplate(-1, -1, predicateIdx, words, parse);
-        return template.getAllQAPairsForArgument(argumentNumber);
-    }
-
-    public static List<QuestionAnswerPair> generateAllQAPairs(int sentenceId,
-                                                              int parseId,
-                                                              int predicateIdx,
-                                                              int argumentNumber,
-                                                              List<String> words,
-                                                              Parse parse) {
-        MultiQuestionTemplate template = new MultiQuestionTemplate(sentenceId, parseId, predicateIdx, words, parse);
-        return template.getAllQAPairsForArgument(argumentNumber);
-    }
-
-    public static ImmutableList<IQuestionAnswerPair> generateAllQAPairs(int sentenceId, ImmutableList<String> words,
-                                                                        int parseId, Parse parse) {
-        return IntStream.range(0, words.size())
-            .mapToObj(Integer::new)
-            .flatMap(predIndex -> IntStream.range(1, parse.categories.get(predIndex).getNumberOfArguments() + 1)
-                    .boxed()
-                    .flatMap(argNum -> QuestionGenerator
-                            .generateAllQAPairs(sentenceId, parseId, predIndex, argNum, words, parse)
-                            .stream()))
-            .collect(toImmutableList());
-    }
-
     /**
      * Generate all question answer pairs for a sentence, given the n-best list.
      * @param sentenceId: unique identifier of the sentence.
@@ -63,8 +24,8 @@ public class QuestionGenerator {
      * @param nBestList: the nbest list.
      * @return
      */
-    public static ImmutableList<IQuestionAnswerPair> generateAllQAPairs(int sentenceId, ImmutableList<String> words,
-                                                                        NBestList nBestList) {
+    public static ImmutableList<QuestionAnswerPair> generateAllQAPairs(int sentenceId, ImmutableList<String> words,
+                                                                       NBestList nBestList) {
         return IntStream.range(0, words.size()).boxed()
                 .flatMap(predId -> IntStream.range(0, nBestList.getN()).boxed()
                                 .flatMap(parseId -> {
@@ -77,6 +38,28 @@ public class QuestionGenerator {
                                                     .stream());
                                 })
                 ).collect(toImmutableList());
+    }
+
+    private static List<QuestionAnswerPair> generateAllQAPairs(int sentenceId,
+                                                              int parseId,
+                                                              int predicateIdx,
+                                                              int argumentNumber,
+                                                              List<String> words,
+                                                              Parse parse) {
+        MultiQuestionTemplate template = new MultiQuestionTemplate(sentenceId, parseId, predicateIdx, words, parse);
+        return new ArrayList<QuestionAnswerPair>(template.getAllQAPairsForArgument(argumentNumber));
+    }
+
+    private static ImmutableList<QuestionAnswerPair> generateAllQAPairs(int sentenceId, ImmutableList<String> words,
+                                                                        int parseId, Parse parse) {
+        return IntStream.range(0, words.size())
+            .mapToObj(Integer::new)
+            .flatMap(predIndex -> IntStream.range(1, parse.categories.get(predIndex).getNumberOfArguments() + 1)
+                    .boxed()
+                    .flatMap(argNum -> QuestionGenerator
+                            .generateAllQAPairs(sentenceId, parseId, predIndex, argNum, words, parse)
+                            .stream()))
+            .collect(toImmutableList());
     }
 }
 

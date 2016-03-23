@@ -40,21 +40,21 @@ public final class TargetDependencySurfaceForm implements QAPairSurfaceForm {
     }
 
     @Override
-    public ImmutableList<IQuestionAnswerPair> getQAPairs() {
+    public ImmutableList<QuestionAnswerPair> getQAPairs() {
         return qaPairs;
     }
 
     private final int sentenceId;
     private final String question;
     private final String answer;
-    private final ImmutableList<IQuestionAnswerPair> qaPairs;
+    private final ImmutableList<QuestionAnswerPair> qaPairs;
 
     private final ResolvedDependency targetDep;
 
     public TargetDependencySurfaceForm(int sentenceId,
                                        String question,
                                        String answer,
-                                       ImmutableList<IQuestionAnswerPair> qaPairs,
+                                       ImmutableList<QuestionAnswerPair> qaPairs,
                                        ResolvedDependency targetDep) {
         this.sentenceId = sentenceId;
         this.question   =  question;

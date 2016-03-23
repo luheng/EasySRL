@@ -4,7 +4,7 @@ import com.google.common.collect.ImmutableMap;
 
 import com.google.common.collect.ImmutableSet;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
-import edu.uw.easysrl.qasrl.qg.IQuestionAnswerPair;
+import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
 import edu.uw.easysrl.syntax.grammar.Category;
 
@@ -47,7 +47,7 @@ public class QuestionStructure {
      * For convenience.
      * @param qaList: Q/A pairs sharing the same question structure.
      */
-    public QuestionStructure(final List<IQuestionAnswerPair> qaList) {
+    public QuestionStructure(final List<QuestionAnswerPair> qaList) {
         this.predicateIndex = qaList.get(0).getPredicateIndex();
         this.category = qaList.get(0).getPredicateCategory();
         this.targetArgNum = qaList.get(0).getArgumentNumber();

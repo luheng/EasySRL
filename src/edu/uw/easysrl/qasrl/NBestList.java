@@ -1,10 +1,19 @@
 package edu.uw.easysrl.qasrl;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+
 import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
 import edu.uw.easysrl.syntax.evaluation.Results;
+import edu.uw.easysrl.main.InputReader;
 
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Optional;
+import java.util.stream.IntStream;
+
+import java.io.*;
 
 import static edu.uw.easysrl.util.GuavaCollectors.*;
 
@@ -14,7 +23,6 @@ import static edu.uw.easysrl.util.GuavaCollectors.*;
  * on the basis of annotations from crowd workers.
  *
  * Holds scores separate from the list of parses in case we want to re-score them as in reranking.
- * Also TODO convenience methods for loading n-best lists from a file or from parsing text.
  *
  * Created by julianmichael on 3/18/16.
  */
@@ -77,11 +85,41 @@ public final class NBestList {
             .collect(toImmutableList());
     }
 
-    public static ImmutableList<NBestList> loadFromFile(String filename) {
-        return null; // XXX TODO
+    public static Optional<NBestList> getNBestList(final BaseCcgParser parser, int sentenceId,
+                                         final List<InputReader.InputWord> inputSentence) {
+        return Optional
+            .ofNullable(parser.parseNBest(sentenceId, inputSentence))
+            .map(ImmutableList::copyOf)
+            .map(NBestList::new);
     }
 
-    public static ImmutableList<NBestList> loadByParsing(String filename /* also should pass in a parser */) {
-        return null; // XXX TODO
+    public static ImmutableMap<Integer, NBestList> getAllNBestLists(
+            final BaseCcgParser parser,
+            final ImmutableList<ImmutableList<InputReader.InputWord>> inputSentences) {
+        Map<Integer, NBestList> allParses = new HashMap<>();
+        IntStream
+            .range(0, inputSentences.size()).boxed()
+            .forEach(sentenceId -> getNBestList(parser, sentenceId, inputSentences.get(sentenceId))
+                     .ifPresent(nBestList -> allParses.put(sentenceId, nBestList)));
+        return ImmutableMap.copyOf(allParses);
     }
+
+    public static Optional<ImmutableMap<Integer, NBestList>> loadNBestListsFromFile(String filepath, int n) {
+        Map<Integer, NBestList> allNBestLists = new HashMap<>();
+        Map<Integer, List<Parse>> readParses;
+        try {
+            ObjectInputStream inputStream = new ObjectInputStream(new BufferedInputStream(new FileInputStream(filepath)));
+            readParses = (Map<Integer, List<Parse>>) inputStream.readObject();
+        }  catch(Exception e){
+            e.printStackTrace();
+            return Optional.empty();
+        }
+        readParses.forEach((sentIdx, parses) ->
+                           allNBestLists.put(sentIdx,
+                                             new NBestList(ImmutableList.copyOf((parses.size() <= n)
+                                                                                ? parses
+                                                                                : parses.subList(0, n)))));
+        return Optional.of(ImmutableMap.copyOf(allNBestLists));
+    }
+
 }

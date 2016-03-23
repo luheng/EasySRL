@@ -1,7 +1,7 @@
 package edu.uw.easysrl.qasrl.qg.surfaceform;
 
 import com.google.common.collect.ImmutableList;
-import edu.uw.easysrl.qasrl.qg.IQuestionAnswerPair;
+import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.syntax.AnswerStructure;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
 import edu.uw.easysrl.syntax.grammar.Category;
@@ -52,14 +52,14 @@ public class QAStructureSurfaceForm implements QAPairSurfaceForm {
     }
 
     @Override
-    public ImmutableList<IQuestionAnswerPair> getQAPairs() {
+    public ImmutableList<QuestionAnswerPair> getQAPairs() {
         return qaPairs;
     }
 
     private final int sentenceId;
     private final String question;
     private final String answer;
-    private final ImmutableList<IQuestionAnswerPair> qaPairs;
+    private final ImmutableList<QuestionAnswerPair> qaPairs;
 
     private final ImmutableList<QuestionStructure> questionStructures;
     private final ImmutableList<AnswerStructure> answerStructures;
@@ -67,7 +67,7 @@ public class QAStructureSurfaceForm implements QAPairSurfaceForm {
     public QAStructureSurfaceForm(int sentenceId,
                                   String question,
                                   String answer,
-                                  ImmutableList<IQuestionAnswerPair> qaPairs,
+                                  ImmutableList<QuestionAnswerPair> qaPairs,
                                   ImmutableList<QuestionStructure> questionStructures,
                                   ImmutableList<AnswerStructure> answerStructures) {
         this.sentenceId = sentenceId;
