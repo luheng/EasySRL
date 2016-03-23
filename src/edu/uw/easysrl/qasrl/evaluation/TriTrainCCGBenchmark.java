@@ -1,16 +1,16 @@
 package edu.uw.easysrl.qasrl.evaluation;
 
+import com.google.common.collect.ImmutableList;
 import edu.stanford.nlp.util.StringUtils;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.main.EasySRL;
 import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.BaseCcgParser;
-import edu.uw.easysrl.qasrl.DataLoader;
 import edu.uw.easysrl.qasrl.Parse;
+import edu.uw.easysrl.qasrl.ParseData;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import uk.co.flamingpenguin.jewel.cli.CliFactory;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -162,8 +162,8 @@ Averaged evaluation time (in sec):	5.288207297726071E-4
  */
 
 public class TriTrainCCGBenchmark {
-    static List<List<InputReader.InputWord>> sentences;
-    static List<Parse> goldParses;
+    static ImmutableList<ImmutableList<InputReader.InputWord>> sentences;
+    static ImmutableList<Parse> goldParses;
     static BaseCcgParser parser;
 
     private static void initialize(String[] args, int nBest) {
@@ -176,9 +176,9 @@ public class TriTrainCCGBenchmark {
             return;
         }
         // Initialize corpora.
-        sentences = new ArrayList<>();
-        goldParses = new ArrayList<>();
-        DataLoader.readDevPool(sentences, goldParses);
+        final ParseData dev = ParseData.loadFromDevPool().get();
+        sentences = dev.getSentenceInputWords();
+        goldParses = dev.getGoldParses();
         parser = new BaseCcgParser.AStarParser(commandLineOptions.getModel(), commandLineOptions.getRootCategories(),
                 nBest);
         //parser = new BaseCcgParser.PipelineCCGParser(commandLineOptions.getModel(), nBest);
