@@ -4,6 +4,7 @@ import edu.uw.easysrl.qasrl.corpora.PronounList;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.Query;
+import edu.uw.easysrl.qasrl.query.QueryGeneratorUtils;
 import edu.uw.easysrl.qasrl.query.QueryGenerators;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.syntax.grammar.Category;
@@ -43,8 +44,8 @@ public class QualityControl {
     }
 
     public static boolean optionContainsPronoun(String optionString) {
-        if (optionString.equals(QueryGenerators.kBadQuestionOptionString) ||
-                optionString.equals(QueryGenerators.kUnlistedAnswerOptionString)) {
+        if (optionString.equals(QueryGeneratorUtils.kBadQuestionOptionString) ||
+                optionString.equals(QueryGeneratorUtils.kUnlistedAnswerOptionString)) {
             return false;
         }
         for (String span : optionString.split(QAPairAggregatorUtils.answerDelimiter)) {

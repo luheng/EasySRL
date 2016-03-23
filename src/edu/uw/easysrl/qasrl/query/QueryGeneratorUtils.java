@@ -1,6 +1,7 @@
 package edu.uw.easysrl.qasrl.query;
 
 import com.google.common.collect.ImmutableCollection;
+import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 
 import java.util.Collection;
 

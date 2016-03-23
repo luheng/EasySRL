@@ -5,6 +5,7 @@ import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.corpora.PronounList;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
+import edu.uw.easysrl.qasrl.query.QueryGeneratorUtils;
 import edu.uw.easysrl.qasrl.query.QueryGenerators;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.syntax.grammar.Category;
@@ -125,7 +126,7 @@ public abstract class Evidence {
         Map<Integer, String> argIdToSpan = new HashMap<>();
         for (int i = 0; i < query.getOptions().size(); i++) {
             final String option = query.getOptions().get(i);
-            if (chosenOptions.contains(i) && option.equals(QueryGenerators.kBadQuestionOptionString)) {
+            if (chosenOptions.contains(i) && option.equals(QueryGeneratorUtils.kBadQuestionOptionString)) {
                 questionIsNA = true;
             }
             if (i < query.getQAPairSurfaceForms().size()) {

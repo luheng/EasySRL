@@ -5,12 +5,12 @@ package edu.uw.easysrl.qasrl.query;
  */
 public class QueryPruningParameters {
 
-    public int questionSurfaceFormTopK = 1;
-    public double minQuestionConfidence = 0.1;
-    public double minAnswerConfidence = 0.05;
-    public double minAnswerEntropy = 0.05;
+    public double minPromptConfidence = 0.1;
+    public double minOptionConfidence = 0.05;
+    public double minOptionEntropy = 0.05;
 
-    private static final int maxNumOptionsPerQuestion = 8;
+    // Not including "Bad question" or "Answer unlisted" option.
+    private static final int maxNumOptionsPerQuery = 6;
 
     public boolean skipBinaryQueries = true;
     public boolean skipPPQuestions = true;
@@ -18,4 +18,5 @@ public class QueryPruningParameters {
 
     public QueryPruningParameters() {
     }
+
 }

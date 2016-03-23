@@ -18,6 +18,7 @@ import java.util.stream.IntStream;
  *
  * Created by julianmichael on 3/17/16.
  */
+@Deprecated
 public class BasicQuery<QA extends QAPairSurfaceForm> implements Query<QA> {
 
     public int getSentenceId() {
@@ -65,13 +66,13 @@ public class BasicQuery<QA extends QAPairSurfaceForm> implements Query<QA> {
 
     public OptionalInt getBadQuestionOptionId() {
         return IntStream.range(0, options.size())
-                .filter(i -> options.get(i).equals(QueryGenerators.kBadQuestionOptionString))
+                .filter(i -> options.get(i).equals(QueryGeneratorUtils.kBadQuestionOptionString))
                 .findFirst();
     }
 
     public OptionalInt getUnlistedAnswerOptionId() {
         return IntStream.range(0, options.size())
-                .filter(i -> options.get(i).equals(QueryGenerators.kUnlistedAnswerOptionString))
+                .filter(i -> options.get(i).equals(QueryGeneratorUtils.kUnlistedAnswerOptionString))
                 .findFirst();
     }
 

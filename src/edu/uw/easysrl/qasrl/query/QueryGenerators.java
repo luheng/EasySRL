@@ -22,6 +22,7 @@ import static java.util.stream.Collectors.*;
  */
 public class QueryGenerators {
 
+    @Deprecated
     public static <QA extends QAPairSurfaceForm> QueryGenerator<QA, Query<QA>> maximalForwardAggregator() {
         return qaPairs -> qaPairs
             .stream()
@@ -93,6 +94,7 @@ public class QueryGenerators {
                             .collect(toList());
                     options.add(QueryGeneratorUtils.kUnlistedAnswerOptionString);
                     options.add(QueryGeneratorUtils.kBadQuestionOptionString);
+                    // TODO: prune options.
                     return new ScoredQuery<>(sentenceId,
                             question,
                             ImmutableList.copyOf(options),

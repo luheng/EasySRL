@@ -107,6 +107,7 @@ public class ReparsingExperiment {
 
         List<DebugBlock> debugging = new ArrayList<>();
         for (int sentenceId : sentenceIds) {
+            final ImmutableList<String> sentence = sentences.get(sentenceId);
             final NBestList nBestList = ExperimentUtils.getNBestList(parser, sentenceId, inputSentences.get(sentenceId));
             if (nBestList == null) {
                 continue;
@@ -116,25 +117,10 @@ public class ReparsingExperiment {
                     .anyMatch(annot -> annot.answerOptions.stream()
                             .anyMatch(op -> op.contains(QAPairAggregatorUtils.answerDelimiter)));
 
-            final ImmutableList<IQuestionAnswerPair> rawQAPairs = QuestionGenerator
-                    .generateAllQAPairs(sentenceId, sentences.get(sentenceId), nBestList);
-            final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> rawQueryList =
+            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList =
                     isRadioButtonVersion ?
-                            QueryGenerators.radioButtonQueryAggregator()
-                                    .generate(QAPairAggregators.aggregateForSingleChoiceQA()
-                                            .aggregate(rawQAPairs)) :
-                            QueryGenerators.checkboxQueryAggregator()
-                                    .generate(QAPairAggregators.aggregateForMultipleChoiceQA()
-                                            .aggregate(rawQAPairs));
-
-            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList = rawQueryList.stream()
-                            .filter(query -> annotations.get(sentenceId).stream()
-                                    .anyMatch(annot -> annot.question.equals(query.getPrompt())))
-                            .filter(query -> {
-                                query.computeScores(nBestList);
-                                return query.getPromptScore() > queryPruningParameters.minQuestionConfidence;
-                            })
-                            .collect(GuavaCollectors.toImmutableList());
+                            ExperimentUtils.generateAllRadioButtonQueries(sentenceId, sentence, nBestList, queryPruningParameters) :
+                            ExperimentUtils.generateAllCheckboxQueries(sentenceId, sentence, nBestList, queryPruningParameters);
 
             nBestList.cacheResults(goldParses.get(sentenceId));
             int oracleId = nBestList.getOracleId();
@@ -216,7 +202,6 @@ public class ReparsingExperiment {
                             .collect(Collectors.toList());
                 }
                 // Print.
-                final List<String> sentence = sentences.get(sentenceId);
                 String sentenceStr = sentence.stream().collect(Collectors.joining(" "));
                 int predId = query.getQAPairSurfaceForms().get(0).getPredicateIndex();
                 Category category = query.getQAPairSurfaceForms().get(0).getCategory();
