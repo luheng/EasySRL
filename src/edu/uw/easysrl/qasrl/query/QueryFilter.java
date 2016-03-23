@@ -40,7 +40,6 @@ public class QueryFilter {
                                     .collect(Collectors.toList());
 
                     // TODO: handle max number of options
-
                     final List<QAStructureSurfaceForm> filteredQAList = filteredOptionIds.stream()
                                     .map(query.getQAPairSurfaceForms()::get)
                                     .collect(Collectors.toList());

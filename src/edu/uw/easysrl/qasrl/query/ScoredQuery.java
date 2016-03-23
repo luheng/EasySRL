@@ -36,7 +36,6 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
     }
 
     private final int sentenceId;
-    private final ImmutableList<QuestionKey> questionKeys;
     private final String prompt;
     private final ImmutableList<String> options;
     private final ImmutableList<QA> qaPairSurfaceForms;
@@ -58,17 +57,6 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
         this.qaPairSurfaceForms = qaPairSurfaceForms;
         this.isJeopardyStyle = isJeopardyStyle;
         this.allowMultipleChoices = allowMultipleChoices;
-        if (!isJeopardyStyle) {
-            questionKeys = ImmutableList.of(new QuestionKey(qaPairSurfaceForms.get(0).getPredicateIndex(),
-                                                            qaPairSurfaceForms.get(0).getCategory(),
-                                                            qaPairSurfaceForms.get(0).getArgumentNumber()));
-        } else {
-            questionKeys = qaPairSurfaceForms.stream()
-                    .map(qa -> new QuestionKey(qa.getPredicateIndex(),
-                                               qa.getCategory(),
-                                               qa.getArgumentNumber()))
-                    .collect(GuavaCollectors.toImmutableList());
-        }
     }
 
     public void computeScores(NBestList nbestList) {
@@ -160,9 +148,9 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
     public String toString(final ImmutableList<String> sentence) {
         // TODO: handle jeopardy style.
         String result = "";
-        final int predicateIndex = questionKeys.get(0).predicateIndex;
-        final Category category  = questionKeys.get(0).predicateCategory;
-        final int argumentNumber = questionKeys.get(0).argumentNumber;
+        final int predicateIndex = getPredicateId().getAsInt();
+        final Category category  = getPredicateCategory().get();
+        final int argumentNumber = getArgumentNumber().getAsInt();
 
         result += String.format("SID=%d\t%s\n", sentenceId, sentence.stream().collect(Collectors.joining(" ")));
         result += String.format("%d:%s\t%s\t%d\n", predicateIndex, sentence.get(predicateIndex), category, argumentNumber);
