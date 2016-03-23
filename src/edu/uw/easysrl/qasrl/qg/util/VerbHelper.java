@@ -3,6 +3,9 @@ package edu.uw.easysrl.qasrl.qg.util;
 import edu.uw.easysrl.corpora.ParallelCorpusReader;
 import edu.uw.easysrl.syntax.grammar.Category;
 
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
+
 import java.io.IOException;
 import java.util.*;
 
@@ -10,68 +13,42 @@ import java.util.*;
  * Created by luheng on 12/9/15.
  */
 public class VerbHelper {
-    public static final VerbHelper trainingSetVerbHelper = new VerbHelper(VerbInflectionDictionary.buildFromPropBankTraining());
-    private static final String[] enAuxiliaryVerbs = {
-            "am",
-            "ai", // as in ai n't
-            "be",
-            "being",
-            "\'m",
-            "is",
-            "\'s",
-            "are",
-            "\'re",
-            "was",
-            "were",
-            "been",
-            "will",
-            "\'ll",
-            "would",
-            "\'d",
-            "wo", /* this is part of wo n't ... */
-            "do",
-            "does",
-            "did",
-            "done",
-            "have",
-            "having",
-            "\'ve",
-            "has",
-            "had",
-            "ca", /* in ca n't */
-            "can",
-            "could",
-            "may",
-            "might",
-            "must",
-            "need",
-            "shall",
-            "should",
-            "ought",
-            "going",
-            "to"
-    };
+    private static final VerbInflectionDictionary s_inflectionDictionary = VerbInflectionDictionary.buildFromPropBankTraining();
+    public static final VerbHelper trainingSetVerbHelper = new VerbHelper(s_inflectionDictionary);
 
-    private static final String[] enCopulaVerbs = {
-        "am", "is", "are", "was", "were",
-        "be", "being", "been",
-        "ai", // as in "ai n't"
-        "\'re", "\'s", "\'re", "\'m"
-    };
+    private static final ImmutableSet<String> doVerbs = new ImmutableSet.Builder<String>()
+        .add("do").add("does").add("did").add("done")
+        .build();
 
-    private static final Set<String> enAuxiliaryVerbSet;
-    static {
-        enAuxiliaryVerbSet = new HashSet<>();
-        Collections.addAll(enAuxiliaryVerbSet, enAuxiliaryVerbs);
-    }
+    private static ImmutableSet<String> beVerbs = new ImmutableSet.Builder<String>()
+        .add("be").add("being").add("been")
+        .add("am").add("'m")
+        .add("is").add("'s").add("ai") // as in ai n't
+        .add("are").add("'re")
+        .add("was").add("were")
+        .build();
 
-    private static final Set<String> enCopulaVerbSet;
-    static {
-        enCopulaVerbSet = new HashSet<>();
-        Collections.addAll(enCopulaVerbSet, enCopulaVerbs);
-    }
+    private static final ImmutableSet<String> willVerbs = new ImmutableSet.Builder<String>()
+        .add("will").add("'ll").add("wo") // as in wo n't
+        .build();
 
-    private VerbInflectionDictionary inflectionDictionary = null;
+    private static final ImmutableSet<String> haveVerbs = new ImmutableSet.Builder<String>()
+        .add("have").add("having").add("'ve").add("has").add("had").add("'d")
+        .build();
+
+    private static final ImmutableSet<String> modalVerbs = new ImmutableSet.Builder<String>()
+        .add("would").add("'d")
+        .add("can").add("ca")
+        .add("could")
+        .add("may").add("might").add("must")
+        .add("shall").add("should").add("ought")
+        .build();
+
+    private static final ImmutableSet<String> auxiliaryVerbs = new ImmutableSet.Builder<String>()
+        .addAll(doVerbs).addAll(beVerbs).addAll(willVerbs).addAll(haveVerbs).addAll(modalVerbs)
+        .build();
+
+    private VerbInflectionDictionary inflectionDictionary;
 
     public VerbHelper(VerbInflectionDictionary inflectionDictionary) {
         this.inflectionDictionary = inflectionDictionary;
@@ -108,7 +85,7 @@ public class VerbHelper {
     }
 
     public boolean isAuxiliaryVerb(List<String> words, List<Category> categories, int index) {
-        return index < words.size() && enAuxiliaryVerbSet.contains(words.get(index).toLowerCase()) &&
+        return index < words.size() && auxiliaryVerbs.contains(words.get(index).toLowerCase()) &&
                 categories.get(index).isFunctionInto(Category.valueOf("(S\\NP)|(S\\NP)"));
     }
 
@@ -129,7 +106,7 @@ public class VerbHelper {
     }
 
     public static boolean isCopulaVerb(String word) {
-        return enCopulaVerbSet.contains(word.toLowerCase());
+        return beVerbs.contains(word.toLowerCase());
     }
 
     /**
@@ -178,6 +155,39 @@ public class VerbHelper {
         String verbStr = words.get(index).toLowerCase();
         String[] infl = inflectionDictionary.getBestInflections(verbStr.toLowerCase());
         return infl != null && verbStr.equals(infl[0]);
+    }
+
+    public static String getPastTense(String verb) {
+        return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
+            .map(infl -> infl[3])
+            .orElse(verb + "[DBG]");
+    }
+
+    public static String getPresentTense(String verb, Noun subject) {
+        return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
+            .map(infl -> ((subject.getNumber().map(num -> num == Noun.Number.SINGULAR).orElse(true)) &&
+                          subject.getPerson() == Noun.Person.THIRD) ? infl[3] : infl[0])
+            .orElse(verb + "[DBG]");
+    }
+
+    // aka progressive form
+    public static String getPresentParticiple(String verb) {
+        return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
+            .map(infl -> infl[2])
+            .orElse(verb + "[DBG]");
+    }
+
+    // aka participle
+    public static String getPastParticiple(String verb) {
+        return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
+            .map(infl -> infl[4])
+            .orElse(verb + "[DBG]");
+    }
+
+    public static String getStem(String verb) {
+        return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
+            .map(infl -> infl[0])
+            .orElse(verb + "[DBG]");
     }
 
     /**

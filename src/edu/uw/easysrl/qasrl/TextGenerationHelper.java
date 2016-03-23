@@ -6,6 +6,8 @@ import edu.uw.easysrl.syntax.grammar.Category.Slash;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeLeaf;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -16,9 +18,6 @@ import java.util.stream.Collectors;
  */
 public class TextGenerationHelper {
 
-    // here is the punctuation we want to avoid spaces before,
-    // and that we don't want at the end of the question or answer.
-    // For now, those are the same.
     // Reference: https://www.cis.upenn.edu/~treebank/tokenization.html
     private static final String trimPunctuation = " ,.:;!?-";
     private static final String vowels = "aeiou";
@@ -52,26 +51,16 @@ public class TextGenerationHelper {
         noSpaceAfter.add("{");
     }
 
-    // the result here is ALL POSSIBLE EXPANSIONS
-    public static List<String> expandContraction(String contraction) {
-        List<String> res = new LinkedList<>();
-        if(contraction.equals("'s")) {
-            res.add("has"); res.add("is");
-        } else if(contraction.equals("'ve")) {
-            res.add("have");
-        } else if(contraction.equals("n't")) {
-            res.add("not");
-        } else if(contraction.equals("'re")) {
-            res.add("are");
-        } else if(contraction.equals("'ll")) {
-            res.add("will");
-        } else if(contraction.equals("'m")) {
-            res.add("am");
-        } else if(contraction.equals("'d")) {
-            res.add("would"); res.add("had");
-        }
-        return res;
-    }
+    // the result here is all possible expansions
+    public static final ImmutableMap<String, ImmutableList<String>> contractionExpansions = new ImmutableMap.Builder<String, ImmutableList<String>>()
+        .put("'s", ImmutableList.of("has", "is"))
+        .put("'ve", ImmutableList.of("have"))
+        .put("n't", ImmutableList.of("not"))
+        .put("'re", ImmutableList.of("are"))
+        .put("'ll", ImmutableList.of("will"))
+        .put("'m", ImmutableList.of("am"))
+        .put("'d", ImmutableList.of("would", "had"))
+        .build();
 
     public static boolean startsWithVowel(String word) {
         if(word.length() == 0) return false;
