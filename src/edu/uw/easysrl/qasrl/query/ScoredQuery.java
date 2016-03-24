@@ -11,6 +11,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 /**
  * Query with Scores. Just more convenient.
@@ -58,25 +59,25 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
     }
 
     public void computeScores(NBestList nbestList) {
-        // TODO: handle jeopardy style.
         double totalScore = nbestList.getScores().stream().mapToDouble(s -> s).sum();
         promptScore = qaPairSurfaceForms.stream()
-                .flatMap(qa -> qa.getQuestionStructures().stream()
-                        .flatMap(q -> q.parseIds.stream()))
+                .flatMap(qa -> isJeopardyStyle ? qa.getAnswerParseIds().stream() : qa.getQuestionParseIds().stream())
                 .distinct()
                 .mapToDouble(nbestList::getScore)
                 .sum() / totalScore;
-        optionScores = IntStream.range(0, options.size())
-                .boxed()
+
+        optionScores = IntStream.range(0, options.size()).boxed()
                 .map(i -> {
                     double optionScore = .0;
                     if (i < qaPairSurfaceForms.size()) {
-                        optionScore = qaPairSurfaceForms.get(i).getAnswerStructures().stream()
-                                .flatMap(a -> a.parseIds.stream())
+                        final QAStructureSurfaceForm qa = qaPairSurfaceForms.get(i);
+                        optionScore = (isJeopardyStyle ? qa.getQuestionParseIds().stream() :
+                                                         qa.getAnswerParseIds().stream())
                                 .distinct()
                                 .mapToDouble(nbestList::getScore)
                                 .sum() / totalScore;
-                    } else if (options.get(i).equals(QueryGeneratorUtils.kBadQuestionOptionString)) {
+                    } else if (options.get(i).equals(QueryGeneratorUtils.kBadQuestionOptionString) ||
+                                options.get(i).equals(QueryGeneratorUtils.kNoneApplicableString)) {
                         optionScore = 1.0 - promptScore;
                     }
                     return optionScore;
@@ -141,7 +142,6 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
     public OptionalInt getArgumentNumber() {
         return isJeopardyStyle ? OptionalInt.empty() : OptionalInt.of(qaPairSurfaceForms.get(0).getArgumentNumber());
     }
-
 
     public String toString(final ImmutableList<String> sentence) {
         // TODO: handle jeopardy style.

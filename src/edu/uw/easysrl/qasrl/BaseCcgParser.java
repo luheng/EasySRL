@@ -238,7 +238,6 @@ public abstract class BaseCcgParser {
      * I personally like that way better so I deprecated this.
      * but feel free to un-deprecate it if you think it's still good. --julian
      */
-    @Deprecated
     public static class MockParser extends BaseCcgParser {
         private Map<Integer, List<Parse>> allParses;
 

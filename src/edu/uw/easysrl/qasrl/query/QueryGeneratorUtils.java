@@ -18,4 +18,5 @@ public class QueryGeneratorUtils {
                 .map(p -> p * Math.log(p))
                 .sum() / Math.log(2);
     }
+
 }

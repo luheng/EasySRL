@@ -5,6 +5,7 @@ import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.syntax.AnswerStructure;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
 import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.util.GuavaCollectors;
 
 /**
  * Stores a list of QuestionStructure and AnswerStructure.
@@ -34,6 +35,20 @@ public class QAStructureSurfaceForm implements QAPairSurfaceForm {
 
     public ImmutableList<AnswerStructure> getAnswerStructures() {
         return answerStructures;
+    }
+
+    public ImmutableList<Integer> getQuestionParseIds() {
+        return questionStructures.stream()
+                .flatMap(qs -> qs.parseIds.stream())
+                .distinct()
+                .collect(GuavaCollectors.toImmutableList());
+    }
+
+    public ImmutableList<Integer> getAnswerParseIds() {
+        return answerStructures.stream()
+                .flatMap(ans -> ans.parseIds.stream())
+                .distinct()
+                .collect(GuavaCollectors.toImmutableList());
     }
 
     @Override
