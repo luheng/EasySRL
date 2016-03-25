@@ -37,6 +37,7 @@ public class TextGenerationHelper {
         noSpaceBefore.add("'re");
         noSpaceBefore.add("'ve");
         noSpaceBefore.add("'ll");
+        noSpaceBefore.add("na");
         noSpaceBefore.add("'m");
         noSpaceBefore.add("'d");
         noSpaceBefore.add("%");
@@ -261,7 +262,28 @@ public class TextGenerationHelper {
     public static List<TextWithDependencies> getRepresentativePhrasesForUnrealized(Category category) {
         List<String> words = new ArrayList<>();
         Set<ResolvedDependency> deps = new HashSet<>();
-        words.add("something");
+        if(category.isFunctionInto(Category.valueOf("PP"))) {
+            // do nothing. we don't know the preposition so we can't come up with anything to say
+        } else if(category.isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)"))) {
+            // still do nothing. adverbials shouldn't appear here honestly but we don't want to wreck things for verbs
+        // } else if(category.isFunctionInto(Category.valueOf("(S[ng]\\NP)"))) {
+        //     words.add("doing");
+        //     words.add("something");
+        } else if(category.isFunctionInto(Category.valueOf("(S\\NP)"))) {
+            words.add("do");
+            words.add("something");
+        } else if(category.matches(Category.valueOf("NP")) || category.matches(Category.valueOf("N"))) {
+            words.add("something");
+        } else if(category.matches(Category.valueOf("NP[thr]"))) {
+            words.add("there");
+        } else if(category.matches(Category.valueOf("S[dcl]"))) {
+            words.add("something");
+            words.add("were");
+            words.add("the");
+            words.add("case");
+        } else {
+            System.err.println("need unrealized phrase for category " + category);
+        }
         List<TextWithDependencies> result = new LinkedList<>();
         result.add(new TextWithDependencies(words, deps));
         return result;
@@ -522,8 +544,43 @@ public class TextGenerationHelper {
         return deps;
     }
 
+    public static List<Map<Integer, Optional<ResolvedDependency>>>
+        getOnlyTargetAndVerbPaths(Map<Integer, Set<ResolvedDependency>> choices, int targetArgNum, Optional<Integer> verbArgNumOpt) {
+
+        List<Map<Integer, Optional<ResolvedDependency>>> paths = new LinkedList<>();
+
+        if(!verbArgNumOpt.isPresent() || verbArgNumOpt.get() == targetArgNum) {
+            for(ResolvedDependency targetDep : choices.get(targetArgNum)) {
+                Map<Integer, Optional<ResolvedDependency>> path = new HashMap<>();
+                for(int argNum : choices.keySet()) {
+                    path.put(argNum, Optional.empty());
+                }
+                // only the target dep is populated.
+                path.put(targetArgNum, Optional.of(targetDep));
+                paths.add(path);
+            }
+        } else {
+            int verbArgNum = verbArgNumOpt.get();
+            for(ResolvedDependency targetDep : choices.get(targetArgNum)) {
+                for(ResolvedDependency verbDep : choices.get(verbArgNum)) {
+                    Map<Integer, Optional<ResolvedDependency>> path = new HashMap<>();
+                    for(int argNum : choices.keySet()) {
+                        path.put(argNum, Optional.empty());
+                    }
+                    // only the target and verb deps are populated.
+                    path.put(targetArgNum, Optional.of(targetDep));
+                    path.put(verbArgNum, Optional.of(verbDep));
+                    paths.add(path);
+                }
+            }
+        }
+        return paths;
+    }
+
     // this is somewhat stupid.
-    public static List<Map<Integer, Optional<ResolvedDependency>>> getAllArgumentChoicePaths(Map<Integer, Set<ResolvedDependency>> choices) {
+    public static List<Map<Integer, Optional<ResolvedDependency>>>
+        getAllArgumentChoicePaths(Map<Integer, Set<ResolvedDependency>> choices) {
+
         List<Map<Integer, Optional<ResolvedDependency>>> pastPaths = new LinkedList<>();
         pastPaths.add(new TreeMap<Integer, Optional<ResolvedDependency>>());
         List<Map.Entry<Integer, Set<ResolvedDependency>>> choicesList = choices

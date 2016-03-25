@@ -313,13 +313,43 @@ public class MultiQuestionTemplate {
      * because we will be trying all of the different preposition supersenses
      * that could possibly be appropriate for a preposition in question.
      */
-    public List<BasicQuestionAnswerPair> getAllQAPairsForArgument(int targetArgNum) {
-        List<Map<Integer, Optional<ResolvedDependency>>> argPaths = TextGenerationHelper.getAllArgumentChoicePaths(allArgDeps);
+    public List<BasicQuestionAnswerPair> getAllQAPairsForArgument(int targetArgNum,
+                                                                  boolean indefinitesOnly,
+                                                                  boolean askAllStandardQuestions,
+                                                                  boolean askSupersenseQuestions) {
+        Optional<Integer> verbArgNumOpt;
+        if(type == QuestionType.VERB_ADJUNCT) {
+            verbArgNumOpt = Optional.of(2);
+        } else {
+            verbArgNumOpt = Optional.empty();
+        }
         final List<BasicQuestionAnswerPair> qaPairs = new ArrayList<>();
-        for(Map<Integer, Optional<ResolvedDependency>> chosenArgDeps : argPaths) {
-            // instantiateForArgument(targetArgNum, chosenArgDeps).stream().findFirst().ifPresent(qaPairs::add);
-            instantiateForArgument(targetArgNum, chosenArgDeps).forEach(qaPairs::add);
-            // getBasicSupersenseQAPairs(targetArgNum, chosenArgDeps).forEach(qaPairs::add);
+        if(indefinitesOnly) {
+            // these have indefinites in place of everything except the target argument
+            List<Map<Integer, Optional<ResolvedDependency>>> justTargetArgPaths = TextGenerationHelper
+                .getOnlyTargetAndVerbPaths(allArgDeps, targetArgNum, verbArgNumOpt);
+            for(Map<Integer, Optional<ResolvedDependency>> chosenArgDeps : justTargetArgPaths) {
+                if(askAllStandardQuestions) {
+                    instantiateForArgument(targetArgNum, chosenArgDeps, !indefinitesOnly).forEach(qaPairs::add);
+                } else {
+                    instantiateForArgument(targetArgNum, chosenArgDeps, !indefinitesOnly).stream().findFirst().ifPresent(qaPairs::add);
+                }
+                if(askSupersenseQuestions) {
+                    getBasicSupersenseQAPairs(targetArgNum, chosenArgDeps).forEach(qaPairs::add);
+                }
+            }
+        } else {
+            List<Map<Integer, Optional<ResolvedDependency>>> argPaths = TextGenerationHelper.getAllArgumentChoicePaths(allArgDeps);
+            for(Map<Integer, Optional<ResolvedDependency>> chosenArgDeps : argPaths) {
+                if(askAllStandardQuestions) {
+                    instantiateForArgument(targetArgNum, chosenArgDeps, !indefinitesOnly).forEach(qaPairs::add);
+                } else {
+                    instantiateForArgument(targetArgNum, chosenArgDeps, !indefinitesOnly).stream().findFirst().ifPresent(qaPairs::add);
+                }
+                if(askSupersenseQuestions) {
+                    getBasicSupersenseQAPairs(targetArgNum, chosenArgDeps).forEach(qaPairs::add);
+                }
+            }
         }
         return qaPairs;
     }
@@ -411,7 +441,9 @@ public class MultiQuestionTemplate {
                                              answer);
     }
 
-    public List<BasicQuestionAnswerPair> instantiateForArgument(int targetArgNum, Map<Integer, Optional<ResolvedDependency>> chosenArgDeps) {
+    public List<BasicQuestionAnswerPair> instantiateForArgument(int targetArgNum,
+                                                                Map<Integer, Optional<ResolvedDependency>> chosenArgDeps,
+                                                                boolean shouldRecoverMissingSubject) {
         if(cantAskQuestion(targetArgNum, chosenArgDeps)) {
             return new LinkedList<BasicQuestionAnswerPair>();
         }
@@ -495,7 +527,8 @@ public class MultiQuestionTemplate {
                 final Category argCategory = argCategories.get(currentArgNum);
                 Optional<ResolvedDependency> argDepOpt = chosenArgDeps.get(currentArgNum);
                 // and now, we have an XXX HACK workaround to get subjects to show up when using adverbs!
-                if(!argDepOpt.isPresent() && type == QuestionType.VERB_ADJUNCT && currentArgNum == 1) {
+                if(!argDepOpt.isPresent() && type == QuestionType.VERB_ADJUNCT && currentArgNum == 1 &&
+                   shouldRecoverMissingSubject) {
                     argDepOpt = parse.dependencies
                         .stream()
                         .filter(dep -> dep.getHead() == verbIndexOpt.get() &&
