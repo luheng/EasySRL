@@ -1,5 +1,6 @@
 package edu.uw.easysrl.qasrl.qg.syntax;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
 import com.google.common.collect.ImmutableSet;
@@ -59,5 +60,9 @@ public class QuestionStructure {
                 */
         this.parseIds = QAPairAggregatorUtils.getParseIds(qaList);
         this.score = QAPairAggregatorUtils.getScore(qaList);
+    }
+
+    public String toString(final ImmutableList<String> words) {
+        return String.format("%d:%s\t%s\t%d\n", predicateIndex, words.get(predicateIndex), category, targetArgNum);
     }
 }

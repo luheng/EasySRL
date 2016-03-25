@@ -174,19 +174,20 @@ public final class QAPairAggregators {
                 .stream()
                 .collect(groupingBy(qa -> qa.getPredicateIndex() + "\t" + qa.getPredicateCategory() + "\t" + qa.getArgumentNumber()))
                 .values().stream()
-                .map(qaList -> new QAPairAggregatorUtils.QuestionSurfaceFormToStructure<>(
-                        QAPairAggregatorUtils.getBestQuestionSurfaceForm(qaList),
-                        new QuestionStructure(qaList),
-                        qaList))
-                .collect(groupingBy(qsts -> qsts.question)) // Group by question surface form.
+                .map(questionStrGroup -> new QAPairAggregatorUtils.QuestionSurfaceFormToStructure<>(
+                        QAPairAggregatorUtils.getBestQuestionSurfaceForm(questionStrGroup),
+                        new QuestionStructure(questionStrGroup),
+                        questionStrGroup))
+                // Group by question surface form.
+                .collect(groupingBy(qsts -> qsts.question))
                 .values().stream()
-                .flatMap(qsList -> {
+                .flatMap(questionSurfGroup -> {
                     // All the question structures sharing the same surface form.
-                    final ImmutableList<QuestionStructure> questionStructures = qsList.stream()
+                    final ImmutableList<QuestionStructure> questionStructures = questionSurfGroup.stream()
                             .map(qs -> qs.structure)
                             .collect(toImmutableList());
                     // All the QAPairs sharing the same surface form.
-                    final ImmutableList<QuestionAnswerPair> qaList = qsList.stream()
+                    final ImmutableList<QuestionAnswerPair> qaList = questionSurfGroup.stream()
                             .flatMap(qs -> qs.qaList.stream())
                             .collect(toImmutableList());
                     final int sentenceId = qaList.get(0).getSentenceId();
@@ -196,10 +197,10 @@ public final class QAPairAggregators {
                             .collect(groupingBy(QuestionAnswerPair::getArgumentIndex))
                             .entrySet()
                             .stream()
-                            .map(argIdGroup -> {
-                                final List<QuestionAnswerPair> qaList2 = argIdGroup.getValue();
+                            .map(argStrGroup -> {
+                                final List<QuestionAnswerPair> qaList2 = argStrGroup.getValue();
                                 final AnswerStructure answerStructure = new AnswerStructure(
-                                        ImmutableList.of(argIdGroup.getKey()),
+                                        ImmutableList.of(argStrGroup.getKey()),
                                         QAPairAggregatorUtils.getParseIds(qaList2),
                                         QAPairAggregatorUtils.getScore(qaList2));
 
@@ -210,16 +211,16 @@ public final class QAPairAggregators {
                             })
                             .collect(groupingBy(asts -> asts.answer))
                             .values().stream()
-                            .map(asList -> {
-                                final ImmutableList<QuestionAnswerPair> qaList2 = asList.stream()
+                            .map(answerSurfGroup -> {
+                                final ImmutableList<QuestionAnswerPair> qaList2 = answerSurfGroup.stream()
                                         .flatMap(asts -> asts.qaList.stream())
                                         .collect(toImmutableList());
                                 return new QAStructureSurfaceForm(sentenceId,
-                                        qsList.get(0).question,
-                                        asList.get(0).answer,
+                                        questionSurfGroup.get(0).question,
+                                        answerSurfGroup.get(0).answer,
                                         qaList2,
                                         questionStructures,
-                                        asList.stream().map(asts -> asts.structure).collect(toImmutableList()));
+                                        answerSurfGroup.stream().map(asts -> asts.structure).collect(toImmutableList()));
                             });
                 })
                 .collect(toImmutableList());

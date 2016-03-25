@@ -2,9 +2,11 @@ package edu.uw.easysrl.qasrl.query;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.sun.org.apache.xml.internal.resolver.helpers.Debug;
 import edu.uw.easysrl.qasrl.experiments.DebugPrinter;
 import edu.uw.easysrl.qasrl.NBestList;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
+import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.GuavaCollectors;
 
@@ -67,7 +69,9 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
                     ImmutableSet<Integer> pids = ImmutableSet.of();
                     if (i < qaPairSurfaceForms.size()) {
                         final QAStructureSurfaceForm qa = qaPairSurfaceForms.get(i);
-                        pids = isJeopardyStyle ? qa.getQuestionParseIds() : qa.getAnswerParseIds();
+                        pids = qa.getQuestionParseIds().stream()
+                                .filter(qa.getAnswerParseIds()::contains)
+                                .collect(GuavaCollectors.toImmutableSet());
                         allParseIds.removeAll(pids);
                     } else if (QueryGeneratorUtils.isNAOption(options.get(i))) {
                         pids = ImmutableSet.copyOf(allParseIds);
@@ -146,32 +150,27 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
     }
 
     public String toString(final ImmutableList<String> sentence) {
-        // TODO: handle jeopardy style.
         String result = String.format("SID=%d\t%s\n", sentenceId, sentence.stream().collect(Collectors.joining(" ")));
 
-        if (!isJeopardyStyle) {
-            final int predicateIndex = getPredicateId().getAsInt();
-            final Category category = getPredicateCategory().get();
-            final int argumentNumber = getArgumentNumber().getAsInt();
-            result += String.format("%d:%s\t%s\t%d\n", predicateIndex, sentence.get(predicateIndex), category, argumentNumber);
-        }
+        // Prompt structure.
+        result += isJeopardyStyle ?
+                qaPairSurfaceForms.get(0).getAnswerStructures().get(0).toString(sentence) :
+                qaPairSurfaceForms.get(0).getQuestionStructures().get(0).toString(sentence);
 
         // Prompt.
-        result += String.format("%.2f\t%s\n", promptScore, prompt);
-
+        result += String.format("\n%.2f\t%s\n", promptScore, prompt);
         for (int i = 0; i < options.size(); i++) {
             String optionString = "";
             if (i < qaPairSurfaceForms.size()) {
                 final QAStructureSurfaceForm qa = qaPairSurfaceForms.get(i);
-                final ImmutableList<Integer> argList = qa.getAnswerStructures().get(0).argumentIndices;
-                String argIdsStr = argList.stream().map(String::valueOf).collect(Collectors.joining(","));
-                String argHeadsStr = argList.stream().map(sentence::get).collect(Collectors.joining(","));
-                String parseIdsStr = DebugPrinter.getShortListString(qa.getAnswerStructures().get(0).parseIds);
-                // Option info.
-                optionString += String.format("%.2f\t%d\t%s\t%s:%s\t%s", optionScores.get(i), i, options.get(i),
-                        argIdsStr, argHeadsStr,  parseIdsStr);
+                String structStr = isJeopardyStyle ?
+                        qa.getQuestionStructures().get(0).toString(sentence) :
+                        qa.getAnswerStructures().get(0).toString(sentence);
+                String parseIdsStr = DebugPrinter.getShortListString(optionToParseIds.get(i));
+                optionString = String.format("%.2f\t%d\t%s\t%s\t%s", optionScores.get(i), i, options.get(i), structStr,
+                        parseIdsStr);
             } else {
-                optionString += String.format("%.2f\t%d\t%s", optionScores.get(i), i, options.get(i));
+                optionString = String.format("%.2f\t%d\t%s", optionScores.get(i), i, options.get(i));
             }
             result += optionString + "\n";
         }

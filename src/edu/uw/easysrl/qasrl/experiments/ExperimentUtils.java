@@ -1,10 +1,7 @@
 package edu.uw.easysrl.qasrl.experiments;
 
 import com.google.common.collect.ImmutableList;
-import edu.uw.easysrl.main.InputReader;
-import edu.uw.easysrl.qasrl.BaseCcgParser;
 import edu.uw.easysrl.qasrl.NBestList;
-import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
 import edu.uw.easysrl.qasrl.annotation.CrowdFlowerDataReader;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
@@ -13,11 +10,9 @@ import edu.uw.easysrl.qasrl.qg.QAPairAggregators;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.*;
-import edu.uw.easysrl.util.Util;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.stream.IntStream;
 
 /**
  * Created by luheng on 3/21/16.

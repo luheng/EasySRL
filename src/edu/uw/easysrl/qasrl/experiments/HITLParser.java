@@ -20,8 +20,7 @@ import java.util.stream.IntStream;
  * Created by luheng on 3/25/16.
  */
 public class HITLParser {
-    private final int nBest = 100;
-
+    private int nBest = 100;
     private ParseData parseData;
     private ImmutableList<ImmutableList<String>> sentences;
     private ImmutableList<ImmutableList<InputReader.InputWord>> inputSentences;
@@ -38,7 +37,8 @@ public class HITLParser {
     /**
      * Initialize data and re-parser.
      */
-    public HITLParser() {
+    public HITLParser(int nBest) {
+        this.nBest = nBest;
         parseData = ParseData.loadFromDevPool().get();
         sentences = parseData.getSentences();
         inputSentences = parseData.getSentenceInputWords();
@@ -84,8 +84,12 @@ public class HITLParser {
     public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getAllQueriesForSentence(int sentenceId,
                                                                                        boolean isJeopardyStyle,
                                                                                        boolean isCheckboxStyle) {
-        return ExperimentUtils.generateAllQueries(sentenceId, sentences.get(sentenceId), nbestLists.get(sentenceId),
-                isJeopardyStyle, isCheckboxStyle, queryPruningParameters);
+        ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList =
+                ExperimentUtils.generateAllQueries(sentenceId, sentences.get(sentenceId), nbestLists.get(sentenceId),
+                                                   isJeopardyStyle, isCheckboxStyle, queryPruningParameters);
+        // Assign query ids.
+        IntStream.range(0, queryList.size()).forEach(i -> queryList.get(i).setQueryId(i));
+        return queryList;
     }
 
     public Parse getReparsed(int sentenceId, Set<Evidence> evidenceSet) {
@@ -98,12 +102,13 @@ public class HITLParser {
         final NBestList nBestList = nbestLists.get(sentenceId);
         for (int i = 0; i < nBestList.getN(); i++) {
             final Parse parse = nBestList.getParse(i);
-            final double rerankScore = evidenceSet.stream()
+            final double rerankScore = parse.score + evidenceSet.stream()
                     .filter(ev -> ev.hasEvidence(parse))
                     .mapToDouble(ev -> ev.isPositive() ? ev.getConfidence() : -ev.getConfidence())
-                    .sum() + parse.score;
+                    .sum();
             if (rerankScore > bestScore + 1e-6) {
                 rerankedId = i;
+                bestScore = rerankScore;
             }
         }
         return rerankedId;

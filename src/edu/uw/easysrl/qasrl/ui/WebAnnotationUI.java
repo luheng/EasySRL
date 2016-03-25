@@ -16,6 +16,7 @@ import com.google.common.collect.ImmutableMap;
 import edu.uw.easysrl.qasrl.*;
 
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
+import edu.uw.easysrl.qasrl.experiments.HITLParser;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
@@ -36,11 +37,7 @@ public class WebAnnotationUI {
     private static int nBest = 100;
 
     // Shared data: nBestList, sentences, etc.
-    private static ParseData parseData;
-    private static ImmutableMap<Integer, NBestList> allParses;
-    private static BaseCcgParser parser;
-    private static BaseCcgParser.ConstrainedCcgParser reparser;
-    private static int maxTagsPerWord = 50;
+    private static HITLParser myHITLParser;
 
     // user name -> all the queries for the current sentence.
     private static Map<String, List<ScoredQuery<QAStructureSurfaceForm>>> activeLearningMap;
@@ -68,6 +65,7 @@ public class WebAnnotationUI {
 
     private static boolean isJeopardyStyle = true;
     private static boolean isCheckboxVersion = true;
+
     private static QueryPruningParameters queryPruningParameters;
     static {
         queryPruningParameters = new QueryPruningParameters();
@@ -83,17 +81,8 @@ public class WebAnnotationUI {
         queryIdMap = new HashMap<>();
         sentenceIdsMap = new HashMap<>();
 
-        // Load parseData and nBestLists;
-        parseData = ParseData.loadFromDevPool().get();
-        System.out.println(String.format("Read %d sentences from the dev set.", parseData.getGoldParses().size()));
-
-        String preparsedFile = "parses.100best.out";
-        parser = new BaseCcgParser.MockParser(preparsedFile, nBest);
-        System.err.println("Parse initialized.");
-        reparser = new BaseCcgParser.ConstrainedCcgParser(BaseCcgParser.modelFolder, BaseCcgParser.rootCategories,
-                maxTagsPerWord, 1 /* nbest */);
-
-        allParses = NBestList.getAllNBestLists(parser, parseData.getSentenceInputWords());
+        myHITLParser = new HITLParser(nBest);
+        myHITLParser.setQueryPruningParameters(queryPruningParameters);
     }
 
     public static void main(final String[] args) throws Exception {
@@ -221,13 +210,8 @@ public class WebAnnotationUI {
         }
 
         private void initializeForUserAndSentence(String userName, int sentenceId) {
-            final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList = ExperimentUtils.generateAllQueries(
-                    sentenceId,
-                    parseData.getSentences().get(sentenceId),
-                    allParses.get(sentenceId),
-                    isJeopardyStyle,
-                    isCheckboxVersion,
-                    queryPruningParameters);
+            final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList = myHITLParser.getAllQueriesForSentence(
+                    sentenceId, isJeopardyStyle, isCheckboxVersion);
             activeLearningMap.put(userName, queryList);
             System.err.println("sentence " + sentenceId + " has " + queryList.size() + " queries.");
             activeLearningMap.put(userName, queryList);
@@ -267,7 +251,7 @@ public class WebAnnotationUI {
             httpWriter.println(WebUIHelper.printProgressBar(queryId, 0 /* numSkipped */, numTotalQueries));
 
             // Print sentence.
-            final List<String> words = parseData.getSentences().get(query.getSentenceId());
+            final ImmutableList<String> words = myHITLParser.getSentence(query.getSentenceId());
 
             httpWriter.println("<container><div class=\"row\">\n");
             httpWriter.println("<div class=\"col-md-12\">");
@@ -298,6 +282,9 @@ public class WebAnnotationUI {
 
             IntStream.range(0, query.getOptions().size()).boxed().forEach(i ->
                 httpWriter.write("<br/>" + query.getOptions().get(i) + "&nbsp&nbsp&nbsp&nbsp" + query.getOptionScores().get(i)));
+
+
+            httpWriter.write("<p>" + query.toString(words).replace("\t", "&nbsp&nbsp").replace("\n", "<br/>") + "</p>");
 
             httpWriter.write("<br/><br/>");
 

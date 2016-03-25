@@ -29,4 +29,10 @@ public class AnswerStructure {
         this.parseIds = QAPairAggregatorUtils.getParseIds(qaList);
         this.score = QAPairAggregatorUtils.getScore(qaList);
     }
+
+    public String toString(final ImmutableList<String> words) {
+        String argIdsStr = argumentIndices.stream().map(String::valueOf).collect(Collectors.joining(","));
+        String argHeadsStr = argumentIndices.stream().map(words::get).collect(Collectors.joining(","));
+        return argIdsStr + ":" + argHeadsStr;
+    }
 }

@@ -35,8 +35,7 @@ public class ReparsingExperiment {
     };
 
     public static void main(String[] args) {
-        myHTILParser = new HITLParser();
-
+        myHTILParser = new HITLParser(nBest);
         annotations = ExperimentUtils.loadCrowdflowerAnnotation(annotationFiles);
         assert annotations != null;
 
