@@ -18,7 +18,6 @@ import java.util.stream.IntStream;
  *
  * Created by julianmichael on 3/17/16.
  */
-@Deprecated
 public class BasicQuery<QA extends QAPairSurfaceForm> implements Query<QA> {
 
     public int getSentenceId() {

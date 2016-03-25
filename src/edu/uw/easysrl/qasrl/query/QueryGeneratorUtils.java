@@ -8,6 +8,7 @@ import java.util.Collection;
 public class QueryGeneratorUtils {
     public static String kBadQuestionOptionString = "Bad question.";
     public static String kUnlistedAnswerOptionString = "Answer is not listed.";
+    // For jeopardy-style.
     public static String kNoneApplicableString = "None of the above.";
 
     public static double computeEntropy(Collection<Double> scores) {
@@ -19,4 +20,7 @@ public class QueryGeneratorUtils {
                 .sum() / Math.log(2);
     }
 
+    public static boolean isNAOption(final String optionStr) {
+        return optionStr.equals(kBadQuestionOptionString) || optionStr.equals(kNoneApplicableString);
+    }
 }

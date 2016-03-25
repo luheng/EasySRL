@@ -116,10 +116,8 @@ public class ExperimentUtils {
 
     static AlignedAnnotation getAlignedAnnotation(ScoredQuery<QAStructureSurfaceForm> query,
                                                   List<AlignedAnnotation> annotations) {
-        String qkey = query.getQAPairSurfaceForms().get(0).getPredicateIndex() + "\t" + query.getPrompt();
         for (AlignedAnnotation annotation : annotations) {
-            String qkey2 = annotation.predicateId + "\t" + annotation.question;
-            if (qkey.equals(qkey2)) {
+            if (query.getPrompt().equals(annotation.question)) {
                 return annotation;
             }
         }

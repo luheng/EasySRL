@@ -1,17 +1,16 @@
 package edu.uw.easysrl.qasrl.query;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import edu.uw.easysrl.qasrl.experiments.DebugPrinter;
 import edu.uw.easysrl.qasrl.NBestList;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.GuavaCollectors;
 
-import java.util.Optional;
-import java.util.OptionalInt;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 /**
  * Query with Scores. Just more convenient.
@@ -43,6 +42,7 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
     private int queryId;
     private double promptScore, optionEntropy;
     private ImmutableList<Double> optionScores;
+    private ImmutableList<ImmutableSet<Integer>> optionToParseIds;
 
     public ScoredQuery(int sentenceId,
                        String prompt,
@@ -59,35 +59,37 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
     }
 
     public void computeScores(NBestList nbestList) {
-        double totalScore = nbestList.getScores().stream().mapToDouble(s -> s).sum();
-        promptScore = qaPairSurfaceForms.stream()
-                .flatMap(qa -> isJeopardyStyle ? qa.getAnswerParseIds().stream() : qa.getQuestionParseIds().stream())
-                .distinct()
-                .mapToDouble(nbestList::getScore)
-                .sum() / totalScore;
+        Set<Integer> allParseIds = IntStream.range(0, nbestList.getN()).boxed().collect(Collectors.toSet());
+        double totalScore = allParseIds.stream().mapToDouble(nbestList::getScore).sum();
 
-        optionScores = IntStream.range(0, options.size()).boxed()
+        optionToParseIds = IntStream.range(0, options.size()).boxed()
                 .map(i -> {
-                    double optionScore = .0;
+                    ImmutableSet<Integer> pids = ImmutableSet.of();
                     if (i < qaPairSurfaceForms.size()) {
                         final QAStructureSurfaceForm qa = qaPairSurfaceForms.get(i);
-                        optionScore = (isJeopardyStyle ? qa.getQuestionParseIds().stream() :
-                                                         qa.getAnswerParseIds().stream())
-                                .distinct()
-                                .mapToDouble(nbestList::getScore)
-                                .sum() / totalScore;
-                    } else if (options.get(i).equals(QueryGeneratorUtils.kBadQuestionOptionString) ||
-                                options.get(i).equals(QueryGeneratorUtils.kNoneApplicableString)) {
-                        optionScore = 1.0 - promptScore;
+                        pids = isJeopardyStyle ? qa.getQuestionParseIds() : qa.getAnswerParseIds();
+                        allParseIds.removeAll(pids);
+                    } else if (QueryGeneratorUtils.isNAOption(options.get(i))) {
+                        pids = ImmutableSet.copyOf(allParseIds);
                     }
-                    return optionScore;
+                    return pids;
                 }).collect(GuavaCollectors.toImmutableList());
+
+        optionScores = optionToParseIds.stream()
+                .map(pids -> pids.stream().mapToDouble(nbestList::getScore).sum() / totalScore)
+                .collect(GuavaCollectors.toImmutableList());
+
+        promptScore = 1.0 - optionScores.get(getBadQuestionOptionId().getAsInt());
 
         optionEntropy = QueryGeneratorUtils.computeEntropy(optionScores);
     }
 
     public ImmutableList<Double> getOptionScores() {
         return optionScores;
+    }
+
+    public ImmutableList<ImmutableSet<Integer>> getOptionToParseIds() {
+        return optionToParseIds;
     }
 
     public double getPromptScore() {
@@ -121,7 +123,7 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
 
     public OptionalInt getBadQuestionOptionId() {
         return IntStream.range(0, options.size())
-                .filter(i -> options.get(i).equals(QueryGeneratorUtils.kBadQuestionOptionString))
+                .filter(i -> QueryGeneratorUtils.isNAOption(options.get(i)))
                 .findFirst();
     }
 

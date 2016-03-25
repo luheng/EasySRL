@@ -1,6 +1,7 @@
 package edu.uw.easysrl.qasrl.qg.surfaceform;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.syntax.AnswerStructure;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
@@ -37,18 +38,18 @@ public class QAStructureSurfaceForm implements QAPairSurfaceForm {
         return answerStructures;
     }
 
-    public ImmutableList<Integer> getQuestionParseIds() {
+    public ImmutableSet<Integer> getQuestionParseIds() {
         return questionStructures.stream()
                 .flatMap(qs -> qs.parseIds.stream())
                 .distinct()
-                .collect(GuavaCollectors.toImmutableList());
+                .collect(GuavaCollectors.toImmutableSet());
     }
 
-    public ImmutableList<Integer> getAnswerParseIds() {
+    public ImmutableSet<Integer> getAnswerParseIds() {
         return answerStructures.stream()
                 .flatMap(ans -> ans.parseIds.stream())
                 .distinct()
-                .collect(GuavaCollectors.toImmutableList());
+                .collect(GuavaCollectors.toImmutableSet());
     }
 
     @Override

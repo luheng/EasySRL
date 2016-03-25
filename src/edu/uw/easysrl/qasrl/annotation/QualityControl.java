@@ -31,6 +31,8 @@ public class QualityControl {
     static {
         badQuestionStrings.add("Question is not valid.");
         badQuestionStrings.add("Bad question.");
+        badQuestionStrings.add(QueryGeneratorUtils.kBadQuestionOptionString);
+        badQuestionStrings.add(QueryGeneratorUtils.kNoneApplicableString);
     }
 
     // FIXME: stream doesn't work here ... why?
@@ -84,12 +86,10 @@ public class QualityControl {
     }
 
     public static int[] getUserResponses(Query query, AlignedAnnotation annotation) {
-        String qkey = query.getQueryKey();
         int numOptions = query.getOptions().size();
         int[] optionDist = new int[numOptions];
         Arrays.fill(optionDist, 0);
-        String qkey2 = annotation.predicateId + "\t" + annotation.question;
-        if (qkey.equals(qkey2)) {
+        if (query.getPrompt().equals(annotation.question)) {
             for (int i = 0; i < numOptions; i++) {
                 for (int j = 0; j < annotation.answerOptions.size(); j++) {
                     String optionStr = (String) query.getOptions().get(i);

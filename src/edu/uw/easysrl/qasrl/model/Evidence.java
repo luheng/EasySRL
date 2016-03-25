@@ -18,8 +18,8 @@ import java.util.*;
 public abstract class Evidence {
 
     // Reward for positive evidence. Penalize for negative evidence. For the A* factored model we can only penalize.
-    boolean isPositive;
-    double confidence;
+    private boolean isPositive;
+    private double confidence;
 
     Evidence(boolean isPositive, double confidence) {
         this.isPositive = isPositive;
