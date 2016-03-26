@@ -35,10 +35,11 @@ public class ExperimentUtils {
             final QueryPruningParameters queryPruningParameters) {
         final ImmutableList<QuestionAnswerPair> rawQAPairs = QuestionGenerator
                 .generateAllQAPairs(sentenceId, sentence, nBestList);
-        return QueryFilter.filter(QueryGenerators.radioButtonQueryGenerator()
-                                    .generate(QAPairAggregators.aggregateForSingleChoiceQA().aggregate(rawQAPairs)),
-                                  nBestList,
-                                  queryPruningParameters);
+        return QueryFilters.scoredQueryFilter()
+                .filter(QueryGenerators.radioButtonQueryGenerator()
+                        .generate(QAPairAggregators.aggregateForSingleChoiceQA()
+                                .aggregate(rawQAPairs)),
+                        nBestList, queryPruningParameters);
     }
 
     public static ImmutableList<ScoredQuery<QAStructureSurfaceForm>> generateAllCheckboxQueries(
@@ -48,10 +49,11 @@ public class ExperimentUtils {
             final QueryPruningParameters queryPruningParameters) {
         final ImmutableList<QuestionAnswerPair> rawQAPairs = QuestionGenerator
                 .generateAllQAPairs(sentenceId, sentence, nBestList);
-        return QueryFilter.filter(QueryGenerators.checkboxQueryGenerator().generate(
-                                        QAPairAggregators.aggregateForMultipleChoiceQA().aggregate(rawQAPairs)),
-                                  nBestList,
-                                  queryPruningParameters);
+        return QueryFilters.scoredQueryFilter()
+                .filter(QueryGenerators.checkboxQueryGenerator()
+                        .generate(QAPairAggregators.aggregateForMultipleChoiceQA()
+                                .aggregate(rawQAPairs)),
+                nBestList, queryPruningParameters);
     }
 
     public static ImmutableList<ScoredQuery<QAStructureSurfaceForm>> generateAllQueries(
@@ -62,25 +64,33 @@ public class ExperimentUtils {
             final boolean isCheckbox,
             final QueryPruningParameters queryPruningParameters) {
         return generateAllQueries(
+                // Choose QAPair aggregator.
                 isCheckbox ?
                         QAPairAggregators.aggregateForMultipleChoiceQA() :
                         QAPairAggregators.aggregateForSingleChoiceQA(),
+                // Choose Query generator.
                 isJeopardyStyle ?
                         QueryGenerators.jeopardyCheckboxQueryGenerator() :
                         (isCheckbox ?
                                 QueryGenerators.checkboxQueryGenerator() :
                                 QueryGenerators.radioButtonQueryGenerator()),
+                // Choose Query filter.
+                isJeopardyStyle ?
+                        QueryFilters.jeopardyPPQueryFilter() :
+                        QueryFilters.scoredQueryFilter(),
+                // Other parameters.
                 sentenceId, sentence, nBestList, queryPruningParameters);
     }
 
     public static ImmutableList<ScoredQuery<QAStructureSurfaceForm>> generateAllQueries(
             QAPairAggregator<QAStructureSurfaceForm> qaPairAggregator,
             QueryGenerator<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> queryGenerator,
+            QueryFilter<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> queryFilter,
             final int sentenceId,
             final ImmutableList<String> sentence,
             final NBestList nBestList,
             final QueryPruningParameters queryPruningParameters) {
-        return QueryFilter.filter(
+        return queryFilter.filter(
                     queryGenerator.generate(
                             qaPairAggregator.aggregate(
                                     QuestionGenerator.generateAllQAPairs(sentenceId, sentence, nBestList))),

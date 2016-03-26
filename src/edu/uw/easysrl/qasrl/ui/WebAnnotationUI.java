@@ -125,9 +125,7 @@ public class WebAnnotationUI {
                 String userName = request.getParameter("UserName");
                 String newRequest = "/annotate?UserName=" + userName;
                 // Forward parameters.
-                if (request.getParameter("KeepBinary") != null) {
-                    newRequest += "&KeepBinary=True";
-                }
+                // if (request.getParameter("KeepBinary") != null) { newRequest += "&KeepBinary=True"; }
                 httpResponse.sendRedirect(httpResponse.encodeRedirectURL(newRequest));
             } else {
                 PrintWriter httpWriter = httpResponse.getWriter();
