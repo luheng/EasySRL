@@ -60,6 +60,8 @@ public class WebAnnotationUI {
     private static final int[] sentencesToAnnotate = new int[] {
             90, 99, 156, 192, 199, 217, 224, 268, 294, 397, 444, 469, 563, 705, 762, 992, 1016, 1078, 1105, 1124, 1199,
             1232, 1261, 1304, 1305, 1489, 1495, 1516, 1564, 1674, 1695
+
+            //0, 3, 5, 6, 8, 12, 13
     };
 
 
@@ -70,7 +72,7 @@ public class WebAnnotationUI {
     static {
         queryPruningParameters = new QueryPruningParameters();
         queryPruningParameters.skipPPQuestions = false;
-        queryPruningParameters.skipBinaryQueries = false;
+        queryPruningParameters.skipBinaryQueries = true;
     }
 
     private static void initializeData() {
@@ -165,8 +167,7 @@ public class WebAnnotationUI {
                 }
                 sentenceIdsMap.put(userName, sentIds);
                 activeLearningHistoryMap.put(userName, new ArrayList<>());
-
-                initializeForUserAndSentence(userName, sentIds.get(0));
+                initializeNextSentenceForUser(userName);
             }
 
             final BufferedWriter fileWriter = annotationFileWriterMap.get(userName);
@@ -207,13 +208,26 @@ public class WebAnnotationUI {
             update(userName, httpResponse.getWriter());
         }
 
-        private void initializeForUserAndSentence(String userName, int sentenceId) {
-            final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList = myHITLParser.getAllQueriesForSentence(
-                    sentenceId, isJeopardyStyle, isCheckboxVersion);
-            activeLearningMap.put(userName, queryList);
-            System.err.println("sentence " + sentenceId + " has " + queryList.size() + " queries.");
+        private boolean initializeNextSentenceForUser(String userName) {
+            final List<Integer> sentenceIds = sentenceIdsMap.get(userName);
+            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList = null;
+            while (sentenceIds.size() > 1) {
+                queryList = myHITLParser.getAllQueriesForSentence(
+                                sentenceIds.get(0),
+                                isJeopardyStyle,
+                                isCheckboxVersion);
+                if (!queryList.isEmpty()) {
+                    break;
+                }
+                sentenceIds.remove(0);
+            }
+            if (queryList == null || queryList.isEmpty()) {
+                return false;
+            }
+            System.err.println("sentence " + sentenceIds.get(0) + " has " + queryList.size() + " queries.");
             activeLearningMap.put(userName, queryList);
             queryIdMap.put(userName, 0);
+            return true;
         }
 
         private void update(final String userName, final PrintWriter httpWriter) {
@@ -224,11 +238,9 @@ public class WebAnnotationUI {
             // Get next query from pool.
             if (queryId >= queryPool.size()) {
                 sentenceIds.remove(0);
-                if (sentenceIds.size() == 0) {
+                if (!initializeNextSentenceForUser(userName)) {
                     return;
                 }
-                int newSentId = sentenceIds.get(0);
-                initializeForUserAndSentence(userName, newSentId);
                 queryPool = activeLearningMap.get(userName);
                 queryId = 0;
             }
@@ -253,20 +265,34 @@ public class WebAnnotationUI {
 
             httpWriter.println("<container><div class=\"row\">\n");
             httpWriter.println("<div class=\"col-md-12\">");
+
             // Annotation margin.
             httpWriter.println("<panel panel-default>\n");
             httpWriter.println("<h5><span class=\"label label-primary\" for=\"Sentence\">Sentence:</span></h5>");
-            httpWriter.println("<div id=\"Sentence\"> " + TextGenerationHelper.renderHTMLSentenceString(words,
-                    -1 /* don't the predicate id */, true /* highlight predicate */) + " </div>");
-            httpWriter.println("<h5><span class=\"label label-primary\" for=\"Question\">Question:</span><br></h5>");
-            httpWriter.println("<div id=\"Question\"> " + query.getPrompt() + " </div>");
+            httpWriter.println("<div id=\"Sentence\"> " + TextGenerationHelper.renderHTMLSentenceString(words, -1 /* don't know the predicate id */, false /* highlight predicate */) + " </div>");
 
-            httpWriter.println("<h5><span class=\"label label-primary\" for=\"AnswerOptions\">Answer Options:</span></h5>");
-            httpWriter.println("<form class=\"form-group\" id=\"AnswerOptions\" action=\"\" method=\"get\">");
+            // TODO: handle radiobutton.
+            if (isJeopardyStyle) {
+                httpWriter.println("<h5><span class=\"label label-primary\" for=\"AnswerOptions\">Question Options:</span></h5>");
+                httpWriter.println("<form class=\"form-group\" id=\"AnswerOptions\" action=\"\" method=\"get\">");
+                query.getOptions().forEach(optionStr ->
+                        httpWriter.println(String.format("<input name=\"UserAnswer\" type=\"checkbox\" value=\"%s\" />&nbsp %s <br/>",
+                                optionStr, optionStr)));
+
+                httpWriter.println("<h5><span class=\"label label-primary\" for=\"Question\">Answer:</span><br></h5>");
+                httpWriter.println("<div id=\"Question\"> " + query.getPrompt() + " </div>");
+            } else {
+                httpWriter.println("<h5><span class=\"label label-primary\" for=\"Question\">Question:</span><br></h5>");
+                httpWriter.println("<div id=\"Question\"> " + query.getPrompt() + " </div>");
+
+                httpWriter.println("<h5><span class=\"label label-primary\" for=\"AnswerOptions\">Answer Options:</span></h5>");
+                httpWriter.println("<form class=\"form-group\" id=\"AnswerOptions\" action=\"\" method=\"get\">");
+                query.getOptions().forEach(optionStr ->
+                        httpWriter.println(String.format("<input name=\"UserAnswer\" type=\"checkbox\" value=\"%s\" />&nbsp %s <br/>",
+                                optionStr, optionStr)));
+            }
+            // Add user name.
             httpWriter.println(String.format("<input type=\"hidden\" input name=\"UserName\" value=\"%s\"/>", userName));
-
-            query.getOptions().forEach(optionStr ->
-                httpWriter.println(String.format("<input name=\"UserAnswer\" type=\"checkbox\" value=\"%s\" />&nbsp %s <br/>", optionStr, optionStr)));
 
             // Comment box.
             httpWriter.println("<br><span class=\"label label-primary\" for=\"Comment\">Comments (if any):</span> <br>");

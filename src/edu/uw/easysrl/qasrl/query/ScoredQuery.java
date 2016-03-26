@@ -58,30 +58,49 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
         this.qaPairSurfaceForms = qaPairSurfaceForms;
         this.isJeopardyStyle = isJeopardyStyle;
         this.allowMultipleChoices = allowMultipleChoices;
+        this.optionScores = null;
+        this.optionToParseIds = null;
+    }
+
+    @Deprecated
+    public ScoredQuery(int sentenceId,
+                       String prompt,
+                       ImmutableList<String> options,
+                       ImmutableList<QA> qaPairSurfaceForms,
+                       boolean isJeopardyStyle,
+                       boolean allowMultipleChoices,
+                       ImmutableList<ImmutableSet<Integer>> optionToParseIds,
+                       ImmutableList<Double> optionScores) {
+        this(sentenceId, prompt, options, qaPairSurfaceForms, isJeopardyStyle, allowMultipleChoices);
+        this.optionToParseIds = optionToParseIds;
+        this.optionScores = optionScores;
     }
 
     public void computeScores(NBestList nbestList) {
         Set<Integer> allParseIds = IntStream.range(0, nbestList.getN()).boxed().collect(Collectors.toSet());
         double totalScore = allParseIds.stream().mapToDouble(nbestList::getScore).sum();
 
-        optionToParseIds = IntStream.range(0, options.size()).boxed()
-                .map(i -> {
-                    ImmutableSet<Integer> pids = ImmutableSet.of();
-                    if (i < qaPairSurfaceForms.size()) {
-                        pids = QueryGeneratorUtils.getParseIdsForQAPair(qaPairSurfaceForms.get(i), nbestList);
-                        allParseIds.removeAll(pids);
-                    } else if (QueryGeneratorUtils.isNAOption(options.get(i))) {
-                        pids = ImmutableSet.copyOf(allParseIds);
-                    }
-                    return pids;
-                }).collect(GuavaCollectors.toImmutableList());
+        if (optionToParseIds == null) {
+            optionToParseIds = IntStream.range(0, options.size()).boxed()
+                    .map(i -> {
+                        ImmutableSet<Integer> pids = ImmutableSet.of();
+                        if (i < qaPairSurfaceForms.size()) {
+                            pids = QueryGeneratorUtils.getParseIdsForQAPair(qaPairSurfaceForms.get(i), nbestList);
+                            allParseIds.removeAll(pids);
+                        } else if (QueryGeneratorUtils.isNAOption(options.get(i))) {
+                            pids = ImmutableSet.copyOf(allParseIds);
+                        }
+                        return pids;
+                    }).collect(GuavaCollectors.toImmutableList());
+        }
 
-        optionScores = optionToParseIds.stream()
-                .map(pids -> pids.stream().mapToDouble(nbestList::getScore).sum() / totalScore)
-                .collect(GuavaCollectors.toImmutableList());
+        if (optionScores == null) {
+            optionScores = optionToParseIds.stream()
+                    .map(pids -> pids.stream().mapToDouble(nbestList::getScore).sum() / totalScore)
+                    .collect(GuavaCollectors.toImmutableList());
+        }
 
         promptScore = 1.0 - optionScores.get(getBadQuestionOptionId().getAsInt());
-
         optionEntropy = QueryGeneratorUtils.computeEntropy(optionScores);
     }
 
