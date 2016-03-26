@@ -1,6 +1,15 @@
 package edu.uw.easysrl.qasrl.query;
 
+import com.google.common.collect.ImmutableSet;
+import edu.uw.easysrl.dependencies.ResolvedDependency;
+import edu.uw.easysrl.qasrl.NBestList;
+import edu.uw.easysrl.qasrl.Parse;
+import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
+
+import edu.uw.easysrl.util.GuavaCollectors;
+
 import java.util.Collection;
+import java.util.stream.IntStream;
 
 /**
  * Created by luheng on 3/22/16.
@@ -11,7 +20,24 @@ public class QueryGeneratorUtils {
     // For jeopardy-style.
     public static String kNoneApplicableString = "None of the above.";
 
-    public static double computeEntropy(Collection<Double> scores) {
+    static ImmutableSet<Integer> getParseIdsForQAPair(final QAStructureSurfaceForm qaPair,
+                                                             final NBestList nBestList) {
+        return IntStream.range(0, nBestList.getN())
+                .filter(i -> {
+                    final Parse parse = nBestList.getParse(i);
+                    return qaPair.getQuestionStructures().stream()
+                            .filter(qStr -> parse.categories.get(qStr.predicateIndex) == qStr.category)
+                            .anyMatch(qStr -> {
+                                final ImmutableSet<ResolvedDependency> deps = qStr.filter(parse.dependencies);
+                                return qaPair.getAnswerStructures().stream()
+                                        .anyMatch(aStr -> !aStr.filter(deps).isEmpty());
+                            });
+                })
+                .boxed()
+                .collect(GuavaCollectors.toImmutableSet());
+    }
+
+    static double computeEntropy(Collection<Double> scores) {
         final double sum = scores.stream().mapToDouble(s -> s).sum();
         return 0.0 - scores.stream()
                 .mapToDouble(s -> s / sum)
@@ -20,7 +46,7 @@ public class QueryGeneratorUtils {
                 .sum() / Math.log(2);
     }
 
-    public static boolean isNAOption(final String optionStr) {
+    static boolean isNAOption(final String optionStr) {
         return optionStr.equals(kBadQuestionOptionString) || optionStr.equals(kNoneApplicableString);
     }
 }

@@ -68,10 +68,7 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
                 .map(i -> {
                     ImmutableSet<Integer> pids = ImmutableSet.of();
                     if (i < qaPairSurfaceForms.size()) {
-                        final QAStructureSurfaceForm qa = qaPairSurfaceForms.get(i);
-                        pids = qa.getQuestionParseIds().stream()
-                                .filter(qa.getAnswerParseIds()::contains)
-                                .collect(GuavaCollectors.toImmutableSet());
+                        pids = QueryGeneratorUtils.getParseIdsForQAPair(qaPairSurfaceForms.get(i), nbestList);
                         allParseIds.removeAll(pids);
                     } else if (QueryGeneratorUtils.isNAOption(options.get(i))) {
                         pids = ImmutableSet.copyOf(allParseIds);

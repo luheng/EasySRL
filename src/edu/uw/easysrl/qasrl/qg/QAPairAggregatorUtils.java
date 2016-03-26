@@ -18,13 +18,6 @@ import static java.util.stream.Collectors.*;
 public class QAPairAggregatorUtils {
     public static String answerDelimiter = " _AND_ ";
 
-
-    public static ImmutableSet<Integer> getParseIds(Collection<QuestionAnswerPair> qaList) {
-        return qaList.stream()
-                .map(QuestionAnswerPair::getParseId)
-                .collect(toImmutableSet());
-    }
-
     public static double getScore(Collection<QuestionAnswerPair> qaList) {
         return qaList.stream()
                 .collect(groupingBy(QuestionAnswerPair::getParseId))

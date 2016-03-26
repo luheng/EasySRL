@@ -6,7 +6,7 @@ import java.util.Objects;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.Preposition;
 
-abstract class Dependency implements Serializable {
+public abstract class Dependency implements Serializable {
 	/**
 	 *
 	 */

@@ -38,20 +38,6 @@ public class QAStructureSurfaceForm implements QAPairSurfaceForm {
         return answerStructures;
     }
 
-    public ImmutableSet<Integer> getQuestionParseIds() {
-        return questionStructures.stream()
-                .flatMap(qs -> qs.parseIds.stream())
-                .distinct()
-                .collect(GuavaCollectors.toImmutableSet());
-    }
-
-    public ImmutableSet<Integer> getAnswerParseIds() {
-        return answerStructures.stream()
-                .flatMap(ans -> ans.parseIds.stream())
-                .distinct()
-                .collect(GuavaCollectors.toImmutableSet());
-    }
-
     @Override
     public int getSentenceId() {
         return sentenceId;

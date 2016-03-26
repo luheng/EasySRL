@@ -38,7 +38,8 @@ public class QueryGenerators {
                         .distinct()
                         .collect(toImmutableList());
                 ImmutableList<QA> surfaceForms = ImmutableList.copyOf(e.getValue());
-                return new BasicQuery<>(sentenceId, question, answers, surfaceForms, false /* is jeopardy style */,
+                return new BasicQuery<>(sentenceId, question, answers, surfaceForms,
+                                        false /* is jeopardy style */,
                                         true /* allow multiple */);
             })
             .collect(toImmutableList());
@@ -98,7 +99,6 @@ public class QueryGenerators {
                 .map(qaList -> {
                     List<String> options = qaList.stream().map(QA::getQuestion).collect(toList());
                     options.add(QueryGeneratorUtils.kNoneApplicableString);
-
                     return new ScoredQuery<>(
                             qaList.get(0).getSentenceId(),
                             qaList.get(0).getAnswer(),

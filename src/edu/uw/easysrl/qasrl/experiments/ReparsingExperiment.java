@@ -10,6 +10,7 @@ import edu.uw.easysrl.qasrl.experiments.ExperimentUtils.*;
 import edu.uw.easysrl.qasrl.model.Evidence;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
+import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
@@ -34,8 +35,14 @@ public class ReparsingExperiment {
             "./Crowdflower_data/all-checkbox-responses.csv"
     };
 
+    private static QueryPruningParameters queryPruningParameters = new QueryPruningParameters();
+    static {
+       // TODO: Set query pruning parameters here.
+    }
+
     public static void main(String[] args) {
         myHTILParser = new HITLParser(nBest);
+        myHTILParser.setQueryPruningParameters(queryPruningParameters);
         annotations = ExperimentUtils.loadCrowdflowerAnnotation(annotationFiles);
         assert annotations != null;
 
