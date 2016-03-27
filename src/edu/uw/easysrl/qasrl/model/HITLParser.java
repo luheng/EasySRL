@@ -13,6 +13,7 @@ import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
@@ -59,6 +60,10 @@ public class HITLParser {
 
     public void setQueryPruningParameters(QueryPruningParameters queryPruningParameters) {
         this.queryPruningParameters = queryPruningParameters;
+    }
+
+    public ImmutableList<Integer> getAllSentenceIds() {
+        return nbestLists.keySet().stream().sorted().collect(GuavaCollectors.toImmutableList());
     }
 
     public ImmutableList<String> getSentence(int sentenceId) {

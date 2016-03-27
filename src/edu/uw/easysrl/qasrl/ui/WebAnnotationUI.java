@@ -4,6 +4,7 @@ import java.io.*;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import javax.servlet.ServletException;
@@ -11,13 +12,19 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Table;
 import edu.uw.easysrl.qasrl.*;
 
+import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
+import edu.uw.easysrl.qasrl.model.Evidence;
 import edu.uw.easysrl.qasrl.model.HITLParser;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
+import edu.uw.easysrl.util.GuavaCollectors;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.HandlerCollection;
@@ -41,13 +48,18 @@ public class WebAnnotationUI {
     private static Map<String, List<ScoredQuery<QAStructureSurfaceForm>>> activeLearningMap;
     // user name -> all the answered queries.
     private static Map<String, List<ScoredQuery<QAStructureSurfaceForm>>> activeLearningHistoryMap;
+    // user name, sentence id -> evidence set
+    private static Table<String, Integer, Set<Evidence>> evidenceMap;
+
     // user name -> current query id.
     private static Map<String, Integer> queryIdMap;
     // user name -> remaining sentence ids.
     private static Map<String, List<Integer>> sentenceIdsMap;
+
     // user name -> annotation file.
     private static Map<String, BufferedWriter> annotationFileWriterMap;
     private static Map<String, String> annotationFileNameMap;
+
     // user name -> parameters
     private static Map<String, Set<String>> parametersMap;
 
@@ -76,6 +88,8 @@ public class WebAnnotationUI {
     private static void initializeData() {
         activeLearningMap = new HashMap<>();
         activeLearningHistoryMap = new HashMap<>();
+        evidenceMap = HashBasedTable.create();
+
         annotationFileWriterMap = new HashMap<>();
         annotationFileNameMap = new HashMap<>();
         queryIdMap = new HashMap<>();
@@ -163,9 +177,10 @@ public class WebAnnotationUI {
             }
 
             final BufferedWriter fileWriter = annotationFileWriterMap.get(userName);
-            final String[] userAnswers = request.getParameterValues("UserAnswer");
+
             // Handle response.
-            if (userAnswers != null) {
+            if (request.getParameterValues("UserAnswer") != null) {
+                final ImmutableList<String> userAnswers = ImmutableList.copyOf(request.getParameterValues("UserAnswer"));
                 int lastQueryId = queryIdMap.get(userName);
                 final List<ScoredQuery<QAStructureSurfaceForm>> queryPool = activeLearningMap.get(userName);
                 ScoredQuery<QAStructureSurfaceForm> query = queryPool.get(lastQueryId);
@@ -187,9 +202,19 @@ public class WebAnnotationUI {
                 fileWriter.write(annotationStr + "\n");
                 fileWriter.flush();
 
+                // TODO: store user options.
+                ImmutableList<Integer> userOptions = IntStream.range(0, query.getOptions().size())
+                        .boxed()
+                        .filter(i -> userAnswers.contains(query.getOptions().get(i)))
+                        .collect(GuavaCollectors.toImmutableList());
+
                 // Advance to the next query.
                 queryIdMap.put(userName, lastQueryId + 1);
                 activeLearningHistoryMap.get(userName).add(query);
+                if (!evidenceMap.contains(userName, sentId)) {
+                    evidenceMap.put(userName, sentId, new HashSet<>());
+                }
+                evidenceMap.get(userName, sentId).addAll(myHITLParser.getEvidenceSet(query, userOptions));
             }
             httpResponse.setContentType("text/html; charset=utf-8");
             httpResponse.setStatus(HttpServletResponse.SC_OK);
@@ -201,10 +226,10 @@ public class WebAnnotationUI {
             annotationFileWriterMap.put(userName, new BufferedWriter(new FileWriter(
                     new File(annotationPath + userFileName))));
             annotationFileNameMap.put(userName, userFileName);
-            List<Integer> sentIds = new ArrayList<>();
-            for (int sid : sentencesToAnnotate) {
+            List<Integer> sentIds = myHITLParser.getAllSentenceIds().stream().collect(Collectors.toList());
+            /* for (int sid : sentencesToAnnotate) {
                 sentIds.add(sid);
-            }
+            }*/
             sentenceIdsMap.put(userName, sentIds);
             activeLearningHistoryMap.put(userName, new ArrayList<>());
             parametersMap.put(userName, new HashSet<>());
@@ -277,7 +302,8 @@ public class WebAnnotationUI {
             // Annotation margin.
             httpWriter.println("<panel panel-default>\n");
             httpWriter.println("<h5><span class=\"label label-primary\" for=\"Sentence\">Sentence:</span></h5>");
-            httpWriter.println("<div id=\"Sentence\"> " + TextGenerationHelper.renderHTMLSentenceString(words, -1 /* don't know the predicate id */, false /* highlight predicate */) + " </div>");
+            httpWriter.println("<div id=\"Sentence\"> " + TextGenerationHelper.renderHTMLSentenceString(words,
+                    -1 /* don't know the predicate id */, false /* highlight predicate */) + " </div>");
 
             // TODO: handle radiobutton.
             if (isJeopardyStyle) {
@@ -299,6 +325,7 @@ public class WebAnnotationUI {
                         httpWriter.println(String.format("<input name=\"UserAnswer\" type=\"checkbox\" value=\"%s\" />&nbsp %s <br/>",
                                 optionStr, optionStr)));
             }
+
             // Add user name.
             httpWriter.println(String.format("<input type=\"hidden\" input name=\"UserName\" value=\"%s\"/>", userName));
 
@@ -309,11 +336,19 @@ public class WebAnnotationUI {
             httpWriter.println("</form>");
             httpWriter.println("</panel>\n");
 
-            // Debugging info
-            //httpWriter.write("<br/><br/><h3>Debugging Information</h3><br/> <p> query confidence:\t" + query.getPromptScore() + "</p>");
-            //IntStream.range(0, query.getOptions().size()).boxed().forEach(i ->
-            //    httpWriter.write("<br/>" + query.getOptions().get(i) + "&nbsp&nbsp&nbsp&nbsp" + query.getOptionScores().get(i)));
+            // Debugging info.
+            httpWriter.write("<br/><br/><hr/>");
+            final int sentenceId = query.getSentenceId();
+            if (evidenceMap.contains(userName, sentenceId)) {
+                final Parse reparsed = myHITLParser.getReparsed(sentenceId, evidenceMap.get(userName, sentenceId));
+                final int reranked = myHITLParser.getRerankedParseId(sentenceId, evidenceMap.get(userName, sentenceId));
+                httpWriter.write("<p> Reparsed F1: &nbsp;" + CcgEvaluation.evaluate(reparsed.dependencies,
+                        myHITLParser.getGoldParse(sentenceId).dependencies) + "</p>");
+                httpWriter.write("<p> Reranked F1:  &nbsp;" + myHITLParser.getNBestList(sentenceId).getResults(reranked) +
+                        " &nbsp;(" + reranked + ")</p>");
+            }
 
+            httpWriter.write("<br/><br/><hr/>");
 
             httpWriter.write("<p>" + query.toString(words,
                     'G', myHITLParser.getGoldOptions(query),
@@ -328,8 +363,6 @@ public class WebAnnotationUI {
             //httpWriter.println("<button class=\"btn btn-primary\" input name=\"NextSentence\" type=\"submit\" value=\"SkipSent\">"
             //            + "Switch to Next Sentence</button>");
             httpWriter.println("</form>");
-
-            // TODO: Gold info and debugging info.
 
             // File download link
             if (activeLearningHistoryMap.get(userName).size() > 0) {
