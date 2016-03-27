@@ -1,5 +1,6 @@
 package edu.uw.easysrl.qasrl.qg.surfaceform;
 
+import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.qg.*;
 
 import com.google.common.collect.ImmutableList;
@@ -29,4 +30,5 @@ public interface QAPairSurfaceForm {
     String getQuestion();
     String getAnswer();
     ImmutableList<QuestionAnswerPair> getQAPairs();
+    boolean canBeGeneratedBy(Parse parse);
 }

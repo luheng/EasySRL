@@ -1,5 +1,6 @@
 package edu.uw.easysrl.qasrl.qg.surfaceform;
 
+import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.qg.*;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 
@@ -61,5 +62,9 @@ public final class TargetDependencySurfaceForm implements QAPairSurfaceForm {
         this.answer     =  answer;
         this.qaPairs    =  qaPairs;
         this.targetDep  =  targetDep;
+    }
+
+    public boolean canBeGeneratedBy(Parse parse) {
+        return parse.dependencies.stream().anyMatch(targetDep::equals);
     }
 }

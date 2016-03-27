@@ -28,6 +28,11 @@ public class AnswerStructure {
         this.singleHeaded = singleHeaded;
     }
 
+    /**
+     * Return all the dependencies that's relevant to this structure.
+     * @param dependencies
+     * @return
+     */
     public ImmutableSet<ResolvedDependency> filter(Collection<ResolvedDependency> dependencies) {
         return singleHeaded ?
                 dependencies.stream()

@@ -55,6 +55,9 @@ public class QuestionStructure {
         */
     }
 
+    /**
+     * * Return all the dependencies that's relevant to this structure.
+     */
     public ImmutableSet<ResolvedDependency> filter(Collection<ResolvedDependency> dependencies) {
         return dependencies.stream()
                 .filter(d -> d.getHead() == predicateIndex &&

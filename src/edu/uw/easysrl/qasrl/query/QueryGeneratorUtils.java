@@ -21,18 +21,9 @@ public class QueryGeneratorUtils {
     public static String kNoneApplicableString = "None of the above.";
 
     static ImmutableSet<Integer> getParseIdsForQAPair(final QAStructureSurfaceForm qaPair,
-                                                             final NBestList nBestList) {
+                                                      final NBestList nBestList) {
         return IntStream.range(0, nBestList.getN())
-                .filter(i -> {
-                    final Parse parse = nBestList.getParse(i);
-                    return qaPair.getQuestionStructures().stream()
-                            .filter(qStr -> parse.categories.get(qStr.predicateIndex) == qStr.category)
-                            .anyMatch(qStr -> {
-                                final ImmutableSet<ResolvedDependency> deps = qStr.filter(parse.dependencies);
-                                return qaPair.getAnswerStructures().stream()
-                                        .anyMatch(aStr -> !aStr.filter(deps).isEmpty());
-                            });
-                })
+                .filter(i -> qaPair.canBeGeneratedBy(nBestList.getParse(i)))
                 .boxed()
                 .collect(GuavaCollectors.toImmutableSet());
     }

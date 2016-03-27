@@ -2,6 +2,8 @@ package edu.uw.easysrl.qasrl.qg.surfaceform;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import edu.uw.easysrl.dependencies.ResolvedDependency;
+import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.syntax.AnswerStructure;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
@@ -78,5 +80,13 @@ public class QAStructureSurfaceForm implements QAPairSurfaceForm {
         this.qaPairs    =  qaPairs;
         this.questionStructures = questionStructures;
         this.answerStructures = answerStructures;
+    }
+
+    public boolean canBeGeneratedBy(Parse parse) {
+        return questionStructures.stream()
+                .filter(qStr -> parse.categories.get(qStr.predicateIndex) == qStr.category)
+                .map(qStr -> qStr.filter(parse.dependencies))
+                .anyMatch(qdeps -> answerStructures.stream()
+                        .anyMatch(aStr -> !aStr.filter(qdeps).isEmpty()));
     }
 }

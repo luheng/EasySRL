@@ -75,16 +75,7 @@ public class ResponseSimulatorGold {
          } else {
              // TODO: move this to: QASurfaceForm.canBeGeneratedBy(Parse parse).
              IntStream.range(0, query.getQAPairSurfaceForms().size()).boxed()
-                     .filter(i -> {
-                         final QAStructureSurfaceForm qaPair = query.getQAPairSurfaceForms().get(i);
-                         return qaPair.getQuestionStructures().stream()
-                                 .filter(qStr -> goldParse.categories.get(qStr.predicateIndex) == qStr.category)
-                                 .anyMatch(qStr -> {
-                                     final ImmutableSet<ResolvedDependency> deps = qStr.filter(goldParse.dependencies);
-                                     return qaPair.getAnswerStructures().stream()
-                                             .anyMatch(aStr -> !aStr.filter(deps).isEmpty());
-                                 });
-                     })
+                     .filter(i -> query.getQAPairSurfaceForms().get(i).canBeGeneratedBy(goldParse))
                      .forEach(chosenOptions::add);
             if (chosenOptions.size() == 0) {
                 chosenOptions.add(query.getBadQuestionOptionId().getAsInt());

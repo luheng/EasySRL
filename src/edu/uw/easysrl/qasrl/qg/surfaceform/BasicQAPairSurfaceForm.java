@@ -1,5 +1,6 @@
 package edu.uw.easysrl.qasrl.qg.surfaceform;
 
+import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.qg.*;
 
 import com.google.common.collect.ImmutableList;
@@ -42,5 +43,10 @@ public final class BasicQAPairSurfaceForm implements QAPairSurfaceForm {
         this.question = question;
         this.answer = answer;
         this.qaPairs = qaPairs;
+    }
+
+    // TODO
+    public boolean canBeGeneratedBy(Parse parse) {
+        return true;
     }
 }
