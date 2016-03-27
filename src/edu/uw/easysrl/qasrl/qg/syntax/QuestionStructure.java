@@ -64,6 +64,6 @@ public class QuestionStructure {
     }
 
     public String toString(final ImmutableList<String> words) {
-        return String.format("%d:%s\t%s\t%d\n", predicateIndex, words.get(predicateIndex), category, targetArgNum);
+        return String.format("%d:%s_%s.%d", predicateIndex, words.get(predicateIndex), category, targetArgNum);
     }
 }

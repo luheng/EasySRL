@@ -8,6 +8,7 @@ import edu.uw.easysrl.qasrl.annotation.QualityControl;
 import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils.*;
 import edu.uw.easysrl.qasrl.model.Evidence;
+import edu.uw.easysrl.qasrl.model.HITLParser;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
@@ -131,7 +132,6 @@ public class ReparsingExperiment {
                         .map(ev -> "Penalizing:\t" + ev.toString(sentence))
                         .collect(Collectors.joining("\n")) + "\n";
 
-                // TODO: add gold, oracle and one-best penalty.
                 for (int j = 0; j < optionDist.length; j++) {
                     String matchStr = "";
                     for (int k = 0; k < optionDist[j]; k++) {

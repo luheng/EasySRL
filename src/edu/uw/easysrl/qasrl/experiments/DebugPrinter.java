@@ -1,5 +1,13 @@
 package edu.uw.easysrl.qasrl.experiments;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import edu.uw.easysrl.qasrl.model.Evidence;
+import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
+import edu.uw.easysrl.qasrl.query.ScoredQuery;
+import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.util.Util;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -29,5 +37,4 @@ public class DebugPrinter {
         return shortList.stream().map(r -> (r[0] == r[1] ? String.valueOf(r[0]) : String.valueOf(r[0]) + "-" + r[1]))
                 .collect(Collectors.joining(","));
     }
-
 }

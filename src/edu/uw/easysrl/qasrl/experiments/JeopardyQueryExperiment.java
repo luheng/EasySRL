@@ -51,6 +51,7 @@ public class JeopardyQueryExperiment {
                     ExperimentUtils.generateAllQueries(sentId, sentence, nBestList,
                             true /* jeopardy */,
                             true /* checkbox */,
+                            true, /* use pronouns */
                             queryPruningParameters
                     );
 

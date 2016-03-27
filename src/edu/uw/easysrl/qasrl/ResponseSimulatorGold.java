@@ -5,8 +5,11 @@ import com.google.common.collect.ImmutableSet;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.qg.*;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAPairSurfaceForm;
+import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.Query;
+import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.util.GuavaCollectors;
+import edu.uw.easysrl.util.Util;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -17,20 +20,21 @@ import java.util.stream.IntStream;
  * knowledge of gold dependencies.
  * Created by luheng on 1/5/16.
  */
-public class ResponseSimulatorGold extends ResponseSimulator {
+public class ResponseSimulatorGold {
     private final ParseData parseData;
 
     public ResponseSimulatorGold(ParseData parseData) {
         this.parseData = parseData;
     }
 
-     public ImmutableList<Integer> respondToQuery(Query query) {
+     public ImmutableList<Integer> respondToQuery(ScoredQuery<QAStructureSurfaceForm> query) {
          final int sentenceId = query.getSentenceId();
          final Parse goldParse = parseData.getGoldParses().get(sentenceId);
 
          Set<Integer> chosenOptions = new HashSet<>();
+
          if (!query.isJeopardyStyle()) {
-             final ImmutableList<QAPairSurfaceForm> qaOptions = query.getQAPairSurfaceForms();
+             final ImmutableList<QAStructureSurfaceForm> qaOptions = query.getQAPairSurfaceForms();
              // The gold considers labeled dependency. If the dependency labels don't match, gold outputs "bad question".
              // So the gold outputs "bad question" in case of dropped pp argument.
              final ImmutableSet<Integer> goldArgIds = goldParse.dependencies.stream()
@@ -68,6 +72,23 @@ public class ResponseSimulatorGold extends ResponseSimulator {
                      chosenOptions.add(query.getBadQuestionOptionId().getAsInt());
                  }
              }
+         } else {
+             // TODO: move this to: QASurfaceForm.canBeGeneratedBy(Parse parse).
+             IntStream.range(0, query.getQAPairSurfaceForms().size()).boxed()
+                     .filter(i -> {
+                         final QAStructureSurfaceForm qaPair = query.getQAPairSurfaceForms().get(i);
+                         return qaPair.getQuestionStructures().stream()
+                                 .filter(qStr -> goldParse.categories.get(qStr.predicateIndex) == qStr.category)
+                                 .anyMatch(qStr -> {
+                                     final ImmutableSet<ResolvedDependency> deps = qStr.filter(goldParse.dependencies);
+                                     return qaPair.getAnswerStructures().stream()
+                                             .anyMatch(aStr -> !aStr.filter(deps).isEmpty());
+                                 });
+                     })
+                     .forEach(chosenOptions::add);
+            if (chosenOptions.size() == 0) {
+                chosenOptions.add(query.getBadQuestionOptionId().getAsInt());
+            }
          }
          // TODO: jeopardy style questions
          return chosenOptions.stream().sorted().collect(GuavaCollectors.toImmutableList());

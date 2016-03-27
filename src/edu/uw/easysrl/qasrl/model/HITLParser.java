@@ -1,4 +1,4 @@
-package edu.uw.easysrl.qasrl.experiments;
+package edu.uw.easysrl.qasrl.model;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -6,7 +6,7 @@ import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
 import edu.uw.easysrl.qasrl.annotation.QualityControl;
-import edu.uw.easysrl.qasrl.model.Evidence;
+import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
@@ -31,8 +31,8 @@ public class HITLParser {
     private QueryPruningParameters queryPruningParameters = new QueryPruningParameters();
     private HITLParsingParameters reparsingParameters = new HITLParsingParameters();
 
-    private static BaseCcgParser.ConstrainedCcgParser reparser;
-    private static ResponseSimulatorGold goldSimulator;
+    private BaseCcgParser.ConstrainedCcgParser reparser;
+    private ResponseSimulatorGold goldSimulator;
 
     /**
      * Initialize data and re-parser.
@@ -84,9 +84,20 @@ public class HITLParser {
     public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getAllQueriesForSentence(int sentenceId,
                                                                                        boolean isJeopardyStyle,
                                                                                        boolean isCheckboxStyle) {
+        return getAllQueriesForSentence(sentenceId, isJeopardyStyle, isCheckboxStyle, false /* default: no pronoun */);
+    }
+
+    public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getAllQueriesForSentence(int sentenceId,
+                                                                                       boolean isJeopardyStyle,
+                                                                                       boolean isCheckboxStyle,
+                                                                                       boolean usePronouns) {
         ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList =
-                ExperimentUtils.generateAllQueries(sentenceId, sentences.get(sentenceId), nbestLists.get(sentenceId),
-                                                   isJeopardyStyle, isCheckboxStyle, queryPruningParameters);
+                ExperimentUtils.generateAllQueries(
+                        sentenceId, sentences.get(sentenceId), nbestLists.get(sentenceId),
+                        isJeopardyStyle,
+                        isCheckboxStyle,
+                        usePronouns,
+                        queryPruningParameters);
         // Assign query ids.
         IntStream.range(0, queryList.size()).forEach(i -> queryList.get(i).setQueryId(i));
         return queryList;

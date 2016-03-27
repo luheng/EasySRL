@@ -11,6 +11,7 @@ import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.*;
+import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -176,7 +177,7 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
         // Prompt.
         result += String.format("\n%.2f\t%s\n", promptScore, prompt);
         for (int i = 0; i < options.size(); i++) {
-            String optionString = "";
+            String optionString;
             if (i < qaPairSurfaceForms.size()) {
                 final QAStructureSurfaceForm qa = qaPairSurfaceForms.get(i);
                 String structStr = isJeopardyStyle ?
@@ -189,6 +190,47 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
                 optionString = String.format("%.2f\t%d\t%s", optionScores.get(i), i, options.get(i));
             }
             result += optionString + "\n";
+        }
+        return result;
+    }
+
+    /**
+     *
+     * @param sentence
+     * @param optionLegends: example: 'G', goldOptions, 'U', userOptions
+     * @return
+     */
+    public String toString(final ImmutableList<String> sentence, Object ... optionLegends) {
+        String result = String.format("SID=%d\t%s\n", sentenceId, sentence.stream().collect(Collectors.joining(" ")));
+
+        // Prompt structure.
+        String promptStructStr = isJeopardyStyle ?
+                qaPairSurfaceForms.get(0).getAnswerStructures().stream()
+                        .map(s -> s.toString(sentence))
+                        .collect(Collectors.joining(" / ")) :
+                qaPairSurfaceForms.get(0).getQuestionStructures().stream()
+                        .map(s -> s.toString(sentence))
+                        .collect(Collectors.joining(" / "));
+
+        // Prompt.
+        result += String.format("\n[prompt]:\t%.2f\t%s\t%s\n", promptScore, prompt, promptStructStr);
+
+        for (int i = 0; i < options.size(); i++) {
+            String matchingStr = "";
+            for (int j = 0; j + 1 < optionLegends.length; j += 2) {
+                final ImmutableList<Integer> chosenOptions = (ImmutableList<Integer>) optionLegends[j+1];
+                matchingStr += chosenOptions.contains(i) ? (char) optionLegends[j] : "";
+            }
+            String structStr = "";
+            if (i < qaPairSurfaceForms.size()) {
+                final QAStructureSurfaceForm qa = qaPairSurfaceForms.get(i);
+                structStr = isJeopardyStyle ?
+                        qa.getQuestionStructures().get(0).toString(sentence) :
+                        qa.getAnswerStructures().get(0).toString(sentence);
+            }
+            String parseIdsStr = DebugPrinter.getShortListString(optionToParseIds.get(i));
+            result += String.format("[%d]\t%-10s\t%.2f\t%s\t%s\t%s\n", i, matchingStr, optionScores.get(i),
+                        options.get(i), structStr, parseIdsStr);
         }
         return result;
     }

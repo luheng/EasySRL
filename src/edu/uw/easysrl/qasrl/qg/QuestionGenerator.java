@@ -24,46 +24,71 @@ public class QuestionGenerator {
      * @param nBestList: the nbest list.
      * @return
      */
-    public static ImmutableList<QuestionAnswerPair> generateAllQAPairs(int sentenceId, ImmutableList<String> words,
-                                                                       NBestList nBestList) {
+    public static ImmutableList<QuestionAnswerPair> generateAllQAPairs(int sentenceId,
+                                                                       ImmutableList<String> words,
+                                                                       NBestList nBestList,
+                                                                       boolean usePronouns) {
         return IntStream.range(0, words.size()).boxed()
                 .flatMap(predId -> IntStream.range(0, nBestList.getN()).boxed()
-                                .flatMap(parseId -> {
-                                    generateAllQAPairs(sentenceId, words, parseId, nBestList.getParse(parseId));
-                                    final Parse parse = nBestList.getParse(parseId);
-                                    final Category category = parse.categories.get(predId);
-                                    return IntStream.range(1, category.getNumberOfArguments() + 1).boxed()
-                                            .flatMap(argNum -> QuestionGenerator
-                                                    .generateAllQAPairs(sentenceId, parseId, predId, argNum, words, parse)
-                                                    .stream());
-                                })
+                        .flatMap(parseId -> {
+                            final Parse parse = nBestList.getParse(parseId);
+                            final Category category = parse.categories.get(predId);
+                            return IntStream.range(1, category.getNumberOfArguments() + 1).boxed()
+                                    .flatMap(argNum -> QuestionGenerator.generateAllQAPairs(
+                                                sentenceId, parseId, predId, argNum, words, parse,
+                                                usePronouns, true /* standard questions */, false /* supersense */)
+                                            .stream());
+                        })
                 ).collect(toImmutableList());
     }
 
-    public static ImmutableList<QuestionAnswerPair> generateAllQAPairs(int sentenceId, ImmutableList<String> words,
-                                                                       int parseId, Parse parse) {
+    public static ImmutableList<QuestionAnswerPair> generateAllQAPairs(int sentenceId,
+                                                                       ImmutableList<String> words,
+                                                                       int parseId,
+                                                                       Parse parse,
+                                                                       boolean usePronouns) {
         return IntStream.range(0, words.size())
             .mapToObj(Integer::new)
             .flatMap(predIndex -> IntStream.range(1, parse.categories.get(predIndex).getNumberOfArguments() + 1)
                     .boxed()
                     .flatMap(argNum -> QuestionGenerator
-                            .generateAllQAPairs(sentenceId, parseId, predIndex, argNum, words, parse)
+                            .generateAllQAPairs(sentenceId, parseId, predIndex, argNum, words, parse, usePronouns,
+                                    true /* standard questions */, false /* supersense */)
                             .stream()))
             .collect(toImmutableList());
     }
 
     private static ImmutableList<QuestionAnswerPair> generateAllQAPairs(int sentenceId,
-                                                              int parseId,
-                                                              int predicateIdx,
-                                                              int argumentNumber,
-                                                              List<String> words,
-                                                              Parse parse) {
+                                                                        int parseId,
+                                                                        int predicateIdx,
+                                                                        int argumentNumber,
+                                                                        List<String> words,
+                                                                        Parse parse,
+                                                                        boolean indefinitesOnly,
+                                                                        boolean askAllStandardQuestions,
+                                                                        boolean askSupersenseQuestions) {
         MultiQuestionTemplate template = new MultiQuestionTemplate(sentenceId, parseId, predicateIdx, words, parse);
-        return ImmutableList.copyOf(template.getAllQAPairsForArgument(argumentNumber,
-                                                                      false, // if true: only ask questions with indefinite noun args
-                                                                      true, // all (false: just one) standard questions
-                                                                      false // if true: include supersense questions
-                                                                      ));
+        return ImmutableList.copyOf(template.getAllQAPairsForArgument(
+                argumentNumber,
+                indefinitesOnly,
+                askAllStandardQuestions,
+                askSupersenseQuestions
+        ));
+    }
+
+    private static ImmutableList<QuestionAnswerPair> generateAllQAPairs(int sentenceId,
+                                                                        int parseId,
+                                                                        int predicateIdx,
+                                                                        int argumentNumber,
+                                                                        List<String> words,
+                                                                        Parse parse) {
+        MultiQuestionTemplate template = new MultiQuestionTemplate(sentenceId, parseId, predicateIdx, words, parse);
+        return ImmutableList.copyOf(template.getAllQAPairsForArgument(
+                argumentNumber,
+                false, // if true: only ask questions with indefinite noun args
+                true, // all (false: just one) standard questions
+                false // if true: include supersense questions
+        ));
     }
 
     /**
@@ -76,7 +101,7 @@ public class QuestionGenerator {
             Parse goldParse = devData.getGoldParses().get(sentenceId);
             System.out.println("==========");
             System.out.println(TextGenerationHelper.renderString(words));
-            for(QuestionAnswerPair qaPair : generateAllQAPairs(sentenceId, words, -1, goldParse)) {
+            for(QuestionAnswerPair qaPair : generateAllQAPairs(sentenceId, words, -1, goldParse, false /* use pronoun */)) {
                 System.out.println(qaPair.getQuestion());
                 System.out.println("\t" + qaPair.getAnswer());
             }

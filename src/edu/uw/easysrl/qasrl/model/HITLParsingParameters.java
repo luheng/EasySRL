@@ -1,4 +1,4 @@
-package edu.uw.easysrl.qasrl.experiments;
+package edu.uw.easysrl.qasrl.model;
 
 /**
  * Created by luheng on 3/25/16.

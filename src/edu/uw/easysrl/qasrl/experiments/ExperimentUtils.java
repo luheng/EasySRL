@@ -34,7 +34,7 @@ public class ExperimentUtils {
             final NBestList nBestList,
             final QueryPruningParameters queryPruningParameters) {
         final ImmutableList<QuestionAnswerPair> rawQAPairs = QuestionGenerator
-                .generateAllQAPairs(sentenceId, sentence, nBestList);
+                .generateAllQAPairs(sentenceId, sentence, nBestList, false /* no pronoun */);
         return QueryFilters.scoredQueryFilter()
                 .filter(QueryGenerators.radioButtonQueryGenerator()
                         .generate(QAPairAggregators.aggregateForSingleChoiceQA()
@@ -48,7 +48,7 @@ public class ExperimentUtils {
             final NBestList nBestList,
             final QueryPruningParameters queryPruningParameters) {
         final ImmutableList<QuestionAnswerPair> rawQAPairs = QuestionGenerator
-                .generateAllQAPairs(sentenceId, sentence, nBestList);
+                .generateAllQAPairs(sentenceId, sentence, nBestList, false /* no pronoun */);
         return QueryFilters.scoredQueryFilter()
                 .filter(QueryGenerators.checkboxQueryGenerator()
                         .generate(QAPairAggregators.aggregateForMultipleChoiceQA()
@@ -62,6 +62,7 @@ public class ExperimentUtils {
             final NBestList nBestList,
             final boolean isJeopardyStyle,
             final boolean isCheckbox,
+            final boolean usePronouns,
             final QueryPruningParameters queryPruningParameters) {
         return generateAllQueries(
                 // Choose QAPair aggregator.
@@ -79,21 +80,22 @@ public class ExperimentUtils {
                         QueryFilters.jeopardyPPQueryFilter() :
                         QueryFilters.scoredQueryFilter(),
                 // Other parameters.
-                sentenceId, sentence, nBestList, queryPruningParameters);
+                sentenceId, sentence, nBestList, usePronouns, queryPruningParameters);
     }
 
-    public static ImmutableList<ScoredQuery<QAStructureSurfaceForm>> generateAllQueries(
+    private static ImmutableList<ScoredQuery<QAStructureSurfaceForm>> generateAllQueries(
             QAPairAggregator<QAStructureSurfaceForm> qaPairAggregator,
             QueryGenerator<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> queryGenerator,
             QueryFilter<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> queryFilter,
             final int sentenceId,
             final ImmutableList<String> sentence,
             final NBestList nBestList,
+            final boolean usePronouns,
             final QueryPruningParameters queryPruningParameters) {
         return queryFilter.filter(
                     queryGenerator.generate(
                             qaPairAggregator.aggregate(
-                                    QuestionGenerator.generateAllQAPairs(sentenceId, sentence, nBestList))),
+                                    QuestionGenerator.generateAllQAPairs(sentenceId, sentence, nBestList, usePronouns))),
                 nBestList, queryPruningParameters);
     }
 
