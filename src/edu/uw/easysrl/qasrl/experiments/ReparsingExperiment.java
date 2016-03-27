@@ -28,6 +28,7 @@ public class ReparsingExperiment {
 
     private static final int nBest = 100;
     private static HITLParser myHTILParser;
+    private static ReparsingHistory myHistory;
     private static Map<Integer, List<AlignedAnnotation>> annotations;
 
     private static final String[] annotationFiles = {
@@ -47,6 +48,7 @@ public class ReparsingExperiment {
         annotations = ExperimentUtils.loadCrowdflowerAnnotation(annotationFiles);
         assert annotations != null;
 
+        myHistory = new ReparsingHistory(myHTILParser);
         runExperiment();
     }
 
@@ -55,17 +57,6 @@ public class ReparsingExperiment {
         System.out.println(sentenceIds.stream().map(String::valueOf).collect(Collectors.joining(", ")));
         System.out.println("Queried " + sentenceIds.size() + " sentences. Total number of questions:\t" +
             annotations.entrySet().stream().mapToInt(e -> e.getValue().size()).sum());
-
-        Results avgBaseline = new Results(),
-                avgReranked = new Results(),
-                avgReparsed = new Results(),
-                avgBeselineChanged = new Results(),
-                avgReparsedChanged = new Results(),
-                avgOracleChanged = new Results();
-        int numWorsenedSentences = 0,
-                numUnchangedSentences = 0,
-                numImprovedSentences = 0,
-                numChanged = 0;
 
         List<DebugBlock> debugging = new ArrayList<>();
         for (int sentenceId : sentenceIds) {
@@ -81,16 +72,13 @@ public class ReparsingExperiment {
                     myHTILParser.getAllQueriesForSentence(sentenceId, false /* jeopardy */, isCheckboxStyle);
 
             int oracleParseId = nBestList.getOracleId();
-            Results oracleF1 = nBestList.getResults(oracleParseId);
-            Results baselineF1 = nBestList.getResults(0);
-            Results currentF1 = nBestList.getResults(0);
-            Results currentReparsedF1 = nBestList.getResults(0);
-
-            Parse reparse = null;
+            final Results oracleF1 = nBestList.getResults(oracleParseId);
+            final Results baselineF1 = nBestList.getResults(0);
+            final Results currentF1 = nBestList.getResults(0);
+            final Results currentReparsedF1 = nBestList.getResults(0);
 
             final int numParses = nBestList.getN();
             final Set<Evidence> allEvidenceSet = new HashSet<>();
-            int queryCount = 0;
             String sentenceDebuggingString = "";
             double[] penalty = new double[numParses];
             Arrays.fill(penalty, 0);
@@ -100,13 +88,11 @@ public class ReparsingExperiment {
                 if (annotation == null) {
                     continue;
                 }
-                queryCount ++;
                 int[] optionDist = QualityControl.getUserResponses(query, annotation);
                 ImmutableList<Integer> goldOptions = myHTILParser.getGoldOptions(query),
                                        oneBestOptions = myHTILParser.getOneBestOptions(query),
                                        oracleOptions = myHTILParser.getOracleOptions(query),
                                        userOptions = myHTILParser.getUserOptions(query, annotation);
-
                 ImmutableSet<Evidence> evidenceSet = myHTILParser.getEvidenceSet(query, userOptions);
                 if (evidenceSet == null || evidenceSet.isEmpty()) {
                     continue;
@@ -114,10 +100,13 @@ public class ReparsingExperiment {
                 allEvidenceSet.addAll(evidenceSet);
 
                 int rerankedId = myHTILParser.getRerankedParseId(sentenceId, allEvidenceSet);
-                reparse = myHTILParser.getReparsed(sentenceId, allEvidenceSet);
+                Parse reparse = myHTILParser.getReparsed(sentenceId, allEvidenceSet);
                 Results rerankedF1 = nBestList.getResults(rerankedId);
                 Results reparsedF1 = CcgEvaluation.evaluate(reparse.dependencies,
                         myHTILParser.getGoldParse(sentenceId).dependencies);
+
+                myHistory.addEntry(sentenceId, query, userOptions, evidenceSet, reparse, rerankedId, reparsedF1,
+                                   rerankedF1);
 
                 // Print debugging information.
                 String sentenceStr = sentence.stream().collect(Collectors.joining(" "));
@@ -168,59 +157,34 @@ public class ReparsingExperiment {
                 result += String.format("Reranked F1: %.3f%%\n", 100.0 * rerankedF1.getF1());
                 result += String.format("Reparsed F1: %.3f%%\n", 100.0 * reparsedF1.getF1());
                 sentenceDebuggingString += result + "\n";
-                currentF1 = rerankedF1;
-                currentReparsedF1 = reparsedF1;
             }
-            boolean changedOneBest = reparse != null &&
-                    CcgEvaluation.evaluate(reparse.dependencies, nBestList.getParse(0).dependencies).getF1()
-                            < 1.0 - 1e-3;
-            double deltaF1 = currentReparsedF1.getF1() - baselineF1.getF1();
-            String changeStr;
-            if (deltaF1 < - 1e-8) {
-                numWorsenedSentences ++;
-                changeStr = "Worsened.";
-            } else if (deltaF1 > 1e-8) {
-                numImprovedSentences ++;
-                changeStr = "Improved.";
-            } else {
-                numUnchangedSentences ++;
-                changeStr = "Unchanged.";
-            }
-
-            avgBaseline.add(baselineF1);
-            avgReranked.add(currentF1);
-            avgReparsed.add(currentReparsedF1);
-
-            if (changedOneBest) {
-                avgBeselineChanged.add(baselineF1);
-                avgReparsedChanged.add(currentReparsedF1);
-                avgOracleChanged.add(oracleF1);
-                numChanged ++;
-            }
-            if (queryCount > 0) {
+            //double deltaF1 = currentReparsedF1.getF1() - baselineF1.getF1();
+            Optional<Results> lastReparsedResult = myHistory.getLastReparsingResult(sentenceId);
+            if (lastReparsedResult.isPresent()) {
+                double deltaF1 = lastReparsedResult.get().getF1() - baselineF1.getF1();
+                String changeStr = deltaF1 < -1e-6 ? "Worsened." : (deltaF1 > 1e-6 ? "Improved." : "Unchanged.");
                 sentenceDebuggingString += String.format("Final F1: %.3f%% over %.3f%% baseline.\t%s\n",
-                        100.0 * currentReparsedF1.getF1(),
-                        100.0 * baselineF1.getF1(),
-                        changeStr);
+                        100.0 * lastReparsedResult.get().getF1(), 100.0 * baselineF1.getF1(), changeStr);
                 debugging.add(new DebugBlock(deltaF1, sentenceDebuggingString));
             }
         }
 
         System.out.println(
-                "Baseline:\n" + avgBaseline + "\n" +
-                "Reranked:\n" + avgReranked + "\n" +
-                "Reparsed:\n" + avgReparsed);
+                "Baseline:\n" + myHistory.getAvgBaseline() + "\n" +
+                "Reranked:\n" + myHistory.getAvgReranked() + "\n" +
+                "Reparsed:\n" + myHistory.getAvgReparsed() + "\n" +
+                "Oracle  :\n" + myHistory.getAvgOracle() + "\n");
 
         System.out.println(
-                "Baseline-changed\n" + avgBeselineChanged + "\n" +
-                "Reparsed-changed:\n" + avgReparsedChanged + "\n" +
-                "Oracle-changed\n" + avgOracleChanged);
+                "Baseline-changed:\n" + myHistory.getAvgBaselineOnModifiedSentences() + "\n" +
+                "Reranked-changed:\n" + myHistory.getAvgRerankedOnModifiedSentences() + "\n" +
+                "Reparsed-changed:\n" + myHistory.getAvgReparsedOnModifiedSentences() + "\n" +
+                "Oracle-changed  :\n" + myHistory.getAvgOracleOnModifiedSentences());
 
         System.out.println(
-                "Num modified: " + numChanged + "\n" +
-                "Num improved: " + numImprovedSentences + "\n" +
-                "Num worsened: " + numWorsenedSentences + "\n" +
-                "Num the same: " + numUnchangedSentences);
+                "Num modified: " + myHistory.getNumModifiedSentences() + "\n" +
+                "Num improved: " + myHistory.getNumImprovedSentences() + "\n" +
+                "Num worsened: " + myHistory.getNumWorsenedSentences());
 
         debugging.stream()
                 .sorted((b1, b2) -> Double.compare(b1.deltaF1, b2.deltaF1))
