@@ -74,8 +74,7 @@ public class ReparsingExperiment {
             int oracleParseId = nBestList.getOracleId();
             final Results oracleF1 = nBestList.getResults(oracleParseId);
             final Results baselineF1 = nBestList.getResults(0);
-            final Results currentF1 = nBestList.getResults(0);
-            final Results currentReparsedF1 = nBestList.getResults(0);
+            Results currentF1 = nBestList.getResults(0);
 
             final int numParses = nBestList.getN();
             final Set<Evidence> allEvidenceSet = new HashSet<>();
@@ -151,12 +150,12 @@ public class ReparsingExperiment {
                 }
 
                 result += String.format("F1: %.3f%% -> %.3f%% %s\n",
-                        100.0 * currentReparsedF1.getF1(),
-                        100.0 * reparsedF1.getF1(),
-                        f1Impv);
+                        100.0 * currentF1.getF1(), 100.0 * reparsedF1.getF1(), f1Impv);
                 result += String.format("Reranked F1: %.3f%%\n", 100.0 * rerankedF1.getF1());
                 result += String.format("Reparsed F1: %.3f%%\n", 100.0 * reparsedF1.getF1());
                 sentenceDebuggingString += result + "\n";
+
+                currentF1 = reparsedF1;
             }
             //double deltaF1 = currentReparsedF1.getF1() - baselineF1.getF1();
             Optional<Results> lastReparsedResult = myHistory.getLastReparsingResult(sentenceId);
@@ -184,7 +183,7 @@ public class ReparsingExperiment {
         System.out.println(
                 "Num modified: " + myHistory.getNumModifiedSentences() + "\n" +
                 "Num improved: " + myHistory.getNumImprovedSentences() + "\n" +
-                "Num worsened: " + myHistory.getNumWorsenedSentences());
+                "Num worsened: " + myHistory.getNumWorsenedSentences() + "\n");
 
         debugging.stream()
                 .sorted((b1, b2) -> Double.compare(b1.deltaF1, b2.deltaF1))

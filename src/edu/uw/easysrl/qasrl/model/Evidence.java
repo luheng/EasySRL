@@ -11,6 +11,7 @@ import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.*;
+import java.util.concurrent.CancellationException;
 
 /**
  * Created by luheng on 3/9/16.
@@ -119,6 +120,22 @@ public abstract class Evidence {
                                                      Collection<Integer> chosenOptions,
                                                      boolean doNotPenalizePronouns) {
         Set<Evidence> evidenceList = new HashSet<>();
+
+        /**
+         * Extract unlabeled, undirected attachment from jeopardy-style queries.
+         * FIXME: consider high/low attachment only.
+         */
+        if (query.isJeopardyStyle()) {
+            // TODO: consider multiple qusetion structures and answer structures.
+            for (int i = 0; i < query.getQAPairSurfaceForms().size(); i++) {
+                if (!chosenOptions.contains(i)) {
+                    final int predId = query.getQAPairSurfaceForms().get(i).getQuestionStructures().get(0).predicateIndex;
+                    final Category category = query.getQAPairSurfaceForms().get(i).getQuestionStructures().get(0).category;
+                    evidenceList.add(new SupertagEvidence(predId, category, false, 1.0));
+                }
+            }
+            return evidenceList;
+        }
 
         boolean questionIsNA = false;
         Set<Integer> chosenArgIds = new HashSet<>(),

@@ -12,15 +12,14 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Table;
 import edu.uw.easysrl.qasrl.*;
 
-import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
+import edu.uw.easysrl.qasrl.experiments.ReparsingHistory;
 import edu.uw.easysrl.qasrl.model.Evidence;
 import edu.uw.easysrl.qasrl.model.HITLParser;
+import edu.uw.easysrl.qasrl.model.HITLParsingParameters;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
@@ -47,9 +46,7 @@ public class WebAnnotationUI {
     // user name -> all the queries for the current sentence.
     private static Map<String, List<ScoredQuery<QAStructureSurfaceForm>>> activeLearningMap;
     // user name -> all the answered queries.
-    private static Map<String, List<ScoredQuery<QAStructureSurfaceForm>>> activeLearningHistoryMap;
-    // user name, sentence id -> evidence set
-    private static Table<String, Integer, Set<Evidence>> evidenceMap;
+    private static Map<String, ReparsingHistory> activeLearningHistoryMap;
 
     // user name -> current query id.
     private static Map<String, Integer> queryIdMap;
@@ -84,11 +81,15 @@ public class WebAnnotationUI {
         queryPruningParameters.skipPPQuestions = false;
         queryPruningParameters.skipBinaryQueries = true;
     }
+    private static HITLParsingParameters reparsingParameters;
+    static {
+        reparsingParameters = new HITLParsingParameters();
+        reparsingParameters.skipPrepositionalQuestions = false;
+    }
 
     private static void initializeData() {
         activeLearningMap = new HashMap<>();
         activeLearningHistoryMap = new HashMap<>();
-        evidenceMap = HashBasedTable.create();
 
         annotationFileWriterMap = new HashMap<>();
         annotationFileNameMap = new HashMap<>();
@@ -210,11 +211,17 @@ public class WebAnnotationUI {
 
                 // Advance to the next query.
                 queryIdMap.put(userName, lastQueryId + 1);
-                activeLearningHistoryMap.get(userName).add(query);
-                if (!evidenceMap.contains(userName, sentId)) {
-                    evidenceMap.put(userName, sentId, new HashSet<>());
-                }
-                evidenceMap.get(userName, sentId).addAll(myHITLParser.getEvidenceSet(query, userOptions));
+                final ImmutableSet<Evidence> evidenceSet = myHITLParser.getEvidenceSet(query, userOptions);
+                activeLearningHistoryMap.get(userName).addEntry(
+                        sentId,
+                        query,
+                        userOptions,
+                        evidenceSet);
+                System.out.println(query.toString(myHITLParser.getSentence(sentId),
+                        'G', myHITLParser.getGoldOptions(query),
+                        'U', userOptions));
+                evidenceSet.forEach(ev -> System.out.println(ev.toString(myHITLParser.getSentence(sentId))));
+                System.out.println();
             }
             httpResponse.setContentType("text/html; charset=utf-8");
             httpResponse.setStatus(HttpServletResponse.SC_OK);
@@ -231,7 +238,7 @@ public class WebAnnotationUI {
                 sentIds.add(sid);
             }*/
             sentenceIdsMap.put(userName, sentIds);
-            activeLearningHistoryMap.put(userName, new ArrayList<>());
+            activeLearningHistoryMap.put(userName, new ReparsingHistory(myHITLParser));
             parametersMap.put(userName, new HashSet<>());
             if (request.getParameter("UsePronouns") != null) {
                 parametersMap.get(userName).add("UsePronouns");
@@ -338,15 +345,24 @@ public class WebAnnotationUI {
 
             // Debugging info.
             httpWriter.write("<br/><br/><hr/>");
-            final int sentenceId = query.getSentenceId();
-            if (evidenceMap.contains(userName, sentenceId)) {
-                final Parse reparsed = myHITLParser.getReparsed(sentenceId, evidenceMap.get(userName, sentenceId));
-                final int reranked = myHITLParser.getRerankedParseId(sentenceId, evidenceMap.get(userName, sentenceId));
-                httpWriter.write("<p> Reparsed F1: &nbsp;" + CcgEvaluation.evaluate(reparsed.dependencies,
-                        myHITLParser.getGoldParse(sentenceId).dependencies) + "</p>");
-                httpWriter.write("<p> Reranked F1:  &nbsp;" + myHITLParser.getNBestList(sentenceId).getResults(reranked) +
-                        " &nbsp;(" + reranked + ")</p>");
-            }
+
+            final ReparsingHistory myHistory = activeLearningHistoryMap.get(userName);
+            httpWriter.write("<p>" + ("Baseline:\n" + myHistory.getAvgBaseline() + "\n" +
+                            "Reranked:\n" + myHistory.getAvgReranked() + "\n" +
+                            "Reparsed:\n" + myHistory.getAvgReparsed() + "\n" +
+                            "Oracle  :\n" + myHistory.getAvgOracle() + "\n")
+                    .replace("\n", "<br/>") + "</p>");
+
+            httpWriter.write("<p>" + ("Baseline-changed:\n" + myHistory.getAvgBaselineOnModifiedSentences() + "\n" +
+                            "Reranked-changed:\n" + myHistory.getAvgRerankedOnModifiedSentences() + "\n" +
+                            "Reparsed-changed:\n" + myHistory.getAvgReparsedOnModifiedSentences() + "\n" +
+                            "Oracle-changed  :\n" + myHistory.getAvgOracleOnModifiedSentences())
+                    .replace("\n", "<br/>") + "</p>");
+
+            httpWriter.write("<p>" + ("Num modified: " + myHistory.getNumModifiedSentences() + "\n" +
+                            "Num improved: " + myHistory.getNumImprovedSentences() + "\n" +
+                            "Num worsened: " + myHistory.getNumWorsenedSentences() + "\n")
+                    .replace("\n", "<br/>") + "</p>");
 
             httpWriter.write("<br/><br/><hr/>");
 
@@ -365,11 +381,10 @@ public class WebAnnotationUI {
             httpWriter.println("</form>");
 
             // File download link
-            if (activeLearningHistoryMap.get(userName).size() > 0) {
-                String annotationFileName = annotationFileNameMap.get(userName);
-                httpWriter.println(String.format("<br><a href=\"%s\" download=\"%s\">Click to download annotation file.</a>",
-                        "/annotation_files/" + annotationFileName, annotationFileName));
-            }
+            String annotationFileName = annotationFileNameMap.get(userName);
+            httpWriter.println(String.format("<br><a href=\"%s\" download=\"%s\">Click to download annotation file.</a>",
+                    "/annotation_files/" + annotationFileName, annotationFileName));
+
 
             httpWriter.println("</div></div></container>\n");
             httpWriter.println("</body>");

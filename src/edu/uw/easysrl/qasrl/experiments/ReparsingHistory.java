@@ -10,6 +10,7 @@ import edu.uw.easysrl.qasrl.model.Evidence;
 import edu.uw.easysrl.qasrl.model.HITLParser;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
+import edu.uw.easysrl.syntax.evaluation.CCGBankEvaluation;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.util.GuavaCollectors;
 import edu.uw.easysrl.util.Util;
@@ -49,7 +50,7 @@ public class ReparsingHistory {
                          final ImmutableList<Integer> options, final ImmutableSet<Evidence> evidenceSet,
                          final Parse reparsed, int reranked, final Results reparsedResult,
                          final Results rerankedResult) {
-        if (sentenceIds.size() == 0 || sentenceIds.get(0) != sentenceId) {
+        if (!queries.containsKey(sentenceId)) {
             sentenceIds.add(sentenceId);
             queries.put(sentenceId, new ArrayList<>());
             userOptions.put(sentenceId, new ArrayList<>());
@@ -68,8 +69,40 @@ public class ReparsingHistory {
         rerankingResults.get(sentenceId).add(rerankedResult);
     }
 
+    public void addEntry(int sentenceId, final ScoredQuery<QAStructureSurfaceForm> query,
+                         final ImmutableList<Integer> options, final ImmutableSet<Evidence> evidenceSet) {
+        if (!queries.containsKey(sentenceId)) {
+            sentenceIds.add(sentenceId);
+            queries.put(sentenceId, new ArrayList<>());
+            userOptions.put(sentenceId, new ArrayList<>());
+            evidenceSets.put(sentenceId, new ArrayList<>());
+            reparses.put(sentenceId, new ArrayList<>());
+            rerankedParseIds.put(sentenceId, new ArrayList<>());
+            reparsingResults.put(sentenceId, new ArrayList<>());
+            rerankingResults.put(sentenceId, new ArrayList<>());
+        }
+        queries.get(sentenceId).add(query);
+        userOptions.get(sentenceId).add(options);
+        evidenceSets.get(sentenceId).add(evidenceSet);
+        final ImmutableSet<Evidence> allEvidence = getAllEvidence(sentenceId);
+        final Parse reparsed = hitlParser.getReparsed(sentenceId, allEvidence);
+        final int reranked = hitlParser.getRerankedParseId(sentenceId, allEvidence);
+        reparses.get(sentenceId).add(reparsed);
+        rerankedParseIds.get(sentenceId).add(reranked);
+        reparsingResults.get(sentenceId).add(CcgEvaluation.evaluate(reparsed.dependencies,
+                hitlParser.getGoldParse(sentenceId).dependencies));
+        rerankingResults.get(sentenceId).add(hitlParser.getNBestList(sentenceId).getResults(reranked));
+    }
+
     private <O extends Object> O getLast(final List<O> history) {
         return history.get(history.size() - 1);
+    }
+
+    public ImmutableSet<Evidence> getAllEvidence(int sentenceId) {
+        return evidenceSets.containsKey(sentenceId) ?
+                evidenceSets.get(sentenceId).stream()
+                        .flatMap(ImmutableSet::stream)
+                        .collect(GuavaCollectors.toImmutableSet()) : ImmutableSet.of();
     }
 
     public Optional<Results> getLastReparsingResult(int sentenceId) {

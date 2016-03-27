@@ -13,7 +13,6 @@ import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
@@ -30,7 +29,14 @@ public class HITLParser {
 
     // Query pruning parameters.
     private QueryPruningParameters queryPruningParameters = new QueryPruningParameters();
+    public void setQueryPruningParameters(QueryPruningParameters queryPruningParameters) {
+        this.queryPruningParameters = queryPruningParameters;
+    }
+
     private HITLParsingParameters reparsingParameters = new HITLParsingParameters();
+    public void setReparsingParameters(HITLParsingParameters reparsingParameters) {
+        this.reparsingParameters = reparsingParameters;
+    }
 
     private BaseCcgParser.ConstrainedCcgParser reparser;
     private ResponseSimulatorGold goldSimulator;
@@ -56,10 +62,6 @@ public class HITLParser {
 
         // Cache results.
         nbestLists.entrySet().forEach(e -> e.getValue().cacheResults(goldParses.get(e.getKey())));
-    }
-
-    public void setQueryPruningParameters(QueryPruningParameters queryPruningParameters) {
-        this.queryPruningParameters = queryPruningParameters;
     }
 
     public ImmutableList<Integer> getAllSentenceIds() {
