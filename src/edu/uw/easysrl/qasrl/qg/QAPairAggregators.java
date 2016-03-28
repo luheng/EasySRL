@@ -168,6 +168,7 @@ public final class QAPairAggregators {
 
     /**
      * The input should be all the question-answer pairs given a sentence and its n-best list.
+     * Each aggregated answer is single headed.
      * @return Aggregated QA pairs with structure information.
      */
     public static QAPairAggregator<QAStructureSurfaceForm> aggregateForMultipleChoiceQA() {
