@@ -173,6 +173,7 @@ public final class QAPairAggregators {
     public static QAPairAggregator<QAStructureSurfaceForm> aggregateForMultipleChoiceQA() {
         return qaPairs ->  qaPairs
                     .stream()
+                // TODO: hash all question deps
                     .collect(groupingBy(qa -> qa.getPredicateIndex() + "\t" + qa.getPredicateCategory() + "\t" + qa.getArgumentNumber()))
                     .values().stream()
                     .map(questionStrGroup -> new QAPairAggregatorUtils.QuestionSurfaceFormToStructure<>(

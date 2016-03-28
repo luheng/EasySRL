@@ -84,6 +84,7 @@ public class WebAnnotationUI {
     private static HITLParsingParameters reparsingParameters;
     static {
         reparsingParameters = new HITLParsingParameters();
+        reparsingParameters.supertagPenaltyWeight = 5.0;
         reparsingParameters.skipPrepositionalQuestions = false;
     }
 
@@ -182,16 +183,17 @@ public class WebAnnotationUI {
             // Handle response.
             if (request.getParameterValues("UserAnswer") != null) {
                 final ImmutableList<String> userAnswers = ImmutableList.copyOf(request.getParameterValues("UserAnswer"));
-                int lastQueryId = queryIdMap.get(userName);
+                final int lastQueryId = queryIdMap.get(userName);
                 final List<ScoredQuery<QAStructureSurfaceForm>> queryPool = activeLearningMap.get(userName);
-                ScoredQuery<QAStructureSurfaceForm> query = queryPool.get(lastQueryId);
-                int sentId = query.getSentenceId();
+                final ScoredQuery<QAStructureSurfaceForm> query = queryPool.get(lastQueryId);
+                final int sentId = query.getSentenceId();
+                final ImmutableList<String> sentence = myHITLParser.getSentence(sentId);
 
                 String annotationStr = "";
                 annotationStr += "SID=" + sentId + "\n";
                 annotationStr += "QID=" + lastQueryId + "\n";
 
-                annotationStr += query.toString() + "\n";
+                annotationStr += query.toString(sentence) + "\n";
                 annotationStr += "[RESPONSES]:\n";
                 for (String answer : userAnswers) {
                     annotationStr += answer + "\n";
