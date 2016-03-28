@@ -296,7 +296,7 @@ public class WebAnnotationUI {
             //httpWriter.println("<container>\n" + WebUIHelper.printInstructions() + "</container>\n");
 
             // Print the progress bar.
-            int numTotalSentences = sentencesToAnnotate.length;
+            int numTotalSentences = myHITLParser.getAllSentenceIds().size();
             int numAnsweredSentences = numTotalSentences - sentenceIds.size();
             int numTotalQueries = queryPool.size();
             httpWriter.println(WebUIHelper.printProgressBar(numAnsweredSentences, 0 /* numSkipped */, numTotalSentences));
@@ -349,6 +349,7 @@ public class WebAnnotationUI {
             httpWriter.write("<br/><br/><hr/>");
 
             final ReparsingHistory myHistory = activeLearningHistoryMap.get(userName);
+            /*
             httpWriter.write("<p>" + ("Baseline:\n" + myHistory.getAvgBaseline() + "\n" +
                             "Reranked:\n" + myHistory.getAvgReranked() + "\n" +
                             "Reparsed:\n" + myHistory.getAvgReparsed() + "\n" +
@@ -365,7 +366,7 @@ public class WebAnnotationUI {
                             "Num improved: " + myHistory.getNumImprovedSentences() + "\n" +
                             "Num worsened: " + myHistory.getNumWorsenedSentences() + "\n")
                     .replace("\n", "<br/>") + "</p>");
-
+            */
             httpWriter.write("<br/><br/><hr/>");
 
             httpWriter.write("<p>" + query.toString(words,
