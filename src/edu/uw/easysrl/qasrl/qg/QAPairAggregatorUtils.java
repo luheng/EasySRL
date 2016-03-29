@@ -1,14 +1,15 @@
 package edu.uw.easysrl.qasrl.qg;
 
-import com.google.common.collect.ImmutableSet;
+import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.qg.syntax.AnswerStructure;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
 
 import java.util.AbstractMap;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.Map;
+import java.util.stream.Collectors;
 
-import static edu.uw.easysrl.util.GuavaCollectors.*;
 import static java.util.stream.Collectors.*;
 
 /**
@@ -17,6 +18,17 @@ import static java.util.stream.Collectors.*;
  */
 public class QAPairAggregatorUtils {
     public static String answerDelimiter = " _AND_ ";
+
+    public static String getQuestionDependenciesHashString(QuestionAnswerPair qa) {
+        return qa.getQuestionDependencies().stream()
+                .filter(dep -> dep.getHead() == qa.getPredicateIndex() && dep.getArgNumber() != qa.getArgumentNumber())
+                .collect(toMap(ResolvedDependency::getArgNumber, ResolvedDependency::getArgumentIndex))
+                .entrySet()
+                .stream()
+                .sorted(Comparator.comparing(Map.Entry::getKey))
+                .map(e -> e.getKey() + ":" + e.getValue())
+                .collect(Collectors.joining("\t"));
+    }
 
     public static double getScore(Collection<QuestionAnswerPair> qaList) {
         return qaList.stream()

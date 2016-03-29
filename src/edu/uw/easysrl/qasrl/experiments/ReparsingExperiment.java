@@ -141,14 +141,13 @@ public class ReparsingExperiment {
                             matchStr, query.getOptionScores().get(j), option, headStr, parseIdsStr);
                 }
                 String f1Impv = " ";
-                if (rerankedF1 != null) {
-                    if (rerankedF1.getF1() < currentF1.getF1() - 1e-8) {
+                if (reparsedF1 != null) {
+                    if (reparsedF1.getF1() < currentF1.getF1() - 1e-8) {
                         f1Impv = "[-]";
-                    } else if (rerankedF1.getF1() > currentF1.getF1() + 1e-8) {
+                    } else if (reparsedF1.getF1() > currentF1.getF1() + 1e-8) {
                         f1Impv = "[+]";
                     }
                 }
-
                 result += String.format("F1: %.3f%% -> %.3f%% %s\n",
                         100.0 * currentF1.getF1(), 100.0 * reparsedF1.getF1(), f1Impv);
                 result += String.format("Reranked F1: %.3f%%\n", 100.0 * rerankedF1.getF1());

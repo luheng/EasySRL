@@ -94,6 +94,55 @@ public class ReparsingHistory {
         rerankingResults.get(sentenceId).add(hitlParser.getNBestList(sentenceId).getResults(reranked));
     }
 
+    public void printLatestHistory() {
+        final int sentId = getLast(sentenceIds);
+        final ImmutableList<String> words = hitlParser.getSentence(sentId);
+        final ScoredQuery<QAStructureSurfaceForm> query = getLast(queries.get(sentId));
+        final Results reparsedF1 = getLast(reparsingResults.get(sentId));
+        final Results rerankedF1 = hitlParser.getNBestList(sentId).getResults(getLast(rerankedParseIds.get(sentId)));
+        final Results currentF1  = reparsingResults.get(sentId).size() < 2 ?
+                hitlParser.getNBestList(sentId).getResults(0) :
+                reparsingResults.get(sentId).get(reparsingResults.get(sentId).size() - 2);
+
+        System.out.println(query.toString(words,
+                'G', hitlParser.getGoldOptions(query),
+                'O', hitlParser.getOracleOptions(query),
+                'B', hitlParser.getOneBestOptions(query),
+                'U', getLast(userOptions.get(sentId))));
+        getLast(evidenceSets.get(sentId)).forEach(ev -> System.out.println(ev.toString(words)));
+        String f1Impv = reparsedF1.getF1() < currentF1.getF1() - 1e-8 ? "[-]" :
+                (reparsedF1.getF1() > currentF1.getF1() + 1e-8 ? "[+]" : " ");
+
+        System.out.println(String.format("F1: %.3f%% -> %.3f%% %s", 100.0 * currentF1.getF1(),
+                                                                    100.0 * reparsedF1.getF1(), f1Impv));
+        System.out.println(String.format("Reranked F1: %.3f%%", 100.0 * rerankedF1.getF1()));
+        System.out.println(String.format("Reparsed F1: %.3f%%", 100.0 * reparsedF1.getF1()));
+        System.out.println();
+    }
+
+    public void printSummary() {
+        System.out.println(
+                "Processed:\t" + queries.keySet().size() + " sentences.\n" +
+                "Processed:\t" + queries.values().stream().mapToInt(List::size).sum() + " queries.\n");
+
+        System.out.println(
+                "Baseline:\n" + getAvgBaseline() + "\n" +
+                "Reranked:\n" + getAvgReranked() + "\n" +
+                "Reparsed:\n" + getAvgReparsed() + "\n" +
+                "Oracle  :\n" + getAvgOracle() + "\n");
+
+        System.out.println(
+                "Baseline-changed:\n" + getAvgBaselineOnModifiedSentences() + "\n" +
+                "Reranked-changed:\n" + getAvgRerankedOnModifiedSentences() + "\n" +
+                "Reparsed-changed:\n" + getAvgReparsedOnModifiedSentences() + "\n" +
+                "Oracle-changed  :\n" + getAvgOracleOnModifiedSentences());
+
+        System.out.println(
+                "Num modified: " + getNumModifiedSentences() + "\n" +
+                "Num improved: " + getNumImprovedSentences() + "\n" +
+                "Num worsened: " + getNumWorsenedSentences() + "\n");
+    }
+
     private <O extends Object> O getLast(final List<O> history) {
         return history.get(history.size() - 1);
     }
