@@ -1,6 +1,8 @@
 package edu.uw.easysrl.qasrl.qg;
 
 import edu.uw.easysrl.qasrl.*;
+import edu.uw.easysrl.qasrl.query.*;
+import edu.uw.easysrl.qasrl.qg.surfaceform.*;
 
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
@@ -16,6 +18,10 @@ import java.util.stream.IntStream;
  * Created by luheng on 12/8/15.
  */
 public class QuestionGenerator {
+
+    private static final boolean indefinitesOnly = false; // if true: only ask questions with indefinite noun args
+    private static final boolean askAllStandardQuestions = true; // all (false: just one) standard questions
+    private static final boolean includeSupersenseQuestions = false; // if true: include supersense questions
 
     /**
      * Generate all question answer pairs for a sentence, given the n-best list.
@@ -60,10 +66,9 @@ public class QuestionGenerator {
                                                               Parse parse) {
         MultiQuestionTemplate template = new MultiQuestionTemplate(sentenceId, parseId, predicateIdx, words, parse);
         return ImmutableList.copyOf(template.getAllQAPairsForArgument(argumentNumber,
-                                                                      false, // if true: only ask questions with indefinite noun args
-                                                                      true, // all (false: just one) standard questions
-                                                                      false // if true: include supersense questions
-                                                                      ));
+                                                                      indefinitesOnly,
+                                                                      askAllStandardQuestions,
+                                                                      includeSupersenseQuestions));
     }
 
     /**
@@ -71,26 +76,67 @@ public class QuestionGenerator {
      */
     public static void main(String[] args) {
         ParseData devData = ParseData.loadFromDevPool().get();
-        for(int sentenceId = 0; sentenceId < devData.getSentences().size(); sentenceId++) {
-            ImmutableList<String> words = devData.getSentences().get(sentenceId);
-            Parse goldParse = devData.getGoldParses().get(sentenceId);
-            System.out.println("==========");
-            System.out.println(TextGenerationHelper.renderString(words));
-            for(QuestionAnswerPair qaPair : generateAllQAPairs(sentenceId, words, -1, goldParse)) {
-                System.out.println(qaPair.getQuestion());
-                System.out.println("\t" + qaPair.getAnswer());
+        if(args.length == 0 || (!args[0].equalsIgnoreCase("gold") && !args[0].equalsIgnoreCase("tricky"))) {
+            System.err.println("requires argument: \"gold\" or \"tricky\"");
+        } else if(args[0].equalsIgnoreCase("gold")) {
+            System.out.println("\nQA Pairs for Gold Parses:\n");
+            for(int sentenceId = 0; sentenceId < devData.getSentences().size(); sentenceId++) {
+                ImmutableList<String> words = devData.getSentences().get(sentenceId);
+                Parse goldParse = devData.getGoldParses().get(sentenceId);
+                System.out.println(String.format("========== SID = %04d ==========", sentenceId));
+                System.out.println(TextGenerationHelper.renderString(words));
+                for(QuestionAnswerPair qaPair : generateAllQAPairs(sentenceId, words, -1, goldParse)) {
+                    System.out.println(qaPair.getQuestion());
+                    System.out.println("\t" + qaPair.getAnswer());
+                }
+            }
+        } else if (args[0].equalsIgnoreCase("tricky")) {
+            System.out.println("\nQA Pairs for tricky sentences:\n");
+            ImmutableList<Integer> trickySentences = new ImmutableList.Builder<Integer>()
+                .add(42)
+                .build();
+            ImmutableMap<Integer, NBestList> nBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 100).get();
+            for(int sentenceId : trickySentences) {
+                System.out.println(String.format("========== SID = %04d ==========", sentenceId));
+                ImmutableList<String> words = devData.getSentences().get(sentenceId);
+                System.out.println(String.format("--------- Gold QA Pairs --------", sentenceId));
+                Parse goldParse = devData.getGoldParses().get(sentenceId);
+                System.out.println(TextGenerationHelper.renderString(words));
+                for(QuestionAnswerPair qaPair : generateAllQAPairs(sentenceId, words, -1, goldParse)) {
+                    System.out.println(qaPair.getQuestion());
+                    System.out.println("\t" + qaPair.getAnswer());
+                }
+                System.out.println(String.format("--------- All QA Pairs ---------", sentenceId));
+                NBestList nBestList = nBestLists.get(sentenceId);
+                ImmutableList<QuestionAnswerPair> qaPairs = generateAllQAPairs(sentenceId, words, nBestList);
+                for(QuestionAnswerPair qaPair : qaPairs) {
+                    System.out.println("--");
+                    System.out.println(words.get(qaPair.getPredicateIndex()));
+                    System.out.println(qaPair.getPredicateCategory());
+                    for(ResolvedDependency dep : qaPair.getQuestionDependencies()) {
+                        System.out.println("\t" + words.get(dep.getHead()) + "\t-"
+                                           + dep.getArgNumber() + "->\t"
+                                           + words.get(dep.getArgument()));
+                    }
+                    System.out.println(qaPair.getQuestion());
+                    for(ResolvedDependency dep : qaPair.getAnswerDependencies()) {
+                        System.out.println("\t" + words.get(dep.getHead()) + "\t-"
+                                           + dep.getArgNumber() + "->\t"
+                                           + words.get(dep.getArgument()));
+                    }
+                    System.out.println("\t" + qaPair.getAnswer());
+                }
+                System.out.println(String.format("------- All Pair Queries -------", sentenceId));
+                ImmutableList<QAPairSurfaceForm> surfaceForms = QAPairAggregators.aggregateByString().aggregate(qaPairs);
+                ImmutableList<Query<QAPairSurfaceForm>> queries = QueryGenerators.maximalForwardGenerator().generate(surfaceForms);
+                for(Query<QAPairSurfaceForm> query : queries) {
+                    System.out.println(query.getPrompt());
+                    for(String option : query.getOptions()) {
+                        System.out.println("\t" + option);
+                    }
+                }
             }
         }
-        // ImmutableMap<Integer, NBestList> nBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 100).get();
-        // System.err.println("loaded n-best lists");
-        // for(int sentenceId : nBestLists.keySet()) {
-        //     ImmutableList<String> words = devData.getSentences().get(sentenceId);
-        //     NBestList nBestList = nBestLists.get(sentenceId);
-        //     for(QuestionAnswerPair qaPair : generateAllQAPairs(sentenceId, words, nBestList)) {
-        //         System.out.println(qaPair.getQuestion());
-        //         System.out.println("\t" + qaPair.getAnswer());
-        //     }
-        // }
     }
 }
 

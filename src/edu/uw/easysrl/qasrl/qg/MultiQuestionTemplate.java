@@ -9,7 +9,9 @@ import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.TextGenerationHelper;
 import edu.uw.easysrl.qasrl.TextGenerationHelper.TextWithDependencies;
+
 import java.util.stream.Collectors;
+import static java.util.stream.Collectors.*;
 
 import java.util.*;
 
@@ -527,14 +529,24 @@ public class MultiQuestionTemplate {
                 final Category argCategory = argCategories.get(currentArgNum);
                 Optional<ResolvedDependency> argDepOpt = chosenArgDeps.get(currentArgNum);
                 // and now, we have an XXX HACK workaround to get subjects to show up when using adverbs!
-                if(!argDepOpt.isPresent() && type == QuestionType.VERB_ADJUNCT && currentArgNum == 1 &&
-                   shouldRecoverMissingSubject) {
+                if(!argDepOpt.isPresent() && type == QuestionType.VERB_ADJUNCT &&
+                   currentArgNum == 1 && shouldRecoverMissingSubject) {
+
                     argDepOpt = parse.dependencies
                         .stream()
                         .filter(dep -> dep.getHead() == verbIndexOpt.get() &&
                                 dep.getArgument() != dep.getHead() &&
                                 dep.getArgNumber() == 1)
                         .findFirst();
+
+                    // add the hacked-in dep to question dependencies (on the left, though doesn't actually matter which side).
+                    if(argDepOpt.isPresent()) {
+                        Set<ResolvedDependency> extraSubjDep = new HashSet<>();
+                        extraSubjDep.add(argDepOpt.get());
+                        lefts = lefts.stream()
+                            .map(left -> left.concat(new TextWithDependencies(new LinkedList<String>(), extraSubjDep)))
+                            .collect(toList());
+                    }
                 }
                 final Optional<Integer> argIndexOpt = argDepOpt.map(ResolvedDependency::getArgument);
 
