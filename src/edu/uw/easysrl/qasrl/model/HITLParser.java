@@ -110,9 +110,9 @@ public class HITLParser {
         return queryList;
     }
 
-    public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getCoreArgumentQueries(int sentenceId,
-                                                                                     boolean isCheckboxStyle,
-                                                                                     boolean usePronouns) {
+    public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getCoreArgumentQueriesForSentence(int sentenceId,
+                                                                                                boolean isCheckboxStyle,
+                                                                                                boolean usePronouns) {
         QueryPruningParameters queryPruningParams = new QueryPruningParameters(queryPruningParameters);
         queryPruningParams.skipPPQuestions = true;
         ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList =
@@ -206,7 +206,6 @@ public class HITLParser {
         final ImmutableSet<Evidence> evidenceSet = Evidence
                 .getEvidenceFromQuery(query, options, reparsingParameters.skipPronounEvidence)
                 .stream()
-                //.filter(ev -> !(isPPQuestion && Evidence.AttachmentEvidence.class.isInstance(ev)))
                 .collect(GuavaCollectors.toImmutableSet());
 
         evidenceSet.forEach(ev -> ev.setConfidence(

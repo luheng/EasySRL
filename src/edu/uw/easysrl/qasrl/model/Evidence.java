@@ -12,6 +12,7 @@ import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.*;
 import java.util.concurrent.CancellationException;
+import java.util.stream.IntStream;
 
 /**
  * Created by luheng on 3/9/16.
@@ -126,14 +127,13 @@ public abstract class Evidence {
          * FIXME: consider high/low attachment only.
          */
         if (query.isJeopardyStyle()) {
-            // TODO: consider multiple qusetion structures and answer structures.
-            for (int i = 0; i < query.getQAPairSurfaceForms().size(); i++) {
-                if (!chosenOptions.contains(i)) {
-                    final int predId = query.getQAPairSurfaceForms().get(i).getQuestionStructures().get(0).predicateIndex;
-                    final Category category = query.getQAPairSurfaceForms().get(i).getQuestionStructures().get(0).category;
-                    evidenceList.add(new SupertagEvidence(predId, category, false, 1.0));
-                }
-            }
+            IntStream.range(0, query.getQAPairSurfaceForms().size())
+                    .boxed()
+                    .filter(i -> !chosenOptions.contains(i))
+                    .map(query.getQAPairSurfaceForms()::get)
+                    .forEach(qa -> qa.getQuestionStructures()
+                            .forEach(qstr -> evidenceList.add(
+                                    new SupertagEvidence(qstr.predicateIndex, qstr.category, false, 1.0))));
             return evidenceList;
         }
 

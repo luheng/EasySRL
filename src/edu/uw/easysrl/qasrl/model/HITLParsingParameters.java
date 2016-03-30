@@ -1,7 +1,5 @@
 package edu.uw.easysrl.qasrl.model;
 
-import java.lang.reflect.Field;
-
 /**
  * Created by luheng on 3/25/16.
  */

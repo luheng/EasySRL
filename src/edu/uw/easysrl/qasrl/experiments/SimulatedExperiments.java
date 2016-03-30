@@ -9,6 +9,8 @@ import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 /**
  * Simulation experiments for PP Attachment questions (jeopardy style)
  * Created by luheng on 3/29/16.
@@ -28,6 +30,8 @@ public class SimulatedExperiments {
     static {
         queryPruningParameters = new QueryPruningParameters();
         queryPruningParameters.minPromptConfidence = 0.1;
+        queryPruningParameters.minOptionConfidence = 0.05;
+        queryPruningParameters.minOptionEntropy = 0.05;
         queryPruningParameters.skipPPQuestions = false;
         queryPruningParameters.skipBinaryQueries = true;
     }
@@ -44,29 +48,52 @@ public class SimulatedExperiments {
         myHITLParser.setReparsingParameters(reparsingParameters);
 
         myHITLHistory = new ReparsingHistory(myHITLParser);
+        AtomicInteger numCoreQueries = new AtomicInteger(0),
+                      numPPQueries = new AtomicInteger(0),
+                      coreQueryAcc = new AtomicInteger(0),
+                      ppQueryAcc = new AtomicInteger(0);
 
         for (int sentenceId : myHITLParser.getAllSentenceIds()) {
-            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries = myHITLParser.getCoreArgumentQueriesForSentence(
-                    sentenceId, isCheckboxVersion, usePronouns);
+            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> coreQueries = myHITLParser
+                    .getCoreArgumentQueriesForSentence(sentenceId, isCheckboxVersion, usePronouns);
 
-            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> ppQueries = myHITLParser.getPPAttachmentQueriesForSentence(
-                    sentenceId, usePronouns);
+            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> ppQueries = myHITLParser
+                    .getPPAttachmentQueriesForSentence(sentenceId, usePronouns);
 
             // Get gold results.
-            queries.forEach(query -> {
+            coreQueries.forEach(query -> {
                 ImmutableList<Integer> goldOptions = myHITLParser.getGoldOptions(query);
                 ImmutableSet<Evidence> evidences = myHITLParser.getEvidenceSet(query, goldOptions);
                 myHITLHistory.addEntry(sentenceId, query, goldOptions, evidences);
                 myHITLHistory.printLatestHistory();
+
+                ImmutableList<Integer> onebestOptions = myHITLParser.getOneBestOptions(query);
+                if (goldOptions.containsAll(onebestOptions) && onebestOptions.containsAll(goldOptions)) {
+                    coreQueryAcc.getAndAdd(1);
+                }
+                numCoreQueries.getAndAdd(1);
             });
+
             ppQueries.forEach(query -> {
                 ImmutableList<Integer> goldOptions = myHITLParser.getGoldOptions(query);
                 ImmutableSet<Evidence> evidences = myHITLParser.getEvidenceSet(query, goldOptions);
                 myHITLHistory.addEntry(sentenceId, query, goldOptions, evidences);
                 myHITLHistory.printLatestHistory();
+
+
+                ImmutableList<Integer> onebestOptions = myHITLParser.getOneBestOptions(query);
+                if (goldOptions.containsAll(onebestOptions) && onebestOptions.containsAll(goldOptions)) {
+                    ppQueryAcc.getAndAdd(1);
+                }
+                numPPQueries.getAndAdd(1);
+                //System.out.println(1.0 * ppQueryAcc.get() / numPPQueries.get());
             });
         }
 
         myHITLHistory.printSummary();
+        System.out.println("Num. core queries:\t" + numCoreQueries + "\tAcc:\t" +
+                            1.0 * coreQueryAcc.get() / numCoreQueries.get());
+        System.out.println("Num. pp queries:\t" + numPPQueries + "\tAcc:\t" +
+                            1.0 * ppQueryAcc.get() / numPPQueries.get());
     }
 }
