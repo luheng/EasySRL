@@ -110,6 +110,39 @@ public class HITLParser {
         return queryList;
     }
 
+    public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getCoreArgumentQueries(int sentenceId,
+                                                                                     boolean isCheckboxStyle,
+                                                                                     boolean usePronouns) {
+        QueryPruningParameters queryPruningParams = new QueryPruningParameters(queryPruningParameters);
+        queryPruningParams.skipPPQuestions = true;
+        ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList =
+                ExperimentUtils.generateAllQueries(
+                        sentenceId, sentences.get(sentenceId), nbestLists.get(sentenceId),
+                        false /* isJeopardyStyle */,
+                        isCheckboxStyle,
+                        usePronouns,
+                        queryPruningParams);
+        // Assign query ids.
+        IntStream.range(0, queryList.size()).forEach(i -> queryList.get(i).setQueryId(i));
+        return queryList;
+    }
+
+    public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getPPAttachmentQueriesForSentence(int sentenceId,
+                                                                                                boolean usePronouns) {
+        QueryPruningParameters queryPruningParams = new QueryPruningParameters(queryPruningParameters);
+        queryPruningParams.skipPPQuestions = false;
+        ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList =
+                ExperimentUtils.generateAllQueries(
+                        sentenceId, sentences.get(sentenceId), nbestLists.get(sentenceId),
+                        true /* isJeopardyStyle */,
+                        true /* isCheckboxStyle */,
+                        usePronouns,
+                        queryPruningParams);
+        // Assign query ids.
+        IntStream.range(0, queryList.size()).forEach(i -> queryList.get(i).setQueryId(i));
+        return queryList;
+    }
+
     public Parse getReparsed(int sentenceId, Set<Evidence> evidenceSet) {
         return reparser.parseWithConstraint(inputSentences.get(sentenceId), evidenceSet);
     }

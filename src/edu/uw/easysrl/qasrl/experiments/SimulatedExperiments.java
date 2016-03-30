@@ -13,7 +13,7 @@ import edu.uw.easysrl.qasrl.query.ScoredQuery;
  * Simulation experiments for PP Attachment questions (jeopardy style)
  * Created by luheng on 3/29/16.
  */
-public class PPAttachmentSimulation {
+public class SimulatedExperiments {
     // Parameters.
     private static int nBest = 100;
 
@@ -21,7 +21,6 @@ public class PPAttachmentSimulation {
     private static HITLParser myHITLParser;
     private static ReparsingHistory myHITLHistory;
 
-    private static boolean isJeopardyStyle = false;
     private static boolean isCheckboxVersion = true;
     private static boolean usePronouns = false;
 
@@ -47,11 +46,20 @@ public class PPAttachmentSimulation {
         myHITLHistory = new ReparsingHistory(myHITLParser);
 
         for (int sentenceId : myHITLParser.getAllSentenceIds()) {
-            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries = myHITLParser.getAllQueriesForSentence(
-                    sentenceId, isJeopardyStyle, isCheckboxVersion, usePronouns);
+            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries = myHITLParser.getCoreArgumentQueriesForSentence(
+                    sentenceId, isCheckboxVersion, usePronouns);
+
+            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> ppQueries = myHITLParser.getPPAttachmentQueriesForSentence(
+                    sentenceId, usePronouns);
 
             // Get gold results.
             queries.forEach(query -> {
+                ImmutableList<Integer> goldOptions = myHITLParser.getGoldOptions(query);
+                ImmutableSet<Evidence> evidences = myHITLParser.getEvidenceSet(query, goldOptions);
+                myHITLHistory.addEntry(sentenceId, query, goldOptions, evidences);
+                myHITLHistory.printLatestHistory();
+            });
+            ppQueries.forEach(query -> {
                 ImmutableList<Integer> goldOptions = myHITLParser.getGoldOptions(query);
                 ImmutableSet<Evidence> evidences = myHITLParser.getEvidenceSet(query, goldOptions);
                 myHITLHistory.addEntry(sentenceId, query, goldOptions, evidences);

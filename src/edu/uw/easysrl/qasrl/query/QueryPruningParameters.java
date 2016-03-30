@@ -10,13 +10,23 @@ public class QueryPruningParameters {
     public double minOptionEntropy = 0.05;
 
     // Not including "Bad question" or "Answer unlisted" option.
-    private static final int maxNumOptionsPerQuery = 6;
+    public int maxNumOptionsPerQuery = 6;
 
     public boolean skipBinaryQueries = true;
     public boolean skipPPQuestions = false;
     public boolean skipQueriesWithPronounOptions = false;
 
     public QueryPruningParameters() {
+    }
+
+    public QueryPruningParameters(QueryPruningParameters other) {
+        this.minPromptConfidence = other.minPromptConfidence;
+        this.minOptionConfidence = other.minOptionConfidence;
+        this.minOptionEntropy = other.minOptionEntropy;
+        this.maxNumOptionsPerQuery = other.maxNumOptionsPerQuery;
+        this.skipBinaryQueries = other.skipBinaryQueries;
+        this.skipPPQuestions = other.skipPPQuestions;
+        this.skipQueriesWithPronounOptions = other.skipQueriesWithPronounOptions;
     }
 
     public String toString() {
