@@ -29,6 +29,10 @@ public class CrowdFlowerDataUtils {
             "query_id", "question_confidence", "question_uncertainty", "sent_id", "sentence", "pred_id", "pred_head",
             "question_key", "question", "answers", "_golden ", "choice_gold", "choice_gold_reason"};
 
+    public static final String[] csvHeaderNew = {
+            "query_id", "sent_id", "sentence", "query_prompt", "options", "_golden ", "choice_gold", "choice_gold_reason",
+            "query_key", "jeopardy_style", "query_confidence", "query_uncertainty" };
+
     public static final String answerDelimiter = " ### ";
 
 
@@ -82,8 +86,8 @@ public class CrowdFlowerDataUtils {
                                            final boolean highlightPredicate,
                                            final CSVPrinter csvPrinter) throws IOException {
         // Print to CSV files.
-        // "query_id", "question_confidence", "question_uncertainty", "sent_id", "sentence", "pred_id", "pred_head",
-        // "question_key", "question", "answers", "_golden ", "choice_gold", "choice_gold_reason"
+        //   "query_id", "question_confidence", "question_uncertainty", "sent_id", "sentence", "pred_id", "pred_head",
+        //   "question_key", "question", "answers", "_golden ", "choice_gold", "choice_gold_reason"
         final QuestionStructure questionStructure = query.getQAPairSurfaceForms().get(0).getQuestionStructures().get(0);
         final AnswerStructure answerStructure = query.getQAPairSurfaceForms().get(0).getAnswerStructures().get(0);
         int predicateIndex = query.isJeopardyStyle() ?
@@ -119,39 +123,33 @@ public class CrowdFlowerDataUtils {
         csvPrinter.printRecord(csvRow);
     }
 
-    public static void printQueryToCSVFile(final ScoredQuery<QAStructureSurfaceForm> query,
-                                           final ImmutableList<String> sentence,
-                                           final ImmutableList<Integer> goldOptionIds,
-                                           final int lineCounter,
-                                           final String delimiter,
-                                           final boolean highlightPredicate,
-                                           final CSVPrinter csvPrinter) throws IOException {
+    public static void printQueryToCSVFileNew(final ScoredQuery<QAStructureSurfaceForm> query,
+                                              final ImmutableList<String> sentence,
+                                              final ImmutableList<Integer> goldOptionIds,
+                                              final int lineCounter,
+                                              final boolean highlightPredicate,
+                                              final String goldReason,
+                                              final CSVPrinter csvPrinter) throws IOException {
         // Print to CSV files.
-        // "query_id", "question_confidence", "question_uncertainty", "sent_id", "sentence", "pred_id", "pred_head",
-        // "question_key", "question", "answers", "_golden ", "choice_gold", "choice_gold_reason"
+        // "query_id", "sent_id", "sentence", "query_prompt", "options", "_golden ", "choice_gold", "choice_gold_reason",
+        // "query_key", "jeopardy_style", "query_confidence", "query_uncertainty"
         final QuestionStructure questionStructure = query.getQAPairSurfaceForms().get(0).getQuestionStructures().get(0);
         final AnswerStructure answerStructure = query.getQAPairSurfaceForms().get(0).getAnswerStructures().get(0);
         int predicateIndex = query.isJeopardyStyle() ?
                 answerStructure.argumentIndices.get(0) :
                 questionStructure.predicateIndex;
+
         int sentenceId = query.getSentenceId();
         final String sentenceStr = TextGenerationHelper.renderHTMLSentenceString(sentence, predicateIndex,
                 highlightPredicate);
         final ImmutableList<String> options = query.getOptions();
         List<String> csvRow = new ArrayList<>();
-        csvRow.add(String.valueOf(lineCounter));
-        csvRow.add(String.format("%.3f", query.getPromptScore()));
-        csvRow.add(String.format("%.3f", 0.0)); // TODO: answer entropy
+        csvRow.add(String.valueOf(lineCounter)); // Query id
+
         csvRow.add(String.valueOf(sentenceId));
         csvRow.add(String.valueOf(sentenceStr));
-        csvRow.add(String.valueOf(predicateIndex));
-        csvRow.add(sentence.get(predicateIndex));
-        csvRow.add(query.isJeopardyStyle() ?
-                answerStructure.toString(sentence) :
-                questionStructure.toString(sentence)
-        );
         csvRow.add(query.getPrompt());
-        csvRow.add(options.stream().collect(Collectors.joining(delimiter)));
+        csvRow.add(options.stream().collect(Collectors.joining(answerDelimiter)));
         if (goldOptionIds == null) {
             csvRow.add(""); // _gold
             csvRow.add(""); // choice_gold
@@ -159,8 +157,14 @@ public class CrowdFlowerDataUtils {
         } else {
             csvRow.add("TRUE");
             csvRow.add(goldOptionIds.stream().map(options::get).collect(Collectors.joining("\n")));
-            csvRow.add("Based on high-agreement of workers.");
+            csvRow.add(goldReason);
         }
+        // Query key.
+        csvRow.add(query.isJeopardyStyle() ? answerStructure.toString(sentence) : questionStructure.toString(sentence));
+        csvRow.add(String.format("%d", query.isJeopardyStyle() ? 1 : 0));
+        csvRow.add(String.format("%.3f", query.getPromptScore()));
+        csvRow.add(String.format("%.3f", query.getOptionEntropy()));
+
         csvPrinter.printRecord(csvRow);
     }
 }

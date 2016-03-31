@@ -210,7 +210,7 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
                         .collect(Collectors.joining(" / "));
 
         // Prompt.
-        result += String.format("\n[prompt]:\t%.2f\t%s\t%s\n", promptScore, prompt, promptStructStr);
+        result += String.format("[prompt]:\t%.2f\t%s\t%s\n", promptScore, prompt, promptStructStr);
 
         for (int i = 0; i < options.size(); i++) {
             String matchingStr = "";

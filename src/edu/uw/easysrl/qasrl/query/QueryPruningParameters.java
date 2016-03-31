@@ -9,7 +9,7 @@ public class QueryPruningParameters {
     public double minOptionConfidence = 0.05;
     public double minOptionEntropy = 0.05;
 
-    // Not including "Bad question" or "Answer unlisted" option.
+    // Not including "Bad queryPrompt" or "Answer unlisted" option.
     public int maxNumOptionsPerQuery = 6;
 
     public boolean skipBinaryQueries = true;

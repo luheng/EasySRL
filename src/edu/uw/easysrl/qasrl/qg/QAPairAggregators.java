@@ -60,7 +60,7 @@ public final class QAPairAggregators {
                 assert qaList.size() > 0
                         : "list in group should always be nonempty";
                 int sentenceId = e.getValue().get(0).getSentenceId();
-                // plurality vote on question and answer
+                // plurality vote on queryPrompt and answer
                 String pluralityQuestion = HashMultiset
                         .create(qaList.stream()
                                 .map(QuestionAnswerPair::getQuestion)
@@ -89,7 +89,7 @@ public final class QAPairAggregators {
     }
 
     /**
-     * The input should be all the question-answer pairs given a sentence and its n-best list.
+     * The input should be all the queryPrompt-answer pairs given a sentence and its n-best list.
      * This is too crazy...
      * @return Aggregated QA pairs with structure information.
      */
@@ -102,10 +102,10 @@ public final class QAPairAggregators {
                         getBestQuestionSurfaceForm(qaList),
                         new QuestionStructure(qaList),
                         qaList))
-                .collect(groupingBy(qsts -> qsts.question)) // Group by question surface form.
+                .collect(groupingBy(qsts -> qsts.question)) // Group by queryPrompt surface form.
                 .values().stream()
                 .flatMap(qsList -> {
-                    // All the question structures sharing the same surface form.
+                    // All the queryPrompt structures sharing the same surface form.
                     final ImmutableList<QuestionStructure> questionStructures = qsList.stream()
                             .map(qsts -> qsts.structure)
                             .collect(toImmutableList());
@@ -167,7 +167,7 @@ public final class QAPairAggregators {
     }
 
     /**
-     * The input should be all the question-answer pairs given a sentence and its n-best list.
+     * The input should be all the queryPrompt-answer pairs given a sentence and its n-best list.
      * Each aggregated answer is single headed.
      * @return Aggregated QA pairs with structure information.
      */
@@ -182,11 +182,11 @@ public final class QAPairAggregators {
                             getBestQuestionSurfaceForm(questionStrGroup),
                             new QuestionStructure(questionStrGroup),
                             questionStrGroup))
-                    // Group by question surface form.
+                    // Group by queryPrompt surface form.
                     .collect(groupingBy(qsts -> qsts.question))
                     .values().stream()
                     .flatMap(questionSurfGroup -> {
-                        // All the question structures sharing the same surface form.
+                        // All the queryPrompt structures sharing the same surface form.
                         final ImmutableList<QuestionStructure> questionStructures = questionSurfGroup.stream()
                                 .map(qs -> qs.structure)
                                 .collect(toImmutableList());
@@ -228,7 +228,7 @@ public final class QAPairAggregators {
     }
 
     /**
-     * The input should be all the question-answer pairs given a sentence and its n-best list.
+     * The input should be all the queryPrompt-answer pairs given a sentence and its n-best list.
      * Each aggregated answer is single headed.
      * @return Aggregated QA pairs with structure information.
      */

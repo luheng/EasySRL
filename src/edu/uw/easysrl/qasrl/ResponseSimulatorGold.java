@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.IntStream;
 
 /**
- * Simulates user response in active learning. When presented with a question, the simulator answerOptions with its
+ * Simulates user response in active learning. When presented with a queryPrompt, the simulator answerOptions with its
  * knowledge of gold dependencies.
  * Created by luheng on 1/5/16.
  */
@@ -36,8 +36,8 @@ public class ResponseSimulatorGold {
 
          if (!query.isJeopardyStyle()) {
              final ImmutableList<QAStructureSurfaceForm> qaOptions = query.getQAPairSurfaceForms();
-             // The gold considers labeled dependency. If the dependency labels don't match, gold outputs "bad question".
-             // So the gold outputs "bad question" in case of dropped pp argument.
+             // The gold considers labeled dependency. If the dependency labels don't match, gold outputs "bad queryPrompt".
+             // So the gold outputs "bad queryPrompt" in case of dropped pp argument.
              AtomicBoolean nonEmptyGoldArgs = new AtomicBoolean(false);
              qaOptions.stream().flatMap(qa -> qa.getQuestionStructures().stream())
                      .forEach(qstr -> {

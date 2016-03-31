@@ -80,8 +80,8 @@ public class BasicQuestionAnswerPair implements QuestionAnswerPair {
     private String questionString = null;
     private String answerString = null;
 
-    // questionMainIndex will be the predicate if we're asking a normal-style question,
-    // and will be the argument if we're asking a flipped-style question.
+    // questionMainIndex will be the predicate if we're asking a normal-style queryPrompt,
+    // and will be the argument if we're asking a flipped-style queryPrompt.
     public BasicQuestionAnswerPair(int sentenceId, int parseId, Parse parse,
                               int predicateIndex, Category predicateCategory, int argumentNumber,
                               int questionMainIndex, QuestionType questionType,

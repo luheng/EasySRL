@@ -7,10 +7,6 @@ import edu.uw.easysrl.syntax.grammar.Category;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.OptionalInt;
-import java.util.stream.IntStream;
-
-import static com.sun.xml.internal.ws.policy.sourcemodel.wspolicy.XmlToken.Optional;
 
 /**
  * Annotation record from a single annotator.
@@ -27,15 +23,15 @@ public class RecordedAnnotation {
     public Category predicateCategory;
 
     // Question information.
-    public int questionId;
-    public String question;
+    public int queryId;
+    public String queryPrompt;
 
     // Answer information
     List<String> optionStrings;
 
     // Answer information, compatible with checkbox version.
-    ImmutableList<String> answers;
-    ImmutableList<Integer> answerIds, goldAnswerIds;
+    ImmutableList<String> userOptions;
+    ImmutableList<Integer> userOptionIds, goldOptionIds;
 
     // Current accuracy
     double rerankF1, oracleF1, onebestF1;
@@ -83,8 +79,8 @@ public class RecordedAnnotation {
                 // Example: QID=4 ent=1.43  marg=0.32 What would be in front seats?
                 line = reader.readLine().trim();
                 info = line.split("\\t");
-                curr.questionId = Integer.parseInt(info[0].split("=")[1]);
-                curr.question = info[info.length - 1].trim();
+                curr.queryId = Integer.parseInt(info[0].split("=")[1]);
+                curr.queryPrompt = info[info.length - 1].trim();
 
                 // 0     prob=0.06 additional safety equipment (12:equipment)  32,41,47
                 while ((line = reader.readLine()) != null) {
@@ -104,10 +100,10 @@ public class RecordedAnnotation {
                     curr.optionStrings.add(info[3]);
                     String match = info[1];
                     if (match.contains("*")) {
-                        curr.answerIds = ImmutableList.of(id);
+                        curr.userOptionIds = ImmutableList.of(id);
                     }
                     if (match.contains("G")) {
-                        curr.goldAnswerIds = ImmutableList.of(id);
+                        curr.goldOptionIds = ImmutableList.of(id);
                     }
                 }
 
@@ -147,7 +143,7 @@ public class RecordedAnnotation {
 
                 // Example: QID=0
                 line = reader.readLine().trim();
-                curr.questionId = Integer.parseInt(line.split("=")[1]);
+                curr.queryId = Integer.parseInt(line.split("=")[1]);
 
                 // Example: SID=50 \t J.P. Bolduc ...
                 line = reader.readLine().trim();
@@ -159,7 +155,7 @@ public class RecordedAnnotation {
 
                 // Example: 0.96 \t {prompt string}
                 line = reader.readLine().trim();
-                curr.question = line.split("\\t")[1].trim();
+                curr.queryPrompt = line.split("\\t")[1].trim();
 
                 // 0     0.06 \t 0 \t {option string} \t {some other info}
                 while ((line = reader.readLine()) != null) {
@@ -178,23 +174,25 @@ public class RecordedAnnotation {
                     final String option = line.trim();
                     int optionId = -1;
                     for (int i = 0; i < curr.optionStrings.size(); i++) {
-                        if (curr.optionStrings.get(i).equals(option)) {
+                        if (curr.optionStrings.get(i).equalsIgnoreCase(option)) {
                             optionId = i;
                             break;
                         }
                     }
-                    answerIds.add(optionId);
+                    if (optionId >= 0) {
+                        answerIds.add(optionId);
+                    }
                     if (line.equals("[COMMENT]:")) {
                         break;
                     }
                 }
-                curr.answerIds = ImmutableList.copyOf(answerIds);
+                curr.userOptionIds = ImmutableList.copyOf(answerIds);
                 curr.comment = reader.readLine().trim();
                 // Empty line.
                 reader.readLine();
 
                 // Other unassigned stuff.
-                curr.goldAnswerIds = ImmutableList.of();
+                curr.goldOptionIds = ImmutableList.of();
             }
         }
         System.out.println(String.format("Loaded %d annotation records from file: %s.", annotations.size(), fileName));
@@ -206,10 +204,10 @@ public class RecordedAnnotation {
         return sentenceId == other.sentenceId
                 && predicateId == other.predicateId
                 && argumentNumber == other.argumentNumber
-                && question.equalsIgnoreCase(other.question)
+                && queryPrompt.equalsIgnoreCase(other.queryPrompt)
                 && optionStrings.size() == other.optionStrings.size()
-                && (goldAnswerIds == null || (goldAnswerIds.containsAll(other.goldAnswerIds)
-                                                && other.goldAnswerIds.containsAll(goldAnswerIds)));
+                && (goldOptionIds == null || (goldOptionIds.containsAll(other.goldOptionIds)
+                                                && other.goldOptionIds.containsAll(goldOptionIds)));
     }
 
     @Override
@@ -218,13 +216,14 @@ public class RecordedAnnotation {
         String result = "ITER=" + iterationId + "\n"
                 + "SID=" + sentenceId + "\t" + sentenceString + "\n"
                 + "PRED=" + predicateId + "\t" + predicateString + "\t" + predicateCategory + "." + argumentNumber + "\n"
-                + "QID=" + questionId + "\t" + question + "\n"
-                + "ANS/GOLD=" + DebugPrinter.getShortListString(answerIds) + "/"
-                              + DebugPrinter.getShortListString(goldAnswerIds) + "\n";
+                + "QID=" + queryId + "\t" + queryPrompt + "\n"
+                + "ANS=" + DebugPrinter.getShortListString(userOptionIds) + "\n"
+                + "GOLD=" + DebugPrinter.getShortListString(goldOptionIds) + "\n";
         for (int i = 0; i < optionStrings.size(); i++) {
             result += i + "\t" + optionStrings.get(i) + "\n";
         }
-        result += String.format("1B=%.3f\tRR=%.3f\tOR=%.3f", onebestF1, rerankF1, oracleF1) + "\n";
+        //result += String.format("1B=%.3f\tRR=%.3f\tOR=%.3f", onebestF1, rerankF1, oracleF1) + "\n";
+        result += comment + "\n";
         return result;
     }
 

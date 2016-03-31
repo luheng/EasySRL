@@ -51,7 +51,7 @@ public abstract class Evidence {
     /**
      * Supertag evidence.
      * Negative supertag evidence:
-     *   That tag of a predicate is used to generate a question, and voted as "Question not valid".
+     *   That tag of a predicate is used to generate a queryPrompt, and voted as "Question not valid".
      */
     public static class SupertagEvidence extends Evidence {
         int predId;

@@ -25,7 +25,7 @@
 //    }
 //    private static final GoldSupportMethod goldSupport = GoldSupportMethod.GOLD_BY_PRED_AND_ARG;
 //
-//    public int questionId;
+//    public int queryId;
 //    String answer;
 //    boolean checked;
 //    boolean goldChecked;
@@ -40,8 +40,8 @@
 //
 //    private RecordedCheckboxAnnotation(RecordedCheckboxAnnotation other) {
 //        super(other);
-//        this.question = other.question;
-//        this.questionId = other.questionId;
+//        this.queryPrompt = other.queryPrompt;
+//        this.queryId = other.queryId;
 //        this.answer = other.answer;
 //        this.checked = other.checked;
 //        this.goldChecked = other.goldChecked;
@@ -57,11 +57,11 @@
 //        final int sentenceId = Integer.parseInt(record.get("sent_id"));
 //        annotation.sentenceId = sentenceId;
 //        annotation.sentenceString = record.get("sentence");
-//        annotation.questionId = Integer.parseInt(record.get("query_id"));
+//        annotation.queryId = Integer.parseInt(record.get("query_id"));
 //        annotation.comment = record.get("comment");
 //        annotation.annotatorId = record.get("_worker_id");
 //        annotation.trust = Double.parseDouble(record.get("_trust"));
-//        annotation.question = record.get("question");
+//        annotation.queryPrompt = record.get("queryPrompt");
 //
 //        annotation.predicateId = Integer.parseInt(record.get("pred_id"));
 //        String qkey = record.get("question_key");
@@ -69,16 +69,16 @@
 //        annotation.predicateCategory = Category.valueOf(qkeyInfo[1]);
 //        annotation.argumentNumber = Integer.parseInt(qkeyInfo[2]);
 //
-//        List<String> answers = Arrays.asList(record.get("answers").split("\n"));
+//        List<String> userOptions = Arrays.asList(record.get("userOptions").split("\n"));
 //        List<String> choices = Arrays.asList(record.get("choice").split("\n"));
 //
 //        // each answer checkbox is a different annotation;
 //        // the variable `annotation` just holds all of the fields common to the ones for every answer.
-//        for(String answer : answers) {
+//        for(String answer : userOptions) {
 //            RecordedCheckboxAnnotation answerAnnotation = new RecordedCheckboxAnnotation(annotation);
 //            answerAnnotation.answer = answer;
 //            answerAnnotation.checked = choices.contains(answer);
-//            // compute the gold answers
+//            // compute the gold userOptions
 //            answerAnnotation.goldChecked = goldSupportsAnnotation(goldQAPairs, answerAnnotation);
 //            annotations.add(answerAnnotation);
 //        }
@@ -120,11 +120,11 @@
 //            // QID=XX
 //            reader.readLine();
 //
-//            // question
-//            pre.question = reader.readLine().trim();
+//            // queryPrompt
+//            pre.queryPrompt = reader.readLine().trim();
 //            pre.predicateId = -1; // these aren't stored by MultiQueries by default, unless that has changed
 //
-//            // answers
+//            // userOptions
 //            while (!(line = reader.readLine()).startsWith("COMMENT")) {
 //                RecordedCheckboxAnnotation newForAnswer = new RecordedCheckboxAnnotation(pre);
 //                String[] info = line.split("\\t");
@@ -137,7 +137,7 @@
 //                }
 //            }
 //
-//            // we need to just compute the gold answers ourselves.
+//            // we need to just compute the gold userOptions ourselves.
 //            final List<QuestionAnswerPair> goldQAPairs;
 //            if(allGoldQAPairs.containsKey(sentenceId)) {
 //                goldQAPairs = allGoldQAPairs.get(sentenceId);
@@ -192,7 +192,7 @@
 //        return String.format("%s\n%d\n%s\n%s",
 //                             "RecordedCheckboxAnnotation",
 //                             sentenceId,
-//                             question,
+//                             queryPrompt,
 //                             answer);
 //    }
 //
@@ -201,7 +201,7 @@
 //        // Number of iteration in user session.
 //        String result = "SID=" + sentenceId + "\n"
 //            + "Sentence: " + sentenceString + "\n"
-//            + "Question: " + question + "\n";
+//            + "Question: " + queryPrompt + "\n";
 //        if(checked) {
 //            result += "*";
 //        } else {
@@ -242,14 +242,14 @@
 //    private static boolean goldSupportsAnnotationByString(List<QuestionAnswerPair> goldQAPairs, RecordedCheckboxAnnotation candidate) {
 //        List<QuestionAnswerPair> questionMatches = goldQAPairs
 //            .stream()
-//            .filter(qa -> qa.renderQuestion().equals(candidate.question))
+//            .filter(qa -> qa.renderQuestion().equals(candidate.queryPrompt))
 //            .collect(Collectors.toList());
 //        boolean exactMatch = questionMatches
 //            .stream()
 //            .filter(qa -> qa.renderAnswer().equals(candidate.answer))
 //            .findFirst()
 //            .isPresent();
-//        boolean badQuestion = questionMatches.isEmpty() && candidate.answer.toLowerCase().contains("bad question.");
+//        boolean badQuestion = questionMatches.isEmpty() && candidate.answer.toLowerCase().contains("bad queryPrompt.");
 //        return exactMatch || badQuestion;
 //    }
 //
@@ -257,7 +257,7 @@
 //        assert candidate.predicateCategory != null;
 //        List<QuestionAnswerPair> questionStringMatches = goldQAPairs
 //            .stream()
-//            .filter(qa -> qa.renderQuestion().equals(candidate.question))
+//            .filter(qa -> qa.renderQuestion().equals(candidate.queryPrompt))
 //            .collect(Collectors.toList());
 //        boolean exactMatch = goldQAPairs
 //            .stream()
@@ -267,7 +267,7 @@
 //            .filter(qa -> qa.renderAnswer().equals(candidate.answer))
 //            .findFirst()
 //            .isPresent();
-//        boolean badQuestion = questionStringMatches.isEmpty() && candidate.answer.toLowerCase().contains("bad question.");
+//        boolean badQuestion = questionStringMatches.isEmpty() && candidate.answer.toLowerCase().contains("bad queryPrompt.");
 //        return exactMatch || badQuestion;
 //    }
 //}

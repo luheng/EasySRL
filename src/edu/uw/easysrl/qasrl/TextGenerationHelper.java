@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 public class TextGenerationHelper {
 
     // here is the punctuation we want to avoid spaces before,
-    // and that we don't want at the end of the question or answer.
+    // and that we don't want at the end of the queryPrompt or answer.
     // For now, those are the same.
     // Reference: https://www.cis.upenn.edu/~treebank/tokenization.html
     private static final String trimPunctuation = " ,.:;!?-";
@@ -306,7 +306,7 @@ public class TextGenerationHelper {
      * takes an optional (by overloading---see above) argument asking for the head word to be replaced by something else.
      *   the optional argument is used when stripping verbs of their tense. (maybe there's a less hacky way to deal with that...)
      * In particular this would be for the phrases inside questions: consider "What did something do between April 1991?"
-     * For multiple answers to the same question, we just call this multiple times. (it should only get one of multiple
+     * For multiple answers to the same queryPrompt, we just call this multiple times. (it should only get one of multiple
      * constituents together in a coordination construction.)
      */
     private static List<TextWithDependencies> getRepresentativePhrases(Optional<Integer> headIndexOpt, Category neededCategory,

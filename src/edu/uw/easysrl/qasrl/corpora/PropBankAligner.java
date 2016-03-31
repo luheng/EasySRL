@@ -413,7 +413,7 @@ public class PropBankAligner {
     }
 
     // TODO: learn a distribution of questions given gold parse/dependencies
-    // TODO: learn a distribution or Propbank tags given question and predicate
+    // TODO: learn a distribution or Propbank tags given queryPrompt and predicate
     public static void main(String[] args)  throws IOException, InterruptedException, NotBoundException {
         AlignedCorpus<SRLDependency, QADependency> pbQA = PropBankAligner.getPbAndQADependencies();
         AlignedCorpus<CCGBankDependency, QADependency> ccgQA = PropBankAligner.getCcgAndQADependencies();

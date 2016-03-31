@@ -59,7 +59,7 @@
 //    final static int maxNumQueries = 1000;
 //
 //    private static String[] csvHeader = {"query_id", "sent_id", "sentence", "pred_id", "pred_head",
-//                                         "question", "answer1", "answer2", "answer3", "answer4"};
+//                                         "queryPrompt", "answer1", "answer2", "answer3", "answer4"};
 //
 //    // TODO: if a parse already has low probability, it should provide very little weight when computing answer entropy.
 //
@@ -193,7 +193,7 @@
 //                    numQueriesPerSentence.get(sentId) + "\t" + bestK + "\t" + oracleK + "\t" + entropy + "\t" +
 //                    reranker.computeParsesEntropy(sentId));
 //
-//            // "query_id", "sent_id", "sentence", "pred_id", "pred_head","question",
+//            // "query_id", "sent_id", "sentence", "pred_id", "pred_head","queryPrompt",
 //            // "answer1", "answer2", "answer3", "answer4";
 //            List<String> csvRow = new ArrayList<>();
 //            csvRow.add(String.valueOf(queryCounter));
@@ -205,7 +205,7 @@
 //            csvRow.add(String.valueOf(sentenceStr));
 //            csvRow.add(String.valueOf(query.predicateIndex));
 //            csvRow.add(words.get(query.predicateIndex));
-//            csvRow.add(query.question);
+//            csvRow.add(query.queryPrompt);
 //            List<GroupedQuery.AnswerOption> options = query.getTopAnswerOptions(maxAnswerOptionsPerQuery);
 //            for (int i = 0; i < maxAnswerOptionsPerQuery; i++) {
 //                if (i < options.size()) {

@@ -5,7 +5,6 @@ import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.Query;
 import edu.uw.easysrl.qasrl.query.QueryGeneratorUtils;
-import edu.uw.easysrl.qasrl.query.QueryGenerators;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.syntax.grammar.Category;
 
@@ -30,7 +29,7 @@ public class QualityControl {
     static Set<String> badQuestionStrings = new HashSet<>();
     static {
         badQuestionStrings.add("Question is not valid.");
-        badQuestionStrings.add("Bad question.");
+        badQuestionStrings.add("Bad queryPrompt.");
         badQuestionStrings.add(QueryGeneratorUtils.kBadQuestionOptionString);
         badQuestionStrings.add(QueryGeneratorUtils.kNoneApplicableString);
     }
@@ -89,7 +88,7 @@ public class QualityControl {
         int numOptions = query.getOptions().size();
         int[] optionDist = new int[numOptions];
         Arrays.fill(optionDist, 0);
-        if (query.getPrompt().equals(annotation.question)) {
+        if (query.getPrompt().equals(annotation.queryPrompt)) {
             for (int i = 0; i < numOptions; i++) {
                 for (int j = 0; j < annotation.answerOptions.size(); j++) {
                     String optionStr = (String) query.getOptions().get(i);

@@ -18,7 +18,7 @@ import java.util.stream.IntStream;
 public class QuestionGenerator {
 
     /**
-     * Generate all question answer pairs for a sentence, given the n-best list.
+     * Generate all queryPrompt answer pairs for a sentence, given the n-best list.
      * @param sentenceId: unique identifier of the sentence.
      * @param words: words in the sentence.
      * @param nBestList: the nbest list.

@@ -17,8 +17,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * CCG structure encoded in question:
- *      category, argnum, question dependency (dependency of other core args used in the question).
+ * CCG structure encoded in queryPrompt:
+ *      category, argnum, queryPrompt dependency (dependency of other core args used in the queryPrompt).
  * CCG structure encoded in answer:
  *      argument id list, other dependencies used to generate the answer span.
  * Created by luheng on 3/19/16.
@@ -40,7 +40,7 @@ public class QuestionStructure {
 
     /**
      * For convenience.
-     * @param qaList: Q/A pairs sharing the same question structure.
+     * @param qaList: Q/A pairs sharing the same queryPrompt structure.
      */
     public QuestionStructure(final List<QuestionAnswerPair> qaList) {
         final QuestionAnswerPair qa = qaList.get(0);

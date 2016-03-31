@@ -125,7 +125,7 @@ public class ExperimentUtils {
     static AlignedAnnotation getAlignedAnnotation(ScoredQuery<QAStructureSurfaceForm> query,
                                                   List<AlignedAnnotation> annotations) {
         for (AlignedAnnotation annotation : annotations) {
-            if (query.getPrompt().equals(annotation.question)) {
+            if (query.getPrompt().equals(annotation.queryPrompt)) {
                 return annotation;
             }
         }

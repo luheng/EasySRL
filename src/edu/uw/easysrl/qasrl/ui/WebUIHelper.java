@@ -31,8 +31,8 @@ public class WebUIHelper {
                 + "<div class=\"panel panel-default\">"
                 + "<div class=\"panel-heading\"> <h3 class=\"panel-title\"> Instructions </h3></div>"
                 + "<div class=\"panel-body\"><ul>"
-                + "<li>Before answering the question, please read the sentence and make sure you understand the sentence correctly.</li>"
-                + "<li>Choose the best answer for the given question. </li>"
+                + "<li>Before answering the queryPrompt, please read the sentence and make sure you understand the sentence correctly.</li>"
+                + "<li>Choose the best answer for the given queryPrompt. </li>"
                 + "</ul></div></div> ";
     }
 

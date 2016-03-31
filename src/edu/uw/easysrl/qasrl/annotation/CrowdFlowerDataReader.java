@@ -47,19 +47,20 @@ public class CrowdFlowerDataReader {
             String[] qkeyInfo = qkey.split("\\.");
             annotation.predicateCategory = Category.valueOf(qkeyInfo[1]);
             annotation.argumentNumber = Integer.parseInt(qkeyInfo[2]);
-            annotation.questionId = Integer.parseInt(record.get("query_id"));
-            annotation.question = record.get("question");
+            annotation.queryId = Integer.parseInt(record.get("query_id"));
+            // TODO: handle new format.
+            annotation.queryPrompt = record.get("question");
             String[] options = record.get("answers").split("\n");
             Collections.addAll(annotation.optionStrings, options);
-            annotation.answers = ImmutableList.copyOf(record.get("choice").split("\n"));
-            annotation.answerIds = IntStream.range(0, options.length)
+            annotation.userOptions = ImmutableList.copyOf(record.get("choice").split("\n"));
+            annotation.userOptionIds = IntStream.range(0, options.length)
                     .boxed()
-                    .filter(id -> annotation.answers.contains(options[id]))
+                    .filter(id -> annotation.userOptions.contains(options[id]))
                     .collect(GuavaCollectors.toImmutableList());
-            if (annotation.answerIds.size() == 0) {
+            if (annotation.userOptionIds.size() == 0) {
                 System.err.print("Unannotated:\t" + record);
             }
-            annotation.goldAnswerIds = null; /* no gold */
+            annotation.goldOptionIds = null; /* no gold */
             annotation.comment = record.get("comment");
 
             // Crowdflower stuff
@@ -96,8 +97,8 @@ public class CrowdFlowerDataReader {
     }
 
     // _unit_id	_created_at	_golden	_id	_missed	_started_at	_tainted	_channel	_trust	_worker_id	_country
-    // _region	_city	_ip	choice	comment	orig__golden	answers	choice_gold	choice_gold_reason	pred_head
-    // pred_id	query_id	question	question_confidence	question_key	question_uncertainty
+    // _region	_city	_ip	choice	comment	orig__golden	userOptions	choice_gold	choice_gold_reason	pred_head
+    // pred_id	query_id	queryPrompt	question_confidence	question_key	question_uncertainty
     // sent_id	sentence
 
     public static void main(String[] args) throws IOException {
