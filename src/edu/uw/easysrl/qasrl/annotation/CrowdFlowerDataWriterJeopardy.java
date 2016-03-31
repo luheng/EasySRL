@@ -30,6 +30,10 @@ public class CrowdFlowerDataWriterJeopardy {
 
     private static final String csvOutputFilePrefix = "./Crowdflower_unannotated/jeopardy_pp_r23_100best";
 
+    private static final String[] testQuestionFiles = new String[] {
+            "Crowdflower_unannotated/test_questions/luheng_20160330-1719.txt",
+    };
+
     static QueryPruningParameters queryPruningParameters;
     static {
         queryPruningParameters = new QueryPruningParameters();
@@ -46,6 +50,7 @@ public class CrowdFlowerDataWriterJeopardy {
         HITLParser hitlParser = new HITLParser(nBest);
 
         // Print candidate test questions.
+        /*
         CSVPrinter csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter(
                 String.format("%s_test.csv", csvOutputFilePrefix))),
                 CSVFormat.EXCEL.withRecordSeparator("\n"));
@@ -60,14 +65,25 @@ public class CrowdFlowerDataWriterJeopardy {
                             hitlParser.getSentence(sid),
                             hitlParser.getGoldOptions(query),
                             10000 + lineCounter.getAndAdd(1),
-                            false, /* highlight predicate */
+                            false, // highlight predicate
                             csvPrinter);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             });
         }
-
         csvPrinter.close();
+        */
+
+
+
+        // Load test questions prepared by the UI.
+        for (String testQuestionFile : testQuestionFiles) {
+            ImmutableList<RecordedAnnotation> annotations  =
+                    RecordedAnnotation.loadAnnotationRecordsFromFile(testQuestionFile);
+            annotations.forEach(annot ->
+                    System.out.println(annot)
+            );
+        }
     }
 }

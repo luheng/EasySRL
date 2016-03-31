@@ -7,6 +7,10 @@ import edu.uw.easysrl.syntax.grammar.Category;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.OptionalInt;
+import java.util.stream.IntStream;
+
+import static com.sun.xml.internal.ws.policy.sourcemodel.wspolicy.XmlToken.Optional;
 
 /**
  * Annotation record from a single annotator.
@@ -47,7 +51,7 @@ public class RecordedAnnotation {
         optionStrings = new ArrayList<>();
     }
 
-    public static List<RecordedAnnotation> loadAnnotationRecordsFromFile(String fileName) throws IOException {
+    public static List<RecordedAnnotation> loadAnnotationRecordsFromFileOldFormat(String fileName) throws IOException {
         List<RecordedAnnotation> annotations = new ArrayList<>();
         BufferedReader reader;
 
@@ -125,6 +129,79 @@ public class RecordedAnnotation {
         return annotations;
     }
 
+    public static ImmutableList<RecordedAnnotation> loadAnnotationRecordsFromFile(String fileName) throws IOException {
+        List<RecordedAnnotation> annotations = new ArrayList<>();
+        BufferedReader reader;
+
+        reader = new BufferedReader(new FileReader(new File(fileName)));
+        String line;
+        RecordedAnnotation curr;
+        while ((line = reader.readLine()) != null) {
+            line = line.trim();
+            // Example: SID=50
+            if (line.startsWith("SID=")) {
+                annotations.add(new RecordedAnnotation());
+                curr = annotations.get(annotations.size() - 1);
+                curr.iterationId = -1;
+                curr.sentenceId = Integer.parseInt(line.split("=")[1]);
+
+                // Example: QID=0
+                line = reader.readLine().trim();
+                curr.questionId = Integer.parseInt(line.split("=")[1]);
+
+                // Example: SID=50 \t J.P. Bolduc ...
+                line = reader.readLine().trim();
+                curr.sentenceString = line.split("\\t")[1];
+
+                // Example: 20:company
+                line = reader.readLine().trim();
+                String[] questionInfo = line.split(":");
+
+                // Example: 0.96 \t {prompt string}
+                line = reader.readLine().trim();
+                curr.question = line.split("\\t")[1].trim();
+
+                // 0     0.06 \t 0 \t {option string} \t {some other info}
+                while ((line = reader.readLine()) != null) {
+                    line = line.trim();
+                    // Empty comment line.
+                    if (line.isEmpty()) {
+                        break;
+                    }
+                    curr.optionStrings.add(line.split("\\t")[2]);
+                }
+                // [RESPONSES]:
+                line = reader.readLine().trim();
+                assert (line.equals("[RESPONSES]:"));
+                List<Integer> answerIds = new ArrayList<>();
+                while ((line = reader.readLine()) != null) {
+                    final String option = line.trim();
+                    int optionId = -1;
+                    for (int i = 0; i < curr.optionStrings.size(); i++) {
+                        if (curr.optionStrings.get(i).equals(option)) {
+                            optionId = i;
+                            break;
+                        }
+                    }
+                    answerIds.add(optionId);
+                    if (line.equals("[COMMENT]:")) {
+                        break;
+                    }
+                }
+                curr.answerIds = ImmutableList.copyOf(answerIds);
+                curr.comment = reader.readLine().trim();
+                // Empty line.
+                reader.readLine();
+
+                // Other unassigned stuff.
+                curr.goldAnswerIds = ImmutableList.of();
+            }
+        }
+        System.out.println(String.format("Loaded %d annotation records from file: %s.", annotations.size(), fileName));
+        return ImmutableList.copyOf(annotations);
+    }
+
+
     public boolean isSameQuestionAs(final RecordedAnnotation other) {
         return sentenceId == other.sentenceId
                 && predicateId == other.predicateId
@@ -154,7 +231,7 @@ public class RecordedAnnotation {
     public static void main(String[] args) {
         String fileName = args[0];
         try {
-            List<RecordedAnnotation> annotations = loadAnnotationRecordsFromFile(fileName);
+            List<RecordedAnnotation> annotations = loadAnnotationRecordsFromFileOldFormat(fileName);
             annotations.forEach(r -> {
                 System.out.println(r.toString()
                 );
