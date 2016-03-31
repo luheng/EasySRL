@@ -135,7 +135,7 @@ public class AlignedAnnotation extends RecordedAnnotation {
             String annotator = info[info.length - 1].split("_")[0];
             System.out.println(annotator);
             try {
-                annotations.put(annotator, RecordedAnnotation.loadAnnotationRecordsFromFileOldFormat(fileName));
+                annotations.put(annotator, AnnotationReader.loadAnnotationRecordsFromFileOldFormat(fileName));
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -150,7 +150,7 @@ public class AlignedAnnotation extends RecordedAnnotation {
             String annotator = info[info.length - 1].split("_")[0];
             System.out.println(annotator);
             try {
-                annotations.put(annotator, RecordedAnnotation.loadAnnotationRecordsFromFileOldFormat(fileName));
+                annotations.put(annotator, AnnotationReader.loadAnnotationRecordsFromFileOldFormat(fileName));
             } catch (IOException e) {
                 e.printStackTrace();
             }

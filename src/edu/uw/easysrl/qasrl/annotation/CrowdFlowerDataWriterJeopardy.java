@@ -27,10 +27,12 @@ public class CrowdFlowerDataWriterJeopardy {
 
     static final int nBest = 100;
     static final boolean usePronouns = false;
+    static final int maxNumQueriesPerFile = 100;
 
-    private static HITLParser hitlParser;
+    private final static HITLParser hitlParser = new HITLParser(nBest);
 
-    private static final String csvOutputFilePrefix = "./Crowdflower_unannotated/jeopardy_pp_r23_100best";
+    //private static final String csvOutputFilePrefix = "./Crowdflower_unannotated/jeopardy_pp_r23_100best";
+    private static final String csvOutputFilePrefix = "./Crowdflower_temp/jeopardy_pp_r23_100best";
 
     private static final String[] testQuestionFiles = new String[] {
             "Crowdflower_unannotated/test_questions/luheng_20160330-1719.txt",
@@ -49,7 +51,7 @@ public class CrowdFlowerDataWriterJeopardy {
         Map<Integer, List<RecordedAnnotation>> annotations = new HashMap<>();
         for (String testQuestionFile : testQuestionFiles) {
             // TODO: align annotations from different people.
-            RecordedAnnotation.loadAnnotationRecordsFromFile(testQuestionFile)
+            AnnotationReader.loadAnnotationRecordsFromFile(testQuestionFile)
                     .forEach(annot -> {
                         if (!annotations.containsKey(annot.sentenceId)) {
                             annotations.put(annot.sentenceId, new ArrayList<>());
@@ -96,14 +98,49 @@ public class CrowdFlowerDataWriterJeopardy {
         csvPrinter.close();
     }
 
+    private static void printQuestionsToAnnotate() throws IOException {
+        final ImmutableList<Integer> sentenceIds = CrowdFlowerDataUtils.getRound2And3SentenceIds();
+        AtomicInteger lineCounter = new AtomicInteger(0),
+                      fileCounter = new AtomicInteger(0);
+
+        CSVPrinter csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter(
+                String.format("%s_%03d.csv", csvOutputFilePrefix, fileCounter.getAndAdd(1)))),
+                CSVFormat.EXCEL.withRecordSeparator("\n"));
+        csvPrinter.printRecord((Object[]) CrowdFlowerDataUtils.csvHeaderNew);
+
+        for (int sid : sentenceIds) {
+            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries =
+                    hitlParser.getPPAttachmentQueriesForSentence(sid, usePronouns);
+            for (ScoredQuery<QAStructureSurfaceForm> query : queries) {
+                final ImmutableList<String> sentence = hitlParser.getSentence(sid);
+                System.out.println(query.toString(sentence,
+                        'G', hitlParser.getGoldOptions(query),
+                        'O', hitlParser.getOracleOptions(query),
+                        'B', hitlParser.getOneBestOptions(query)));
+                CrowdFlowerDataUtils.printQueryToCSVFileNew(
+                        query,
+                        sentence,
+                        null, // gold options
+                        lineCounter.getAndAdd(1),
+                        false, // highlight predicate
+                        "",
+                        csvPrinter);
+                if (lineCounter.get() % maxNumQueriesPerFile == 0) {
+                    csvPrinter.close();
+                    csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter(
+                            String.format("%s_%03d.csv", csvOutputFilePrefix, fileCounter.getAndAdd(1)))),
+                            CSVFormat.EXCEL.withRecordSeparator("\n"));
+                    csvPrinter.printRecord((Object[]) CrowdFlowerDataUtils.csvHeaderNew);
+                }
+            }
+        }
+        csvPrinter.close();
+    }
+
     public static void main(String[] args) throws IOException {
         //final ImmutableList<Integer> testSentenceIds = CrowdFlowerDataUtils.getTestSentenceIds();
-        final ImmutableList<Integer> sentenceIds = CrowdFlowerDataUtils.getRound2And3SentenceIds();
-
-        hitlParser = new HITLParser(nBest);
-
-        // Print candidate test questions.
 
         printTestQuestions();
+        //printQuestionsToAnnotate();
     }
 }
