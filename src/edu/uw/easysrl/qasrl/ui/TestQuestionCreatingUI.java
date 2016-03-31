@@ -181,7 +181,11 @@ public class TestQuestionCreatingUI {
             final BufferedWriter fileWriter = annotationFileWriterMap.get(userName);
 
             // Handle response.
-            if (request.getParameterValues("UserAnswer") != null) {
+            if (request.getParameterValues("Skip") != null) {
+                // Advance to the next query.
+                final int lastQueryId = queryIdMap.get(userName);
+                queryIdMap.put(userName, lastQueryId + 1);
+            } else if (request.getParameterValues("UserAnswer") != null) {
                 final ImmutableList<String> userAnswers = ImmutableList.copyOf(request.getParameterValues("UserAnswer"));
                 final int lastQueryId = queryIdMap.get(userName);
                 final List<ScoredQuery<QAStructureSurfaceForm>> queryPool = activeLearningMap.get(userName);
@@ -199,7 +203,7 @@ public class TestQuestionCreatingUI {
                     annotationStr += answer + "\n";
                 }
                 if (request.getParameter("Comment") != null) {
-                    annotationStr += "[COMMENT]:\n" + request.getParameter("Comment").trim();
+                    annotationStr += "[COMMENT]:\n" + request.getParameter("Comment").trim() + "\n";
                 }
                 // Writing annotation to file.
                 fileWriter.write(annotationStr + "\n");
