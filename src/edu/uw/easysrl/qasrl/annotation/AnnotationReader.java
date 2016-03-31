@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 
+ *
  * Created by luheng on 3/31/16.
  */
 public class AnnotationReader {
