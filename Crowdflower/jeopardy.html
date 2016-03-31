@@ -1,0 +1,55 @@
+We want to teach our smart robot to understand human language and we need your help! The robot will read a sentence and then ask you some questions about it. But the questions by in the style of the game show Jeopardy! where the robot will give you an answer and require you to respond with valid questions. For example, given the sentence:
+
+Assets of the 400 taxable funds grew by $1.5 billion during the latest week.
+The robot may show you the answer:
+
+the latest week
+along with the following options as possible questions:
+
+What would $1.5 billion be during?
+What would something grow during?
+None of the Above.
+You need to choose every sensible question for which the answer is explicitly indicated by the sentence. In this case, there is just one: What would something grow during?
+
+Choosing Questions
+
+You should choose all the questions, and only the questions, that satisfy the three following criteria:
+
+The question is grammatical and sensible in the context of the sentence.
+The question is explicitly, directly answered in the sentence with the given answer.
+The question does not add extra descriptions that other options don't.
+For example, consider the sentence
+
+She was waiting in anticipation for Barack Obama, the president of the United States, to pay her a visit in her hometown.
+The robot may show you the answer
+
+her hometown
+and the questions:
+
+What would someone to pay her a visit in?
+What would Barack Obama pay her a visit in?
+What would the president of the United States pay her a visit in?
+What would Barack Obama, the president of the United States, pay her a visit in?
+What would she pay her a visit in?
+What would a visit be in?
+What would she be waiting in?
+None of the Above.
+In this case, there are four correct choices: What would someone pay her a visit in? What would Barack Obama pay her a visit in? What would the president of the United States pay her a visit in? and What would a visit be in? The other four choices are incorrect.
+
+First, What would someone to pay her a visit in? is ungrammatical, so it violates criterion 1.
+
+Second, What would Barack Obama, the president of the United States, pay her a visit in? has the extra description of Barack Obama as the president of the United States, where other options avoid this by referring to him either as Barack Obama or as the president of the United States. So it violates criterion 3.
+
+Third, What would she pay her a visit in? assumes that she would be paying someone a visit, where it is actually Barack Obama who would pay the visit, so the question does not make sense in the context of the sentence and violates criterion 1.
+
+Fourth, What would she be waiting in? has the answer anticipation, not her hometown. Even though the reader might conclude that she is waiting in her hometown, the sentence does not explicitly, directly say this. So this option violates criterion 2.
+
+In the actual task, robot will generally not give you this many options. This was just a contrived example to illustrate the three criteria.
+
+Note: there are three kinds of errors that you should forgive in questions. First, the robot may make mistakes between "who" and "what," and "someone" and "something." Second, the robot does not know how to ask "when" or "where" questions, and will always phrase them as "what" questions, as in the above example. Third, the robot might forget to say "not" in the question. In these cases, proceed as though this error had not been made.
+
+If none of the questions meet all three criteria, then please just choose None of the Above.
+
+Thank You!
+
+Thank you for your help! Your work will help us build more intelligent machine reading systems! If you have any questions or suggestions, please let us know in the comment box. We're still iterating on this, so there might be some problems with the overall design or the test questions. Your feedback would be very valuable in helping us improve.
