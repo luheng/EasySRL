@@ -5,16 +5,20 @@ import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.Category.Slash;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeLeaf;
+import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeBinary;
 
 
 import java.util.*;
 import java.util.stream.Collectors;
+import static java.util.stream.Collectors.*;
 
 /**
  * Tools for generating text from trees, dependencies, and lists of tokens.
  * Created by luheng on 1/20/16.
  */
 public class TextGenerationHelper {
+
+    private static final boolean useShorterNPs = true;
 
     // here is the punctuation we want to avoid spaces before,
     // and that we don't want at the end of the question or answer.
@@ -103,15 +107,18 @@ public class TextGenerationHelper {
             if(!noSpace) {
                 result.append(" ");
             }
-            // only for use with NP shortcut
-            // if(word.equalsIgnoreCase("a") && nextWord.isPresent() && startsWithVowel(nextWord.get())) {
-            //     result.append("an");
-            // } else if(word.equalsIgnoreCase("an") && nextWord.isPresent() && !startsWithVowel(nextWord.get())) {
-            //     result.append("a");
-            // } else {
-            //     result.append(word);
-            // }
-            result.append(word);
+            // NP shortcut
+            if(useShorterNPs) {
+                if(word.equalsIgnoreCase("a") && nextWord.isPresent() && startsWithVowel(nextWord.get())) {
+                    result.append("an");
+                } else if(word.equalsIgnoreCase("an") && nextWord.isPresent() && !startsWithVowel(nextWord.get())) {
+                    result.append("a");
+                } else {
+                    result.append(word);
+                }
+            } else {
+                result.append(word);
+            }
             prevWord = Optional.of(prevIterator.next());
             if(nextIterator.hasNext()) {
                 nextWord = Optional.of(nextIterator.next());
@@ -333,39 +340,42 @@ public class TextGenerationHelper {
 
         // TODO figure out if this is better: optional fix for reducing the size of noun phrases
         // if asking for an NP, just take the determiner and the noun itself.
-        // Buts then when aking for a noun, get one modifier if present.
-        // if(Category.valueOf("N").matches(node.getCategory())) {
-        //     Optional<SyntaxTreeNode> parentOpt = getParent(node, tree);
-        //     if(parentOpt.isPresent()) {
-        //         SyntaxTreeNode parent = parentOpt.get();
-        //         if(Category.valueOf("N").matches(parent.getCategory())) {
-        //             List<TextWithDependencies> result = new LinkedList<>();
-        //             result.add(new TextWithDependencies(getNodeWords(parent, replacementIndexOpt, replacementWord),
-        //                                                 getContainedDependencies(parent, parse)));
-        //             return result;
-        //         }
-        //     }
-        // } else if((node instanceof SyntaxTreeNodeBinary) &&
-        //           Category.valueOf("NP").matches(node.getCategory()) &&
-        //           Category.valueOf("NP/N").matches(((SyntaxTreeNodeBinary) node).getLeftChild().getHead().getCategory()) &&
-        //           !(lookForOf && // don't do the NP shortcut when there's an of-phrase later that we need to include.
-        //             node.getEndIndex() < tree.getEndIndex() &&
-        //             tree.getLeaves().get(node.getEndIndex()).getWord().equals("of"))) {
-        //     SyntaxTreeNodeLeaf detHead = ((SyntaxTreeNodeBinary) node).getLeftChild().getHead();
-        //     List<TextWithDependencies> phrases = getRepresentativePhrases(headIndexOpt, Category.valueOf("N"), parse, replacementIndexOpt, replacementWord, lookForOf);
-        //     // System.err.println("Reworking headedness of node: category " + node.getCategory() + ", word " + node.getWord());
-        //     // System.err.println("Head node: category " + detHead.getCategory() + ", word " + detHead.getWord());
-        //     // System.err.println("Sub phrase: " + renderString(phrases.get(0).tokens));
-        //     return phrases
-        //         .stream()
-        //         .map(twd -> {
-        //                 List<String> tokens = new LinkedList<>();
-        //                 tokens.addAll(getNodeWords(detHead, replacementIndexOpt, replacementWord));
-        //                 tokens.addAll(twd.tokens);
-        //                 return new TextWithDependencies(tokens, twd.dependencies);
-        //                     })
-        //         .collect(Collectors.toList());
-        // }
+        // But then when aking for a noun, get one modifier if present.
+        // And don't do this for proper nouns.
+        if(useShorterNPs && !node.getHead().getPos().equals("NNP") && !node.getHead().getPos().equals("NNPS")) {
+            if(Category.valueOf("N").matches(node.getCategory())) {
+                Optional<SyntaxTreeNode> parentOpt = getParent(node, tree);
+                if(parentOpt.isPresent()) {
+                    SyntaxTreeNode parent = parentOpt.get();
+                    if(Category.valueOf("N").matches(parent.getCategory())) {
+                        List<TextWithDependencies> result = new LinkedList<>();
+                        result.add(new TextWithDependencies(getNodeWords(parent, replacementIndexOpt, replacementWord),
+                                                            getContainedDependencies(parent, parse)));
+                        return result;
+                    }
+                }
+            } else if((node instanceof SyntaxTreeNodeBinary) &&
+                      Category.valueOf("NP").matches(node.getCategory()) &&
+                      Category.valueOf("NP/N").matches(((SyntaxTreeNodeBinary) node).getLeftChild().getHead().getCategory()) &&
+                      !(lookForOf && // don't do the NP shortcut when there's an of-phrase later that we need to include.
+                        node.getEndIndex() < tree.getEndIndex() &&
+                        tree.getLeaves().get(node.getEndIndex()).getWord().equals("of"))) {
+                SyntaxTreeNodeLeaf detHead = ((SyntaxTreeNodeBinary) node).getLeftChild().getHead();
+                List<TextWithDependencies> phrases = getRepresentativePhrases(headIndexOpt, Category.valueOf("N"), parse, replacementIndexOpt, replacementWord, lookForOf);
+                // System.err.println("Reworking headedness of node: category " + node.getCategory() + ", word " + node.getWord());
+                // System.err.println("Head node: category " + detHead.getCategory() + ", word " + detHead.getWord());
+                // System.err.println("Sub phrase: " + renderString(phrases.get(0).tokens));
+                return phrases
+                    .stream()
+                    .map(twd -> {
+                            List<String> tokens = new LinkedList<>();
+                            tokens.addAll(getNodeWords(detHead, replacementIndexOpt, replacementWord));
+                            tokens.addAll(twd.tokens);
+                            return new TextWithDependencies(tokens, twd.dependencies);
+                        })
+                    .collect(Collectors.toList());
+            }
+        }
 
         // get all of the dependencies that were (presumably) touched in the course of getting the lowest good ancestor
         touchedDeps.addAll(getContainedDependencies(node, parse));
@@ -491,7 +501,7 @@ public class TextGenerationHelper {
             return phrases
                 .stream()
                 .filter(twd -> twd.tokens.size() > 0)
-                .collect(Collectors.toList());
+                .collect(toList());
         }
 
     }
