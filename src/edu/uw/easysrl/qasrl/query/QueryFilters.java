@@ -70,7 +70,8 @@ public class QueryFilters {
                     query.computeScores(nBestList);
                     // Prune answer options.
                     final int numQAOptions = query.getQAPairSurfaceForms().size();
-                    final ImmutableList<Integer> filteredNAOptions = IntStream.range(0, numQAOptions)
+
+                    final ImmutableList<Integer> filteredQAOptions = IntStream.range(0, numQAOptions)
                             .boxed()
                             .filter(i -> query.getOptionScores().get(i) > queryPruningParameters.minOptionConfidence)
                             .filter(i -> query.getQAPairSurfaceForms().get(i).getQuestionStructures().stream()
@@ -82,14 +83,14 @@ public class QueryFilters {
 
                     final ImmutableList<Integer> filteredOptions = IntStream.range(0, query.getOptions().size())
                             .boxed()
-                            .filter(i -> i >= numQAOptions || filteredNAOptions.contains(i))
+                            .filter(i -> i >= numQAOptions || filteredQAOptions.contains(i))
                             .collect(toImmutableList());
 
                     return new ScoredQuery<>(
                             query.getSentenceId(),
                             query.getPrompt(),
                             filteredOptions.stream().map(query.getOptions()::get).collect(toImmutableList()),
-                            filteredNAOptions.stream().map(query.getQAPairSurfaceForms()::get).collect(toImmutableList()),
+                            filteredQAOptions.stream().map(query.getQAPairSurfaceForms()::get).collect(toImmutableList()),
                             query.isJeopardyStyle(),
                             query.allowMultipleChoices());
                 })

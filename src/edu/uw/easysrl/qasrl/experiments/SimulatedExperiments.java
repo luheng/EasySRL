@@ -38,7 +38,8 @@ public class SimulatedExperiments {
     private static HITLParsingParameters reparsingParameters;
     static {
         reparsingParameters = new HITLParsingParameters();
-        reparsingParameters.supertagPenaltyWeight = 1.0;
+        reparsingParameters.attachmentPenaltyWeight = 5.0;
+        reparsingParameters.supertagPenaltyWeight = 5.0;
         reparsingParameters.skipPrepositionalQuestions = false;
     }
 
@@ -61,6 +62,7 @@ public class SimulatedExperiments {
                     .getPPAttachmentQueriesForSentence(sentenceId, usePronouns);
 
             // Get gold results.
+            /*
             coreQueries.forEach(query -> {
                 ImmutableList<Integer> goldOptions = myHITLParser.getGoldOptions(query);
                 ImmutableSet<Evidence> evidences = myHITLParser.getEvidenceSet(query, goldOptions);
@@ -73,13 +75,13 @@ public class SimulatedExperiments {
                 }
                 numCoreQueries.getAndAdd(1);
             });
+            */
 
             ppQueries.forEach(query -> {
                 ImmutableList<Integer> goldOptions = myHITLParser.getGoldOptions(query);
                 ImmutableSet<Evidence> evidences = myHITLParser.getEvidenceSet(query, goldOptions);
                 myHITLHistory.addEntry(sentenceId, query, goldOptions, evidences);
                 myHITLHistory.printLatestHistory();
-
 
                 ImmutableList<Integer> onebestOptions = myHITLParser.getOneBestOptions(query);
                 if (goldOptions.containsAll(onebestOptions) && onebestOptions.containsAll(goldOptions)) {

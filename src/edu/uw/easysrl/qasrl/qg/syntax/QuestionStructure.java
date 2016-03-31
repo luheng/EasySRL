@@ -43,10 +43,11 @@ public class QuestionStructure {
      * @param qaList: Q/A pairs sharing the same question structure.
      */
     public QuestionStructure(final List<QuestionAnswerPair> qaList) {
-        this.predicateIndex = qaList.get(0).getPredicateIndex();
-        this.category = qaList.get(0).getPredicateCategory();
-        this.targetArgNum = qaList.get(0).getArgumentNumber();
-        this.otherDependencies = ImmutableMap.copyOf(qaList.get(0).getQuestionDependencies().stream()
+        final QuestionAnswerPair qa = qaList.get(0);
+        this.predicateIndex = qa.getPredicateIndex();
+        this.category = qa.getPredicateCategory();
+        this.targetArgNum = qa.getArgumentNumber();
+        this.otherDependencies = ImmutableMap.copyOf(qa.getQuestionDependencies().stream()
                 .filter(dep -> dep.getHead() == predicateIndex && dep.getArgNumber() != targetArgNum)
                 .collect(Collectors.toMap(ResolvedDependency::getArgNumber, ResolvedDependency::getArgument)));
     }
