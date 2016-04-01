@@ -71,8 +71,8 @@ public class QualityControl {
     }
 
     public static boolean queryIsPrepositional(ScoredQuery<QAStructureSurfaceForm> query) {
-        return !query.isJeopardyStyle() && propositionalCategories.contains(
-                query.getQAPairSurfaceForms().get(0).getCategory());
+        return (!query.isJeopardyStyle() && propositionalCategories.contains(
+                query.getQAPairSurfaceForms().get(0).getCategory())) || query.isJeopardyStyle();
     }
 
     public static int getAgreementNumber(Query query, AlignedAnnotation annotation) {

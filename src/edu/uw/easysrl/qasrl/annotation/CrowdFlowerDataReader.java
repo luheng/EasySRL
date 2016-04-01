@@ -55,8 +55,6 @@ public class CrowdFlowerDataReader {
                 System.err.print("Unannotated:\t" + record);
             }
 
-            annotation.isJeopardyStyle = record.isMapped("jeopardy_style") && Integer.parseInt(record.get("jeopardy_style")) > 0;
-
             annotation.goldOptionIds = null; /* no gold */
             annotation.comment = record.get("comment");
 

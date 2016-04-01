@@ -25,9 +25,7 @@ import java.util.stream.Collectors;
  * Created by luheng on 3/20/16.
  */
 public class ReparsingExperiment {
-
     private static final int nBest = 100;
-    private static final boolean usePronouns = false;
     private static HITLParser myHTILParser;
     private static ReparsingHistory myHistory;
     private static Map<Integer, List<AlignedAnnotation>> annotations;
@@ -36,7 +34,7 @@ public class ReparsingExperiment {
            // "./Crowdflower_data/f878213.csv",
            // "./Crowdflower_data/f882410.csv",
            //  "./Crowdflower_data/all-checkbox-responses.csv",
-            "./Crowdflower_data/ff891522.csv",
+            "./Crowdflower_data/f891522.csv",
     };
 
     private static QueryPruningParameters queryPruningParameters = new QueryPruningParameters();
@@ -49,6 +47,9 @@ public class ReparsingExperiment {
         myHTILParser.setQueryPruningParameters(queryPruningParameters);
         annotations = ExperimentUtils.loadCrowdflowerAnnotation(annotationFiles);
         assert annotations != null;
+
+        annotations.values().stream().flatMap(annotList -> annotList.stream()).forEach(
+                annot -> System.out.println(annot));
 
         myHistory = new ReparsingHistory(myHTILParser);
         runExperiment();
@@ -67,7 +68,8 @@ public class ReparsingExperiment {
 
             final List<AlignedAnnotation> annotated = annotations.get(sentenceId);
             boolean isJeopardyStyle = annotated.stream()
-                    .anyMatch(annot -> annot.isJeopardyStyle);
+                    .anyMatch(annot -> annot.answerOptions.stream()
+                            .anyMatch(op -> op.endsWith("?")));
             boolean isCheckboxStyle = !annotated.stream()
                     .anyMatch(annot -> annot.answerOptions.stream()
                             .anyMatch(op -> op.contains(QAPairAggregatorUtils.answerDelimiter)));
@@ -88,6 +90,7 @@ public class ReparsingExperiment {
             Arrays.fill(penalty, 0);
 
             for (ScoredQuery<QAStructureSurfaceForm> query : queryList) {
+                //System.out.println(query.toString(sentence));
                 AlignedAnnotation annotation = ExperimentUtils.getAlignedAnnotation(query, annotations.get(sentenceId));
                 if (annotation == null) {
                     continue;
@@ -113,14 +116,7 @@ public class ReparsingExperiment {
                                    rerankedF1);
 
                 // Print debugging information.
-                String sentenceStr = sentence.stream().collect(Collectors.joining(" "));
-                int predId = query.getPredicateId().getAsInt();
-                Category category = query.getPredicateCategory().get();
-                int argNum = query.getArgumentNumber().getAsInt();
-                String result =  "SID=" + sentenceId + "\t" + sentenceStr + "\n" + "PRED=" + predId+ "\t \t"
-                        + query.getPrompt() + "\t" + category + "." + argNum + "\t"
-                        + String.format("Baseline:: %.3f%%\tOracle:: %.3f%%\tOracle ParseId::%d\tRerank ParseId::%d\n",
-                        100.0 * baselineF1.getF1(), 100.0 * oracleF1.getF1(), oracleParseId, rerankedId);
+                String result = query.toString(sentence) + "\n";
                 result += evidenceSet.stream()
                         .map(ev -> "Penalizing:\t" + ev.toString(sentence))
                         .collect(Collectors.joining("\n")) + "\n";
