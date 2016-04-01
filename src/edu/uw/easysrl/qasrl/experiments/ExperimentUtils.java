@@ -67,9 +67,9 @@ public class ExperimentUtils {
         return generateAllQueries(
                 // Choose QAPair aggregator.
                 isCheckbox ?
-                        QAPairAggregators.aggregateForMultipleChoiceQA() :
-                        //QAPairAggregators.aggregateForSingleChoiceQA(),
-                        QAPairAggregators.aggregateWithFullQuestionStructure(),
+                        QAPairAggregators.aggregateWithFullQuestionStructure() :
+                        //QAPairAggregators.aggregateForMultipleChoiceQA() :
+                        QAPairAggregators.aggregateForSingleChoiceQA(),
                 // Choose Query generator.
                 isJeopardyStyle ?
                         QueryGenerators.jeopardyCheckboxQueryGenerator() :

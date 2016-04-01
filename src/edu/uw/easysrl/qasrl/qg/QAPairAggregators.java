@@ -1,6 +1,7 @@
 package edu.uw.easysrl.qasrl.qg;
 
 import com.google.common.collect.*;
+import edu.uw.easysrl.qasrl.experiments.DebugPrinter;
 import edu.uw.easysrl.qasrl.qg.surfaceform.*;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 
@@ -168,6 +169,15 @@ public final class QAPairAggregators {
                                                             commonQS2S.stream().map(qs2s -> qs2s.structure).collect(toImmutableList()),
                                                             commonAS2S.stream().map(as2s -> as2s.structure).collect(toImmutableList()));
                                                     qaStructureSurfaceFormList.add(qa);
+
+                                                    // Debug.
+                                                    /*
+                                                    System.err.println(
+                                                            qa.getSentenceId() + "\t" + qa.getQuestion() + "\t" + qa.getAnswer() + "\t" +
+                                                                    DebugPrinter.getShortListString(
+                                                                            qa.getQAPairs().stream().map(QuestionAnswerPair::getParseId)
+                                                                                    .distinct().collect(Collectors.toList())));
+                                                    */
                                                 }
                                             })
                                 );

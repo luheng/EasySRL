@@ -28,11 +28,11 @@ public class QAPairAggregatorUtils {
     public static String getQuestionDependenciesString(final QuestionAnswerPair qa) {
         return qa.getQuestionDependencies().stream()
                 .filter(dep -> dep.getHead() == qa.getPredicateIndex() && dep.getArgNumber() != qa.getArgumentNumber())
-                .collect(toMap(ResolvedDependency::getArgNumber, ResolvedDependency::getArgumentIndex))
+                .collect(groupingBy(ResolvedDependency::getArgNumber))
                 .entrySet()
                 .stream()
                 .sorted(Comparator.comparing(Map.Entry::getKey))
-                .map(e -> e.getKey() + ":" + e.getValue())
+                .map(e -> e.getKey() + ":" + e.getValue().stream().map(String::valueOf).collect(Collectors.joining(",")))
                 .collect(Collectors.joining("\t"));
     }
 
