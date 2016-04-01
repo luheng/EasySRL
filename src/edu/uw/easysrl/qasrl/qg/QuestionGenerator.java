@@ -120,45 +120,29 @@ public class QuestionGenerator {
                 System.out.println(String.format("========== SID = %04d ==========", sentenceId));
                 System.out.println(TextGenerationHelper.renderString(words));
                 for(QuestionAnswerPair qaPair : generateAllQAPairs(sentenceId, words, -1, goldParse)) {
-                    System.out.println(qaPair.getQuestion());
-                    System.out.println("\t" + qaPair.getAnswer());
+                    printQAPair(words, qaPair);
                 }
             }
         } else if (args[0].equalsIgnoreCase("tricky")) {
             System.out.println("\nQA Pairs for tricky sentences:\n");
             ImmutableList<Integer> trickySentences = new ImmutableList.Builder<Integer>()
-                .add(42)
+                .add(42).add(1489).add(36)
                 .build();
             ImmutableMap<Integer, NBestList> nBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 100).get();
             for(int sentenceId : trickySentences) {
                 System.out.println(String.format("========== SID = %04d ==========", sentenceId));
                 ImmutableList<String> words = devData.getSentences().get(sentenceId);
+                System.out.println(TextGenerationHelper.renderString(words));
                 System.out.println(String.format("--------- Gold QA Pairs --------", sentenceId));
                 Parse goldParse = devData.getGoldParses().get(sentenceId);
-                System.out.println(TextGenerationHelper.renderString(words));
                 for(QuestionAnswerPair qaPair : generateAllQAPairs(sentenceId, words, -1, goldParse)) {
-                    System.out.println(qaPair.getQuestion());
-                    System.out.println("\t" + qaPair.getAnswer());
+                    printQAPair(words, qaPair);
                 }
                 System.out.println(String.format("--------- All QA Pairs ---------", sentenceId));
                 NBestList nBestList = nBestLists.get(sentenceId);
                 ImmutableList<QuestionAnswerPair> qaPairs = generateAllQAPairs(sentenceId, words, nBestList);
                 for(QuestionAnswerPair qaPair : qaPairs) {
-                    System.out.println("--");
-                    System.out.println(words.get(qaPair.getPredicateIndex()));
-                    System.out.println(qaPair.getPredicateCategory());
-                    for(ResolvedDependency dep : qaPair.getQuestionDependencies()) {
-                        System.out.println("\t" + words.get(dep.getHead()) + "\t-"
-                                           + dep.getArgNumber() + "->\t"
-                                           + words.get(dep.getArgument()));
-                    }
-                    System.out.println(qaPair.getQuestion());
-                    for(ResolvedDependency dep : qaPair.getAnswerDependencies()) {
-                        System.out.println("\t" + words.get(dep.getHead()) + "\t-"
-                                           + dep.getArgNumber() + "->\t"
-                                           + words.get(dep.getArgument()));
-                    }
-                    System.out.println("\t" + qaPair.getAnswer());
+                    printQAPair(words, qaPair);
                 }
                 System.out.println(String.format("------- All Pair Queries -------", sentenceId));
                 ImmutableList<QAPairSurfaceForm> surfaceForms = QAPairAggregators.aggregateByString().aggregate(qaPairs);
@@ -171,6 +155,25 @@ public class QuestionGenerator {
                 }
             }
         }
+    }
+
+    private static void printQAPair(ImmutableList<String> words, QuestionAnswerPair qaPair) {
+        System.out.println("--");
+        System.out.println(words.get(qaPair.getPredicateIndex()));
+        System.out.println(qaPair.getPredicateCategory());
+        for(ResolvedDependency dep : qaPair.getQuestionDependencies()) {
+            System.out.println("\t" + words.get(dep.getHead()) + "\t-"
+                               + dep.getArgNumber() + "->\t"
+                               + words.get(dep.getArgument()));
+        }
+        System.out.println(qaPair.getQuestion());
+        for(ResolvedDependency dep : qaPair.getAnswerDependencies()) {
+            System.out.println("\t" + words.get(dep.getHead()) + "\t-"
+                               + dep.getArgNumber() + "->\t"
+                               + words.get(dep.getArgument()));
+        }
+        System.out.println("\t" + qaPair.getAnswer());
+        System.out.println("--");
     }
 }
 
