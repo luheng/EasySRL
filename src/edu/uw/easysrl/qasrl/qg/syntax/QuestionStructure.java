@@ -42,7 +42,7 @@ public class QuestionStructure {
      * For convenience.
      * @param qaList: Q/A pairs sharing the same queryPrompt structure.
      */
-    public QuestionStructure(final List<QuestionAnswerPair> qaList) {
+    public <QA extends QuestionAnswerPair> QuestionStructure(final List<QA> qaList) {
         final QuestionAnswerPair qa = qaList.get(0);
         this.predicateIndex = qa.getPredicateIndex();
         this.category = qa.getPredicateCategory();

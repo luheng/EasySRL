@@ -15,9 +15,10 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Simulation experiments for PP Attachment questions (jeopardy style)
  * Created by luheng on 3/29/16.
  */
-public class SimulatedExperiments {
+public class SyntheticExperiments {
     // Parameters.
     private static int nBest = 100;
+    private static int maxNumSentences = 100;
 
     // Shared data: nBestList, sentences, etc.
     private static HITLParser myHITLParser;
@@ -54,6 +55,7 @@ public class SimulatedExperiments {
                       coreQueryAcc = new AtomicInteger(0),
                       ppQueryAcc = new AtomicInteger(0);
 
+        AtomicInteger sentenceCounter = new AtomicInteger(0);
         for (int sentenceId : myHITLParser.getAllSentenceIds()) {
             ImmutableList<ScoredQuery<QAStructureSurfaceForm>> coreQueries = myHITLParser
                     .getCoreArgumentQueriesForSentence(sentenceId, isCheckboxVersion, usePronouns);
@@ -90,6 +92,10 @@ public class SimulatedExperiments {
                 numPPQueries.getAndAdd(1);
                 //System.out.println(1.0 * ppQueryAcc.get() / numPPQueries.get());
             });
+
+            if (sentenceCounter.addAndGet(1) >= maxNumSentences) {
+                break;
+            }
         }
 
         myHITLHistory.printSummary();
