@@ -31,11 +31,16 @@ public class CrowdFlowerDataWriterJeopardy {
 
     private final static HITLParser hitlParser = new HITLParser(nBest);
 
-    //private static final String csvOutputFilePrefix = "./Crowdflower_unannotated/jeopardy_pp_r23_100best";
-    private static final String csvOutputFilePrefix = "./Crowdflower_temp/jeopardy_pp_r23_100best";
+    private static final String csvOutputFilePrefix = "./Crowdflower_unannotated/jeopardy_pp_r23_100best";
+    // private static final String csvOutputFilePrefix = "./Crowdflower_temp/jeopardy_pp_r23_100best";
 
-    private static final String[] testQuestionFiles = new String[] {
-            "Crowdflower_unannotated/test_questions/luheng_20160330-1719.txt",
+    private static final String[] unreviewedTestQuestionFiles = new String[] {
+          //  "Crowdflower_unannotated/test_questions/luheng_20160330-1719.txt",
+            "Crowdflower_unannotated/test_questions/Julian_20160330-2349.txt",
+    };
+
+    private static final String[] reviewedTestQuestionFiles = new String[] {
+            "Crowdflower_unannotated/test_questions/reviewed_test_questions_jeopardy_pp.tsv",
     };
 
     static QueryPruningParameters queryPruningParameters;
@@ -49,9 +54,11 @@ public class CrowdFlowerDataWriterJeopardy {
     private static void printTestQuestions() throws IOException {
         // Load test questions prepared by the UI.
         Map<Integer, List<RecordedAnnotation>> annotations = new HashMap<>();
-        for (String testQuestionFile : testQuestionFiles) {
+        for (String testQuestionFile : reviewedTestQuestionFiles) {
+        // for (String testQuestionFile : unreviewedTestQuestionFiles) {
             // TODO: align annotations from different people.
-            AnnotationReader.loadAnnotationRecordsFromFile(testQuestionFile)
+            AnnotationReader.readReviewedTestQuestionsFromTSV(testQuestionFile)
+            // AnnotationReader.loadAnnotationRecordsFromFile(testQuestionFile)
                     .forEach(annot -> {
                         if (!annotations.containsKey(annot.sentenceId)) {
                             annotations.put(annot.sentenceId, new ArrayList<>());
@@ -60,9 +67,9 @@ public class CrowdFlowerDataWriterJeopardy {
                     });
         }
 
-        CSVPrinter csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter(
-                String.format("%s_test.csv", csvOutputFilePrefix))),
-                CSVFormat.EXCEL.withRecordSeparator("\n"));
+        final String testQuestionsFile = String.format("%s_test.csv", csvOutputFilePrefix);
+        CSVPrinter csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter(testQuestionsFile)),
+                                               CSVFormat.EXCEL.withRecordSeparator("\n"));
         csvPrinter.printRecord((Object[]) CrowdFlowerDataUtils.csvHeaderNew);
 
         AtomicInteger lineCounter = new AtomicInteger(0);
@@ -96,6 +103,7 @@ public class CrowdFlowerDataWriterJeopardy {
             });
         }
         csvPrinter.close();
+        System.out.println(String.format("Wrote %d test questions to file %s.", lineCounter.get(), testQuestionsFile));
     }
 
     private static void printQuestionsToAnnotate() throws IOException {

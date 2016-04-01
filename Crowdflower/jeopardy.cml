@@ -1,0 +1,26 @@
+<div class="html-element-wrapper">
+  <br />
+  <h2 class="legend">Sentence:</h2>
+  <span>{{sentence}}</span>
+  <br />
+  <br />
+  <h2 class="legend">Answer:</h2>
+  <span>{{query_prompt}}</span>
+  <br />
+  <br />
+</div>
+<cml:checkboxes name="choice" label="Check one or more" validates="required" strict="true" gold="true">
+
+  {% for option in options %}
+
+
+
+  <cml:checkbox value="{{ option }}" label="{{ option }}"></cml:checkbox>
+  {% endfor %}
+
+
+
+
+
+</cml:checkboxes>
+<cml:text label="Comment:" name="comment"></cml:text>
