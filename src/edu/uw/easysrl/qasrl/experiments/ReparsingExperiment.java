@@ -27,14 +27,16 @@ import java.util.stream.Collectors;
 public class ReparsingExperiment {
 
     private static final int nBest = 100;
+    private static final boolean usePronouns = false;
     private static HITLParser myHTILParser;
     private static ReparsingHistory myHistory;
     private static Map<Integer, List<AlignedAnnotation>> annotations;
 
     private static final String[] annotationFiles = {
-            "./Crowdflower_data/f878213.csv",
-            "./Crowdflower_data/f882410.csv",
-            "./Crowdflower_data/all-checkbox-responses.csv"
+           // "./Crowdflower_data/f878213.csv",
+           // "./Crowdflower_data/f882410.csv",
+           //  "./Crowdflower_data/all-checkbox-responses.csv",
+            "./Crowdflower_data/ff891522.csv",
     };
 
     private static QueryPruningParameters queryPruningParameters = new QueryPruningParameters();
@@ -64,12 +66,15 @@ public class ReparsingExperiment {
             final NBestList nBestList = myHTILParser.getNBestList(sentenceId);
 
             final List<AlignedAnnotation> annotated = annotations.get(sentenceId);
+            boolean isJeopardyStyle = annotated.stream()
+                    .anyMatch(annot -> annot.isJeopardyStyle);
             boolean isCheckboxStyle = !annotated.stream()
                     .anyMatch(annot -> annot.answerOptions.stream()
                             .anyMatch(op -> op.contains(QAPairAggregatorUtils.answerDelimiter)));
 
-            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList =
-                    myHTILParser.getAllQueriesForSentence(sentenceId, false /* jeopardy */, isCheckboxStyle);
+            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList = isJeopardyStyle ?
+                            myHTILParser.getPPAttachmentQueriesForSentence(sentenceId) :
+                            myHTILParser.getCoreArgumentQueriesForSentence(sentenceId, isCheckboxStyle);
 
             int oracleParseId = nBestList.getOracleId();
             final Results oracleF1 = nBestList.getResults(oracleParseId);
@@ -88,11 +93,11 @@ public class ReparsingExperiment {
                     continue;
                 }
                 int[] optionDist = QualityControl.getUserResponses(query, annotation);
-                ImmutableList<Integer> goldOptions = myHTILParser.getGoldOptions(query),
+                ImmutableList<Integer> goldOptions    = myHTILParser.getGoldOptions(query),
                                        oneBestOptions = myHTILParser.getOneBestOptions(query),
-                                       oracleOptions = myHTILParser.getOracleOptions(query),
-                                       userOptions = myHTILParser.getUserOptions(query, annotation);
-                ImmutableSet<Evidence> evidenceSet = myHTILParser.getEvidenceSet(query, userOptions);
+                                       oracleOptions  = myHTILParser.getOracleOptions(query),
+                                       userOptions    = myHTILParser.getUserOptions(query, annotation);
+                ImmutableSet<Evidence> evidenceSet    = myHTILParser.getEvidenceSet(query, userOptions);
                 if (evidenceSet == null || evidenceSet.isEmpty()) {
                     continue;
                 }

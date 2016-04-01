@@ -29,6 +29,8 @@ public class RecordedAnnotation {
     // Answer information
     List<String> optionStrings;
 
+    public boolean isJeopardyStyle;
+
     // Answer information, compatible with checkbox version.
     ImmutableList<String> userOptions;
     ImmutableList<Integer> userOptionIds, goldOptionIds;

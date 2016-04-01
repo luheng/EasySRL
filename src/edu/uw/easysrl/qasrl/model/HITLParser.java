@@ -90,12 +90,6 @@ public class HITLParser {
 
     public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getAllQueriesForSentence(int sentenceId,
                                                                                        boolean isJeopardyStyle,
-                                                                                       boolean isCheckboxStyle) {
-        return getAllQueriesForSentence(sentenceId, isJeopardyStyle, isCheckboxStyle, false /* default: no pronoun */);
-    }
-
-    public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getAllQueriesForSentence(int sentenceId,
-                                                                                       boolean isJeopardyStyle,
                                                                                        boolean isCheckboxStyle,
                                                                                        boolean usePronouns) {
         ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList =
@@ -110,9 +104,14 @@ public class HITLParser {
         return queryList;
     }
 
+    /**
+     * Pre-set "recipes" for query generation.
+     * @param sentenceId
+     * @param isCheckboxStyle
+     * @return
+     */
     public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getCoreArgumentQueriesForSentence(int sentenceId,
-                                                                                                boolean isCheckboxStyle,
-                                                                                                boolean usePronouns) {
+                                                                                                boolean isCheckboxStyle) {
         QueryPruningParameters queryPruningParams = new QueryPruningParameters(queryPruningParameters);
         queryPruningParams.skipPPQuestions = true;
         ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList =
@@ -120,15 +119,14 @@ public class HITLParser {
                         sentenceId, sentences.get(sentenceId), nbestLists.get(sentenceId),
                         false /* isJeopardyStyle */,
                         isCheckboxStyle,
-                        usePronouns,
+                        false /* usePronouns */,
                         queryPruningParams);
         // Assign query ids.
         IntStream.range(0, queryList.size()).forEach(i -> queryList.get(i).setQueryId(i));
         return queryList;
     }
 
-    public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getPPAttachmentQueriesForSentence(int sentenceId,
-                                                                                                boolean usePronouns) {
+    public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getPPAttachmentQueriesForSentence(int sentenceId) {
         QueryPruningParameters queryPruningParams = new QueryPruningParameters(queryPruningParameters);
         queryPruningParams.skipPPQuestions = false;
         ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList =
@@ -136,7 +134,22 @@ public class HITLParser {
                         sentenceId, sentences.get(sentenceId), nbestLists.get(sentenceId),
                         true /* isJeopardyStyle */,
                         true /* isCheckboxStyle */,
-                        usePronouns,
+                        false /* usePronouns */,
+                        queryPruningParams);
+        // Assign query ids.
+        IntStream.range(0, queryList.size()).forEach(i -> queryList.get(i).setQueryId(i));
+        return queryList;
+    }
+
+    public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getPronounPPAttachmentQueriesForSentence(int sentenceId) {
+        QueryPruningParameters queryPruningParams = new QueryPruningParameters(queryPruningParameters);
+        queryPruningParams.skipPPQuestions = false;
+        ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList =
+                ExperimentUtils.generateAllQueries(
+                        sentenceId, sentences.get(sentenceId), nbestLists.get(sentenceId),
+                        true /* isJeopardyStyle */,
+                        true /* isCheckboxStyle */,
+                        true /* usePronouns */,
                         queryPruningParams);
         // Assign query ids.
         IntStream.range(0, queryList.size()).forEach(i -> queryList.get(i).setQueryId(i));

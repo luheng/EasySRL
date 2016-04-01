@@ -23,8 +23,7 @@ public class CrowdFlowerDataReader {
         final Iterable<CSVRecord> records = CSVFormat.DEFAULT.withHeader().parse(new FileReader(filePath));
         List<RecordedAnnotation> annotations = new ArrayList<>();
         for (CSVRecord record : records) {
-            //System.out.println(record);
-
+            // Skip gold (test questions).
             if (record.get("_golden").equals("true")) {
                 continue;
             }
@@ -55,6 +54,9 @@ public class CrowdFlowerDataReader {
             if (annotation.userOptionIds.size() == 0) {
                 System.err.print("Unannotated:\t" + record);
             }
+
+            annotation.isJeopardyStyle = record.isMapped("jeopardy_style") && Integer.parseInt(record.get("jeopardy_style")) > 0;
+
             annotation.goldOptionIds = null; /* no gold */
             annotation.comment = record.get("comment");
 

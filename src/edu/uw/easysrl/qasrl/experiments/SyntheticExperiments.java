@@ -58,10 +58,10 @@ public class SyntheticExperiments {
         AtomicInteger sentenceCounter = new AtomicInteger(0);
         for (int sentenceId : myHITLParser.getAllSentenceIds()) {
             ImmutableList<ScoredQuery<QAStructureSurfaceForm>> coreQueries = myHITLParser
-                    .getCoreArgumentQueriesForSentence(sentenceId, isCheckboxVersion, usePronouns);
+                    .getCoreArgumentQueriesForSentence(sentenceId, isCheckboxVersion);
 
             ImmutableList<ScoredQuery<QAStructureSurfaceForm>> ppQueries = myHITLParser
-                    .getPPAttachmentQueriesForSentence(sentenceId, usePronouns);
+                    .getPPAttachmentQueriesForSentence(sentenceId);
 
             // Get gold results.
             /*

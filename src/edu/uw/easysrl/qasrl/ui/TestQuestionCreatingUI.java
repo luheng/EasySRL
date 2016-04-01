@@ -254,9 +254,9 @@ public class TestQuestionCreatingUI {
             final Set<String> parameters = parametersMap.get(userName);
             ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList = null;
             while (sentenceIds.size() > 1) {
-                queryList = myHITLParser.getPPAttachmentQueriesForSentence(
-                        sentenceIds.get(0),
-                        parameters.contains("UsePronouns"));
+                queryList = parameters.contains("UsePronouns") ?
+                        myHITLParser.getPPAttachmentQueriesForSentence(sentenceIds.get(0)) :
+                        myHITLParser.getPronounPPAttachmentQueriesForSentence(sentenceIds.get(0));
                 if (!queryList.isEmpty()) {
                     break;
                 }

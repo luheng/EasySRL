@@ -74,8 +74,7 @@ public class CrowdFlowerDataWriterJeopardy {
 
         AtomicInteger lineCounter = new AtomicInteger(0);
         for (int sid : annotations.keySet()) {
-            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries =
-                    hitlParser.getPPAttachmentQueriesForSentence(sid, usePronouns);
+            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries = hitlParser.getPPAttachmentQueriesForSentence(sid);
             queries.stream().forEach(query -> {
                 Optional<RecordedAnnotation> annotation = annotations.get(sid).stream()
                         .filter(annot -> annot.queryPrompt.equals(query.getPrompt()))
@@ -117,8 +116,7 @@ public class CrowdFlowerDataWriterJeopardy {
         csvPrinter.printRecord((Object[]) CrowdFlowerDataUtils.csvHeaderNew);
 
         for (int sid : sentenceIds) {
-            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries =
-                    hitlParser.getPPAttachmentQueriesForSentence(sid, usePronouns);
+            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries = hitlParser.getPPAttachmentQueriesForSentence(sid);
             for (ScoredQuery<QAStructureSurfaceForm> query : queries) {
                 final ImmutableList<String> sentence = hitlParser.getSentence(sid);
                 System.out.println(query.toString(sentence,
