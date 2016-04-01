@@ -27,15 +27,15 @@ public class QuestionStructure {
     public final int predicateIndex;
     public final Category category;
     public final int targetArgNum;
-    public final ImmutableMap<Integer, Integer> otherDependencies;
+    //public final ImmutableMap<Integer, Collection<Integer>> otherDependencies;
 
     public QuestionStructure(int predId, Category category, int argNum, Collection<ResolvedDependency> otherDeps) {
         this.predicateIndex = predId;
         this.category = category;
         this.targetArgNum = argNum;
-        this.otherDependencies = ImmutableMap.copyOf(otherDeps.stream()
-                .filter(dep -> dep.getHead() == predId && dep.getArgNumber() != argNum)
-                .collect(Collectors.toMap(ResolvedDependency::getArgNumber, ResolvedDependency::getArgument)));
+       // this.otherDependencies = ImmutableMap.copyOf(otherDeps.stream()
+        //        .filter(dep -> dep.getHead() == predId && dep.getArgNumber() != argNum)
+        //        .collect(Collectors.groupingBy(ResolvedDependency::getArgNumber));
     }
 
     /**
@@ -47,9 +47,9 @@ public class QuestionStructure {
         this.predicateIndex = qa.getPredicateIndex();
         this.category = qa.getPredicateCategory();
         this.targetArgNum = qa.getArgumentNumber();
-        this.otherDependencies = ImmutableMap.copyOf(qa.getQuestionDependencies().stream()
-                .filter(dep -> dep.getHead() == predicateIndex && dep.getArgNumber() != targetArgNum)
-                .collect(Collectors.toMap(ResolvedDependency::getArgNumber, ResolvedDependency::getArgument)));
+     //   this.otherDependencies = ImmutableMap.copyOf(otherDeps.stream()
+       //         .filter(dep -> dep.getHead() == predId && dep.getArgNumber() != argNum)
+         //       .collect(Collectors.groupingBy(ResolvedDependency::getArgNumber));
     }
 
     /**

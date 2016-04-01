@@ -19,16 +19,8 @@ public class CrowdFlowerDataReader {
 
     private static int maxNumAnnotators = 10;
 
-    /**
-     *
-     * @param filePath Annotation file.
-     * @return A list of AlignedAnnotation objects (Aggregated annotations)
-     * @throws IOException
-     */
-    public static List<AlignedAnnotation> readAggregatedAnnotationFromFile(String filePath) throws IOException {
-        FileReader fileReader = new FileReader(filePath);
-        Iterable<CSVRecord> records = CSVFormat.DEFAULT.withHeader().parse(fileReader);
-
+    public static ImmutableList<AlignedAnnotation> readAggregatedAnnotationFromFile(String filePath) throws IOException {
+        final Iterable<CSVRecord> records = CSVFormat.DEFAULT.withHeader().parse(new FileReader(filePath));
         List<RecordedAnnotation> annotations = new ArrayList<>();
         for (CSVRecord record : records) {
             //System.out.println(record);
@@ -41,16 +33,19 @@ public class CrowdFlowerDataReader {
             annotation.iterationId = -1; // unknown
             annotation.sentenceId = Integer.parseInt(record.get("sent_id"));
             annotation.sentenceString = record.get("sentence");
-            annotation.predicateId = Integer.parseInt(record.get("pred_id"));
-            annotation.predicateString = record.get("pred_head");
-            String qkey = record.get("question_key");
-            String[] qkeyInfo = qkey.split("\\.");
-            annotation.predicateCategory = Category.valueOf(qkeyInfo[1]);
-            annotation.argumentNumber = Integer.parseInt(qkeyInfo[2]);
+
+            if (record.isMapped("pred_id")) {
+                annotation.predicateId = Integer.parseInt(record.get("pred_id"));
+                annotation.predicateString = record.get("pred_head");
+            } else {
+                String qkey = record.get("query_key");
+                annotation.predicateId = Integer.parseInt(qkey.split(":")[0]);
+            }
+
             annotation.queryId = Integer.parseInt(record.get("query_id"));
-            // TODO: handle new format.
-            annotation.queryPrompt = record.get("question");
-            String[] options = record.get("answers").split("\n");
+            annotation.queryPrompt = record.isMapped("question") ? record.get("question") : record.get("query_prompt");
+
+            String[] options = record.isMapped("answers") ? record.get("answers").split("\n") : record.get("options").split("\n");
             Collections.addAll(annotation.optionStrings, options);
             annotation.userOptions = ImmutableList.copyOf(record.get("choice").split("\n"));
             annotation.userOptionIds = IntStream.range(0, options.length)
@@ -76,7 +71,7 @@ public class CrowdFlowerDataReader {
         int[] agreementCount = new int[maxNumAnnotators + 1];
         Arrays.fill(agreementCount, 0);
         alignedAnnotations.forEach(annotation -> {
-            if (annotation.getNumAnnotated() > 5) {
+            if (annotation.getNumAnnotated() != 5) {
                 System.out.println(annotation);
             }
             int maxAgree = 0;
@@ -93,13 +88,8 @@ public class CrowdFlowerDataReader {
         // TODO: recover IAA ..
         //double[] iaa = computeAgreement(alignedAnnotations, maxNumAnnotators);
         //InterAnnotatorAgreement.printKappa(iaa);
-        return alignedAnnotations;
+        return ImmutableList.copyOf(alignedAnnotations);
     }
-
-    // _unit_id	_created_at	_golden	_id	_missed	_started_at	_tainted	_channel	_trust	_worker_id	_country
-    // _region	_city	_ip	choice	comment	orig__golden	userOptions	choice_gold	choice_gold_reason	pred_head
-    // pred_id	query_id	queryPrompt	question_confidence	question_key	question_uncertainty
-    // sent_id	sentence
 
     public static void main(String[] args) throws IOException {
         readAggregatedAnnotationFromFile(args[0]);
