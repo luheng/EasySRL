@@ -34,25 +34,21 @@ public class EvidenceExtractor {
     private static List<int[]> getPPAttachments(QAStructureSurfaceForm qa) {
         final List<int[]> attachments = new ArrayList<>();
         for (QuestionStructure qs : qa.getQuestionStructures()) {
+            final int predicateIndex = qs.predicateIndex;
             final Category category = qs.category;
-            if (category.getArgument(qs.targetArgNum).equals(Category.PP)) {
-                System.out.println("Verb-arg:\t" + category + "\t" + qs.targetArgNum
-                        + qa.getAnswerStructures().stream().map(a -> DebugPrinter.getShortListString(a.argumentIndices))
-                            .collect(Collectors.joining("\t")));
-                //attachments.add(new int[] { predicateIndex, });
-                continue;
-            }
             int attachmentArgNum = -1;
+            if (category.getArgument(qs.targetArgNum).equals(Category.PP)) {
+                attachmentArgNum = qs.targetArgNum;
+            }
             if (category.isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)"))) {
-                //System.out.println("Verb-adj:\t" + category + "\t" + 2);
                 attachmentArgNum = 2;
-            } else if (category == Category.valueOf("(NP\\NP)/NP")) {
-                //System.out.println("Noun-adj:\t" + category + "\t" + 1);
+            }
+            else if (category == Category.valueOf("(NP\\NP)/NP")) {
                 attachmentArgNum = 1;
             }
             if (qs.otherDependencies.containsKey(attachmentArgNum)) {
                 qs.otherDependencies.get(attachmentArgNum)
-                        .forEach(argId -> attachments.add(new int[]{ qa.getPredicateIndex(), argId }));
+                        .forEach(argId -> attachments.add(new int[]{ predicateIndex, argId }));
             }
         }
         return attachments;
