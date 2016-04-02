@@ -46,7 +46,7 @@ public class ConstrainedSupertagFactoredModel extends SupertagFactoredModel {
                         Evidence.AttachmentEvidence ev1 = (Evidence.AttachmentEvidence) ev;
                         attachmentEvidence.put(ev1.getHeadId(), ev1.getArgId(), ev1.getConfidence());
                         // undirected evidence.
-                        // attachmentEvidence.put(ev1.getArgId(), ev1.getHeadId(), ev1.getConfidence());
+                        attachmentEvidence.put(ev1.getArgId(), ev1.getHeadId(), ev1.getConfidence());
                     }
                 });
         // Normalize attachment evidence.

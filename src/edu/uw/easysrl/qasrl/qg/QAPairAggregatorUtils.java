@@ -6,6 +6,7 @@ import com.google.common.collect.Table;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.qg.syntax.AnswerStructure;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
+import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.*;
@@ -26,8 +27,11 @@ public class QAPairAggregatorUtils {
     }
 
     public static String getQuestionDependenciesString(final QuestionAnswerPair qa) {
+        // If the QA is a pp-arg question (i.e. What did X sell Y to?), then we need to include all dependencies.
+        final boolean isPPArg = qa.getPredicateCategory().getArgument(qa.getArgumentNumber()) == Category.PP;
         return qa.getQuestionDependencies().stream()
-                .filter(dep -> dep.getHead() == qa.getPredicateIndex() && dep.getArgNumber() != qa.getArgumentNumber())
+                .filter(dep -> dep.getHead() == qa.getPredicateIndex())
+                .filter(dep -> isPPArg || dep.getArgNumber() != qa.getArgumentNumber())
                 .collect(groupingBy(ResolvedDependency::getArgNumber))
                 .entrySet()
                 .stream()

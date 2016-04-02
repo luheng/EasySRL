@@ -32,8 +32,10 @@ public class QuestionStructure {
         this.predicateIndex = predId;
         this.category = category;
         this.targetArgNum = argNum;
+        final boolean isPPArg = category.getArgument(argNum) == Category.PP;
         this.otherDependencies = otherDeps.stream()
-                .filter(dep -> dep.getHead() == predId && dep.getArgNumber() != argNum)
+                .filter(dep -> dep.getHead() == predId)
+                .filter(dep -> isPPArg || dep.getArgNumber() != argNum)
                 .collect(Collectors.groupingBy(ResolvedDependency::getArgNumber))
                 .entrySet().stream()
                 .collect(GuavaCollectors.toImmutableMap(
@@ -53,8 +55,10 @@ public class QuestionStructure {
         this.predicateIndex = qa.getPredicateIndex();
         this.category = qa.getPredicateCategory();
         this.targetArgNum = qa.getArgumentNumber();
+        final boolean isPPArg = category.getArgument(targetArgNum) == Category.PP;
         this.otherDependencies = qaList.get(0).getQuestionDependencies().stream()
-                .filter(dep -> dep.getHead() == predicateIndex && dep.getArgNumber() != targetArgNum)
+                .filter(dep -> dep.getHead() == predicateIndex)
+                .filter(dep -> isPPArg || dep.getArgNumber() != targetArgNum)
                 .collect(Collectors.groupingBy(ResolvedDependency::getArgNumber))
                 .entrySet().stream()
                 .collect(GuavaCollectors.toImmutableMap(
