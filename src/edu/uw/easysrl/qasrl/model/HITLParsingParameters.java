@@ -11,7 +11,7 @@ public class HITLParsingParameters {
     public int ppQuestionMinAgreement = 4;
     public double ppQuestionWeight = 1.0;
 
-    public boolean skipPrepositionalQuestions = true;
+    public boolean skipPrepositionalQuestions = false;
     public boolean skipPronounEvidence = true;
 
     public int maxTagsPerWord = 50;

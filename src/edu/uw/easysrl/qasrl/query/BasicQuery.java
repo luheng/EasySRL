@@ -91,7 +91,7 @@ public class BasicQuery<QA extends QAPairSurfaceForm> implements Query<QA> {
         return prompt;
     }
 
-    public String toString(final ImmutableList<String> sentence) {
+    public String toString(ImmutableList<String> sentence, Object ... optionLegends) {
         String result = "";
         final int predicateIndex = qaPairSurfaceForms.get(0).getQAPairs().get(0).getPredicateIndex();
         final Category category  = qaPairSurfaceForms.get(0).getQAPairs().get(0).getPredicateCategory();

@@ -9,6 +9,7 @@ import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils.*;
 import edu.uw.easysrl.qasrl.model.Evidence;
 import edu.uw.easysrl.qasrl.model.HITLParser;
+import edu.uw.easysrl.qasrl.model.HITLParsingParameters;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
@@ -37,20 +38,22 @@ public class ReparsingExperiment {
             "./Crowdflower_data/f891522.csv",
     };
 
-    private static QueryPruningParameters queryPruningParameters = new QueryPruningParameters();
+    private final static QueryPruningParameters queryPruningParameters = new QueryPruningParameters();
     static {
        // TODO: Set query pruning parameters here.
+    }
+
+    private final static HITLParsingParameters reparsingParameters = new HITLParsingParameters();
+    static {
+        reparsingParameters.ppQuestionMinAgreement = 3;
     }
 
     public static void main(String[] args) {
         myHTILParser = new HITLParser(nBest);
         myHTILParser.setQueryPruningParameters(queryPruningParameters);
+        myHTILParser.setReparsingParameters(reparsingParameters);
         annotations = ExperimentUtils.loadCrowdflowerAnnotation(annotationFiles);
         assert annotations != null;
-
-        annotations.values().stream().flatMap(annotList -> annotList.stream()).forEach(
-                annot -> System.out.println(annot));
-
         myHistory = new ReparsingHistory(myHTILParser);
         runExperiment();
     }
@@ -100,6 +103,12 @@ public class ReparsingExperiment {
                                        oneBestOptions = myHTILParser.getOneBestOptions(query),
                                        oracleOptions  = myHTILParser.getOracleOptions(query),
                                        userOptions    = myHTILParser.getUserOptions(query, annotation);
+                if (userOptions.size() == 0) {
+                    continue;
+                }
+                if (query.isJeopardyStyle() && userOptions.contains(query.getBadQuestionOptionId().getAsInt())) {
+                    continue;
+                }
                 ImmutableSet<Evidence> evidenceSet    = myHTILParser.getEvidenceSet(query, userOptions);
                 if (evidenceSet == null || evidenceSet.isEmpty()) {
                     continue;
@@ -116,31 +125,17 @@ public class ReparsingExperiment {
                                    rerankedF1);
 
                 // Print debugging information.
-                String result = query.toString(sentence) + "\n";
+                String result = query.toString(sentence,
+                        'G', goldOptions,
+                        'O', oracleOptions,
+                        'B', oneBestOptions,
+                        'U', userOptions,
+                        '*', optionDist);
+                // Evidence.
                 result += evidenceSet.stream()
                         .map(ev -> "Penalizing:\t" + ev.toString(sentence))
                         .collect(Collectors.joining("\n")) + "\n";
-
-                for (int j = 0; j < optionDist.length; j++) {
-                    String matchStr = "";
-                    for (int k = 0; k < optionDist[j]; k++) {
-                        matchStr += "*";
-                    }
-                    matchStr += (goldOptions.contains(j) ? "G" : "") +
-                                (oracleOptions.contains(j) ? "O" : "") +
-                                (oneBestOptions.contains(j) ? "U" : "");
-                    String option = query.getOptions().get(j);
-                    String headStr = "-";
-                    if (j < query.getQAPairSurfaceForms().size()) {
-                        QAStructureSurfaceForm qa = query.getQAPairSurfaceForms().get(j);
-                        final List<Integer> argList = qa.getArgumentIndices();
-                        headStr = DebugPrinter.getShortListString(argList) + ":" +
-                                argList.stream().map(sentence::get).collect(Collectors.joining(","));
-                    }
-                    String parseIdsStr = DebugPrinter.getShortListString(query.getOptionToParseIds().get(j));
-                    result += String.format("%-8s\t%.3f\t%-40s\t%-30s\t-\t-\t%s\n",
-                            matchStr, query.getOptionScores().get(j), option, headStr, parseIdsStr);
-                }
+                // Improvement.
                 String f1Impv = " ";
                 if (reparsedF1 != null) {
                     if (reparsedF1.getF1() < currentF1.getF1() - 1e-8) {

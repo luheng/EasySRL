@@ -35,5 +35,5 @@ public interface Query<QA extends QAPairSurfaceForm> {
     Optional<Category> getPredicateCategory();
     OptionalInt getArgumentNumber();
 
-    String toString(ImmutableList<String> sentence);
+    String toString(ImmutableList<String> sentence, Object ... optionLegends);
 }
