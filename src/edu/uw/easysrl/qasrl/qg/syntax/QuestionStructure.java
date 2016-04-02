@@ -11,10 +11,7 @@ import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.GuavaCollectors;
 
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -80,6 +77,12 @@ public class QuestionStructure {
     }
 
     public String toString(final ImmutableList<String> words) {
-        return String.format("%d:%s_%s.%d", predicateIndex, words.get(predicateIndex), category, targetArgNum);
+        return String.format("%d:%s_%s.%d", predicateIndex, words.get(predicateIndex), category, targetArgNum)
+                + "\t"
+                + otherDependencies.entrySet().stream()
+                        .sorted(Comparator.comparing(Map.Entry::getKey))
+                        .map(e -> String.format("%d:%s", e.getKey(), e.getValue().stream()
+                                .map(String::valueOf).collect(Collectors.joining(","))))
+                        .collect(Collectors.joining("_"));
     }
 }
