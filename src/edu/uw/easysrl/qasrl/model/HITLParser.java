@@ -216,7 +216,7 @@ public class HITLParser {
         }
 
         final double questionTypeWeight = isPPQuestion ? reparsingParameters.ppQuestionWeight : 1.0;
-        final ImmutableSet<Evidence> evidenceSet = Evidence
+        final ImmutableSet<Evidence> evidenceSet = EvidenceExtractor
                 .getEvidenceFromQuery(query, options, reparsingParameters.skipPronounEvidence)
                 .stream()
                 .collect(GuavaCollectors.toImmutableSet());

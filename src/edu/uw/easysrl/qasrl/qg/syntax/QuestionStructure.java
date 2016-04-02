@@ -78,11 +78,11 @@ public class QuestionStructure {
 
     public String toString(final ImmutableList<String> words) {
         return String.format("%d:%s_%s.%d", predicateIndex, words.get(predicateIndex), category, targetArgNum)
-                + "\t"
+                + "\t("
                 + otherDependencies.entrySet().stream()
                         .sorted(Comparator.comparing(Map.Entry::getKey))
                         .map(e -> String.format("%d:%s", e.getKey(), e.getValue().stream()
                                 .map(String::valueOf).collect(Collectors.joining(","))))
-                        .collect(Collectors.joining("_"));
+                        .collect(Collectors.joining("_")) + ") ";
     }
 }
