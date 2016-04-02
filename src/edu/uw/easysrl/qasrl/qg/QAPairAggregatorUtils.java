@@ -32,7 +32,8 @@ public class QAPairAggregatorUtils {
                 .entrySet()
                 .stream()
                 .sorted(Comparator.comparing(Map.Entry::getKey))
-                .map(e -> e.getKey() + ":" + e.getValue().stream().map(String::valueOf).collect(Collectors.joining(",")))
+                .map(e -> e.getKey() + ":" + e.getValue().stream().distinct().sorted()
+                        .map(String::valueOf).collect(Collectors.joining(",")))
                 .collect(Collectors.joining("\t"));
     }
 
@@ -40,19 +41,12 @@ public class QAPairAggregatorUtils {
         return getQuestionLabelString(qa) + "\t" + getQuestionDependenciesString(qa);
     }
 
-    public static double getScore(Collection<QuestionAnswerPair> qaList) {
-        return qaList.stream()
-                .collect(groupingBy(QuestionAnswerPair::getParseId))
-                .entrySet().stream()
-                .mapToDouble(e -> e.getValue().get(0).getParse().score)
-                .sum();
-    }
-
     public static QuestionSurfaceFormToStructure getQuestionSurfaceFormToStructure(
             final List<QuestionAnswerPair> qaList) {
+        final List<QuestionAnswerPair> bestSurfaceFormQAs = getQAListWithBestQuestionSurfaceForm(qaList);
         return new QuestionSurfaceFormToStructure(
-                getBestQuestionSurfaceForm(qaList),
-                new QuestionStructure(qaList),
+                bestSurfaceFormQAs.get(0).getQuestion(),
+                new QuestionStructure(bestSurfaceFormQAs),
                 qaList);
     }
 
@@ -61,8 +55,9 @@ public class QAPairAggregatorUtils {
         final AnswerStructure answerStructure = new AnswerStructure(
                 ImmutableList.of(qaList.get(0).getArgumentIndex()),
                 true /* single headed */);
+        final List<QuestionAnswerPair> bestSurfaceFormQAs = getQAListWithBestAnswerSurfaceForm(qaList);
         return new AnswerSurfaceFormToStructure(
-                getBestAnswerSurfaceForm(qaList),
+                bestSurfaceFormQAs.get(0).getAnswer(),
                 answerStructure,
                 qaList);
     }
@@ -104,31 +99,28 @@ public class QAPairAggregatorUtils {
                 }).collect(GuavaCollectors.toImmutableList());
     }
 
-    public static String getBestQuestionSurfaceForm(Collection<QuestionAnswerPair> qaList) {
+    private static List<QuestionAnswerPair> getQAListWithBestQuestionSurfaceForm(Collection<QuestionAnswerPair> qaList) {
         return qaList.stream()
                 .collect(groupingBy(QuestionAnswerPair::getQuestion))
-                .entrySet()
-                .stream()
-                .map(questionStringGroup -> new AbstractMap.SimpleEntry<>(
-                        questionStringGroup.getKey(),
-                        QAPairAggregatorUtils.getScore(questionStringGroup.getValue())))
-                .max(Comparator.comparing(AbstractMap.SimpleEntry::getValue))
-                .get().getKey();
+                .entrySet().stream()
+                .max(Comparator.comparing(e -> QAPairAggregatorUtils.getScore(e.getValue())))
+                .get().getValue();
     }
 
-    public static String getBestAnswerSurfaceForm(Collection<QuestionAnswerPair> qaList) {
+    private static List<QuestionAnswerPair> getQAListWithBestAnswerSurfaceForm(Collection<QuestionAnswerPair> qaList) {
         return qaList.stream()
                 .collect(groupingBy(QuestionAnswerPair::getAnswer))
-                .entrySet()
-                .stream()
-                .map(answerStringGroup -> {
-                    double score = answerStringGroup.getValue().stream()
-                        .mapToDouble(qaPair -> qaPair.getParse().score)
-                        .sum();
-                    return new AbstractMap.SimpleEntry<>(answerStringGroup.getKey(), score);
-                })
-                .max(Comparator.comparing(AbstractMap.SimpleEntry::getValue))
-                .get().getKey();
+                .entrySet().stream()
+                .max(Comparator.comparing(e -> QAPairAggregatorUtils.getScore(e.getValue())))
+                .get().getValue();
+    }
+
+    private static double getScore(Collection<QuestionAnswerPair> qaList) {
+        return qaList.stream()
+                .collect(groupingBy(QuestionAnswerPair::getParseId))
+                .entrySet().stream()
+                .mapToDouble(e -> e.getValue().get(0).getParse().score)
+                .sum();
     }
 
     static class QuestionSurfaceFormToStructure {

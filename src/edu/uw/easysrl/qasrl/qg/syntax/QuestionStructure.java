@@ -13,6 +13,8 @@ import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -27,29 +29,43 @@ public class QuestionStructure {
     public final int predicateIndex;
     public final Category category;
     public final int targetArgNum;
-    //public final ImmutableMap<Integer, Collection<Integer>> otherDependencies;
+    public final ImmutableMap<Integer, ImmutableList<Integer>> otherDependencies;
 
     public QuestionStructure(int predId, Category category, int argNum, Collection<ResolvedDependency> otherDeps) {
         this.predicateIndex = predId;
         this.category = category;
         this.targetArgNum = argNum;
-       // this.otherDependencies = ImmutableMap.copyOf(otherDeps.stream()
-        //        .filter(dep -> dep.getHead() == predId && dep.getArgNumber() != argNum)
-        //        .collect(Collectors.groupingBy(ResolvedDependency::getArgNumber));
+        this.otherDependencies = otherDeps.stream()
+                .filter(dep -> dep.getHead() == predId && dep.getArgNumber() != argNum)
+                .collect(Collectors.groupingBy(ResolvedDependency::getArgNumber))
+                .entrySet().stream()
+                .collect(GuavaCollectors.toImmutableMap(
+                        Map.Entry::getKey,
+                        e -> e.getValue().stream()
+                                .map(ResolvedDependency::getArgumentIndex)
+                                .distinct().sorted()
+                                .collect(GuavaCollectors.toImmutableList())));
     }
 
     /**
      * For convenience.
      * @param qaList: Q/A pairs sharing the same queryPrompt structure.
      */
-    public <QA extends QuestionAnswerPair> QuestionStructure(final List<QA> qaList) {
+    public QuestionStructure(final List<QuestionAnswerPair> qaList) {
         final QuestionAnswerPair qa = qaList.get(0);
         this.predicateIndex = qa.getPredicateIndex();
         this.category = qa.getPredicateCategory();
         this.targetArgNum = qa.getArgumentNumber();
-     //   this.otherDependencies = ImmutableMap.copyOf(otherDeps.stream()
-       //         .filter(dep -> dep.getHead() == predId && dep.getArgNumber() != argNum)
-         //       .collect(Collectors.groupingBy(ResolvedDependency::getArgNumber));
+        this.otherDependencies = qaList.get(0).getQuestionDependencies().stream()
+                .filter(dep -> dep.getHead() == predicateIndex && dep.getArgNumber() != targetArgNum)
+                .collect(Collectors.groupingBy(ResolvedDependency::getArgNumber))
+                .entrySet().stream()
+                .collect(GuavaCollectors.toImmutableMap(
+                        Map.Entry::getKey,
+                        e -> e.getValue().stream()
+                                .map(ResolvedDependency::getArgumentIndex)
+                                .distinct().sorted()
+                                .collect(GuavaCollectors.toImmutableList())));
     }
 
     /**

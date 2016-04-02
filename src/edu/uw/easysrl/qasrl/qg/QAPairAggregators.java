@@ -1,21 +1,13 @@
 package edu.uw.easysrl.qasrl.qg;
 
 import com.google.common.collect.*;
-import edu.uw.easysrl.qasrl.experiments.DebugPrinter;
 import edu.uw.easysrl.qasrl.qg.surfaceform.*;
-import edu.uw.easysrl.dependencies.ResolvedDependency;
-
-import edu.uw.easysrl.qasrl.qg.syntax.AnswerStructure;
-import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
-import edu.uw.easysrl.util.GuavaCollectors;
 
 import static edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils.*;
 import static edu.uw.easysrl.util.GuavaCollectors.*;
 import static java.util.stream.Collectors.*;
 
 import java.util.*;
-import java.util.Map.Entry;
-import java.util.stream.Collectors;
 
 /**
  * Helper class where we put all of our useful QAPairAggregator instances
