@@ -2,7 +2,7 @@ package edu.uw.easysrl.qasrl.experiments;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import edu.uw.easysrl.qasrl.model.Evidence;
+import edu.uw.easysrl.qasrl.model.Constraint;
 import edu.uw.easysrl.qasrl.model.HITLParser;
 import edu.uw.easysrl.qasrl.model.HITLParsingParameters;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
@@ -41,7 +41,7 @@ public class SyntheticExperiments {
         reparsingParameters = new HITLParsingParameters();
         reparsingParameters.attachmentPenaltyWeight = 5.0;
         reparsingParameters.supertagPenaltyWeight = 5.0;
-        reparsingParameters.skipPrepositionalQuestions = false;
+        reparsingParameters.skipJeopardyQuestions = false;
     }
 
     public static void main(String[] args) {
@@ -67,7 +67,7 @@ public class SyntheticExperiments {
             /*
             coreQueries.forEach(query -> {
                 ImmutableList<Integer> goldOptions = myHITLParser.getGoldOptions(query);
-                ImmutableSet<Evidence> evidences = myHITLParser.getEvidenceSet(query, goldOptions);
+                ImmutableSet<Evidence> evidences = myHITLParser.getConstraints(query, goldOptions);
                 myHITLHistory.addEntry(sentenceId, query, goldOptions, evidences);
                 myHITLHistory.printLatestHistory();
 
@@ -81,8 +81,8 @@ public class SyntheticExperiments {
 
             ppQueries.forEach(query -> {
                 ImmutableList<Integer> goldOptions = myHITLParser.getGoldOptions(query);
-                ImmutableSet<Evidence> evidences = myHITLParser.getEvidenceSet(query, goldOptions);
-                myHITLHistory.addEntry(sentenceId, query, goldOptions, evidences);
+                ImmutableSet<Constraint> constraints = myHITLParser.getConstraints(query, goldOptions);
+                myHITLHistory.addEntry(sentenceId, query, goldOptions, constraints);
                 myHITLHistory.printLatestHistory();
 
                 ImmutableList<Integer> onebestOptions = myHITLParser.getOneBestOptions(query);

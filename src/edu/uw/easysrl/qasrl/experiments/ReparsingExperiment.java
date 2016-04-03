@@ -7,7 +7,7 @@ import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
 import edu.uw.easysrl.qasrl.annotation.QualityControl;
 import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils.*;
-import edu.uw.easysrl.qasrl.model.Evidence;
+import edu.uw.easysrl.qasrl.model.Constraint;
 import edu.uw.easysrl.qasrl.model.HITLParser;
 import edu.uw.easysrl.qasrl.model.HITLParsingParameters;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
@@ -15,7 +15,6 @@ import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.syntax.evaluation.Results;
-import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -32,20 +31,22 @@ public class ReparsingExperiment {
     private static Map<Integer, List<AlignedAnnotation>> annotations;
 
     private static final String[] annotationFiles = {
-           // "./Crowdflower_data/f878213.csv",
-           // "./Crowdflower_data/f882410.csv",
-           //  "./Crowdflower_data/all-checkbox-responses.csv",
+            "./Crowdflower_data/f878213.csv",
+            "./Crowdflower_data/f882410.csv",
+            "./Crowdflower_data/all-checkbox-responses.csv",
             "./Crowdflower_data/f891522.csv",
     };
 
-    private final static QueryPruningParameters queryPruningParameters = new QueryPruningParameters();
+    private static QueryPruningParameters queryPruningParameters;
     static {
-       // TODO: Set query pruning parameters here.
+        queryPruningParameters = new QueryPruningParameters();
     }
 
-    private final static HITLParsingParameters reparsingParameters = new HITLParsingParameters();
+    private static HITLParsingParameters reparsingParameters;
     static {
-        reparsingParameters.ppQuestionMinAgreement = 3;
+        reparsingParameters = new HITLParsingParameters();
+        reparsingParameters.jeopardyQuestionMinAgreement = 3;
+        reparsingParameters.jeopardyQuestionWeight = 0.000;
     }
 
     public static void main(String[] args) {
@@ -81,16 +82,16 @@ public class ReparsingExperiment {
                             myHTILParser.getPPAttachmentQueriesForSentence(sentenceId) :
                             myHTILParser.getCoreArgumentQueriesForSentence(sentenceId, isCheckboxStyle);
 
-            int oracleParseId = nBestList.getOracleId();
-            final Results oracleF1 = nBestList.getResults(oracleParseId);
             final Results baselineF1 = nBestList.getResults(0);
             Results currentF1 = nBestList.getResults(0);
 
             final int numParses = nBestList.getN();
-            final Set<Evidence> allEvidenceSet = new HashSet<>();
+            final Set<Constraint> allConstraintSet = new HashSet<>();
             String sentenceDebuggingString = "";
             double[] penalty = new double[numParses];
             Arrays.fill(penalty, 0);
+
+            myHistory.addSentence(sentenceId);
 
             for (ScoredQuery<QAStructureSurfaceForm> query : queryList) {
                 //System.out.println(query.toString(sentence));
@@ -106,22 +107,22 @@ public class ReparsingExperiment {
                 if (userOptions.size() == 0) {
                     continue;
                 }
-                if (query.isJeopardyStyle() && userOptions.contains(query.getBadQuestionOptionId().getAsInt())) {
+                /*if (query.isJeopardyStyle() && userOptions.contains(query.getBadQuestionOptionId().getAsInt())) {
+                    continue;
+                }*/
+                ImmutableSet<Constraint> constraintSet = myHTILParser.getConstraints(query, userOptions);
+                if (constraintSet == null || constraintSet.isEmpty()) {
                     continue;
                 }
-                ImmutableSet<Evidence> evidenceSet    = myHTILParser.getEvidenceSet(query, userOptions);
-                if (evidenceSet == null || evidenceSet.isEmpty()) {
-                    continue;
-                }
-                allEvidenceSet.addAll(evidenceSet);
+                allConstraintSet.addAll(constraintSet);
 
-                int rerankedId = myHTILParser.getRerankedParseId(sentenceId, allEvidenceSet);
-                Parse reparse = myHTILParser.getReparsed(sentenceId, allEvidenceSet);
+                int rerankedId = myHTILParser.getRerankedParseId(sentenceId, allConstraintSet);
+                Parse reparse = myHTILParser.getReparsed(sentenceId, allConstraintSet);
                 Results rerankedF1 = nBestList.getResults(rerankedId);
                 Results reparsedF1 = CcgEvaluation.evaluate(reparse.dependencies,
                         myHTILParser.getGoldParse(sentenceId).dependencies);
 
-                myHistory.addEntry(sentenceId, query, userOptions, evidenceSet, reparse, rerankedId, reparsedF1,
+                myHistory.addEntry(sentenceId, query, userOptions, constraintSet, reparse, rerankedId, reparsedF1,
                                    rerankedF1);
 
                 // Print debugging information.
@@ -132,7 +133,7 @@ public class ReparsingExperiment {
                         'U', userOptions,
                         '*', optionDist);
                 // Evidence.
-                result += evidenceSet.stream()
+                result += constraintSet.stream()
                         .map(ev -> "Penalizing:\t" + ev.toString(sentence))
                         .collect(Collectors.joining("\n")) + "\n";
                 // Improvement.
@@ -149,10 +150,8 @@ public class ReparsingExperiment {
                 result += String.format("Reranked F1: %.3f%%\n", 100.0 * rerankedF1.getF1());
                 result += String.format("Reparsed F1: %.3f%%\n", 100.0 * reparsedF1.getF1());
                 sentenceDebuggingString += result + "\n";
-
                 currentF1 = reparsedF1;
             }
-            //double deltaF1 = currentReparsedF1.getF1() - baselineF1.getF1();
             Optional<Results> lastReparsedResult = myHistory.getLastReparsingResult(sentenceId);
             if (lastReparsedResult.isPresent()) {
                 double deltaF1 = lastReparsedResult.get().getF1() - baselineF1.getF1();
@@ -163,22 +162,7 @@ public class ReparsingExperiment {
             }
         }
 
-        System.out.println(
-                "Baseline:\n" + myHistory.getAvgBaseline() + "\n" +
-                "Reranked:\n" + myHistory.getAvgReranked() + "\n" +
-                "Reparsed:\n" + myHistory.getAvgReparsed() + "\n" +
-                "Oracle  :\n" + myHistory.getAvgOracle() + "\n");
-
-        System.out.println(
-                "Baseline-changed:\n" + myHistory.getAvgBaselineOnModifiedSentences() + "\n" +
-                "Reranked-changed:\n" + myHistory.getAvgRerankedOnModifiedSentences() + "\n" +
-                "Reparsed-changed:\n" + myHistory.getAvgReparsedOnModifiedSentences() + "\n" +
-                "Oracle-changed  :\n" + myHistory.getAvgOracleOnModifiedSentences());
-
-        System.out.println(
-                "Num modified: " + myHistory.getNumModifiedSentences() + "\n" +
-                "Num improved: " + myHistory.getNumImprovedSentences() + "\n" +
-                "Num worsened: " + myHistory.getNumWorsenedSentences() + "\n");
+        myHistory.printSummary();
 
         debugging.stream()
                 .sorted((b1, b2) -> Double.compare(b1.deltaF1, b2.deltaF1))

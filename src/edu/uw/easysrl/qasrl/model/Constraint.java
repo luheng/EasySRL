@@ -1,46 +1,37 @@
 package edu.uw.easysrl.qasrl.model;
 
-import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.qasrl.Parse;
-import edu.uw.easysrl.qasrl.corpora.PronounList;
-import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
-import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
-import edu.uw.easysrl.qasrl.query.QueryGeneratorUtils;
-import edu.uw.easysrl.qasrl.query.QueryGenerators;
-import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.*;
-import java.util.concurrent.CancellationException;
-import java.util.stream.IntStream;
 
 /**
  * Created by luheng on 3/9/16.
  */
-public abstract class Evidence {
+public abstract class Constraint {
 
     // Reward for positive evidence. Penalize for negative evidence. For the A* factored model we can only penalize.
-    private boolean isPositive;
-    private double confidence;
+    protected boolean isPositive;
+    protected double strength;
 
-    Evidence(boolean isPositive, double confidence) {
+    Constraint(boolean isPositive, double strength) {
         this.isPositive = isPositive;
-        this.confidence = confidence;
+        this.strength = strength;
     }
 
     public boolean isPositive() {
         return isPositive;
     }
 
-    public double getConfidence() {
-        return confidence;
+    public double getStrength() {
+        return strength;
     }
 
-    public void setConfidence(double confidence) {
-        this.confidence = confidence;
+    public void setStrength(double strength) {
+        this.strength = strength;
     }
 
-    public abstract boolean hasEvidence(Parse parse);
+    public abstract boolean isSatisfiedBy(Parse parse);
 
     public abstract String toString(List<String> sentence);
 
@@ -53,10 +44,10 @@ public abstract class Evidence {
      * Negative supertag evidence:
      *   That tag of a predicate is used to generate a queryPrompt, and voted as "Question not valid".
      */
-    public static class SupertagEvidence extends Evidence {
+    public static class SupertagConstraint extends Constraint {
         int predId;
         Category category;
-        public SupertagEvidence(int predId, Category category, boolean isPositive, double confidence) {
+        public SupertagConstraint(int predId, Category category, boolean isPositive, double confidence) {
             super(isPositive, confidence);
             this.predId = predId;
             this.category = category;
@@ -70,7 +61,7 @@ public abstract class Evidence {
             return category;
         }
 
-        public boolean hasEvidence(Parse parse) {
+        public boolean isSatisfiedBy(Parse parse) {
             return parse.categories.get(predId) == category;
         }
 
@@ -79,7 +70,7 @@ public abstract class Evidence {
         }
 
         public String toString(List<String> sentence) {
-            return predId + ":" + sentence.get(predId) + "\t" + category;
+            return predId + ":" + sentence.get(predId) + "\t" + category + "\t" + strength;
         }
     }
 
@@ -88,9 +79,9 @@ public abstract class Evidence {
      * Negative attachment evidence:
      *   The (head, arg) dep is not picked by a user, and it's not part of a coordination*.
      */
-    public static class AttachmentEvidence extends Evidence {
+    public static class AttachmentConstraint extends Constraint {
         int headId, argId;
-        public AttachmentEvidence(int headId, int argId, boolean isPositive, double confidence) {
+        public AttachmentConstraint(int headId, int argId, boolean isPositive, double confidence) {
             super(isPositive, confidence);
             this.headId = headId;
             this.argId = argId;
@@ -104,8 +95,10 @@ public abstract class Evidence {
             return argId;
         }
 
-        public boolean hasEvidence(Parse parse) {
-            return parse.dependencies.stream().anyMatch(dep -> dep.getHead() == headId && dep.getArgument() == argId);
+        public boolean isSatisfiedBy(Parse parse) {
+            return parse.dependencies.stream()
+                    .anyMatch(dep -> (dep.getHead() == headId && dep.getArgument() == argId)
+                                    || (dep.getHead() == argId && dep.getArgument() == headId));
         }
 
         public String toString() {
@@ -113,7 +106,7 @@ public abstract class Evidence {
         }
 
         public String toString(List<String> sentence) {
-            return headId + ":" + sentence.get(headId) + "-->" + argId + ":" + sentence.get(argId);
+            return headId + ":" + sentence.get(headId) + "-->" + argId + ":" + sentence.get(argId) + "\t" + strength;
         }
     }
 }

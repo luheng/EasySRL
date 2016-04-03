@@ -156,19 +156,19 @@ public class HITLParser {
         return queryList;
     }
 
-    public Parse getReparsed(int sentenceId, Set<Evidence> evidenceSet) {
-        return reparser.parseWithConstraint(inputSentences.get(sentenceId), evidenceSet);
+    public Parse getReparsed(int sentenceId, Set<Constraint> constraintSet) {
+        return reparser.parseWithConstraint(inputSentences.get(sentenceId), constraintSet);
     }
 
-    public int getRerankedParseId(int sentenceId, Set<Evidence> evidenceSet) {
+    public int getRerankedParseId(int sentenceId, Set<Constraint> constraintSet) {
         int rerankedId = 0;
         double bestScore = Double.MIN_VALUE;
         final NBestList nBestList = nbestLists.get(sentenceId);
         for (int i = 0; i < nBestList.getN(); i++) {
             final Parse parse = nBestList.getParse(i);
-            final double rerankScore = parse.score + evidenceSet.stream()
-                    .filter(ev -> ev.hasEvidence(parse))
-                    .mapToDouble(ev -> ev.isPositive() ? ev.getConfidence() : -ev.getConfidence())
+            final double rerankScore = parse.score + constraintSet.stream()
+                    .filter(ev -> ev.isSatisfiedBy(parse))
+                    .mapToDouble(ev -> ev.isPositive() ? ev.getStrength() : -ev.getStrength())
                     .sum();
             if (rerankScore > bestScore + 1e-6) {
                 rerankedId = i;
@@ -200,33 +200,30 @@ public class HITLParser {
     public ImmutableList<Integer> getUserOptions(final ScoredQuery<QAStructureSurfaceForm> query,
                                                  final AlignedAnnotation annotation) {
         final int[] optionDist = QualityControl.getUserResponses(query, annotation);
-        final boolean isPPQuestion =  QualityControl.queryIsPrepositional(query);
         return IntStream.range(0, query.getOptions().size())
-                .filter(i -> (!isPPQuestion && optionDist[i] >= reparsingParameters.minAgreement) ||
-                             (isPPQuestion && optionDist[i] >= reparsingParameters.ppQuestionMinAgreement))
+                .filter(i -> (!query.isJeopardyStyle() && optionDist[i] >= reparsingParameters.minAgreement) ||
+                             (query.isJeopardyStyle()
+                                     && optionDist[i] >= reparsingParameters.jeopardyQuestionMinAgreement))
                 .boxed()
                 .collect(GuavaCollectors.toImmutableList());
     }
 
-    public ImmutableSet<Evidence> getEvidenceSet(final ScoredQuery<QAStructureSurfaceForm> query,
-                                                 final ImmutableList<Integer> options) {
-        final boolean isPPQuestion =  QualityControl.queryIsPrepositional(query);
-        if (isPPQuestion && reparsingParameters.skipPrepositionalQuestions) {
+    // TODO: inject constraint strength classifier.
+    public ImmutableSet<Constraint> getConstraints(final ScoredQuery<QAStructureSurfaceForm> query,
+                                                   final ImmutableList<Integer> options) {
+        if (query.isJeopardyStyle() && reparsingParameters.skipJeopardyQuestions) {
             return ImmutableSet.of();
         }
-
-        final double questionTypeWeight = isPPQuestion ? reparsingParameters.ppQuestionWeight : 1.0;
-        final ImmutableSet<Evidence> evidenceSet = EvidenceExtractor
+        final double questionTypeWeight = query.isJeopardyStyle() ? reparsingParameters.jeopardyQuestionWeight : 1.0;
+        final ImmutableSet<Constraint> constraintSet = ConstraintExtractor
                 .getEvidenceFromQuery(query, options, reparsingParameters.skipPronounEvidence)
                 .stream()
                 .collect(GuavaCollectors.toImmutableSet());
-
-        evidenceSet.forEach(ev -> ev.setConfidence(
-                questionTypeWeight *
-                        (Evidence.SupertagEvidence.class.isInstance(ev) ?
-                                reparsingParameters.supertagPenaltyWeight :
-                                reparsingParameters.attachmentPenaltyWeight)));
-        return evidenceSet;
+        constraintSet.forEach(ev -> ev.setStrength(
+                questionTypeWeight * (Constraint.SupertagConstraint.class.isInstance(ev) ?
+                        reparsingParameters.supertagPenaltyWeight :
+                        reparsingParameters.attachmentPenaltyWeight)));
+        return constraintSet;
     }
 
 }

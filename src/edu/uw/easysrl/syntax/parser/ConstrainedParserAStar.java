@@ -12,7 +12,7 @@ import edu.uw.easysrl.dependencies.DependencyStructure;
 import edu.uw.easysrl.dependencies.UnlabelledDependency;
 import edu.uw.easysrl.main.InputReader.InputToParser;
 import edu.uw.easysrl.main.InputReader.InputWord;
-import edu.uw.easysrl.qasrl.model.Evidence;
+import edu.uw.easysrl.qasrl.model.Constraint;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.Combinator.RuleProduction;
 import edu.uw.easysrl.syntax.grammar.Combinator.RuleType;
@@ -51,10 +51,10 @@ public class ConstrainedParserAStar extends AbstractParser {
 
 
     public List<Scored<SyntaxTreeNode>> parseAstarWithConstraints(final InputToParser input,
-                                                                  Set<Evidence> evidenceSet,
+                                                                  Set<Constraint> constraintSet,
                                                                   DependencyGenerator dependencyGenerator) {
         cellFactory.newSentence();
-        return parseAstar(input.getInputWords(), modelFactory.make(input, evidenceSet, dependencyGenerator));
+        return parseAstar(input.getInputWords(), modelFactory.make(input, constraintSet, dependencyGenerator));
     }
 
     @Override

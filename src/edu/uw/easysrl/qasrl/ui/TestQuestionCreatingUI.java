@@ -4,7 +4,6 @@ import java.io.*;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import javax.servlet.ServletException;
@@ -18,7 +17,7 @@ import edu.uw.easysrl.qasrl.*;
 
 import edu.uw.easysrl.qasrl.annotation.CrowdFlowerDataUtils;
 import edu.uw.easysrl.qasrl.experiments.ReparsingHistory;
-import edu.uw.easysrl.qasrl.model.Evidence;
+import edu.uw.easysrl.qasrl.model.Constraint;
 import edu.uw.easysrl.qasrl.model.HITLParser;
 import edu.uw.easysrl.qasrl.model.HITLParsingParameters;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
@@ -83,7 +82,7 @@ public class TestQuestionCreatingUI {
     static {
         reparsingParameters = new HITLParsingParameters();
         reparsingParameters.supertagPenaltyWeight = 5.0;
-        reparsingParameters.skipPrepositionalQuestions = false;
+        reparsingParameters.skipJeopardyQuestions = false;
     }
 
     private static void initializeData() {
@@ -217,16 +216,16 @@ public class TestQuestionCreatingUI {
 
                 // Advance to the next query.
                 queryIdMap.put(userName, lastQueryId + 1);
-                final ImmutableSet<Evidence> evidenceSet = myHITLParser.getEvidenceSet(query, userOptions);
+                final ImmutableSet<Constraint> constraintSet = myHITLParser.getConstraints(query, userOptions);
                 activeLearningHistoryMap.get(userName).addEntry(
                         sentId,
                         query,
                         userOptions,
-                        evidenceSet);
+                        constraintSet);
                 System.out.println(query.toString(myHITLParser.getSentence(sentId),
                         'G', myHITLParser.getGoldOptions(query),
                         'U', userOptions));
-                evidenceSet.forEach(ev -> System.out.println(ev.toString(myHITLParser.getSentence(sentId))));
+                constraintSet.forEach(ev -> System.out.println(ev.toString(myHITLParser.getSentence(sentId))));
                 System.out.println();
             }
             httpResponse.setContentType("text/html; charset=utf-8");

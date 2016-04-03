@@ -3,7 +3,7 @@ package edu.uw.easysrl.qasrl;
 import edu.uw.easysrl.dependencies.*;
 import edu.uw.easysrl.main.EasySRL;
 import edu.uw.easysrl.main.InputReader;
-import edu.uw.easysrl.qasrl.model.Evidence;
+import edu.uw.easysrl.qasrl.model.Constraint;
 import edu.uw.easysrl.qasrl.corpora.CountDictionary;
 import edu.uw.easysrl.syntax.evaluation.CCGBankEvaluation;
 import edu.uw.easysrl.syntax.grammar.Category;
@@ -208,24 +208,24 @@ public abstract class BaseCcgParser {
             return parseNBestWithConstraint(sentence, new HashSet<>());
         }
 
-        public Parse parseWithConstraint(List<InputReader.InputWord> sentence, Set<Evidence> evidenceSet) {
+        public Parse parseWithConstraint(List<InputReader.InputWord> sentence, Set<Constraint> constraintSet) {
             if (sentence.size() > maxSentenceLength) {
                 System.err.println("Skipping sentence of length " + sentence.size());
                 return null;
             }
             List<Scored<SyntaxTreeNode>> parses = parser.parseAstarWithConstraints(
-                    new InputReader.InputToParser(sentence, null, null, false), evidenceSet, dependencyGenerator);
+                    new InputReader.InputToParser(sentence, null, null, false), constraintSet, dependencyGenerator);
             return (parses == null || parses.size() == 0) ? null :
                     getParse(sentence, parses.get(0), dependencyGenerator);
         }
 
-        public List<Parse> parseNBestWithConstraint(List<InputReader.InputWord> sentence, Set<Evidence> evidenceSet) {
+        public List<Parse> parseNBestWithConstraint(List<InputReader.InputWord> sentence, Set<Constraint> constraintSet) {
             if (sentence.size() > maxSentenceLength) {
                 System.err.println("Skipping sentence of length " + sentence.size());
                 return null;
             }
             List<Scored<SyntaxTreeNode>> parses = parser.parseAstarWithConstraints(
-                    new InputReader.InputToParser(sentence, null, null, false), evidenceSet, dependencyGenerator);
+                    new InputReader.InputToParser(sentence, null, null, false), constraintSet, dependencyGenerator);
             return (parses == null || parses.size() == 0) ? null :
                     parses.stream().map(p -> getParse(sentence, p, dependencyGenerator)).collect(Collectors.toList());
         }

@@ -3,26 +3,21 @@ package edu.uw.easysrl.qasrl.model;
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Table;
-import edu.stanford.nlp.util.Pair;
-import edu.uw.easysrl.qasrl.annotation.QualityControl;
 import edu.uw.easysrl.qasrl.corpora.PronounList;
-import edu.uw.easysrl.qasrl.experiments.DebugPrinter;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
 import edu.uw.easysrl.qasrl.query.QueryGeneratorUtils;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.syntax.grammar.Category;
-import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 /**
  * Created by luheng on 4/1/16.
  */
-public class EvidenceExtractor {
+public class ConstraintExtractor {
 
     /**
      * 1. Verb argument: ((S\NP)/PP)/NP -> return < qa.predicateIndex, qa.otherDependencies[qa.targetArgnum] >
@@ -54,9 +49,9 @@ public class EvidenceExtractor {
         return attachments;
     }
 
-    public static Set<Evidence> getEvidenceFromQuery(ScoredQuery<QAStructureSurfaceForm> query,
-                                                     Collection<Integer> chosenOptions,
-                                                     boolean doNotPenalizePronouns) {
+    public static Set<Constraint> getEvidenceFromQuery(ScoredQuery<QAStructureSurfaceForm> query,
+                                                       Collection<Integer> chosenOptions,
+                                                       boolean doNotPenalizePronouns) {
         final int numQAOptions = query.getQAPairSurfaceForms().size();
         if (query.isJeopardyStyle()) {
             // 0: listed. 1: chosen.
@@ -79,11 +74,11 @@ public class EvidenceExtractor {
             return attachments.cellSet().stream()
                     // listed but not chosen.
                     .filter(c -> c.getValue() == 0)
-                    .map(c -> new Evidence.AttachmentEvidence(c.getRowKey(), c.getColumnKey(), false, 1.0))
+                    .map(c -> new Constraint.AttachmentConstraint(c.getRowKey(), c.getColumnKey(), false, 1.0))
                     .collect(Collectors.toSet());
         }
 
-        final Set<Evidence> evidenceList = new HashSet<>();
+        final Set<Constraint> constraintList = new HashSet<>();
         boolean questionIsNA = false;
         Set<Integer> chosenArgIds = new HashSet<>(), listedArgIds = new HashSet<>();
         Map<Integer, String> argIdToSpan = new HashMap<>();
@@ -110,7 +105,7 @@ public class EvidenceExtractor {
         final int predId = query.getQAPairSurfaceForms().get(0).getPredicateIndex();
         final Category category = query.getQAPairSurfaceForms().get(0).getCategory();
         if (questionIsNA) {
-            evidenceList.add(new Evidence.SupertagEvidence(predId, category, false, 1.0));
+            constraintList.add(new Constraint.SupertagConstraint(predId, category, false, 1.0));
         }
         // TODO: take into account co-ordinations.
         else {
@@ -122,10 +117,10 @@ public class EvidenceExtractor {
                             continue;
                         }
                     }
-                    evidenceList.add(new Evidence.AttachmentEvidence(predId, argId, false, 1.0));
+                    constraintList.add(new Constraint.AttachmentConstraint(predId, argId, false, 1.0));
                 }
             }
         }
-        return evidenceList;
+        return constraintList;
     }
 }
