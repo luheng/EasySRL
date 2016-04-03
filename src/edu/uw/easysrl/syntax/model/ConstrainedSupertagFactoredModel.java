@@ -40,21 +40,19 @@ public class ConstrainedSupertagFactoredModel extends SupertagFactoredModel {
                 .filter(constraint -> !constraint.isPositive())
                 .forEach(constraint -> {
                     if (Constraint.SupertagConstraint.class.isInstance(constraint)) {
-                        Constraint.SupertagConstraint supertagConstraint = (Constraint.SupertagConstraint) constraint;
-                        final int predId = supertagConstraint.getPredId();
-                        final Category category = supertagConstraint.getCategory();
+                        Constraint.SupertagConstraint c = (Constraint.SupertagConstraint) constraint;
+                        final int predId = c.getPredId();
+                        final Category category = c.getCategory();
                         final double strength = supertagConstraints.contains(predId, category) ?
-                                Math.max(supertagConstraints.get(predId, category), supertagConstraint.getStrength()) :
-                                supertagConstraint.getStrength();
+                                Math.max(supertagConstraints.get(predId, category), c.getStrength()) : c.getStrength();
                         supertagConstraints.put(predId, category, strength);
                     } else if (Constraint.AttachmentConstraint.class.isInstance(constraint)) {
-                        Constraint.AttachmentConstraint attachmentConstraint = (Constraint.AttachmentConstraint) constraint;
-                        final int headId = attachmentConstraint.getHeadId();
-                        final int argId = attachmentConstraint.getArgId();
+                        Constraint.AttachmentConstraint c = (Constraint.AttachmentConstraint) constraint;
+                        final int headId = c.getHeadId();
+                        final int argId = c.getArgId();
                         // Undirected attachment constraint.
                         final double strength = attachmentConstraints.contains(headId, argId) ?
-                                Math.max(attachmentConstraints.get(headId, argId), attachmentConstraint.getStrength()) :
-                                attachmentConstraint.getStrength();
+                                Math.max(attachmentConstraints.get(headId, argId), c.getStrength()) : c.getStrength();
                         attachmentConstraints.put(headId, argId, strength);
                         attachmentConstraints.put(argId, headId, strength);
                     }
