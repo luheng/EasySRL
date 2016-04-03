@@ -119,10 +119,6 @@ public class ReparsingHistory {
 
     public void printSummary() {
         System.out.println(
-                "Processed:\t" + queries.keySet().size() + " sentences.\n" +
-                "Processed:\t" + queries.values().stream().mapToInt(List::size).sum() + " queries.\n");
-
-        System.out.println(
                 "Baseline:\n" + getAvgBaseline() + "\n" +
                 "Reranked:\n" + getAvgReranked() + "\n" +
                 "Reparsed:\n" + getAvgReparsed() + "\n" +
@@ -133,6 +129,10 @@ public class ReparsingHistory {
                 "Reranked-changed:\n" + getAvgRerankedOnModifiedSentences() + "\n" +
                 "Reparsed-changed:\n" + getAvgReparsedOnModifiedSentences() + "\n" +
                 "Oracle-changed  :\n" + getAvgOracleOnModifiedSentences());
+
+        System.out.println(
+                "Processed:\t" + queries.keySet().size() + " sentences.\n" +
+                "Processed:\t" + queries.values().stream().mapToInt(List::size).sum() + " queries.\n");
 
         System.out.println(
                 "Num modified: " + getNumModifiedSentences() + "\n" +

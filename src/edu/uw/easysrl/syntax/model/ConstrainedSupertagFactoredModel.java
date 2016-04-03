@@ -1,6 +1,8 @@
 package edu.uw.easysrl.syntax.model;
 
 import com.google.common.collect.HashBasedTable;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Table;
 import edu.uw.easysrl.dependencies.DependencyGenerator;
 import edu.uw.easysrl.dependencies.UnlabelledDependency;
@@ -10,9 +12,11 @@ import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.syntax.parser.AbstractParser;
 import edu.uw.easysrl.syntax.tagger.Tagger;
+import edu.uw.easysrl.util.GuavaCollectors;
 
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Created by luheng on 3/10/16.
@@ -44,7 +48,8 @@ public class ConstrainedSupertagFactoredModel extends SupertagFactoredModel {
                         final int predId = c.getPredId();
                         final Category category = c.getCategory();
                         final double strength = supertagConstraints.contains(predId, category) ?
-                                Math.max(supertagConstraints.get(predId, category), c.getStrength()) : c.getStrength();
+                                Math.max(supertagConstraints.get(predId, category), c.getStrength()) :
+                                c.getStrength();
                         supertagConstraints.put(predId, category, strength);
                     } else if (Constraint.AttachmentConstraint.class.isInstance(constraint)) {
                         Constraint.AttachmentConstraint c = (Constraint.AttachmentConstraint) constraint;
@@ -52,7 +57,8 @@ public class ConstrainedSupertagFactoredModel extends SupertagFactoredModel {
                         final int argId = c.getArgId();
                         // Undirected attachment constraint.
                         final double strength = attachmentConstraints.contains(headId, argId) ?
-                                Math.max(attachmentConstraints.get(headId, argId), c.getStrength()) : c.getStrength();
+                                Math.max(attachmentConstraints.get(headId, argId), c.getStrength()) :
+                                c.getStrength();
                         attachmentConstraints.put(headId, argId, strength);
                         attachmentConstraints.put(argId, headId, strength);
                     }
@@ -61,7 +67,8 @@ public class ConstrainedSupertagFactoredModel extends SupertagFactoredModel {
         attachmentConstraints.rowKeySet().stream().forEach(head -> {
             int numArgs = attachmentConstraints.row(head).size();
             double norm = 1.0 * numArgs;
-            Set<Integer> args = new HashSet<>(attachmentConstraints.row(head).keySet());
+            ImmutableSet<Integer> args = attachmentConstraints.row(head).keySet().stream()
+                    .collect(GuavaCollectors.toImmutableSet());
             args.forEach(arg -> {
                 double weight = attachmentConstraints.get(head, arg);
                 attachmentConstraints.put(head, arg, weight / norm);

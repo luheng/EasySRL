@@ -15,7 +15,7 @@ import java.util.stream.IntStream;
  * Created by luheng on 3/22/16.
  */
 public class QueryGeneratorUtils {
-    public static String kBadQuestionOptionString = "Bad queryPrompt.";
+    public static String kBadQuestionOptionString = "Bad question.";
     public static String kUnlistedAnswerOptionString = "Answer is not listed.";
     // For jeopardy-style.
     public static String kNoneApplicableString = "None of the above.";
