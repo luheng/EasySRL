@@ -5,6 +5,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Table;
 import edu.uw.easysrl.qasrl.corpora.PronounList;
+import edu.uw.easysrl.qasrl.experiments.DebugPrinter;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
@@ -46,16 +47,21 @@ public class ConstraintExtractor {
             else if (category == Category.valueOf("(NP\\NP)/NP")) {
                 attachmentArgNum = 1;
             }
+
             if (qDeps.containsKey(attachmentArgNum)) {
                 qDeps.get(attachmentArgNum)
                         .forEach(argId -> attachments.add(new int[]{ predicateIndex, argId }));
             }
             final int ppId = isPPArg ? (qDeps.containsKey(attachmentArgNum) ? qDeps.get(attachmentArgNum).get(0) : -1)
-                    : predicateIndex;
-            qa.getAnswerStructures().stream()
-                    .flatMap(astr -> astr.argumentIndices.stream())
-                    .distinct()
-                    .forEach(argId -> attachments.add(new int[] { ppId, argId }));
+                                        : predicateIndex;
+            System.out.println(qa.getQuestion() + "\t" + qa.getAnswer() + "\t" + isPPArg + "\t" + ppId + "\t"
+                                + DebugPrinter.getShortListString(qa.getAnswerStructures().get(0).argumentIndices));
+            if (ppId >= 0) {
+                qa.getAnswerStructures().stream()
+                        .flatMap(astr -> astr.argumentIndices.stream())
+                        .distinct()
+                        .forEach(argId -> attachments.add(new int[]{ ppId, argId }));
+            }
         }
         return attachments;
     }

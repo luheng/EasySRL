@@ -102,9 +102,9 @@ public class ReparsingExperiment {
                 if (userOptions.size() == 0) {
                     continue;
                 }
-                /*if (query.isJeopardyStyle() && userOptions.contains(query.getBadQuestionOptionId().getAsInt())) {
+                if (query.isJeopardyStyle() && userOptions.contains(query.getBadQuestionOptionId().getAsInt())) {
                     continue;
-                }*/
+                }
                 ImmutableSet<Constraint> constraintSet = myHTILParser.getConstraints(query, userOptions);
                 if (constraintSet == null || constraintSet.isEmpty()) {
                     continue;
@@ -128,10 +128,11 @@ public class ReparsingExperiment {
                         'U', userOptions,
                         '*', optionDist);
                 // Debugging.
-                result += "-----\n" + annotation.toString() + "\n";
+                // result += "-----\n" + annotation.toString() + "\n";
+
                 // Evidence.
                 result += constraintSet.stream()
-                        .map(ev -> "Penalizing:\t" + ev.toString(sentence))
+                        .map(ev -> "Penalizing:\t \t" + ev.toString(sentence))
                         .collect(Collectors.joining("\n")) + "\n";
                 // Improvement.
                 String f1Impv = " ";

@@ -174,15 +174,17 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
 
         // Prompt structure.
         String promptStructStr = isJeopardyStyle ?
-                qaPairSurfaceForms.get(0).getAnswerStructures().stream()
+                qaPairSurfaceForms.stream()
+                        .flatMap(qa -> qa.getAnswerStructures().stream())
                         .map(s -> s.toString(sentence))
                         .collect(Collectors.joining(" / ")) :
-                qaPairSurfaceForms.get(0).getQuestionStructures().stream()
+                qaPairSurfaceForms.stream()
+                        .flatMap(qa -> qa.getQuestionStructures().stream())
                         .map(s -> s.toString(sentence))
                         .collect(Collectors.joining(" / "));
 
         // Prompt.
-        result += String.format("[prompt]:\t%.2f\t%s\t%s\n", promptScore, prompt, promptStructStr);
+        result += String.format("[prompt]:\t \t%.2f\t%s\t%s\n", promptScore, prompt, promptStructStr);
 
         for (int i = 0; i < options.size(); i++) {
             String matchingStr = "";

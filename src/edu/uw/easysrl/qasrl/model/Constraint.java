@@ -70,7 +70,7 @@ public abstract class Constraint {
         }
 
         public String toString(List<String> sentence) {
-            return predId + ":" + sentence.get(predId) + "\t" + category + "\t" + strength;
+            return strength + "\t" + predId + ":" + sentence.get(predId) + "\t" + category;
         }
     }
 
@@ -106,7 +106,7 @@ public abstract class Constraint {
         }
 
         public String toString(List<String> sentence) {
-            return headId + ":" + sentence.get(headId) + "-->" + argId + ":" + sentence.get(argId) + "\t" + strength;
+            return strength + "\t" + headId + ":" + sentence.get(headId) + "-->" + argId + ":" + sentence.get(argId);
         }
     }
 }

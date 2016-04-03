@@ -26,6 +26,8 @@ public class QuestionStructure {
     public final int predicateIndex;
     public final Category category;
     public final int targetArgNum;
+    // TODO:
+    // public final int prepositionIndex;
     public final ImmutableMap<Integer, ImmutableList<Integer>> otherDependencies;
 
     public QuestionStructure(int predId, Category category, int argNum, Collection<ResolvedDependency> otherDeps) {

@@ -1,6 +1,8 @@
 package edu.uw.easysrl.qasrl.qg;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 
 import com.google.common.collect.ImmutableSet;
@@ -31,8 +33,17 @@ public class BasicQuestionAnswerPair implements QuestionAnswerPair {
 
     public int getArgumentNumber() { return argumentNumber; }
 
+    // A hack for getting the true argument head for PP arguments.
+    // This would break if there is coordination under the PP.
     public int getArgumentIndex() {
-        return targetDep.getArgumentIndex();
+        //return targetDep.getArgumentIndex();
+        return getPredicateCategory().getArgument(getArgumentNumber()) == Category.PP ?
+                answerDeps.stream()
+                    .filter(dep -> dep.getCategory() == Category.valueOf("PP/NP"))
+                    .map(ResolvedDependency::getArgument)
+                    .findFirst()
+                    .orElse(targetDep.getArgumentIndex()) :
+                targetDep.getArgumentIndex();
     }
 
     // TODO: store the immutable sets as fields
