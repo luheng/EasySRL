@@ -31,10 +31,10 @@ public class ReparsingExperiment {
     private static Map<Integer, List<AlignedAnnotation>> annotations;
 
     private static final String[] annotationFiles = {
-            "./Crowdflower_data/f878213.csv", // Round1: radio-button, core + pp
-            "./Crowdflower_data/f882410.csv", // Round2: radio-button, core only
+            "./Crowdflower_data/f878213.csv",                // Round1: radio-button, core + pp
+            "./Crowdflower_data/f882410.csv",                // Round2: radio-button, core only
             "./Crowdflower_data/all-checkbox-responses.csv", // Round3: checkbox, core + pp
-            "./Crowdflower_data/f891522.csv", // Round4: jeopardy checkbox, pp only
+            "./Crowdflower_data/f891522.csv",                // Round4: jeopardy checkbox, pp only
     };
 
     private static QueryPruningParameters queryPruningParameters;
@@ -46,7 +46,7 @@ public class ReparsingExperiment {
     static {
         reparsingParameters = new HITLParsingParameters();
         reparsingParameters.jeopardyQuestionMinAgreement = 1;
-        reparsingParameters.jeopardyQuestionWeight = 0.01;
+        reparsingParameters.jeopardyQuestionWeight = 1.0;
     }
 
     public static void main(String[] args) {
@@ -127,6 +127,8 @@ public class ReparsingExperiment {
                         'B', oneBestOptions,
                         'U', userOptions,
                         '*', optionDist);
+                // Debugging.
+                result += "-----\n" + annotation.toString() + "\n";
                 // Evidence.
                 result += constraintSet.stream()
                         .map(ev -> "Penalizing:\t" + ev.toString(sentence))

@@ -18,7 +18,7 @@ import static java.util.stream.Collectors.*;
  */
 public class TextGenerationHelper {
 
-    private static final boolean useShorterNPs = true;
+    private static final boolean useShorterNPs = false;
 
     // here is the punctuation we want to avoid spaces before,
     // and that we don't want at the end of the queryPrompt or answer.
