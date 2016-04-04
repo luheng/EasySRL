@@ -36,7 +36,6 @@ public class BasicQuestionAnswerPair implements QuestionAnswerPair {
     // A hack for getting the true argument head for PP arguments.
     // This would break if there is coordination under the PP.
     public int getArgumentIndex() {
-        //return targetDep.getArgumentIndex();
         return getPredicateCategory().getArgument(getArgumentNumber()) == Category.PP ?
                 answerDeps.stream()
                     .filter(dep -> dep.getCategory() == Category.valueOf("PP/NP"))

@@ -46,7 +46,9 @@ public class ReparsingExperiment {
     static {
         reparsingParameters = new HITLParsingParameters();
         reparsingParameters.jeopardyQuestionMinAgreement = 1;
+        reparsingParameters.minAgreement = 1;
         reparsingParameters.jeopardyQuestionWeight = 1.0;
+        reparsingParameters.attachmentPenaltyWeight = 1.0;
     }
 
     public static void main(String[] args) {

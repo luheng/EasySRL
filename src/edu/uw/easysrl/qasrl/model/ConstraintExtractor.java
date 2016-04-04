@@ -1,20 +1,20 @@
 package edu.uw.easysrl.qasrl.model;
 
-import com.google.common.collect.HashBasedTable;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Table;
+import com.google.common.collect.*;
 import edu.uw.easysrl.qasrl.corpora.PronounList;
 import edu.uw.easysrl.qasrl.experiments.DebugPrinter;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
+import edu.uw.easysrl.qasrl.qg.syntax.AnswerStructure;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
 import edu.uw.easysrl.qasrl.query.QueryGeneratorUtils;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * TODO: Need to refactor.
@@ -54,9 +54,8 @@ public class ConstraintExtractor {
             }
             final int ppId = isPPArg ? (qDeps.containsKey(attachmentArgNum) ? qDeps.get(attachmentArgNum).get(0) : -1)
                                         : predicateIndex;
-            System.out.println(qa.getQuestion() + "\t" + qa.getAnswer() + "\t" + isPPArg + "\t" + ppId + "\t"
-                                + DebugPrinter.getShortListString(qa.getAnswerStructures().get(0).argumentIndices));
             if (ppId >= 0) {
+                // Target dependency.
                 qa.getAnswerStructures().stream()
                         .flatMap(astr -> astr.argumentIndices.stream())
                         .distinct()
@@ -66,9 +65,83 @@ public class ConstraintExtractor {
         return attachments;
     }
 
-    public static Set<Constraint> getEvidenceFromQuery(ScoredQuery<QAStructureSurfaceForm> query,
-                                                       Collection<Integer> chosenOptions,
-                                                       boolean doNotPenalizePronouns) {
+    private static ImmutableSet<Integer> getPronounArgumentIds(final QAStructureSurfaceForm qa) {
+        final String[] answerSpans = qa.getAnswer().split(QAPairAggregatorUtils.answerDelimiter);
+        return qa.getAnswerStructures().stream()
+                .filter(astr -> astr.argumentIndices.size() == answerSpans.length)
+                .flatMap(astr -> IntStream.range(0, astr.argumentIndices.size())
+                        .boxed()
+                        .filter(i -> PronounList.englishPronounSet.contains(answerSpans[i].toLowerCase()))
+                        .map(astr.argumentIndices::get))
+                .distinct()
+                .collect(GuavaCollectors.toImmutableSet());
+    }
+
+    private static List<int[]> getAttachments(final QAStructureSurfaceForm qa, boolean skipPronounAnswer) {
+        final List<int[]> attachments = new ArrayList<>();
+        for (QuestionStructure qs : qa.getQuestionStructures()) {
+            final int predicateIndex = qs.predicateIndex;
+            final Category category = qs.category;
+            final ImmutableMap<Integer, ImmutableList<Integer>> qDeps = qs.otherDependencies;
+
+            // Get PP child (for PP arg).
+            int ppId = -1;
+            if (category.getArgument(qs.targetArgNum).equals(Category.PP)  && qDeps.containsKey(qs.targetArgNum)) {
+                ppId = qDeps.get(qs.targetArgNum).get(0);
+            }
+
+            // Add Attachment(q).
+            qDeps.values().forEach(argList -> argList
+                    .forEach(argId -> attachments.add(new int[] { predicateIndex, argId })));
+
+            // Add attachment (q, a) (target dependency).
+            Set<Integer> skipArgIds = new HashSet<>();
+            if (skipPronounAnswer) {
+                skipArgIds.addAll(getPronounArgumentIds(qa));
+            }
+            final int qaDepHead = ppId >= 0 ? ppId : predicateIndex;
+            qa.getAnswerStructures().stream()
+                    .flatMap(astr -> astr.argumentIndices.stream())
+                    .distinct()
+                    .filter(id -> !skipArgIds.contains(id))
+                    .forEach(argId -> attachments.add(new int[]{ qaDepHead, argId }));
+        }
+        return attachments;
+    }
+
+    public static Set<Constraint> extractConstraints(ScoredQuery<QAStructureSurfaceForm> query,
+                                                     Collection<Integer> chosenOptions,
+                                                     boolean doNotPenalizePronouns) {
+        final int numQAOptions = query.getQAPairSurfaceForms().size();
+
+        // 0: listed. 1: chosen.
+        Table<Integer, Integer, Integer> attachments = HashBasedTable.create();
+        for (int i = 0; i < numQAOptions; i++) {
+            final boolean chosen = chosenOptions.contains(i);
+            getAttachments(query.getQAPairSurfaceForms().get(i), doNotPenalizePronouns).forEach(a -> {
+                if (!attachments.contains(a[0], a[1])) {
+                    attachments.put(a[0], a[1], 0);
+                }
+                if (!attachments.contains(a[1], a[0])) {
+                    attachments.put(a[1], a[0], 0);
+                }
+                if (chosen) {
+                    attachments.put(a[0], a[1], 1);
+                    attachments.put(a[1], a[0], 1);
+                }
+            });
+        }
+        return attachments.cellSet().stream()
+                // listed but not chosen.
+                .filter(c -> c.getValue() == 0)
+                .map(c -> new Constraint.AttachmentConstraint(c.getRowKey(), c.getColumnKey(), false, 1.0))
+                .collect(Collectors.toSet());
+    }
+
+    /*
+    public static Set<Constraint> extractConstraints(ScoredQuery<QAStructureSurfaceForm> query,
+                                                     Collection<Integer> chosenOptions,
+                                                     boolean doNotPenalizePronouns) {
         final int numQAOptions = query.getQAPairSurfaceForms().size();
         if (query.isJeopardyStyle()) {
             // 0: listed. 1: chosen.
@@ -140,4 +213,5 @@ public class ConstraintExtractor {
         }
         return constraintList;
     }
+    */
 }

@@ -216,7 +216,7 @@ public class HITLParser {
         }
         final double questionTypeWeight = query.isJeopardyStyle() ? reparsingParameters.jeopardyQuestionWeight : 1.0;
         final ImmutableSet<Constraint> constraintSet = ConstraintExtractor
-                .getEvidenceFromQuery(query, options, reparsingParameters.skipPronounEvidence)
+                .extractConstraints(query, options, reparsingParameters.skipPronounEvidence)
                 .stream()
                 .collect(GuavaCollectors.toImmutableSet());
         constraintSet.forEach(ev -> ev.setStrength(

@@ -45,18 +45,18 @@ public class QueryGenerators {
             .collect(toImmutableList());
     }
 
-    public static <QA extends QAStructureSurfaceForm> QueryGenerator<QA, ScoredQuery<QA>> checkboxQueryGenerator() {
+    public static QueryGenerator<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> checkboxQueryGenerator() {
         return qaPairs -> qaPairs
                 .stream()
-                .collect(groupingBy(QA::getQuestion))
+                .collect(groupingBy(QAStructureSurfaceForm::getQuestion))
                 .values()
                 .stream()
                 .map(qaList -> {
-                    ImmutableList<QA> sortedQAList = qaList.stream()
+                    ImmutableList<QAStructureSurfaceForm> sortedQAList = qaList.stream()
                             .sorted((qa1, qa2) -> Integer.compare(qa1.getArgumentIndices().get(0),
                                                                   qa2.getArgumentIndices().get(0)))
                             .collect(GuavaCollectors.toImmutableList());
-                    List<String> options = sortedQAList.stream().map(QA::getAnswer).collect(toList());
+                    List<String> options = sortedQAList.stream().map(QAStructureSurfaceForm::getAnswer).collect(toList());
                     options.add(QueryGeneratorUtils.kBadQuestionOptionString);
                     return new ScoredQuery<>(qaList.get(0).getSentenceId(),
                                              qaList.get(0).getQuestion(),
@@ -67,14 +67,14 @@ public class QueryGenerators {
                 }).collect(toImmutableList());
     }
 
-    public static <QA extends QAStructureSurfaceForm> QueryGenerator<QA, ScoredQuery<QA>> radioButtonQueryGenerator() {
+    public static QueryGenerator<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> radioButtonQueryGenerator() {
         return qaPairs -> qaPairs
                 .stream()
-                .collect(groupingBy(QA::getQuestion))
+                .collect(groupingBy(QAStructureSurfaceForm::getQuestion))
                 .values()
                 .stream()
                 .map(qaList -> {
-                    List<String> options = qaList.stream().map(QA::getAnswer).collect(toList());
+                    List<String> options = qaList.stream().map(QAStructureSurfaceForm::getAnswer).collect(toList());
                     options.add(QueryGeneratorUtils.kUnlistedAnswerOptionString);
                     options.add(QueryGeneratorUtils.kBadQuestionOptionString);
                     return new ScoredQuery<>(
@@ -90,14 +90,14 @@ public class QueryGenerators {
     /**
      * Generate all jeopardy-style checkbox queries.
      */
-    public static <QA extends QAStructureSurfaceForm> QueryGenerator<QA, ScoredQuery<QA>> jeopardyCheckboxQueryGenerator() {
+    public static QueryGenerator<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> jeopardyCheckboxQueryGenerator() {
         return qaPairs -> qaPairs
                 .stream()
-                .collect(groupingBy(QA::getAnswer))
+                .collect(groupingBy(QAStructureSurfaceForm::getAnswer))
                 .values()
                 .stream()
                 .map(qaList -> {
-                    List<String> options = qaList.stream().map(QA::getQuestion).collect(toList());
+                    List<String> options = qaList.stream().map(QAStructureSurfaceForm::getQuestion).collect(toList());
                     options.add(QueryGeneratorUtils.kNoneApplicableString);
                     return new ScoredQuery<>(
                             qaList.get(0).getSentenceId(),
