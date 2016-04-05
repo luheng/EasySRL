@@ -52,10 +52,14 @@ public final class NBestList {
         return scores.get(parseId);
     }
 
-    public NBestList(ImmutableList<Parse> parses, ImmutableList<Double> scores) {
-        this.parses = parses;
-        this.scores = scores;
+    public int getOracleId() {
+        return oracleId;
     }
+
+    public Results getResults(int parseId) {
+        return results.get(parseId);
+    }
+
 
     public void cacheResults(final Parse goldParse) {
         results = ImmutableList.copyOf(CcgEvaluation.evaluateNBest(parses, goldParse.dependencies));
@@ -67,13 +71,20 @@ public final class NBestList {
         }
     }
 
-    public int getOracleId() {
-        return oracleId;
+    /* transformers */
+
+    // public NBestList withoutAuxiliaryAttachments() {
+    //     ImmutableList.Builder<Integer> goodParses;
+    //     for(int i = 0)
+    // }
+
+    /* constructors */
+
+    public NBestList(ImmutableList<Parse> parses, ImmutableList<Double> scores) {
+        this.parses = parses;
+        this.scores = scores;
     }
 
-    public Results getResults(int parseId) {
-        return results.get(parseId);
-    }
 
     /**
      * uses the parser-assigned scores
@@ -84,6 +95,8 @@ public final class NBestList {
             .map(p -> p.score)
             .collect(toImmutableList());
     }
+
+    /* Factory methods */
 
     public static Optional<NBestList> getNBestList(final BaseCcgParser parser, int sentenceId,
                                          final List<InputReader.InputWord> inputSentence) {

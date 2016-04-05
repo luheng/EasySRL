@@ -76,8 +76,9 @@ public class QuestionGenerator {
      */
     public static void main(String[] args) {
         ParseData devData = ParseData.loadFromDevPool().get();
-        if(args.length == 0 || (!args[0].equalsIgnoreCase("gold") && !args[0].equalsIgnoreCase("tricky"))) {
-            System.err.println("requires argument: \"gold\" or \"tricky\"");
+        if(args.length == 0 || (!args[0].equalsIgnoreCase("gold") && !args[0].equalsIgnoreCase("tricky") &&
+                                !args[0].equalsIgnoreCase("queries"))) {
+            System.err.println("requires argument: \"gold\" or \"tricky\" or \"queries\"");
         } else if(args[0].equalsIgnoreCase("gold")) {
             System.out.println("\nQA Pairs for Gold Parses:\n");
             for(int sentenceId = 0; sentenceId < devData.getSentences().size(); sentenceId++) {
@@ -120,6 +121,27 @@ public class QuestionGenerator {
                     }
                 }
             }
+        } else if (args[0].equalsIgnoreCase("queries")) {
+            System.out.println("All queries:\n");
+            ImmutableMap<Integer, NBestList> nBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 100).get();
+            for(int sentenceId = 0; sentenceId < 25; sentenceId++) {
+                if(!nBestLists.containsKey(sentenceId)) {
+                    continue;
+                }
+                ImmutableList<String> words = devData.getSentences().get(sentenceId);
+                NBestList nBestList = nBestLists.get(sentenceId);
+                System.out.println(String.format("--------- All Queries --------", sentenceId));
+                System.out.println(TextGenerationHelper.renderString(words));
+                ImmutableList<QuestionAnswerPair> qaPairs = generateAllQAPairs(sentenceId, words, nBestList);
+                ImmutableList<QAPairSurfaceForm> surfaceForms = QAPairAggregators.aggregateByString().aggregate(qaPairs);
+                ImmutableList<Query<QAPairSurfaceForm>> queries = QueryGenerators.maximalForwardGenerator().generate(surfaceForms);
+                for(Query<QAPairSurfaceForm> query : queries) {
+                    System.out.println(query.getPrompt());
+                    for(String option : query.getOptions()) {
+                        System.out.println("\t" + option);
+                    }
+                }
+            }
         }
     }
 
@@ -127,6 +149,9 @@ public class QuestionGenerator {
         System.out.println("--");
         System.out.println(words.get(qaPair.getPredicateIndex()));
         System.out.println(qaPair.getPredicateCategory());
+        System.out.println(words.get(qaPair.getTargetDependency().getHead()) + "\t-"
+                           + qaPair.getTargetDependency().getArgNumber() + "->\t"
+                           + words.get(qaPair.getTargetDependency().getArgument()));
         for(ResolvedDependency dep : qaPair.getQuestionDependencies()) {
             System.out.println("\t" + words.get(dep.getHead()) + "\t-"
                                + dep.getArgNumber() + "->\t"
