@@ -1,8 +1,11 @@
 package edu.uw.easysrl.qasrl;
 
+import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Table;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
+import edu.uw.easysrl.qasrl.model.AttachmentHelper;
 import edu.uw.easysrl.qasrl.qg.*;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAPairSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
@@ -11,6 +14,7 @@ import edu.uw.easysrl.qasrl.query.Query;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.util.GuavaCollectors;
 
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -28,6 +32,22 @@ public class ResponseSimulatorGold {
         this.parseData = parseData;
     }
 
+
+    public ImmutableList<Integer> respondToQuery(ScoredQuery<QAStructureSurfaceForm> query) {
+        final int sentenceId = query.getSentenceId();
+        final Parse goldParse = parseData.getGoldParses().get(sentenceId);
+        final Set<Integer> chosenOptions = new HashSet<>();
+        IntStream.range(0, query.getQAPairSurfaceForms().size()).boxed()
+                .filter(i -> query.getQAPairSurfaceForms().get(i).canBeGeneratedBy(goldParse))
+                .forEach(chosenOptions::add);
+
+        if (chosenOptions.size() == 0) {
+            chosenOptions.add(query.getBadQuestionOptionId().getAsInt());
+        }
+        return chosenOptions.stream().sorted().collect(GuavaCollectors.toImmutableList());
+    }
+
+    /*
      public ImmutableList<Integer> respondToQuery(ScoredQuery<QAStructureSurfaceForm> query) {
          final int sentenceId = query.getSentenceId();
          final Parse goldParse = parseData.getGoldParses().get(sentenceId);
@@ -76,15 +96,13 @@ public class ResponseSimulatorGold {
                 }
              }
          } else {
-             // TODO: move this to: QASurfaceForm.canBeGeneratedBy(Parse parse).
              IntStream.range(0, query.getQAPairSurfaceForms().size()).boxed()
                      .filter(i -> query.getQAPairSurfaceForms().get(i).canBeGeneratedBy(goldParse))
                      .forEach(chosenOptions::add);
-            if (chosenOptions.size() == 0) {
+             if (chosenOptions.size() == 0) {
                 chosenOptions.add(query.getBadQuestionOptionId().getAsInt());
-            }
+             }
          }
-         // TODO: jeopardy style questions
          return chosenOptions.stream().sorted().collect(GuavaCollectors.toImmutableList());
-     }
+     }*/
 }

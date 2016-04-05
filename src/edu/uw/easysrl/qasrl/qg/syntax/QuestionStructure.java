@@ -26,8 +26,7 @@ public class QuestionStructure {
     public final int predicateIndex;
     public final Category category;
     public final int targetArgNum;
-    // TODO:
-    // public final int prepositionIndex;
+    public final int targetPrepositionIndex;
     public final ImmutableMap<Integer, ImmutableList<Integer>> otherDependencies;
 
     public QuestionStructure(int predId, Category category, int argNum, Collection<ResolvedDependency> otherDeps) {
@@ -46,6 +45,8 @@ public class QuestionStructure {
                                 .map(ResolvedDependency::getArgumentIndex)
                                 .distinct().sorted()
                                 .collect(GuavaCollectors.toImmutableList())));
+        targetPrepositionIndex = isPPArg && otherDependencies.containsKey(targetArgNum) ?
+                otherDependencies.get(targetArgNum).get(0) : -1;
     }
 
     /**
@@ -69,6 +70,8 @@ public class QuestionStructure {
                                 .map(ResolvedDependency::getArgumentIndex)
                                 .distinct().sorted()
                                 .collect(GuavaCollectors.toImmutableList())));
+        targetPrepositionIndex = isPPArg && otherDependencies.containsKey(targetArgNum) ?
+                otherDependencies.get(targetArgNum).get(0) : -1;
     }
 
     /**
@@ -76,9 +79,11 @@ public class QuestionStructure {
      */
     public ImmutableSet<ResolvedDependency> filter(Collection<ResolvedDependency> dependencies) {
         return dependencies.stream()
-                .filter(d -> d.getHead() == predicateIndex &&
-                             d.getCategory() == category &&
-                             d.getArgNumber() == targetArgNum)
+                .filter(d -> (targetPrepositionIndex >= 0
+                                && d.getCategory() == Category.valueOf("PP/NP")
+                                && targetPrepositionIndex == d.getHead()) ||
+                            (d.getHead() == predicateIndex && d.getCategory() == category
+                                && d.getArgNumber() == targetArgNum))
                 .collect(GuavaCollectors.toImmutableSet());
     }
 

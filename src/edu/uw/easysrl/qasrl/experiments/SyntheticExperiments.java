@@ -18,23 +18,22 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class SyntheticExperiments {
     // Parameters.
     private static int nBest = 100;
-    private static int maxNumSentences = 100;
+    private static int maxNumSentences = 1000;
 
     // Shared data: nBestList, sentences, etc.
     private static HITLParser myHITLParser;
     private static ReparsingHistory myHITLHistory;
 
     private static boolean isCheckboxVersion = true;
-    private static boolean usePronouns = false;
+    private static boolean usePronouns = true;
 
     private static QueryPruningParameters queryPruningParameters;
     static {
         queryPruningParameters = new QueryPruningParameters();
         queryPruningParameters.minPromptConfidence = 0.1;
         queryPruningParameters.minOptionConfidence = 0.0;
-        queryPruningParameters.minOptionEntropy = 0.0;
+        queryPruningParameters.minOptionEntropy = 0.05;
         queryPruningParameters.skipPPQuestions = false;
-        queryPruningParameters.skipBinaryQueries = true;
     }
     private static HITLParsingParameters reparsingParameters;
     static {
