@@ -21,7 +21,7 @@ public class ReparsingHistory {
 
     final List<Integer> sentenceIds;
     final Map<Integer, List<ScoredQuery<QAStructureSurfaceForm>>> queries;
-    final Map<Integer, List<ImmutableSet<Constraint>>> evidenceSets;
+    final Map<Integer, List<ImmutableSet<Constraint>>> constraints;
     final Map<Integer, List<ImmutableList<Integer>>> userOptions;
     final Map<Integer, List<Parse>> reparses;
     final Map<Integer, List<Integer>> rerankedParseIds;
@@ -33,7 +33,7 @@ public class ReparsingHistory {
         sentenceIds = new ArrayList<>();
         queries = new HashMap<>();
         userOptions = new HashMap<>();
-        evidenceSets = new HashMap<>();
+        constraints = new HashMap<>();
         reparses = new HashMap<>();
         rerankedParseIds = new HashMap<>();
         reparsingResults = new HashMap<>();
@@ -45,7 +45,7 @@ public class ReparsingHistory {
             sentenceIds.add(sentenceId);
             queries.put(sentenceId, new ArrayList<>());
             userOptions.put(sentenceId, new ArrayList<>());
-            evidenceSets.put(sentenceId, new ArrayList<>());
+            constraints.put(sentenceId, new ArrayList<>());
             reparses.put(sentenceId, new ArrayList<>());
             rerankedParseIds.put(sentenceId, new ArrayList<>());
             reparsingResults.put(sentenceId, new ArrayList<>());
@@ -53,7 +53,7 @@ public class ReparsingHistory {
         }
         queries.get(sentenceId).add(null /* no query */);
         userOptions.get(sentenceId).add(null /* no options */);
-        evidenceSets.get(sentenceId).add(null /* no options */);
+        constraints.get(sentenceId).add(null /* no options */);
         reparses.get(sentenceId).add(hitlParser.getNBestList(sentenceId).getParse(0));
         rerankedParseIds.get(sentenceId).add(0);
         final Results baseline = hitlParser.getNBestList(sentenceId).getResults(0);
@@ -68,7 +68,7 @@ public class ReparsingHistory {
         addSentence(sentenceId);
         queries.get(sentenceId).add(query);
         userOptions.get(sentenceId).add(options);
-        evidenceSets.get(sentenceId).add(constraintSet);
+        constraints.get(sentenceId).add(constraintSet);
         reparses.get(sentenceId).add(reparsed);
         rerankedParseIds.get(sentenceId).add(reranked);
         reparsingResults.get(sentenceId).add(reparsedResult);
@@ -80,7 +80,7 @@ public class ReparsingHistory {
         addSentence(sentenceId);
         queries.get(sentenceId).add(query);
         userOptions.get(sentenceId).add(options);
-        evidenceSets.get(sentenceId).add(constraintSet);
+        constraints.get(sentenceId).add(constraintSet);
         final ImmutableSet<Constraint> allConstraints = getAllConstraints(sentenceId);
         final Parse reparsed = hitlParser.getReparsed(sentenceId, allConstraints);
         final int reranked = hitlParser.getRerankedParseId(sentenceId, allConstraints);
@@ -106,7 +106,7 @@ public class ReparsingHistory {
                 'O', hitlParser.getOracleOptions(query),
                 'B', hitlParser.getOneBestOptions(query),
                 'U', getLast(userOptions.get(sentId))));
-        getLast(evidenceSets.get(sentId)).forEach(ev -> System.out.println(ev.toString(words)));
+        getLast(constraints.get(sentId)).forEach(ev -> System.out.println(ev.toString(words)));
         String f1Impv = reparsedF1.getF1() < currentF1.getF1() - 1e-8 ? "[-]" :
                 (reparsedF1.getF1() > currentF1.getF1() + 1e-8 ? "[+]" : " ");
 
@@ -145,8 +145,9 @@ public class ReparsingHistory {
     }
 
     public ImmutableSet<Constraint> getAllConstraints(int sentenceId) {
-        return evidenceSets.containsKey(sentenceId) ?
-                evidenceSets.get(sentenceId).stream()
+        return constraints.containsKey(sentenceId) && !constraints.get(sentenceId).isEmpty()?
+                constraints.get(sentenceId).stream()
+                        .filter(s -> s != null)
                         .flatMap(ImmutableSet::stream)
                         .collect(GuavaCollectors.toImmutableSet()) : ImmutableSet.of();
     }

@@ -31,8 +31,8 @@ public class SyntheticExperiments {
     static {
         queryPruningParameters = new QueryPruningParameters();
         queryPruningParameters.minPromptConfidence = 0.1;
-        queryPruningParameters.minOptionConfidence = 0.05;
-        queryPruningParameters.minOptionEntropy = 0.05;
+        queryPruningParameters.minOptionConfidence = 0.0;
+        queryPruningParameters.minOptionEntropy = 0.0;
         queryPruningParameters.skipPPQuestions = false;
         queryPruningParameters.skipBinaryQueries = true;
     }
@@ -60,6 +60,9 @@ public class SyntheticExperiments {
             ImmutableList<ScoredQuery<QAStructureSurfaceForm>> coreQueries = myHITLParser
                     .getCoreArgumentQueriesForSentence(sentenceId, isCheckboxVersion);
 
+            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> adjunctQueries = myHITLParser
+                    .getAdjunctQueriesForSentence(sentenceId, isCheckboxVersion);
+
             ImmutableList<ScoredQuery<QAStructureSurfaceForm>> ppQueries = myHITLParser
                     .getPPAttachmentQueriesForSentence(sentenceId);
 
@@ -79,7 +82,7 @@ public class SyntheticExperiments {
             });
             */
 
-            ppQueries.forEach(query -> {
+            adjunctQueries.forEach(query -> {
                 ImmutableList<Integer> goldOptions = myHITLParser.getGoldOptions(query);
                 ImmutableSet<Constraint> constraints = myHITLParser.getConstraints(query, goldOptions);
                 myHITLHistory.addEntry(sentenceId, query, goldOptions, constraints);

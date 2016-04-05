@@ -126,6 +126,31 @@ public class HITLParser {
         return queryList;
     }
 
+    /**
+     * Old non-jeopardy pp queries.
+     * @param sentenceId
+     * @return
+     */
+    public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getAdjunctQueriesForSentence(int sentenceId,
+                                                                                           boolean isCheckboxStyle) {
+        QueryPruningParameters queryPruningParams = new QueryPruningParameters(queryPruningParameters);
+        queryPruningParams.skipPPQuestions = false;
+        queryPruningParams.skipBinaryQueries = false;
+        ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList =
+                ExperimentUtils.generateAllQueries(
+                        sentenceId, sentences.get(sentenceId), nbestLists.get(sentenceId),
+                        false /* isJeopardyStyle */,
+                        isCheckboxStyle,
+                        false /* usePronouns */,
+                        queryPruningParams)
+                .stream().filter(QualityControl::queryIsPrepositional)
+                .collect(GuavaCollectors.toImmutableList());
+        // Assign query ids.
+        IntStream.range(0, queryList.size())
+                .forEach(i -> queryList.get(i).setQueryId(i));
+        return queryList;
+    }
+
     public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getPPAttachmentQueriesForSentence(int sentenceId) {
         QueryPruningParameters queryPruningParams = new QueryPruningParameters(queryPruningParameters);
         queryPruningParams.skipPPQuestions = false;
