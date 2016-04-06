@@ -1,8 +1,12 @@
 package edu.uw.easysrl.qasrl.model;
 
 import com.google.common.collect.*;
+import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
+import edu.uw.easysrl.qasrl.qg.util.PronounList;
+import edu.uw.easysrl.qasrl.query.QueryGeneratorUtils;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
+import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -13,6 +17,7 @@ import java.util.stream.Collectors;
  */
 public class ConstraintExtractor {
 
+    /*
     public static Set<Constraint> extractConstraints(ScoredQuery<QAStructureSurfaceForm> query,
                                                      Collection<Integer> chosenOptions,
                                                      boolean doNotPenalizePronouns) {
@@ -40,9 +45,8 @@ public class ConstraintExtractor {
                 .filter(c -> c.getValue() == 0)
                 .map(c -> new Constraint.AttachmentConstraint(c.getRowKey(), c.getColumnKey(), false, 1.0))
                 .collect(Collectors.toSet());
-    }
+    }*/
 
-    /*
     public static Set<Constraint> extractConstraints(ScoredQuery<QAStructureSurfaceForm> query,
                                                      Collection<Integer> chosenOptions,
                                                      boolean doNotPenalizePronouns) {
@@ -52,7 +56,7 @@ public class ConstraintExtractor {
             Table<Integer, Integer, Integer> attachments = HashBasedTable.create();
             for (int i = 0; i < numQAOptions; i++) {
                 final boolean chosen = chosenOptions.contains(i);
-                getPPAttachments(query.getQAPairSurfaceForms().get(i)).forEach(a -> {
+                AttachmentHelper.getPPAttachments(query.getQAPairSurfaceForms().get(i)).forEach(a -> {
                     if (!attachments.contains(a[0], a[1])) {
                         attachments.put(a[0], a[1], 0);
                     }
@@ -117,5 +121,4 @@ public class ConstraintExtractor {
         }
         return constraintList;
     }
-    */
 }

@@ -29,7 +29,7 @@ public class AttachmentHelper {
      * @param qa
      * @return
      */
-    private static List<int[]> getPPAttachments(QAStructureSurfaceForm qa) {
+    public static List<int[]> getPPAttachments(QAStructureSurfaceForm qa) {
         final List<int[]> attachments = new ArrayList<>();
         for (QuestionStructure qs : qa.getQuestionStructures()) {
             final int predicateIndex = qs.predicateIndex;
