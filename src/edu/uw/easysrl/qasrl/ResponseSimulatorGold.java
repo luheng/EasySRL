@@ -32,7 +32,7 @@ public class ResponseSimulatorGold {
         this.parseData = parseData;
     }
 
-
+    /*
     public ImmutableList<Integer> respondToQuery(ScoredQuery<QAStructureSurfaceForm> query) {
         final int sentenceId = query.getSentenceId();
         final Parse goldParse = parseData.getGoldParses().get(sentenceId);
@@ -45,9 +45,8 @@ public class ResponseSimulatorGold {
             chosenOptions.add(query.getBadQuestionOptionId().getAsInt());
         }
         return chosenOptions.stream().sorted().collect(GuavaCollectors.toImmutableList());
-    }
+    }*/
 
-    /*
      public ImmutableList<Integer> respondToQuery(ScoredQuery<QAStructureSurfaceForm> query) {
          final int sentenceId = query.getSentenceId();
          final Parse goldParse = parseData.getGoldParses().get(sentenceId);
@@ -91,7 +90,7 @@ public class ResponseSimulatorGold {
              if (chosenOptions.size() == 0) {
                  if (nonEmptyGoldArgs.get() && query.getUnlistedAnswerOptionId().isPresent()) {
                      chosenOptions.add(query.getUnlistedAnswerOptionId().getAsInt());
-                 } else if (!nonEmptyGoldArgs.get() && query.getBadQuestionOptionId().isPresent()){
+                 } else if (query.getBadQuestionOptionId().isPresent()){
                      chosenOptions.add(query.getBadQuestionOptionId().getAsInt());
                 }
              }
@@ -104,5 +103,5 @@ public class ResponseSimulatorGold {
              }
          }
          return chosenOptions.stream().sorted().collect(GuavaCollectors.toImmutableList());
-     }*/
+     }
 }

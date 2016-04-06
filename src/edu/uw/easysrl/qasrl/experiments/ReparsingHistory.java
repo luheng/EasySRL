@@ -50,15 +50,16 @@ public class ReparsingHistory {
             rerankedParseIds.put(sentenceId, new ArrayList<>());
             reparsingResults.put(sentenceId, new ArrayList<>());
             rerankingResults.put(sentenceId, new ArrayList<>());
+
+            queries.get(sentenceId).add(null /* no query */);
+            userOptions.get(sentenceId).add(null /* no options */);
+            constraints.get(sentenceId).add(null /* no options */);
+            reparses.get(sentenceId).add(hitlParser.getNBestList(sentenceId).getParse(0));
+            rerankedParseIds.get(sentenceId).add(0);
+            final Results baseline = hitlParser.getNBestList(sentenceId).getResults(0);
+            reparsingResults.get(sentenceId).add(baseline);
+            rerankingResults.get(sentenceId).add(baseline);
         }
-        queries.get(sentenceId).add(null /* no query */);
-        userOptions.get(sentenceId).add(null /* no options */);
-        constraints.get(sentenceId).add(null /* no options */);
-        reparses.get(sentenceId).add(hitlParser.getNBestList(sentenceId).getParse(0));
-        rerankedParseIds.get(sentenceId).add(0);
-        final Results baseline = hitlParser.getNBestList(sentenceId).getResults(0);
-        reparsingResults.get(sentenceId).add(baseline);
-        rerankingResults.get(sentenceId).add(baseline);
     }
 
     public void addEntry(int sentenceId, final ScoredQuery<QAStructureSurfaceForm> query,
@@ -84,10 +85,11 @@ public class ReparsingHistory {
         final ImmutableSet<Constraint> allConstraints = getAllConstraints(sentenceId);
         final Parse reparsed = hitlParser.getReparsed(sentenceId, allConstraints);
         final int reranked = hitlParser.getRerankedParseId(sentenceId, allConstraints);
+        final Results reparsingResult = CcgEvaluation.evaluate(reparsed.dependencies,
+                hitlParser.getGoldParse(sentenceId).dependencies);
         reparses.get(sentenceId).add(reparsed);
         rerankedParseIds.get(sentenceId).add(reranked);
-        reparsingResults.get(sentenceId).add(CcgEvaluation.evaluate(reparsed.dependencies,
-                hitlParser.getGoldParse(sentenceId).dependencies));
+        reparsingResults.get(sentenceId).add(reparsingResult);
         rerankingResults.get(sentenceId).add(hitlParser.getNBestList(sentenceId).getResults(reranked));
     }
 
@@ -96,11 +98,8 @@ public class ReparsingHistory {
         final ImmutableList<String> words = hitlParser.getSentence(sentId);
         final ScoredQuery<QAStructureSurfaceForm> query = getLast(queries.get(sentId));
         final Results reparsedF1 = getLast(reparsingResults.get(sentId));
-        final Results rerankedF1 = hitlParser.getNBestList(sentId).getResults(getLast(rerankedParseIds.get(sentId)));
-        final Results currentF1  = reparsingResults.get(sentId).size() < 2 ?
-                hitlParser.getNBestList(sentId).getResults(0) :
-                reparsingResults.get(sentId).get(reparsingResults.get(sentId).size() - 2);
-
+        final Results rerankedF1 = getLast(rerankingResults.get(sentId));
+        final Results currentF1  = reparsingResults.get(sentId).get(reparsingResults.get(sentId).size() - 2);
         System.out.println(query.toString(words,
                 'G', hitlParser.getGoldOptions(query),
                 'O', hitlParser.getOracleOptions(query),
@@ -109,7 +108,6 @@ public class ReparsingHistory {
         getLast(constraints.get(sentId)).forEach(ev -> System.out.println(ev.toString(words)));
         String f1Impv = reparsedF1.getF1() < currentF1.getF1() - 1e-8 ? "[-]" :
                 (reparsedF1.getF1() > currentF1.getF1() + 1e-8 ? "[+]" : " ");
-
         System.out.println(String.format("F1: %.3f%% -> %.3f%% %s", 100.0 * currentF1.getF1(),
                                                                     100.0 * reparsedF1.getF1(), f1Impv));
         System.out.println(String.format("Reranked F1: %.3f%%", 100.0 * rerankedF1.getF1()));

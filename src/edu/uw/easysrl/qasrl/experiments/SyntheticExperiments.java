@@ -31,7 +31,7 @@ public class SyntheticExperiments {
     static {
         queryPruningParameters = new QueryPruningParameters();
         queryPruningParameters.minPromptConfidence = 0.1;
-        queryPruningParameters.minOptionConfidence = 0.0;
+        queryPruningParameters.minOptionConfidence = 0.05;
         queryPruningParameters.minOptionEntropy = 0.05;
         queryPruningParameters.skipPPQuestions = false;
     }
@@ -81,7 +81,7 @@ public class SyntheticExperiments {
             });
             */
 
-            adjunctQueries.forEach(query -> {
+            coreQueries.forEach(query -> {
                 ImmutableList<Integer> goldOptions = myHITLParser.getGoldOptions(query);
                 ImmutableSet<Constraint> constraints = myHITLParser.getConstraints(query, goldOptions);
                 myHITLHistory.addEntry(sentenceId, query, goldOptions, constraints);
