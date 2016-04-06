@@ -20,8 +20,10 @@ import java.util.stream.IntStream;
 public class QuestionGenerator {
 
     private static final boolean indefinitesOnly = false; // if true: only ask questions with indefinite noun args
-    private static final boolean askAllStandardQuestions = true; // all (false: just one) standard questions
+    private static final boolean askAllStandardQuestions = false; // all (false: just one) standard questions
     private static final boolean includeSupersenseQuestions = false; // if true: include supersense questions
+    // if this is true, the previous three don't matter
+    private static final boolean askPPAttachmentQuestions = true; // if true: include PP attachment questions
 
     /**
      * Generate all question answer pairs for a sentence, given the n-best list.
@@ -34,28 +36,34 @@ public class QuestionGenerator {
                                                                        NBestList nBestList) {
         return IntStream.range(0, words.size()).boxed()
                 .flatMap(predId -> IntStream.range(0, nBestList.getN()).boxed()
-                                .flatMap(parseId -> {
-                                    generateAllQAPairs(sentenceId, words, parseId, nBestList.getParse(parseId));
-                                    final Parse parse = nBestList.getParse(parseId);
-                                    final Category category = parse.categories.get(predId);
-                                    return IntStream.range(1, category.getNumberOfArguments() + 1).boxed()
-                                            .flatMap(argNum -> QuestionGenerator
-                                                    .generateAllQAPairs(sentenceId, parseId, predId, argNum, words, parse)
-                                                    .stream());
-                                })
+                         .flatMap(parseId -> {
+                                 generateAllQAPairs(sentenceId, words, parseId, nBestList.getParse(parseId));
+                                 final Parse parse = nBestList.getParse(parseId);
+                                 return generateAllQAPairs(sentenceId, words, parseId, parse).stream();
+                             })
                 ).collect(toImmutableList());
     }
 
     public static ImmutableList<QuestionAnswerPair> generateAllQAPairs(int sentenceId, ImmutableList<String> words,
                                                                        int parseId, Parse parse) {
-        return IntStream.range(0, words.size())
-            .mapToObj(Integer::new)
-            .flatMap(predIndex -> IntStream.range(1, parse.categories.get(predIndex).getNumberOfArguments() + 1)
-                    .boxed()
-                    .flatMap(argNum -> QuestionGenerator
-                            .generateAllQAPairs(sentenceId, parseId, predIndex, argNum, words, parse)
-                            .stream()))
-            .collect(toImmutableList());
+        if(askPPAttachmentQuestions) {
+            return IntStream.range(0, words.size())
+                .mapToObj(Integer::new)
+                .flatMap(predIndex -> {
+                        MultiQuestionTemplate template = new MultiQuestionTemplate(sentenceId, parseId, predIndex, words, parse);
+                        return template.getAllPPAttachmentQAPairs().stream();
+                    })
+                .collect(toImmutableList());
+        } else {
+            return IntStream.range(0, words.size())
+                .mapToObj(Integer::new)
+                .flatMap(predIndex -> IntStream.range(1, parse.categories.get(predIndex).getNumberOfArguments() + 1)
+                         .boxed()
+                         .flatMap(argNum -> QuestionGenerator
+                                  .generateAllQAPairs(sentenceId, parseId, predIndex, argNum, words, parse)
+                                  .stream()))
+                .collect(toImmutableList());
+        }
     }
 
     private static ImmutableList<QuestionAnswerPair> generateAllQAPairs(int sentenceId,
@@ -133,12 +141,26 @@ public class QuestionGenerator {
                 System.out.println(String.format("--------- All Queries --------", sentenceId));
                 System.out.println(TextGenerationHelper.renderString(words));
                 ImmutableList<QuestionAnswerPair> qaPairs = generateAllQAPairs(sentenceId, words, nBestList);
-                ImmutableList<QAPairSurfaceForm> surfaceForms = QAPairAggregators.aggregateByString().aggregate(qaPairs);
-                ImmutableList<Query<QAPairSurfaceForm>> queries = QueryGenerators.maximalForwardGenerator().generate(surfaceForms);
-                for(Query<QAPairSurfaceForm> query : queries) {
-                    System.out.println(query.getPrompt());
-                    for(String option : query.getOptions()) {
-                        System.out.println("\t" + option);
+                if(args.length > 1 && args[1].equalsIgnoreCase("aggDeps")) {
+                    ImmutableList<QADependenciesSurfaceForm> surfaceForms = QAPairAggregators
+                        .aggregateBySalientDeps().aggregate(qaPairs);
+                    ImmutableList<Query<QADependenciesSurfaceForm>> queries = QueryGenerators
+                        .answerAdjunctPartitioningQueryGenerator().generate(surfaceForms);
+                    for(Query<QADependenciesSurfaceForm> query : queries) {
+                        System.out.println(query.getPrompt());
+                        for(String option : query.getOptions()) {
+                            System.out.println("\t" + option);
+                        }
+                    }
+                } else {
+                    QAPairAggregator<QAPairSurfaceForm> qaPairAggregator = QAPairAggregators.aggregateByString();
+                    ImmutableList<QAPairSurfaceForm> surfaceForms = qaPairAggregator.aggregate(qaPairs);
+                    ImmutableList<Query<QAPairSurfaceForm>> queries = QueryGenerators.maximalForwardGenerator().generate(surfaceForms);
+                    for(Query<QAPairSurfaceForm> query : queries) {
+                        System.out.println(query.getPrompt());
+                        for(String option : query.getOptions()) {
+                            System.out.println("\t" + option);
+                        }
                     }
                 }
             }
@@ -149,9 +171,9 @@ public class QuestionGenerator {
         System.out.println("--");
         System.out.println(words.get(qaPair.getPredicateIndex()));
         System.out.println(qaPair.getPredicateCategory());
-        System.out.println(words.get(qaPair.getTargetDependency().getHead()) + "\t-"
-                           + qaPair.getTargetDependency().getArgNumber() + "->\t"
-                           + words.get(qaPair.getTargetDependency().getArgument()));
+        System.out.println(Optional.ofNullable(qaPair.getTargetDependency()).map(targetDep -> words.get(targetDep.getHead())).orElse("something") + "\t-"
+                           + Optional.ofNullable(qaPair.getTargetDependency()).map(dep -> new Integer(dep.getArgNumber()).toString()).orElse("?") + "->\t"
+                           + Optional.ofNullable(qaPair.getTargetDependency()).map(targetDep -> words.get(targetDep.getArgument())).orElse("something"));
         for(ResolvedDependency dep : qaPair.getQuestionDependencies()) {
             System.out.println("\t" + words.get(dep.getHead()) + "\t-"
                                + dep.getArgNumber() + "->\t"

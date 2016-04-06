@@ -7,12 +7,15 @@ import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.qg.syntax.AnswerStructure;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
 
+import edu.uw.easysrl.syntax.grammar.Category;
+
 import static edu.uw.easysrl.util.GuavaCollectors.*;
 import static java.util.stream.Collectors.*;
 
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Helper class where we put all of our useful QAPairAggregator instances
@@ -84,6 +87,56 @@ public final class QAPairAggregators {
                                                        ImmutableList.copyOf(qaList),
                                                        targetDep);
             })
+            .collect(toImmutableList());
+    }
+
+
+    /**
+     * for the below aggregator. tells us whether we want to group based on a dependency.
+     */
+    private static boolean isDependencySalient(ResolvedDependency dep, QuestionAnswerPair qaPair) {
+        ImmutableList<Category> categories = ImmutableList.copyOf(qaPair.getParse().categories);
+        return Stream.of(dep.getHead(), dep.getArgument())
+            .anyMatch(index -> {
+                    Category cat = categories.get(index);
+                    return cat.isFunctionInto(Category.valueOf("S\\NP")) || // verb or adverb
+                        cat.isFunctionInto(Category.valueOf("NP\\NP")); // noun adjunct
+                });
+    }
+    /**
+     * Aggregates by question and answer deps connected to verbs or noun/verb adjuncts.
+     */
+    public static QAPairAggregator<QADependenciesSurfaceForm> aggregateBySalientDeps() {
+        return qaPairs -> qaPairs
+            .stream()
+            .collect(groupingBy(qaPair -> qaPair.getQuestionDependencies().stream()
+                                .filter(dep -> isDependencySalient(dep, qaPair))
+                                .collect(toImmutableSet())))
+            .entrySet()
+            .stream()
+            .flatMap(eQuestion -> eQuestion.getValue()
+                    .stream()
+                    .collect(groupingBy(qaPair -> qaPair.getAnswerDependencies().stream()
+                                        .filter(dep -> isDependencySalient(dep, qaPair))
+                                        .collect(toImmutableSet())))
+                    .entrySet()
+                    .stream()
+                    .map(eAnswer -> {
+                        assert eAnswer.getValue().size() > 0
+                                : "list in group should always be nonempty";
+                        int sentenceId = eAnswer.getValue().get(0).getSentenceId();
+                        QuestionAnswerPair bestQAPair = eAnswer.getValue().stream()
+                            .collect(maxBy((qaPair1, qaPair2) -> Double.compare(qaPair1.getParse().score, qaPair2.getParse().score)))
+                            .get();
+                        String question = bestQAPair.getQuestion();
+                        String answer = bestQAPair.getAnswer();
+                        return new QADependenciesSurfaceForm(sentenceId,
+                                                             question,
+                                                             answer,
+                                                             ImmutableList.copyOf(eAnswer.getValue()),
+                                                             eQuestion.getKey(),
+                                                             eAnswer.getKey());
+                        }))
             .collect(toImmutableList());
     }
 

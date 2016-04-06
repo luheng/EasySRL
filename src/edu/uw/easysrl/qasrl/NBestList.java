@@ -73,6 +73,7 @@ public final class NBestList {
 
     /* transformers */
 
+    // TODO still not done yet.
     // public NBestList withoutAuxiliaryAttachments() {
     //     ImmutableList.Builder<Integer> goodParses;
     //     for(int i = 0)
