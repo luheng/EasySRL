@@ -36,7 +36,8 @@ public class QAPairAggregatorUtils {
                 .entrySet()
                 .stream()
                 .sorted(Comparator.comparing(Map.Entry::getKey))
-                .map(e -> e.getKey() + ":" + e.getValue().stream().distinct().sorted()
+                .map(e -> e.getKey() + ":" + e.getValue().stream()
+                        .map(ResolvedDependency::getArgument).distinct().sorted()
                         .map(String::valueOf).collect(Collectors.joining(",")))
                 .collect(Collectors.joining("\t"));
     }

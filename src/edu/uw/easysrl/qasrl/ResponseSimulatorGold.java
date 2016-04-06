@@ -62,10 +62,11 @@ public class ResponseSimulatorGold {
                      .forEach(qstr -> {
                          // FIXME: this doesn't work for the radiobutton version.
                          final ImmutableSet<Integer> goldArgIds = goldParse.dependencies.stream()
-                                 .filter(dep -> dep.getHead() == qstr.predicateIndex ||
-                                                                dep.getHead() == qstr.targetPrepositionIndex)
-                                 // && dep.getCategory() == qstr.category
-                                // && dep.getArgNumber() == qstr.targetArgNum)
+                                 .filter(dep ->
+                                         (dep.getHead() == qstr.predicateIndex ||
+                                                 dep.getHead() == qstr.targetPrepositionIndex)
+                                    && dep.getCategory() == qstr.category
+                                    && dep.getArgNumber() == qstr.targetArgNum)
                                  .map(ResolvedDependency::getArgument)
                                  .distinct()
                                  .collect(GuavaCollectors.toImmutableSet());

@@ -10,6 +10,8 @@ import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.GuavaCollectors;
 
+import java.util.stream.Collectors;
+
 /**
  * Stores a list of QuestionStructure and AnswerStructure.
  * Created by luheng on 3/19/16.
@@ -79,6 +81,13 @@ public class QAStructureSurfaceForm implements QAPairSurfaceForm {
         this.answer     =  answer;
         this.qaPairs    =  qaPairs;
         this.questionStructures = questionStructures;
+        /*
+        this.questionStructures = questionStructures.stream()
+                .collect(Collectors.groupingBy(QuestionStructure::hashCode))
+                .values().stream()
+                .map(qs -> qs.get(0))
+                .collect(GuavaCollectors.toImmutableList());
+                */
         this.answerStructures = answerStructures;
     }
 

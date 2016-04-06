@@ -176,10 +176,12 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
         String promptStructStr = isJeopardyStyle ?
                 qaPairSurfaceForms.stream()
                         .flatMap(qa -> qa.getAnswerStructures().stream())
+                        .distinct()
                         .map(s -> s.toString(sentence))
                         .collect(Collectors.joining(" / ")) :
                 qaPairSurfaceForms.stream()
                         .flatMap(qa -> qa.getQuestionStructures().stream())
+                        .distinct()
                         .map(s -> s.toString(sentence))
                         .collect(Collectors.joining(" / "));
 

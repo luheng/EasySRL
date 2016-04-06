@@ -81,6 +81,7 @@ public class SyntheticExperiments {
             });
             */
 
+            myHITLHistory.addSentence(sentenceId);
             coreQueries.forEach(query -> {
                 ImmutableList<Integer> goldOptions = myHITLParser.getGoldOptions(query);
                 ImmutableSet<Constraint> constraints = myHITLParser.getConstraints(query, goldOptions);

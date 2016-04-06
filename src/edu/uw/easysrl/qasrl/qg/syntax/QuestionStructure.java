@@ -28,6 +28,7 @@ public class QuestionStructure {
     public final int targetArgNum;
     public final int targetPrepositionIndex;
     public final ImmutableMap<Integer, ImmutableList<Integer>> otherDependencies;
+    private final String hashString;
 
     public QuestionStructure(int predId, Category category, int argNum, Collection<ResolvedDependency> otherDeps) {
         this.predicateIndex = predId;
@@ -47,6 +48,12 @@ public class QuestionStructure {
                                 .collect(GuavaCollectors.toImmutableList())));
         targetPrepositionIndex = isPPArg && otherDependencies.containsKey(targetArgNum) ?
                 otherDependencies.get(targetArgNum).get(0) : -1;
+        hashString = predicateIndex + "\t" + category + "\t" + targetArgNum + "\t("
+                        + otherDependencies.entrySet().stream()
+                            .sorted(Comparator.comparing(Map.Entry::getKey))
+                            .map(e -> String.format("%d:%s", e.getKey(), e.getValue().stream()
+                            .map(String::valueOf).collect(Collectors.joining(","))))
+                            .collect(Collectors.joining("_")) + ")";
     }
 
     /**
@@ -72,22 +79,21 @@ public class QuestionStructure {
                                 .collect(GuavaCollectors.toImmutableList())));
         targetPrepositionIndex = isPPArg && otherDependencies.containsKey(targetArgNum) ?
                 otherDependencies.get(targetArgNum).get(0) : -1;
+        hashString = predicateIndex + "\t" + category + "\t" + targetArgNum + "\t("
+                + otherDependencies.entrySet().stream()
+                .sorted(Comparator.comparing(Map.Entry::getKey))
+                .map(e -> String.format("%d:%s", e.getKey(), e.getValue().stream()
+                        .map(String::valueOf).collect(Collectors.joining(","))))
+                .collect(Collectors.joining("_")) + ")";
+    }
+
+    public boolean equals(final Object other) {
+        return QuestionStructure.class.isInstance(other) && hashString.equals(((QuestionStructure) other).hashString);
     }
 
     @Override
-    public boolean equals(Object otherObject) {
-        if (!QuestionStructure.class.isInstance(otherObject)) {
-            return false;
-        }
-        final QuestionStructure other = (QuestionStructure) otherObject;
-        return predicateIndex == other.predicateIndex &&
-                category == other.category &&
-                targetArgNum == other.targetArgNum &&
-                otherDependencies.size() == other.otherDependencies.size() &&
-                otherDependencies.keySet().stream().allMatch(argNum ->
-                        other.otherDependencies.containsKey(argNum) &&
-                        otherDependencies.get(argNum).size() == other.otherDependencies.get(argNum).size() &&
-                        otherDependencies.get(argNum).stream().allMatch(other.otherDependencies.get(argNum)::contains));
+    public int hashCode() {
+        return hashString.hashCode();
     }
 
     /**

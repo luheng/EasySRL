@@ -68,8 +68,8 @@ public final class QAPairAggregators {
                                     qs2sEntries.get(0).question,
                                     as2sEntries.get(0).answer,
                                     as2sEntries.stream().flatMap(asts -> asts.qaList.stream()).collect(toImmutableList()),
-                                    qs2sEntries.stream().map(qsts -> qsts.structure).collect(toImmutableList()),
-                                    as2sEntries.stream().map(asts -> asts.structure).collect(toImmutableList()))
+                                    qs2sEntries.stream().map(qsts -> qsts.structure).distinct().collect(toImmutableList()),
+                                    as2sEntries.stream().map(asts -> asts.structure).distinct().collect(toImmutableList()))
                             );
                 })
                 .collect(toImmutableList());
@@ -104,8 +104,8 @@ public final class QAPairAggregators {
                                     qs2sEntries.get(0).question,
                                     as2sEntries.get(0).answer,
                                     as2sEntries.stream().flatMap(asts -> asts.qaList.stream()).collect(toImmutableList()),
-                                    qs2sEntries.stream().map(qs -> qs.structure).collect(toImmutableList()),
-                                    as2sEntries.stream().map(asts -> asts.structure).collect(toImmutableList())));
+                                    qs2sEntries.stream().map(qsts -> qsts.structure).distinct().collect(toImmutableList()),
+                                    as2sEntries.stream().map(asts -> asts.structure).distinct().collect(toImmutableList())));
                 })
                 .collect(toImmutableList());
     }

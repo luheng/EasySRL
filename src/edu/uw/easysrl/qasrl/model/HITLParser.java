@@ -119,7 +119,7 @@ public class HITLParser {
                         sentenceId, sentences.get(sentenceId), nbestLists.get(sentenceId),
                         false /* isJeopardyStyle */,
                         isCheckboxStyle,
-                        false /* usePronouns */,
+                        true /* usePronouns */,
                         queryPruningParams);
         // Assign query ids.
         IntStream.range(0, queryList.size()).forEach(i -> queryList.get(i).setQueryId(i));
