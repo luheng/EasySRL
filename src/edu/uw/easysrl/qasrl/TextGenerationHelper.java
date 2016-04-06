@@ -232,6 +232,16 @@ public class TextGenerationHelper {
         return lastCandidate;
     }
 
+    public static Optional<SyntaxTreeNode> getLowestAncestorOfNodes(SyntaxTreeNode one, SyntaxTreeNode two, SyntaxTreeNode wholeTree) {
+        final int start = Math.min(one.getStartIndex(), two.getStartIndex());
+        final int end = Math.max(one.getEndIndex(), two.getEndIndex());
+        Optional<SyntaxTreeNode> cur = Optional.of(one);
+        while(cur.isPresent() && (cur.get().getStartIndex() > start || cur.get().getEndIndex() < end)) {
+            cur = getParent(cur.get(), wholeTree);
+        }
+        return cur;
+    }
+
     /**
      * Climbs up the tree, starting at the given node,
      * until we reach a node whose category is a function into (i.e., ends on the left with)

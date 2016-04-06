@@ -5,12 +5,16 @@ import java.util.HashMap;
 import java.util.Optional;
 
 import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
+import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeLeaf;
+import edu.uw.easysrl.qasrl.Parse;
+import edu.uw.easysrl.qasrl.TextGenerationHelper;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
-public class Noun extends Predication {
+public abstract class Noun extends Predication {
 
     /* useful grammar enums */
 
@@ -38,6 +42,67 @@ public class Noun extends Predication {
         DEFINITE, INDEFINITE, FOCAL
     }
 
+    /* factory methods */
+
+    public static Noun getFullNPFromHead(Optional<Integer> headIndexOpt, Parse parse) {
+        if(!headIndexOpt.isPresent()) {
+            return Pronoun.fromString("something").get();
+        }
+        final SyntaxTreeNode tree = parse.syntaxTree;
+        final int headIndex = headIndexOpt.get();
+        final SyntaxTreeNodeLeaf headLeaf = tree.getLeaves().get(headIndex);
+        final String predicate = TextGenerationHelper.renderString(TextGenerationHelper.getNodeWords(headLeaf, Optional.empty(), Optional.empty()));
+
+        // if it's a pronoun, we're done
+        final Optional<Pronoun> pronounOpt = Pronoun.fromString(predicate);
+        if(pronounOpt.isPresent()) {
+            return pronounOpt.get();
+        }
+
+        // otherwise, we have a lot more work to do.
+
+        /* recover the whole noun phrase. */
+        final Optional<SyntaxTreeNode> npNodeOpt = TextGenerationHelper.getLowestAncestorFunctionIntoCategory(headLeaf, Category.NP, tree);
+        assert npNodeOpt.isPresent()
+            : "the head of an NP can always be traced up to a function into an NP";
+        final SyntaxTreeNode npNode = npNodeOpt.get();
+        assert npNode.getCategory().matches(Category.valueOf("NP"))
+            : "climbing up to function into NP should always yield NP, since we don't have NPs that take arguments";
+
+        /* extract grammatical features. */
+        // this is fine because none of our nouns take arguments, right?
+        final ImmutableMap<Integer, Predication> argPreds = ImmutableMap.of();
+        // only pronouns are case marked
+        final Optional<Case> caseMarking = Optional.empty();
+        // TODO we should predict this.
+        final Optional<Number> number = null;
+        // TODO we should predict this.
+        final Optional<Gender> gender = null;
+        // only pronouns can be non-third person
+        final Person person = Person.THIRD;
+        // TODO we should predict this.
+        final Definiteness definiteness = null;
+
+        /* include an of-phrase if necessary. */
+        final ImmutableList<String> words;
+        if(npNode.getEndIndex() < tree.getEndIndex() &&
+           tree.getLeaves().get(npNode.getEndIndex()).getWord().equals("of")) {
+            final SyntaxTreeNode ofNode = tree.getLeaves().get(npNode.getEndIndex());
+            final Optional<SyntaxTreeNode> npNodeWithOfOpt = TextGenerationHelper.getLowestAncestorOfNodes(npNode, ofNode, tree);
+            if(npNodeWithOfOpt.isPresent()) {
+                words = ImmutableList.copyOf(TextGenerationHelper.getNodeWords(npNodeWithOfOpt.get(), Optional.empty(), Optional.empty()));
+            } else {
+                words = ImmutableList.copyOf(TextGenerationHelper.getNodeWords(npNode, Optional.empty(), Optional.empty()));
+            }
+        } else {
+            words = ImmutableList.copyOf(TextGenerationHelper.getNodeWords(npNode, Optional.empty(), Optional.empty()));
+        }
+        return new BasicNoun(predicate, Category.NP,
+                             ImmutableMap.of(),
+                             caseMarking, number, gender, person, definiteness,
+                             words);
+    }
+
     /* public API */
 
     // overrides
@@ -52,11 +117,7 @@ public class Noun extends Predication {
         return new QuestionData(wh, placeholder, answer);
     }
 
-    @Override
-    public ImmutableList<String> getCompletePhrase() {
-        assert false;
-        return null;
-    }
+    // getCompletePhrase is left abstract
 
     // getters
 
@@ -108,44 +169,20 @@ public class Noun extends Predication {
             .withDefiniteness(Definiteness.FOCAL);
     }
 
-    // transformers -- subclasses should override
+    // transformers -- subclasses need to override
 
-    public Noun withCase(Case caseMarking) {
-        return this.withCase(Optional.of(caseMarking));
-    }
+    public abstract Noun withCase(Case caseMarking);
+    public abstract Noun withCase(Optional<Case> caseMarking);
 
-    public Noun withCase(Optional<Case> caseMarking) {
-        return new Noun(getPredicate(), getPredicateCategory(), getArgPreds(),
-                        caseMarking, number, gender, person, definiteness);
-    }
+    public abstract Noun withNumber(Number number);
+    public abstract Noun withNumber(Optional<Number> number);
 
-    public Noun withNumber(Number number) {
-        return this.withNumber(Optional.of(number));
-    }
+    public abstract Noun withGender(Gender gender);
+    public abstract Noun withGender(Optional<Gender> gender);
 
-    public Noun withNumber(Optional<Number> number) {
-        return new Noun(getPredicate(), getPredicateCategory(), getArgPreds(),
-                        caseMarking, number, gender, person, definiteness);
-    }
+    public abstract Noun withPerson(Person person);
 
-    public Noun withGender(Gender gender) {
-        return this.withGender(Optional.of(gender));
-    }
-
-    public Noun withGender(Optional<Gender> gender) {
-        return new Noun(getPredicate(), getPredicateCategory(), getArgPreds(),
-                        caseMarking, number, gender, person, definiteness);
-    }
-
-    public Noun withPerson(Person person) {
-        return new Noun(getPredicate(), getPredicateCategory(), getArgPreds(),
-                        caseMarking, number, gender, person, definiteness);
-    }
-
-    public Noun withDefiniteness(Definiteness definiteness) {
-        return new Noun(getPredicate(), getPredicateCategory(), getArgPreds(),
-                        caseMarking, number, gender, person, definiteness);
-    }
+    public abstract Noun withDefiniteness(Definiteness definiteness);
 
     /* protected methods and fields */
 
