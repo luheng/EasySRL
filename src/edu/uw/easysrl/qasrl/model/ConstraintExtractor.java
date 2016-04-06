@@ -1,20 +1,11 @@
 package edu.uw.easysrl.qasrl.model;
 
 import com.google.common.collect.*;
-import edu.uw.easysrl.qasrl.corpora.PronounList;
-import edu.uw.easysrl.qasrl.experiments.DebugPrinter;
-import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
-import edu.uw.easysrl.qasrl.qg.syntax.AnswerStructure;
-import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
-import edu.uw.easysrl.qasrl.query.QueryGeneratorUtils;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
-import edu.uw.easysrl.syntax.grammar.Category;
-import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 /**
  * TODO: Need to refactor.

@@ -1,6 +1,6 @@
 package edu.uw.easysrl.qasrl.annotation;
 
-import edu.uw.easysrl.qasrl.corpora.PronounList;
+import edu.uw.easysrl.qasrl.qg.util.PronounList;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.Query;

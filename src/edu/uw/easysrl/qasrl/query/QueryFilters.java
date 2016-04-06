@@ -33,6 +33,7 @@ public class QueryFilters {
                 .filter(query -> {
                     final ImmutableList<QuestionStructure> qstrs = query.getQAPairSurfaceForms().stream()
                             .flatMap(qa -> qa.getQuestionStructures().stream())
+                            .distinct()
                             .collect(GuavaCollectors.toImmutableList());
                     return (!queryPruningParameters.skipSAdjQuestions ||
                                 !qstrs.stream().anyMatch(q -> q.category.isFunctionInto(Category.valueOf("S[adj]")))) &&
@@ -72,6 +73,7 @@ public class QueryFilters {
                 .collect(toImmutableList());
     }
 
+    // FIXME
     public static QueryFilter<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> jeopardyPPQueryFilter() {
         return (queries, nBestList, queryPruningParameters) -> queries.stream()
                 .map(query -> {

@@ -8,11 +8,14 @@ import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
 import edu.uw.easysrl.qasrl.annotation.QualityControl;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
+import edu.uw.easysrl.qasrl.qg.util.VerbHelper;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
+import edu.uw.easysrl.semantics.lexicon.CopulaLexicon;
 import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
@@ -104,12 +107,42 @@ public class HITLParser {
         return queryList;
     }
 
-    /**
-     * Pre-set "recipes" for query generation.
-     * @param sentenceId
-     * @param isCheckboxStyle
-     * @return
-     */
+    /****************************** Pre-set "recipes" for query generation. *************************/
+
+    public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getPronounCoreArgQueriesForSentence(int sentenceId) {
+        final QueryPruningParameters queryPruningParams = new QueryPruningParameters(queryPruningParameters);
+        queryPruningParams.skipPPQuestions = true;
+        final ImmutableList<String> sentence = sentences.get(sentenceId);
+
+        ImmutableList<ScoredQuery<QAStructureSurfaceForm>> copulaQueries = ExperimentUtils.generateAllQueries(
+                    sentenceId, sentence, nbestLists.get(sentenceId),
+                    false /* isJeopardyStyle */,
+                    true  /* checkbox style */,
+                    false /* usePronouns */,
+                    queryPruningParams)
+                .stream().filter(query -> {
+                    final int predicateId = query.getQAPairSurfaceForms().get(0).getQuestionStructures().get(0).predicateIndex;
+                    return VerbHelper.isCopulaVerb(sentence.get(predicateId));
+                }).collect(GuavaCollectors.toImmutableList());
+
+        List<ScoredQuery<QAStructureSurfaceForm>> queryList = ExperimentUtils.generateAllQueries(
+                        sentenceId, sentence, nbestLists.get(sentenceId),
+                        false /* isJeopardyStyle */,
+                        true  /* checkbox style */,
+                        true /* usePronouns */,
+                        queryPruningParams)
+                .stream().filter(query -> {
+                    final int predicateId = query.getQAPairSurfaceForms().get(0).getQuestionStructures().get(0).predicateIndex;
+                    return !VerbHelper.isCopulaVerb(sentence.get(predicateId));
+                }).collect(Collectors.toList());
+
+        queryList.addAll(copulaQueries);
+
+        // Assign query ids.
+        IntStream.range(0, queryList.size()).forEach(i -> queryList.get(i).setQueryId(i));
+        return ImmutableList.copyOf(queryList);
+    }
+
     public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getCoreArgumentQueriesForSentence(int sentenceId,
                                                                                                 boolean isCheckboxStyle) {
         QueryPruningParameters queryPruningParams = new QueryPruningParameters(queryPruningParameters);
@@ -119,7 +152,7 @@ public class HITLParser {
                         sentenceId, sentences.get(sentenceId), nbestLists.get(sentenceId),
                         false /* isJeopardyStyle */,
                         isCheckboxStyle,
-                        true /* usePronouns */,
+                        false /* usePronouns */,
                         queryPruningParams);
         // Assign query ids.
         IntStream.range(0, queryList.size()).forEach(i -> queryList.get(i).setQueryId(i));

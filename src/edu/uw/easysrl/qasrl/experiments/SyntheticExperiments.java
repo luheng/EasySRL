@@ -57,7 +57,7 @@ public class SyntheticExperiments {
         AtomicInteger sentenceCounter = new AtomicInteger(0);
         for (int sentenceId : myHITLParser.getAllSentenceIds()) {
             ImmutableList<ScoredQuery<QAStructureSurfaceForm>> coreQueries = myHITLParser
-                    .getCoreArgumentQueriesForSentence(sentenceId, isCheckboxVersion);
+                    .getPronounCoreArgQueriesForSentence(sentenceId);
 
             ImmutableList<ScoredQuery<QAStructureSurfaceForm>> adjunctQueries = myHITLParser
                     .getAdjunctQueriesForSentence(sentenceId, isCheckboxVersion);
@@ -90,9 +90,9 @@ public class SyntheticExperiments {
 
                 ImmutableList<Integer> onebestOptions = myHITLParser.getOneBestOptions(query);
                 if (goldOptions.containsAll(onebestOptions) && onebestOptions.containsAll(goldOptions)) {
-                    ppQueryAcc.getAndAdd(1);
+                    coreQueryAcc.getAndAdd(1);
                 }
-                numPPQueries.getAndAdd(1);
+                numCoreQueries.getAndAdd(1);
                 //System.out.println(1.0 * ppQueryAcc.get() / numPPQueries.get());
             });
 
