@@ -35,12 +35,12 @@ public class ConstraintExtractor {
                 if (!attachments.contains(a[0], a[1])) {
                     attachments.put(a[0], a[1], 0);
                 }
-                if (!attachments.contains(a[1], a[0])) {
-                    attachments.put(a[1], a[0], 0);
-                }
+                //if (!attachments.contains(a[1], a[0])) {
+                //    attachments.put(a[1], a[0], 0);
+                //}
                 if (chosen) {
                     attachments.put(a[0], a[1], 1);
-                    attachments.put(a[1], a[0], 1);
+                //    attachments.put(a[1], a[0], 1);
                 }
             });
         }

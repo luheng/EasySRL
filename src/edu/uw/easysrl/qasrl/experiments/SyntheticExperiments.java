@@ -18,7 +18,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class SyntheticExperiments {
     // Parameters.
     private static int nBest = 100;
-    private static int maxNumSentences = 1000;
+    private static int maxNumSentences = 2000;
 
     // Shared data: nBestList, sentences, etc.
     private static HITLParser myHITLParser;

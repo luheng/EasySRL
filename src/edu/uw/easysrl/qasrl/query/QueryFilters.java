@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
 import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -29,6 +30,15 @@ public class QueryFilters {
 
     public static QueryFilter<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> scoredQueryFilter() {
         return (queries, nBestList, queryPruningParameters) -> queries.stream()
+                .filter(query -> {
+                    final ImmutableList<QuestionStructure> qstrs = query.getQAPairSurfaceForms().stream()
+                            .flatMap(qa -> qa.getQuestionStructures().stream())
+                            .collect(GuavaCollectors.toImmutableList());
+                    return (!queryPruningParameters.skipSAdjQuestions ||
+                                !qstrs.stream().anyMatch(q -> q.category.isFunctionInto(Category.valueOf("S[adj]")))) &&
+                            (!queryPruningParameters.skipPPQuestions || qstrs.stream()
+                                    .anyMatch(q -> !propositionalCategories.contains(q.category)));
+                })
                 .map(query -> {
                     query.computeScores(nBestList);
                     // Prune answer options.
@@ -57,9 +67,7 @@ public class QueryFilters {
                     query.computeScores(nBestList);
                     return query.getPromptScore() > queryPruningParameters.minPromptConfidence
                             && query.getOptionEntropy() > queryPruningParameters.minOptionEntropy
-                            && (!queryPruningParameters.skipBinaryQueries || query.getQAPairSurfaceForms().size() > 1)
-                            && (!queryPruningParameters.skipPPQuestions || !query.getPredicateCategory().isPresent()
-                                || !propositionalCategories.contains(query.getPredicateCategory().get()));
+                            && (!queryPruningParameters.skipBinaryQueries || query.getQAPairSurfaceForms().size() > 1);
                 })
                 .collect(toImmutableList());
     }

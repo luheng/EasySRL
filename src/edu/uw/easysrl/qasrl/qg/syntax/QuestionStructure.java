@@ -74,6 +74,22 @@ public class QuestionStructure {
                 otherDependencies.get(targetArgNum).get(0) : -1;
     }
 
+    @Override
+    public boolean equals(Object otherObject) {
+        if (!QuestionStructure.class.isInstance(otherObject)) {
+            return false;
+        }
+        final QuestionStructure other = (QuestionStructure) otherObject;
+        return predicateIndex == other.predicateIndex &&
+                category == other.category &&
+                targetArgNum == other.targetArgNum &&
+                otherDependencies.size() == other.otherDependencies.size() &&
+                otherDependencies.keySet().stream().allMatch(argNum ->
+                        other.otherDependencies.containsKey(argNum) &&
+                        otherDependencies.get(argNum).size() == other.otherDependencies.get(argNum).size() &&
+                        otherDependencies.get(argNum).stream().allMatch(other.otherDependencies.get(argNum)::contains));
+    }
+
     /**
      * * Return all the dependencies that's relevant to this structure.
      */

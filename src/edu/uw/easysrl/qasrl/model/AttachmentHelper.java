@@ -91,8 +91,14 @@ public class AttachmentHelper {
             }
 
             // Add Attachment(q).
-            qDeps.values().forEach(argList -> argList
-                    .forEach(argId -> attachments.add(new int[] { predicateIndex, argId })));
+            qDeps.entrySet().forEach(e -> e.getValue()
+                    .forEach(argId -> {
+                        attachments.add(new int[] { predicateIndex, argId });
+                        final int argNum = e.getKey();
+                        //if (category.getArgument(argNum) == Category.PP) {
+                        //    attachments.add(new int[] { argId, predicateIndex });
+                        //}
+                    }));
 
             // Add attachment (q, a) (target dependency).
             Set<Integer> skipArgIds = new HashSet<>();
@@ -100,11 +106,17 @@ public class AttachmentHelper {
                 skipArgIds.addAll(getPronounArgumentIds(qa));
             }
             final int qaDepHead = ppId >= 0 ? ppId : predicateIndex;
+            //final boolean isVerbAdjunct = category.isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)"));
             qa.getAnswerStructures().stream()
                     .flatMap(astr -> astr.argumentIndices.stream())
                     .distinct()
                     .filter(id -> !skipArgIds.contains(id))
-                    .forEach(argId -> attachments.add(new int[]{ qaDepHead, argId }));
+                    .forEach(argId -> {
+                        attachments.add(new int[]{ qaDepHead, argId });
+                        //if (isVerbAdjunct) {
+                        //    attachments.add(new int[] { argId, qaDepHead });
+                        //}
+                    });
         }
         return attachments;
     }

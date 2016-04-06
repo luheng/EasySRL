@@ -13,6 +13,7 @@ public class QueryPruningParameters {
     public int maxNumOptionsPerQuery = 6;
 
     public boolean skipBinaryQueries = true;
+    public boolean skipSAdjQuestions = true;
     public boolean skipPPQuestions = false;
     public boolean skipQueriesWithPronounOptions = false;
 
@@ -27,6 +28,7 @@ public class QueryPruningParameters {
         this.skipBinaryQueries = other.skipBinaryQueries;
         this.skipPPQuestions = other.skipPPQuestions;
         this.skipQueriesWithPronounOptions = other.skipQueriesWithPronounOptions;
+        this.skipSAdjQuestions = other.skipSAdjQuestions;
     }
 
     public String toString() {

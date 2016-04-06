@@ -55,12 +55,12 @@ public class ConstrainedSupertagFactoredModel extends SupertagFactoredModel {
                         Constraint.AttachmentConstraint c = (Constraint.AttachmentConstraint) constraint;
                         final int headId = c.getHeadId();
                         final int argId = c.getArgId();
-                        // Undirected attachment constraint.
                         final double strength = attachmentConstraints.contains(headId, argId) ?
                                 Math.max(attachmentConstraints.get(headId, argId), c.getStrength()) :
                                 c.getStrength();
                         attachmentConstraints.put(headId, argId, strength);
-                        attachmentConstraints.put(argId, headId, strength);
+                        // Undirected attachment constraint.
+                        // attachmentConstraints.put(argId, headId, strength);
                     }
                 });
         // Normalize attachment evidence.
