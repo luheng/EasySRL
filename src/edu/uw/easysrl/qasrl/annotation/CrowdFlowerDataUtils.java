@@ -167,4 +167,37 @@ public class CrowdFlowerDataUtils {
 
         csvPrinter.printRecord(csvRow);
     }
+
+    public static void printRecordToCSVFile(final RecordedAnnotation annotation,
+                                            final int lineCounter,
+                                            final boolean highlightPredicate,
+                                            final CSVPrinter csvPrinter) throws IOException {
+        // Print to CSV files.
+        // "query_id", "sent_id", "sentence", "query_prompt", "options", "_golden ", "choice_gold", "choice_gold_reason",
+        // "query_key", "jeopardy_style", "query_confidence", "query_uncertainty"
+        int predicateIndex = annotation.predicateId;
+        int sentenceId = annotation.sentenceId;
+        ImmutableList<String> sentence = ImmutableList.copyOf(annotation.sentenceString.split("\\s+"));
+        final String sentenceStr = TextGenerationHelper.renderHTMLSentenceString(sentence, predicateIndex, highlightPredicate);
+        final List<String> options = annotation.optionStrings;
+        List<String> csvRow = new ArrayList<>();
+        csvRow.add(String.valueOf(lineCounter)); // Query id
+
+        csvRow.add(String.valueOf(sentenceId));
+        csvRow.add(String.valueOf(sentenceStr));
+        csvRow.add(annotation.queryPrompt);
+        csvRow.add(options.stream().collect(Collectors.joining(answerDelimiter)));
+
+        csvRow.add("TRUE");
+        csvRow.add(annotation.userOptionIds.stream().map(options::get).collect(Collectors.joining("\n")));
+        csvRow.add(annotation.comment);
+
+        // Query key.
+        csvRow.add(String.format("pid=%d", predicateIndex));
+        csvRow.add(String.format("%d", annotation.optionStrings.get(0).endsWith("?") ? 1 : 0)); // jeopardy-style
+        csvRow.add("1.0"); // prompt score
+        csvRow.add("0.0"); // entropy
+
+        csvPrinter.printRecord(csvRow);
+    }
 }

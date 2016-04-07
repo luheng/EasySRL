@@ -57,7 +57,8 @@ public class QueryGenerators {
                                                                   qa2.getArgumentIndices().get(0)))
                             .collect(GuavaCollectors.toImmutableList());
                     List<String> options = sortedQAList.stream().map(QAStructureSurfaceForm::getAnswer).collect(toList());
-                    options.add(QueryGeneratorUtils.kBadQuestionOptionString);
+                    //options.add(QueryGeneratorUtils.kBadQuestionOptionString);
+                    options.add(QueryGeneratorUtils.kNoneApplicableString);
                     return new ScoredQuery<>(qaList.get(0).getSentenceId(),
                                              qaList.get(0).getQuestion(),
                                              ImmutableList.copyOf(options),

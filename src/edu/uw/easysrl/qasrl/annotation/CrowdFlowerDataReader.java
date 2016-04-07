@@ -9,6 +9,7 @@ import org.apache.commons.csv.CSVRecord;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
@@ -24,7 +25,8 @@ public class CrowdFlowerDataReader {
         List<RecordedAnnotation> annotations = new ArrayList<>();
         for (CSVRecord record : records) {
             // Skip gold (test questions).
-            if (record.get("_golden").equals("true")) {
+            if (record.get("_golden").equalsIgnoreCase("true") ||
+                    (record.isMapped("orig_golden") && record.get("orig_golden").equalsIgnoreCase("true"))) {
                 continue;
             }
             // TODO: move this RecordedAnnotation.
@@ -89,6 +91,71 @@ public class CrowdFlowerDataReader {
         //double[] iaa = computeAgreement(alignedAnnotations, maxNumAnnotators);
         //InterAnnotatorAgreement.printKappa(iaa);
         return ImmutableList.copyOf(alignedAnnotations);
+    }
+
+    private static int parseIntOrElse(final String toParse, int elseInt) {
+        try {
+            return Integer.parseInt(toParse);
+        } catch (NumberFormatException e) {
+            return elseInt;
+        }
+    }
+
+    /**
+     * Read Crowdflower format test questions from .csv file.
+     * @param filePath
+     * @return
+     * @throws IOException
+     */
+    public static ImmutableList<RecordedAnnotation> readTestQuestionsFromFile(String filePath) throws IOException {
+        final Iterable<CSVRecord> records = CSVFormat.DEFAULT.withHeader().parse(new FileReader(filePath));
+        List<RecordedAnnotation> testQuestions = new ArrayList<>();
+        for (CSVRecord record : records) {
+            // Read only gold questions.
+            if (!record.get("_golden").equalsIgnoreCase("true")) {
+                continue;
+            }
+            RecordedAnnotation annotation = new RecordedAnnotation();
+            annotation.iterationId = -1; // unknown
+            annotation.sentenceId = parseIntOrElse(record.get("sent_id"), -1);
+            annotation.sentenceString = record.get("sentence");
+
+            if (record.isMapped("pred_id")) {
+                annotation.predicateId = parseIntOrElse(record.get("pred_id"), -1);
+                annotation.predicateString = record.get("pred_head");
+                final String[] qkeyInfo = record.get("question_key").split("\\.");
+                annotation.predicateCategory = Category.valueOf(qkeyInfo[1]);
+                annotation.argumentNumber = parseIntOrElse(qkeyInfo[2], -1);
+            } else {
+                String qkey = record.get("query_key");
+                annotation.predicateId = parseIntOrElse(qkey.split(":")[0], -1);
+            }
+
+            annotation.queryId = parseIntOrElse(record.get("query_id"), -1);
+            annotation.queryPrompt = record.isMapped("question") ?
+                    record.get("question") :
+                    record.get("query_prompt");
+
+            final String[] options = record.isMapped("answers") ?
+                    record.get("answers").split("\n") :
+                    record.get("options").split("\n");
+            Collections.addAll(annotation.optionStrings, options);
+
+            annotation.userOptions = ImmutableList.copyOf(record.get("choice_gold").split("\n"));
+            annotation.userOptionIds = IntStream.range(0, options.length)
+                    .boxed()
+                    .filter(id -> annotation.userOptions.contains(options[id]))
+                    .collect(GuavaCollectors.toImmutableList());
+            if (annotation.userOptionIds.size() == 0) {
+                continue;
+            }
+            annotation.goldOptionIds = ImmutableList.copyOf(annotation.userOptionIds);
+            annotation.comment = record.get("choice_gold_reason");
+
+            testQuestions.add(annotation);
+        }
+        System.out.println("Read " + testQuestions.size() + " test questions.");
+        return ImmutableList.copyOf(testQuestions);
     }
 
     public static void main(String[] args) throws IOException {

@@ -4,7 +4,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
-import edu.uw.easysrl.qasrl.annotation.QualityControl;
+import edu.uw.easysrl.qasrl.annotation.AnnotationUtils;
 import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils.*;
 import edu.uw.easysrl.qasrl.model.Constraint;
@@ -96,7 +96,7 @@ public class ReparsingExperiment {
                 if (annotation == null) {
                     continue;
                 }
-                int[] optionDist = QualityControl.getUserResponses(query, annotation);
+                int[] optionDist = AnnotationUtils.getUserResponseDistribution(query, annotation);
                 ImmutableList<Integer> goldOptions    = myHTILParser.getGoldOptions(query),
                                        oneBestOptions = myHTILParser.getOneBestOptions(query),
                                        oracleOptions  = myHTILParser.getOracleOptions(query),

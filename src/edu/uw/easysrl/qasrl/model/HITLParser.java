@@ -5,13 +5,12 @@ import com.google.common.collect.ImmutableSet;
 import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
-import edu.uw.easysrl.qasrl.annotation.QualityControl;
+import edu.uw.easysrl.qasrl.annotation.AnnotationUtils;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.util.VerbHelper;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
-import edu.uw.easysrl.semantics.lexicon.CopulaLexicon;
 import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.*;
@@ -121,7 +120,7 @@ public class HITLParser {
                     false /* usePronouns */,
                     queryPruningParams)
                 .stream().filter(query -> {
-                    final int predicateId = query.getQAPairSurfaceForms().get(0).getQuestionStructures().get(0).predicateIndex;
+                    final int predicateId = query.getPredicateId().getAsInt();
                     return VerbHelper.isCopulaVerb(sentence.get(predicateId));
                 }).collect(GuavaCollectors.toImmutableList());
 
@@ -132,7 +131,7 @@ public class HITLParser {
                         true /* usePronouns */,
                         queryPruningParams)
                 .stream().filter(query -> {
-                    final int predicateId = query.getQAPairSurfaceForms().get(0).getQuestionStructures().get(0).predicateIndex;
+                    final int predicateId = query.getPredicateId().getAsInt();
                     return !VerbHelper.isCopulaVerb(sentence.get(predicateId));
                 }).collect(Collectors.toList());
 
@@ -176,7 +175,7 @@ public class HITLParser {
                         isCheckboxStyle,
                         false /* usePronouns */,
                         queryPruningParams)
-                .stream().filter(QualityControl::queryIsPrepositional)
+                .stream().filter(AnnotationUtils::queryIsPrepositional)
                 .collect(GuavaCollectors.toImmutableList());
         // Assign query ids.
         IntStream.range(0, queryList.size())
@@ -257,7 +256,7 @@ public class HITLParser {
 
     public ImmutableList<Integer> getUserOptions(final ScoredQuery<QAStructureSurfaceForm> query,
                                                  final AlignedAnnotation annotation) {
-        final int[] optionDist = QualityControl.getUserResponses(query, annotation);
+        final int[] optionDist = AnnotationUtils.getUserResponseDistribution(query, annotation);
         return IntStream.range(0, query.getOptions().size())
                 .filter(i -> (!query.isJeopardyStyle() && optionDist[i] >= reparsingParameters.minAgreement) ||
                              (query.isJeopardyStyle()

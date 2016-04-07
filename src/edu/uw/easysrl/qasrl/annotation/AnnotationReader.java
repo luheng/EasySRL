@@ -43,14 +43,14 @@ public class AnnotationReader {
                 // Example: \t [prompt]: 0.84 {prompt} {prompt head}
                 line = reader.readLine().trim();
                 info = line.split("\\t");
-                curr.queryPrompt = info[2];
+                curr.queryPrompt = info[1].trim().isEmpty() ? info[3] : info[2];
 
                 // \t [2] GU          0.16  None of the above.    11,21,28,37,41,50,52,62,66-67,82-83,91,93,96,99
                 List<Integer> optionIds = new ArrayList<>();
                 while ((line = reader.readLine()) != null) {
                     line = line.trim();
                     // Options ends with empty line.
-                    if (line.isEmpty()) {
+                    if (line.isEmpty() || line.trim().startsWith("[reason]:")) {
                         break;
                     }
                     info = line.split("\\t");
@@ -63,7 +63,9 @@ public class AnnotationReader {
                 curr.goldOptionIds = ImmutableList.of();
 
                 // \t Reason: {reason}
-                line = reader.readLine().trim();
+                if (line.isEmpty()) {
+                    line = reader.readLine().trim();
+                }
                 curr.comment = line.split("\\t")[1];
 
                 // Empty line.

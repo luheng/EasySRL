@@ -15,10 +15,10 @@ import java.util.stream.IntStream;
  * Created by luheng on 3/22/16.
  */
 public class QueryGeneratorUtils {
-    public static String kBadQuestionOptionString = "Bad question.";
+    public static String kBadQuestionOptionString = "Bad Question.";
     public static String kUnlistedAnswerOptionString = "Answer is not listed.";
-    // For jeopardy-style.
     public static String kNoneApplicableString = "None of the above.";
+    public static String kOldBadQuestionOptionString = "Question is not valid.";
 
     static ImmutableSet<Integer> getParseIdsForQAPair(final QAStructureSurfaceForm qaPair,
                                                       final NBestList nBestList) {
@@ -38,6 +38,7 @@ public class QueryGeneratorUtils {
     }
 
     static boolean isNAOption(final String optionStr) {
-        return optionStr.equals(kBadQuestionOptionString) || optionStr.equals(kNoneApplicableString);
+        return optionStr.equals(kBadQuestionOptionString) || optionStr.equals(kNoneApplicableString) ||
+                optionStr.equals(kOldBadQuestionOptionString);
     }
 }
