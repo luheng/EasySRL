@@ -9,7 +9,7 @@ import com.google.common.collect.ImmutableList;
  * Most basic instance of QAPairSurfaceForm, with just the bare necessities.
  * Created by julianmichael on 3/17/16.
  */
-public final class BasicQAPairSurfaceForm implements QAPairSurfaceForm {
+public class BasicQAPairSurfaceForm implements QAPairSurfaceForm {
     @Override
     public int getSentenceId() {
         return sentenceId;

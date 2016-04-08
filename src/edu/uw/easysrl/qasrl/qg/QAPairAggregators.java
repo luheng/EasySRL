@@ -1,9 +1,12 @@
 package edu.uw.easysrl.qasrl.qg;
 
 import com.google.common.collect.*;
+import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.qg.surfaceform.*;
 
 import static edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils.*;
+import edu.uw.easysrl.syntax.grammar.Category;
+
 import static edu.uw.easysrl.util.GuavaCollectors.*;
 import static java.util.stream.Collectors.*;
 
@@ -39,6 +42,101 @@ public final class QAPairAggregators {
                                 eAnswer.getKey(),
                                 ImmutableList.copyOf(eAnswer.getValue()));
                     }))
+            .collect(toImmutableList());
+    }
+
+    public static QAPairAggregator<TargetDependencySurfaceForm> aggregateByTargetDependency() {
+        return qaPairs -> qaPairs
+            .stream()
+            .collect(groupingBy(QuestionAnswerPair::getTargetDependency))
+            .entrySet()
+            .stream()
+            .map(e -> {
+                final ResolvedDependency targetDep = e.getKey();
+                final Collection<QuestionAnswerPair> qaList = e.getValue();
+                assert qaList.size() > 0
+                        : "list in group should always be nonempty";
+                int sentenceId = e.getValue().get(0).getSentenceId();
+                // plurality vote on question and answer
+                String pluralityQuestion = HashMultiset
+                        .create(qaList.stream()
+                                .map(QuestionAnswerPair::getQuestion)
+                                .collect(toList()))
+                        .entrySet()
+                        .stream()
+                        .max(Comparator.comparing(Multiset.Entry::getCount))
+                        .map(Multiset.Entry::getElement)
+                        .get(); // there should always be one because our list is nonempty
+                String pluralityAnswer = HashMultiset
+                        .create(qaList.stream()
+                                .map(QuestionAnswerPair::getAnswer)
+                                .collect(toList()))
+                        .entrySet()
+                        .stream()
+                        .max(Comparator.comparing(Multiset.Entry::getCount))
+                        .map(Multiset.Entry::getElement)
+                        .get(); // there should always be one because our list is nonempty
+                return new TargetDependencySurfaceForm(sentenceId,
+                                                       pluralityQuestion,
+                                                       pluralityAnswer,
+                                                       ImmutableList.copyOf(qaList),
+                                                       targetDep);
+            })
+            .collect(toImmutableList());
+    }
+
+
+    /**
+     * for the below aggregator. tells us whether we want to group based on a dependency.
+     */
+    private static boolean isDependencySalient(ResolvedDependency dep, QuestionAnswerPair qaPair) {
+        ImmutableList<Category> categories = ImmutableList.copyOf(qaPair.getParse().categories);
+        ImmutableList<String> words = qaPair.getParse().syntaxTree.getLeaves().stream()
+            .map(l -> l.getWord())
+            .collect(toImmutableList());
+        int index = dep.getHead();
+        Category cat = categories.get(index);
+        return (qaPair.getTargetDependency() != null && dep.equals(qaPair.getTargetDependency())) ||
+            (cat.isFunctionInto(Category.valueOf("S\\NP")) && !cat.isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)"))) ||
+            (cat.isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)")) && dep.getArgNumber() == 2) ||
+            (cat.isFunctionInto(Category.valueOf("NP\\NP")) && dep.getArgNumber() == 1 && !words.get(index).equalsIgnoreCase("of"));
+            // (Category.valueOf("((S\\NP)\\(S\\NP))/NP").matches(cat) && dep.getArgNumber() == 2) ||
+            // (Category.valueOf("(NP\\NP)/NP").matches(cat) && dep.getArgNumber() == 1 && !words.get(index).equalsIgnoreCase("of"));
+    }
+    /**
+     * Aggregates by question and answer deps connected to verbs or noun/verb adjuncts.
+     */
+    public static QAPairAggregator<QADependenciesSurfaceForm> aggregateBySalientDeps() {
+        return qaPairs -> qaPairs
+            .stream()
+            .collect(groupingBy(qaPair -> qaPair.getQuestionDependencies().stream()
+                                .filter(dep -> isDependencySalient(dep, qaPair))
+                                .collect(toImmutableSet())))
+            .entrySet()
+            .stream()
+            .flatMap(eQuestion -> eQuestion.getValue()
+                    .stream()
+                    .collect(groupingBy(qaPair -> qaPair.getAnswerDependencies().stream()
+                                        .filter(dep -> isDependencySalient(dep, qaPair))
+                                        .collect(toImmutableSet())))
+                    .entrySet()
+                    .stream()
+                    .map(eAnswer -> {
+                        assert eAnswer.getValue().size() > 0
+                                : "list in group should always be nonempty";
+                        int sentenceId = eAnswer.getValue().get(0).getSentenceId();
+                        QuestionAnswerPair bestQAPair = eAnswer.getValue().stream()
+                            .collect(maxBy((qaPair1, qaPair2) -> Double.compare(qaPair1.getParse().score, qaPair2.getParse().score)))
+                            .get();
+                        String question = bestQAPair.getQuestion();
+                        String answer = bestQAPair.getAnswer();
+                        return new QADependenciesSurfaceForm(sentenceId,
+                                                             question,
+                                                             answer,
+                                                             ImmutableList.copyOf(eAnswer.getValue()),
+                                                             eQuestion.getKey(),
+                                                             eAnswer.getKey());
+                        }))
             .collect(toImmutableList());
     }
 
