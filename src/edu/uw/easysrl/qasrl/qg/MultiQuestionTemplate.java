@@ -684,18 +684,21 @@ public class MultiQuestionTemplate {
                 Stream<BasicQuestionAnswerPair> nounAnswerQAPairsWithPPs = ppTWDs.stream()
                     .flatMap(ppTWD -> Stream.concat(justNounAnswers.stream(), modifiedNounAnswers.stream())
                     .map(answerTWD -> {
+                            ResolvedDependency ppDep = ppDepOpt.get(); // must be present at this part of the code
                             ImmutableList<String> nounQuestion = Stream
                             .concat(nounQuestionWithoutArgs.stream(), ppTWD.tokens.stream())
                             .collect(toImmutableList());
                             ImmutableSet<ResolvedDependency> questionDeps = new ImmutableSet.Builder<ResolvedDependency>()
                             .addAll(subject.dependencies)
+                            .addAll(subjDependencyOpt.isPresent() ? ImmutableList.of(subjDependencyOpt.get()) : ImmutableList.of())
                             .addAll(ppTWD.dependencies)
+                            .add(ppDep)
                             .build();
                             return new BasicQuestionAnswerPair(sentenceId, parseId, parse,
                                                                predicateIndex, predicateCategory, 1, // TODO ? change predicate index and cat to modifier's in that case?
                                                                predicateIndex, null, // maybe should get rid of QuestionType?
                                                                questionDeps, nounQuestion,
-                                                               subjDependencyOpt.orElse(null), answerTWD);
+                                                               objDep, answerTWD);
                         }));
 
                 Stream<BasicQuestionAnswerPair> ppAnswerQAPairsWithNouns = justNounAnswers.stream()
@@ -708,14 +711,16 @@ public class MultiQuestionTemplate {
                             .collect(toImmutableList());
                             final ImmutableSet<ResolvedDependency> questionDeps = new ImmutableSet.Builder<ResolvedDependency>()
                             .addAll(subject.dependencies)
+                            .addAll(subjDependencyOpt.isPresent() ? ImmutableList.of(subjDependencyOpt.get()) : ImmutableList.of())
+                            .add(objDep)
                             .addAll(nounArgTWD.dependencies)
-                            .add(ppDep) 
+                            .add(ppDep)
                             .build();
                             return new BasicQuestionAnswerPair(sentenceId, parseId, parse,
                                                                predicateIndex, predicateCategory, 1, // TODO ? change predicate index and cat to modifier's in that case?
                                                                predicateIndex, null, // maybe should get rid of QuestionType?
                                                                questionDeps, nounQuestion,
-                                                               subjDependencyOpt.orElse(null), answerTWD);
+                                                               null, answerTWD); // TODO in theory target dependencies should be the ones coming out from the preposition
                         }));
 
                 Stream<BasicQuestionAnswerPair> ppAnswerQAPairsWithoutNouns = ppArgsTWDs.stream()
@@ -727,22 +732,29 @@ public class MultiQuestionTemplate {
                             .collect(toImmutableList());
                             final ImmutableSet<ResolvedDependency> questionDeps = new ImmutableSet.Builder<ResolvedDependency>()
                             .addAll(subject.dependencies)
-                            .add(ppDep) 
+                            .addAll(subjDependencyOpt.isPresent() ? ImmutableList.of(subjDependencyOpt.get()) : ImmutableList.of())
+                            .add(ppDep)
                             .build();
                             return new BasicQuestionAnswerPair(sentenceId, parseId, parse,
                                                                predicateIndex, predicateCategory, 1, // TODO ? change predicate index and cat to modifier's in that case?
                                                                predicateIndex, null, // maybe should get rid of QuestionType?
                                                                questionDeps, nounQuestion,
-                                                               subjDependencyOpt.orElse(null), answerTWD);
+                                                               null, answerTWD); // TODO in theory target dependencies should be the ones coming out from the preposition
                         });
 
                 Stream<BasicQuestionAnswerPair> nounAnswerQAPairsWithoutPPs = Stream
                     .concat(justNounAnswers.stream(), modifiedNounAnswers.stream())
-                    .map(answerTWD -> new BasicQuestionAnswerPair(sentenceId, parseId, parse,
-                                                                  predicateIndex, predicateCategory, 1, // TODO perhaps change predicate index and cat to adverb's
-                                                                  predicateIndex, null, // maybe should get rid of QuestionType?
-                                                                  ImmutableSet.copyOf(subject.dependencies), nounQuestionWithoutArgs,
-                                                                  subjDependencyOpt.orElse(null), answerTWD));
+                    .map(answerTWD -> {
+                            ImmutableSet<ResolvedDependency> questionDeps = new ImmutableSet.Builder<ResolvedDependency>()
+                            .addAll(subject.dependencies)
+                            .addAll(subjDependencyOpt.isPresent() ? ImmutableList.of(subjDependencyOpt.get()) : ImmutableList.of())
+                            .build();
+                            return new BasicQuestionAnswerPair(sentenceId, parseId, parse,
+                                                               predicateIndex, predicateCategory, 1, // TODO perhaps change predicate index and cat to adverb's
+                                                               predicateIndex, null, // maybe should get rid of QuestionType?
+                                                               questionDeps, nounQuestionWithoutArgs,
+                                                               objDep, answerTWD);
+                        });
 
                 nounQAPairs = Stream.concat(nounAnswerQAPairsWithPPs,
                               Stream.concat(ppAnswerQAPairsWithNouns,
@@ -756,7 +768,6 @@ public class MultiQuestionTemplate {
 
         return Stream.concat(justVerbQAPairs.stream(), Stream.concat(verbAndAdverbQAPairs.stream(), nounQAPairs.stream()));
         // return nounQAPairs.stream();
-                    
         }).collect(toImmutableList());
     }
 
