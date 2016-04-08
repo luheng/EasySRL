@@ -1,6 +1,7 @@
 package edu.uw.easysrl.qasrl.query;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
 import edu.uw.easysrl.syntax.grammar.Category;
@@ -28,6 +29,22 @@ public class QueryFilters {
                 Category.valueOf("((S\\NP)\\(S\\NP))/S[dcl]"));
     }
 
+    private static boolean canBeSplitted(final String option, final ImmutableList<String> allOptions) {
+        for (String op1 : allOptions) {
+            for (String op2 : allOptions) {
+                if (option.equalsIgnoreCase(op1 + ", " + op2) ||
+                        option.equalsIgnoreCase(op1 + " and " + op2) ||
+                        option.equalsIgnoreCase(op1 + " or " + op2)) {
+                    System.err.println(option);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // TODO: filter answers that is a superspan of two non-overlapping answers. i.e.
+    //   Barack Obama, president vs. Obama vs. president
     public static QueryFilter<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> scoredQueryFilter() {
         return (queries, nBestList, queryPruningParameters) -> queries.stream()
                 .filter(query -> {
@@ -42,11 +59,16 @@ public class QueryFilters {
                 })
                 .map(query -> {
                     query.computeScores(nBestList);
+                    final ImmutableList<String> options = query.getOptions().stream()
+                            .filter(op -> !op.isEmpty())
+                            .collect(GuavaCollectors.toImmutableList());
                     // Prune answer options.
                     final int numQAOptions = query.getQAPairSurfaceForms().size();
                     final List<Integer> filteredOptionIds =
                             IntStream.range(0, numQAOptions).boxed()
+                                    .filter(i -> !query.getOptions().get(i).isEmpty())
                                     .filter(i -> query.getOptionScores().get(i) > queryPruningParameters.minOptionConfidence)
+                                    .filter(i -> !canBeSplitted(query.getOptions().get(i), options))
                                     .collect(Collectors.toList());
                     // TODO: handle max number of options
                     final List<QAStructureSurfaceForm> filteredQAList = filteredOptionIds.stream()

@@ -121,25 +121,6 @@ public class ConstrainedSupertagFactoredModel extends SupertagFactoredModel {
             }
         }
 
-        // TODO: equals check
-        // TODO: keep track of dependencies
-        /*
-        Set<UnlabelledDependency> unlabelledDeps = new HashSet<>();
-        dependencyGenerator.generateDependencies(node, unlabelledDeps);
-        for (UnlabelledDependency dep : unlabelledDeps) {
-            int headId = dep.getHead();
-            if (!attachmentEvidence.containsRow(headId)) {
-                continue;
-            }
-            for (int argId : dep.getArguments()) {
-                boolean headInLeft = leftChild.startOfSpan <= headId && headId < leftChild.startOfSpan + leftChild.spanLength;
-                boolean argInLeft =  leftChild.startOfSpan <= argId &&  argId <  leftChild.startOfSpan + leftChild.spanLength;
-                if (headInLeft ^ argInLeft && attachmentEvidence.contains(headId, argId)) {
-                    evidencePenalty += attachmentEvidence.get(headId, argId);
-                }
-            }
-        }*/
-
         return new AgendaItem(node,
                 leftChild.getInsideScore() + rightChild.getInsideScore() - lengthPenalty - evidencePenalty, /* inside */
                 getOutsideUpperBound(leftChild.startOfSpan, leftChild.startOfSpan + length),                /* outside */

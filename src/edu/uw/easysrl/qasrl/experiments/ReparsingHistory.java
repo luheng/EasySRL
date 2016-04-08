@@ -130,9 +130,11 @@ public class ReparsingHistory {
                 "Reparsed-changed:\n" + getAvgReparsedOnModifiedSentences() + "\n" +
                 "Oracle-changed  :\n" + getAvgOracleOnModifiedSentences());
 
+        // FIXME:
         System.out.println(
                 "Processed:\t" + queries.keySet().size() + " sentences.\n" +
-                "Processed:\t" + queries.values().stream().mapToInt(List::size).sum() + " queries.\n");
+                "Queried:\t" + queries.values().stream().filter(q -> q.size() > 1).count() + " sentences.\n" +
+                "Processed:\t" + queries.values().stream().mapToInt(q -> q.size() - 1).sum() + " queries.\n");
 
         System.out.println(
                 "Num modified: " + getNumModifiedSentences() + "\n" +

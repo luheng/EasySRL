@@ -25,7 +25,6 @@ public class SyntheticExperiments {
     private static ReparsingHistory myHITLHistory;
 
     private static boolean isCheckboxVersion = true;
-    private static boolean usePronouns = true;
 
     private static QueryPruningParameters queryPruningParameters;
     static {
@@ -89,7 +88,7 @@ public class SyntheticExperiments {
                 myHITLHistory.printLatestHistory();
 
                 ImmutableList<Integer> onebestOptions = myHITLParser.getOneBestOptions(query);
-                if (goldOptions.containsAll(onebestOptions) && onebestOptions.containsAll(goldOptions)) {
+                    if (goldOptions.containsAll(onebestOptions) && onebestOptions.containsAll(goldOptions)) {
                     coreQueryAcc.getAndAdd(1);
                 }
                 numCoreQueries.getAndAdd(1);

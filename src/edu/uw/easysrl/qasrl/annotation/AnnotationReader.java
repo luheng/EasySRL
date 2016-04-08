@@ -54,7 +54,7 @@ public class AnnotationReader {
                         break;
                     }
                     info = line.split("\\t");
-                    if (info[1].contains("U")) {
+                    if (info[1].contains("U") || info[1].contains("T")) {
                         optionIds.add(curr.optionStrings.size());
                     }
                     curr.optionStrings.add(info[3]);
@@ -66,7 +66,8 @@ public class AnnotationReader {
                 if (line.isEmpty()) {
                     line = reader.readLine().trim();
                 }
-                curr.comment = line.split("\\t")[1];
+                info = line.split("\\t");
+                curr.comment = info[1].trim().isEmpty() ? info[2] : info[1];
 
                 // Empty line.
                 reader.readLine();
