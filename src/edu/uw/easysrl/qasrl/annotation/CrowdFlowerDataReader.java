@@ -29,7 +29,6 @@ public class CrowdFlowerDataReader {
                     (record.isMapped("orig_golden") && record.get("orig_golden").equalsIgnoreCase("true"))) {
                 continue;
             }
-            // TODO: move this RecordedAnnotation.
             RecordedAnnotation annotation = new RecordedAnnotation();
             annotation.iterationId = -1; // unknown
             annotation.sentenceId = Integer.parseInt(record.get("sent_id"));
@@ -41,10 +40,9 @@ public class CrowdFlowerDataReader {
                 final String[] qkeyInfo = record.get("question_key").split("\\.");
                 annotation.predicateCategory = Category.valueOf(qkeyInfo[1]);
                 annotation.argumentNumber = parseIntOrElse(qkeyInfo[2], -1);
-                // FIXME: hack
-                if (AnnotationUtils.propositionalCategories.contains(annotation.predicateCategory)) {
-                    continue;
-                }
+                //if (AnnotationUtils.propositionalCategories.contains(annotation.predicateCategory)) {
+                //    continue;
+                //}
             } else {
                 String qkey = record.get("query_key");
                 annotation.predicateId = Integer.parseInt(qkey.split(":")[0]);
