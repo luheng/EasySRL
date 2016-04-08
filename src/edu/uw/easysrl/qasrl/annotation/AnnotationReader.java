@@ -44,6 +44,13 @@ public class AnnotationReader {
                 line = reader.readLine().trim();
                 info = line.split("\\t");
                 curr.queryPrompt = info[1].trim().isEmpty() ? info[3] : info[2];
+                String qkey = info[1].trim().isEmpty() ? info[4] : info[3];
+                if (!qkey.isEmpty()) {
+                    curr.predicateId = Integer.parseInt(qkey.split(":")[0]);
+                    curr.predicateString = qkey.split("_")[0].split(":")[1];
+                    //System.err.println(curr.sentenceString + "\n" + curr.queryPrompt + "\n" +
+                    //       curr.sentenceString.split("\\s+")[curr.predicateId] + "\n" + curr.predicateString);
+                }
 
                 // \t [2] GU          0.16  None of the above.    11,21,28,37,41,50,52,62,66-67,82-83,91,93,96,99
                 List<Integer> optionIds = new ArrayList<>();

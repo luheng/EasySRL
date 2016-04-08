@@ -66,6 +66,18 @@ public class CrowdFlowerDataUtils {
         return heldOutSentences.stream().distinct().sorted().collect(GuavaCollectors.toImmutableList());
     }
 
+    public static ImmutableList<Integer> getRound3SentenceIds() {
+        List<AlignedAnnotation> cfAnnotations = new ArrayList<>();
+        try {
+            cfAnnotations.addAll(CrowdFlowerDataReader.readAggregatedAnnotationFromFile(cfRound3AnnotationFile));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return cfAnnotations.stream()
+                .map(annotation -> annotation.sentenceId).distinct().sorted()
+                .collect(GuavaCollectors.toImmutableList());
+    }
+
     public static ImmutableList<Integer> getRound2And3SentenceIds() {
         List<AlignedAnnotation> cfAnnotations = new ArrayList<>();
         try {
@@ -178,6 +190,7 @@ public class CrowdFlowerDataUtils {
         int predicateIndex = annotation.predicateId;
         int sentenceId = annotation.sentenceId;
         ImmutableList<String> sentence = ImmutableList.copyOf(annotation.sentenceString.split("\\s+"));
+        assert  annotation.predicateId < 0 || sentence.get(annotation.predicateId).equalsIgnoreCase(annotation.predicateString);
         final String sentenceStr = TextGenerationHelper.renderHTMLSentenceString(sentence, predicateIndex, highlightPredicate);
         final List<String> options = annotation.optionStrings;
         List<String> csvRow = new ArrayList<>();

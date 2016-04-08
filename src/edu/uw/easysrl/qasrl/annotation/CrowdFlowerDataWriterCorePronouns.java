@@ -33,10 +33,10 @@ public class CrowdFlowerDataWriterCorePronouns {
     private final static HITLParser hitlParser = new HITLParser(nBest);
     private final static ReparsingHistory history = new ReparsingHistory(hitlParser);
 
-    private static final String csvOutputFilePrefix = "./Crowdflower_unannotated/pronoun_core_r23_100best";
+    private static final String csvOutputFilePrefix = "./Crowdflower_unannotated/pronoun_core_r3_100best";
 
     private static final String[] reviewedTestQuestionFiles = new String[] {
-             "Crowdflower_unannotated/test_questions/test_question_core_pronoun_r01.tsv",
+             "./Crowdflower_unannotated/test_questions/test_question_core_pronoun_r01.tsv",
     };
 
     static QueryPruningParameters queryPruningParameters;
@@ -66,7 +66,7 @@ public class CrowdFlowerDataWriterCorePronouns {
         queryPruningParams.minOptionConfidence = 0;
         queryPruningParams.minOptionEntropy = -1;
         queryPruningParams.minPromptConfidence = -1;
-        hitlParser.setQueryPruningParameters(queryPruningParams);
+        //hitlParser.setQueryPruningParameters(queryPruningParams);
 
         final String testQuestionsFile = String.format("%s_test.csv", csvOutputFilePrefix);
         CSVPrinter csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter(testQuestionsFile)),
@@ -82,7 +82,7 @@ public class CrowdFlowerDataWriterCorePronouns {
                         CrowdFlowerDataUtils.printRecordToCSVFile(
                                 annot,
                                 10000 + lineCounter.getAndAdd(1),
-                                false, // highlight predicate
+                                true, // highlight predicate
                                 csvPrinter);
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -124,7 +124,7 @@ public class CrowdFlowerDataWriterCorePronouns {
     }
 
     private static void printQuestionsToAnnotate() throws IOException {
-        final ImmutableList<Integer> sentenceIds = CrowdFlowerDataUtils.getRound2And3SentenceIds();
+        final ImmutableList<Integer> sentenceIds = CrowdFlowerDataUtils.getRound3SentenceIds();
         AtomicInteger lineCounter = new AtomicInteger(0),
                       fileCounter = new AtomicInteger(0);
 
@@ -147,7 +147,7 @@ public class CrowdFlowerDataWriterCorePronouns {
                         sentence,
                         null, // gold options
                         lineCounter.getAndAdd(1),
-                        false, // highlight predicate
+                        true, // highlight predicate
                         "",
                         csvPrinter);
                 history.addEntry(sid, query, goldOptionIds, hitlParser.getConstraints(query, goldOptionIds));
@@ -167,7 +167,7 @@ public class CrowdFlowerDataWriterCorePronouns {
 
     public static void main(String[] args) throws IOException {
         //final ImmutableList<Integer> testSentenceIds = CrowdFlowerDataUtils.getTestSentenceIds();
-        //printTestQuestions();
+        printTestQuestions();
         printQuestionsToAnnotate();
     }
 }
