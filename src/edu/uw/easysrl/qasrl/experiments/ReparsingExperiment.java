@@ -15,6 +15,7 @@ import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.syntax.evaluation.Results;
+import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -33,8 +34,9 @@ public class ReparsingExperiment {
     private static final String[] annotationFiles = {
           //  "./Crowdflower_data/f878213.csv",                // Round1: radio-button, core + pp
           //  "./Crowdflower_data/f882410.csv",                // Round2: radio-button, core only
-            "./Crowdflower_data/all-checkbox-responses.csv", // Round3: checkbox, core + pp
+          //  "./Crowdflower_data/all-checkbox-responses.csv", // Round3: checkbox, core + pp
           //  "./Crowdflower_data/f891522.csv",                // Round4: jeopardy checkbox, pp only
+            "./Crowdflower_data/f893900.csv"                   // Round3-pronouns: checkbox, core only, pronouns.
     };
 
     private static QueryPruningParameters queryPruningParameters;
@@ -67,6 +69,14 @@ public class ReparsingExperiment {
         System.out.println("Queried " + sentenceIds.size() + " sentences. Total number of questions:\t" +
             annotations.entrySet().stream().mapToInt(e -> e.getValue().size()).sum());
 
+        ImmutableSet<String> annotators =
+                annotations.values().stream()
+                        .flatMap(al -> al.stream())
+                        .flatMap(annot -> annot.annotatorToAnswerIds.keySet().stream())
+                        .sorted()
+                        .collect(GuavaCollectors.toImmutableSet());
+        annotators.stream().forEach(System.err::println);
+
         List<DebugBlock> debugging = new ArrayList<>();
         for (int sentenceId : sentenceIds) {
             final ImmutableList<String> sentence = myHTILParser.getSentence(sentenceId);
@@ -78,8 +88,9 @@ public class ReparsingExperiment {
                             .anyMatch(op -> op.contains(QAPairAggregatorUtils.answerDelimiter)));
 
             List<ScoredQuery<QAStructureSurfaceForm>> queryList = new ArrayList<>();
-            queryList.addAll(myHTILParser.getCoreArgumentQueriesForSentence(sentenceId, isCheckboxStyle));
-            queryList.addAll(myHTILParser.getPPAttachmentQueriesForSentence(sentenceId));
+            //queryList.addAll(myHTILParser.getCoreArgumentQueriesForSentence(sentenceId, isCheckboxStyle));
+            //queryList.addAll(myHTILParser.getPPAttachmentQueriesForSentence(sentenceId));
+            queryList.addAll(myHTILParser.getPronounCoreArgQueriesForSentence(sentenceId));
 
             final Results baselineF1 = nBestList.getResults(0);
             Results currentF1 = nBestList.getResults(0);

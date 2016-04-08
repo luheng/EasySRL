@@ -38,6 +38,13 @@ public class CrowdFlowerDataReader {
             if (record.isMapped("pred_id")) {
                 annotation.predicateId = Integer.parseInt(record.get("pred_id"));
                 annotation.predicateString = record.get("pred_head");
+                final String[] qkeyInfo = record.get("question_key").split("\\.");
+                annotation.predicateCategory = Category.valueOf(qkeyInfo[1]);
+                annotation.argumentNumber = parseIntOrElse(qkeyInfo[2], -1);
+                // FIXME: hack
+                if (AnnotationUtils.propositionalCategories.contains(annotation.predicateCategory)) {
+                    continue;
+                }
             } else {
                 String qkey = record.get("query_key");
                 annotation.predicateId = Integer.parseInt(qkey.split(":")[0]);

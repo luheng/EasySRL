@@ -9,8 +9,8 @@ import java.util.*;
  * Created by luheng on 2/13/16.
  */
 public class AlignedAnnotation extends RecordedAnnotation {
-    Map<String, ImmutableList<Integer>> annotatorToAnswerIds;
-    Map<String, String> annotatorToComment;
+    public Map<String, ImmutableList<Integer>> annotatorToAnswerIds;
+    public Map<String, String> annotatorToComment;
     public List<String> answerOptions;
     public int[] answerDist;
     public double[] answerTrust;
