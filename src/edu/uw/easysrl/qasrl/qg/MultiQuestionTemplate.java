@@ -457,6 +457,29 @@ public class MultiQuestionTemplate {
                                            answer);
     }
 
+    private ImmutableList<TextWithDependencies> getAllCandidateNounTWDs(int npIndex) {
+        ImmutableList<TextWithDependencies> justNounPhrases = ImmutableList
+            .copyOf(TextGenerationHelper.getRepresentativePhrases(Optional.of(npIndex), Category.NP, parse));
+        ImmutableList<TextWithDependencies> modifiedNounPhrases = justNounPhrases.stream()
+            .flatMap(nounAnswerTWD -> parse.dependencies.stream()
+            .filter(dep -> categories.get(dep.getHead()).isFunctionInto(Category.valueOf("NP\\NP")) &&
+                    dep.getArgument() == npIndex &&
+                    dep.getArgument() != dep.getHead() &&
+                    dep.getArgNumber() == 1 &&
+                    !(words.get(dep.getHead()).equalsIgnoreCase("of")))
+            .flatMap(targetDep -> TextGenerationHelper.getRepresentativePhrases(Optional.of(targetDep.getHead()), Category.valueOf("NP\\NP"), parse).stream()
+            .map(modifierTWD -> {
+                    TextWithDependencies answerTWD = nounAnswerTWD.concat(modifierTWD);
+                    answerTWD.dependencies.add(targetDep);
+                    return answerTWD;
+                })))
+            .collect(toImmutableList());
+        return new ImmutableList.Builder<TextWithDependencies>()
+            .addAll(justNounPhrases)
+            .addAll(modifiedNounPhrases)
+            .build();
+    }
+
     public ImmutableList<BasicQuestionAnswerPair> getPPAttachmentQAPairs(Map<Integer, Optional<ResolvedDependency>> chosenArgDeps) {
         // verb must be our predicate.
         if(type != QuestionType.VERB ||
@@ -553,7 +576,7 @@ public class MultiQuestionTemplate {
                                                                         ImmutableSet.copyOf(subject.dependencies), verbAttachmentQuestion,
                                                                         subjDependencyOpt.orElse(null), answerTWD))
                      ).collect(toImmutableList());
-        
+
         ImmutableList<TextWithDependencies> verbAndAdverbAnswerTWDs = parse.dependencies.stream()
             .filter(dep -> categories.get(dep.getHead()).isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)")) &&
                     dep.getArgument() == predicateIndex &&
@@ -574,7 +597,7 @@ public class MultiQuestionTemplate {
                                                           predicateIndex, null, // maybe should get rid of QuestionType?
                                                           ImmutableSet.copyOf(subject.dependencies), verbAttachmentQuestion, subjDependencyOpt.orElse(null), answerTWD))
             .collect(toImmutableList());
-        
+
         final ImmutableList<String> nounQuestionWithoutArgs = new ImmutableList.Builder<String>()
             .add("What").add("is").add("it").add("that")
             .addAll(subject.tokens)
@@ -590,23 +613,7 @@ public class MultiQuestionTemplate {
             } else {
                 ResolvedDependency objDep = objDepOpt.get();
                 int objIndex = objDep.getArgument();
-                ImmutableList<TextWithDependencies> justNounAnswers = ImmutableList
-                    .copyOf(TextGenerationHelper.getRepresentativePhrases(Optional.of(objIndex), Category.NP, parse));
-                ImmutableList<TextWithDependencies> modifiedNounAnswers = justNounAnswers.stream()
-                    .flatMap(nounAnswerTWD -> parse.dependencies.stream()
-                    .filter(dep -> categories.get(dep.getHead()).isFunctionInto(Category.valueOf("NP\\NP")) &&
-                            dep.getArgument() == objIndex &&
-                            dep.getArgument() != dep.getHead() &&
-                            dep.getArgNumber() == 1 &&
-                            !(words.get(dep.getHead()).equalsIgnoreCase("of")))
-                    .flatMap(targetDep -> TextGenerationHelper.getRepresentativePhrases(Optional.of(targetDep.getHead()), Category.valueOf("NP\\NP"), parse).stream()
-                    .map(modifierTWD -> {
-                            TextWithDependencies answerTWD = nounAnswerTWD.concat(modifierTWD);
-                            answerTWD.dependencies.add(targetDep);
-                            return answerTWD;
-                        })))
-                    .collect(toImmutableList());
-                nounQAPairs = Stream.concat(justNounAnswers.stream(), modifiedNounAnswers.stream())
+                nounQAPairs = getAllCandidateNounTWDs(objIndex).stream()
                     .map(answerTWD -> new BasicQuestionAnswerPair(sentenceId, parseId, parse,
                                                                   predicateIndex, predicateCategory, 1, // TODO perhaps change predicate index and cat to adverb's
                                                                   predicateIndex, null, // maybe should get rid of QuestionType?
@@ -621,129 +628,43 @@ public class MultiQuestionTemplate {
             } else {
                 ResolvedDependency ppDep = ppDepOpt.get();
                 int ppIndex = ppDep.getArgument();
-                ImmutableList<TextWithDependencies> ppArgsTWDs = ImmutableList
-                    .copyOf(TextGenerationHelper.getRepresentativePhrases(Optional.of(ppIndex), Category.PP, parse, Optional.of("")));
                 String ppWord = words.get(ppIndex);
-                ImmutableList<String> nounQuestion = Stream
-                    .concat(nounQuestionWithoutArgs.stream(), Stream.of(ppWord))
-                    .collect(toImmutableList());
-                ImmutableSet<ResolvedDependency> questionDeps = new ImmutableSet.Builder<ResolvedDependency>()
-                    .addAll(subject.dependencies)
-                    .add(ppDep)
-                    .build();
-                nounQAPairs = ppArgsTWDs.stream()
-                    .map(answerTWD -> new BasicQuestionAnswerPair(sentenceId, parseId, parse,
-                                                                  predicateIndex, predicateCategory, 1, // TODO ? change predicate index and cat to prep's in that case?
-                                                                  predicateIndex, null, // maybe should get rid of QuestionType?
-                                                                  questionDeps, nounQuestion,
-                                                                  subjDependencyOpt.orElse(null), answerTWD)) // TODO need set of target deps to PP's arguments..? currently in answerDeps
-                    .collect(toImmutableList());
+                Category prepCat = categories.get(ppIndex);
+                if(!Category.valueOf("PP/NP").matches(prepCat)) {
+                    nounQAPairs = ImmutableList.of();
+                } else {
+                    nounQAPairs = parse.dependencies.stream()
+                        .filter(dep -> dep.getHead() == ppIndex &&
+                                dep.getArgument() != ppIndex &&
+                                dep.getArgNumber() == 1)
+                        .flatMap(ppObjDep -> getAllCandidateNounTWDs(ppObjDep.getArgument()).stream()
+                        .map(ppObjTWD -> {
+                                int ppObjIndex = ppObjDep.getArgument();
+                                ImmutableList<String> nounQuestion = Stream
+                                .concat(nounQuestionWithoutArgs.stream(), Stream.of(ppWord))
+                                .collect(toImmutableList());
+                                ImmutableSet<ResolvedDependency> questionDeps = new ImmutableSet.Builder<ResolvedDependency>()
+                                .addAll(subject.dependencies)
+                                .add(ppDep)
+                                .build();
+                                return new BasicQuestionAnswerPair(sentenceId, parseId, parse,
+                                                                   predicateIndex, predicateCategory, 1, // TODO ? change predicate index and cat to prep's in that case?
+                                                                   predicateIndex, null, // maybe should get rid of QuestionType?
+                                                                   questionDeps, nounQuestion,
+                                                                   ppObjDep, ppObjTWD);
+                            }))
+                        .collect(toImmutableList());
+                }
             }
         } else if(Category.valueOf("((S\\NP)/PP)/NP").matches(predicateCategory)) {
-            // TODO noun attachment to object of preposition
-            // TODO just noun, no preposition
             Optional<ResolvedDependency> objDepOpt = chosenArgDeps.get(3);
             if(!objDepOpt.isPresent()) {
                 nounQAPairs = ImmutableList.of();
             } else {
                 ResolvedDependency objDep = objDepOpt.get();
                 int objIndex = objDep.getArgument();
-                ImmutableList<TextWithDependencies> justNounAnswers = ImmutableList
-                    .copyOf(TextGenerationHelper.getRepresentativePhrases(Optional.of(objIndex), Category.NP, parse));
-                ImmutableList<TextWithDependencies> modifiedNounAnswers = justNounAnswers.stream()
-                    .flatMap(nounAnswerTWD -> parse.dependencies.stream()
-                    .filter(dep -> categories.get(dep.getHead()).isFunctionInto(Category.valueOf("NP\\NP")) &&
-                            dep.getArgument() == objIndex &&
-                            dep.getArgument() != dep.getHead() &&
-                            dep.getArgNumber() == 1 &&
-                            !(words.get(dep.getHead()).equalsIgnoreCase("of")))
-                    .flatMap(targetDep -> TextGenerationHelper.getRepresentativePhrases(Optional.of(targetDep.getHead()), Category.valueOf("NP\\NP"), parse).stream()
-                    .map(modifierTWD -> {
-                            TextWithDependencies answerTWD = nounAnswerTWD.concat(modifierTWD);
-                            answerTWD.dependencies.add(targetDep);
-                            return answerTWD;
-                        })))
-                    .collect(toImmutableList());
-
-                final Optional<ResolvedDependency> ppDepOpt = chosenArgDeps.get(2);
-                final ImmutableList<TextWithDependencies> ppTWDs;
-                final ImmutableList<TextWithDependencies> ppArgsTWDs;
-                if(ppDepOpt.isPresent()) {
-                    ResolvedDependency ppDep = ppDepOpt.get();
-                    int ppIndex = ppDep.getArgument();
-                    ppTWDs = ImmutableList
-                        .copyOf(TextGenerationHelper.getRepresentativePhrases(Optional.of(ppIndex), Category.PP, parse));
-                    ppArgsTWDs = ImmutableList
-                        .copyOf(TextGenerationHelper.getRepresentativePhrases(Optional.of(ppIndex), Category.PP, parse, Optional.of("")));
-                } else {
-                    ppTWDs = ImmutableList.of();
-                    ppArgsTWDs = ImmutableList.of();
-                }
-
-
-                Stream<BasicQuestionAnswerPair> nounAnswerQAPairsWithPPs = ppTWDs.stream()
-                    .flatMap(ppTWD -> Stream.concat(justNounAnswers.stream(), modifiedNounAnswers.stream())
-                    .map(answerTWD -> {
-                            ResolvedDependency ppDep = ppDepOpt.get(); // must be present at this part of the code
-                            ImmutableList<String> nounQuestion = Stream
-                            .concat(nounQuestionWithoutArgs.stream(), ppTWD.tokens.stream())
-                            .collect(toImmutableList());
-                            ImmutableSet<ResolvedDependency> questionDeps = new ImmutableSet.Builder<ResolvedDependency>()
-                            .addAll(subject.dependencies)
-                            .addAll(subjDependencyOpt.isPresent() ? ImmutableList.of(subjDependencyOpt.get()) : ImmutableList.of())
-                            .addAll(ppTWD.dependencies)
-                            .add(ppDep)
-                            .build();
-                            return new BasicQuestionAnswerPair(sentenceId, parseId, parse,
-                                                               predicateIndex, predicateCategory, 1, // TODO ? change predicate index and cat to modifier's in that case?
-                                                               predicateIndex, null, // maybe should get rid of QuestionType?
-                                                               questionDeps, nounQuestion,
-                                                               objDep, answerTWD);
-                        }));
-
-                Stream<BasicQuestionAnswerPair> ppAnswerQAPairsWithNouns = justNounAnswers.stream()
-                    .flatMap(nounArgTWD -> ppArgsTWDs.stream()
-                    .map(answerTWD -> {
-                            final ResolvedDependency ppDep = ppDepOpt.get(); // this will be present if we ever reach this part of the code
-                            final String ppWord = words.get(ppDep.getArgument());
-                            final ImmutableList<String> nounQuestion = Stream
-                            .concat(nounQuestionWithoutArgs.stream(), Stream.concat(nounArgTWD.tokens.stream(), Stream.of(ppWord)))
-                            .collect(toImmutableList());
-                            final ImmutableSet<ResolvedDependency> questionDeps = new ImmutableSet.Builder<ResolvedDependency>()
-                            .addAll(subject.dependencies)
-                            .addAll(subjDependencyOpt.isPresent() ? ImmutableList.of(subjDependencyOpt.get()) : ImmutableList.of())
-                            .add(objDep)
-                            .addAll(nounArgTWD.dependencies)
-                            .add(ppDep)
-                            .build();
-                            return new BasicQuestionAnswerPair(sentenceId, parseId, parse,
-                                                               predicateIndex, predicateCategory, 1, // TODO ? change predicate index and cat to modifier's in that case?
-                                                               predicateIndex, null, // maybe should get rid of QuestionType?
-                                                               questionDeps, nounQuestion,
-                                                               null, answerTWD); // TODO in theory target dependencies should be the ones coming out from the preposition
-                        }));
-
-                Stream<BasicQuestionAnswerPair> ppAnswerQAPairsWithoutNouns = ppArgsTWDs.stream()
-                    .map(answerTWD -> {
-                            final ResolvedDependency ppDep = ppDepOpt.get(); // this will be present if we ever reach this part of the code
-                            final String ppWord = words.get(ppDep.getArgument());
-                            final ImmutableList<String> nounQuestion = Stream
-                            .concat(nounQuestionWithoutArgs.stream(), Stream.of(ppWord))
-                            .collect(toImmutableList());
-                            final ImmutableSet<ResolvedDependency> questionDeps = new ImmutableSet.Builder<ResolvedDependency>()
-                            .addAll(subject.dependencies)
-                            .addAll(subjDependencyOpt.isPresent() ? ImmutableList.of(subjDependencyOpt.get()) : ImmutableList.of())
-                            .add(ppDep)
-                            .build();
-                            return new BasicQuestionAnswerPair(sentenceId, parseId, parse,
-                                                               predicateIndex, predicateCategory, 1, // TODO ? change predicate index and cat to modifier's in that case?
-                                                               predicateIndex, null, // maybe should get rid of QuestionType?
-                                                               questionDeps, nounQuestion,
-                                                               null, answerTWD); // TODO in theory target dependencies should be the ones coming out from the preposition
-                        });
-
-                Stream<BasicQuestionAnswerPair> nounAnswerQAPairsWithoutPPs = Stream
-                    .concat(justNounAnswers.stream(), modifiedNounAnswers.stream())
+                ImmutableList<TextWithDependencies> allObjAnswers = getAllCandidateNounTWDs(objIndex);
+                final Stream<BasicQuestionAnswerPair> objQAPairs = allObjAnswers.stream()
                     .map(answerTWD -> {
                             ImmutableSet<ResolvedDependency> questionDeps = new ImmutableSet.Builder<ResolvedDependency>()
                             .addAll(subject.dependencies)
@@ -756,10 +677,43 @@ public class MultiQuestionTemplate {
                                                                objDep, answerTWD);
                         });
 
-                nounQAPairs = Stream.concat(nounAnswerQAPairsWithPPs,
-                              Stream.concat(ppAnswerQAPairsWithNouns,
-                              Stream.concat(ppAnswerQAPairsWithoutNouns,
-                                            nounAnswerQAPairsWithoutPPs)))
+                final Optional<ResolvedDependency> ppDepOpt = chosenArgDeps.get(2);
+                final Stream<BasicQuestionAnswerPair> ppObjQAPairs;
+                if(!ppDepOpt.isPresent()) {
+                    ppObjQAPairs = Stream.empty();
+                } else {
+                    ResolvedDependency ppDep = ppDepOpt.get();
+                    int ppIndex = ppDep.getArgument();
+                    Category prepCat = categories.get(ppIndex);
+                    if(!Category.valueOf("PP/NP").matches(prepCat)) {
+                        ppObjQAPairs = Stream.empty();
+                    } else {
+                        ppObjQAPairs = parse.dependencies.stream()
+                            .filter(dep -> dep.getHead() == ppIndex &&
+                                    dep.getArgument() != ppIndex &&
+                                    dep.getArgNumber() == 1)
+                            .flatMap(ppObjDep -> getAllCandidateNounTWDs(ppObjDep.getArgument()).stream()
+                            .map(answerTWD -> {
+                                    int ppObjIndex = ppObjDep.getArgument();
+                                    final String ppWord = words.get(ppDep.getArgument());
+                                    final ImmutableList<String> nounQuestion = Stream
+                                    .concat(nounQuestionWithoutArgs.stream(), Stream.of(ppWord))
+                                    .collect(toImmutableList());
+                                    final ImmutableSet<ResolvedDependency> questionDeps = new ImmutableSet.Builder<ResolvedDependency>()
+                                    .addAll(subject.dependencies)
+                                    .addAll(subjDependencyOpt.isPresent() ? ImmutableList.of(subjDependencyOpt.get()) : ImmutableList.of())
+                                    .add(ppDep)
+                                    .build();
+                                    return new BasicQuestionAnswerPair(sentenceId, parseId, parse,
+                                                                       predicateIndex, predicateCategory, 1, // TODO ? change predicate index and cat?
+                                                                       predicateIndex, null, // maybe should get rid of QuestionType?
+                                                                       questionDeps, nounQuestion,
+                                                                       ppObjDep, answerTWD);
+                                }));
+                    }
+                }
+
+                nounQAPairs = Stream.concat(objQAPairs, ppObjQAPairs)
                     .collect(toImmutableList());
             }
         } else {

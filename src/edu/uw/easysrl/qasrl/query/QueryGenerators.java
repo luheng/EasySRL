@@ -74,12 +74,6 @@ public class QueryGenerators {
                                           dep.getCategory().isFunctionInto(Category.valueOf("NP\\NP"))))
                         .collect(toImmutableList());
 
-                    // ImmutableList<String> answers = noAdjunctSurfaceForms.stream()
-                    //     .map(QA::getAnswer)
-                    //     .collect(toImmutableList());
-                    // return Stream.of(new BasicQuery<>(sentenceId, question, answers, noAdjunctSurfaceForms,
-                    //                                 false, true));
-
                     ImmutableSet<Integer> adjunctIndices = surfaceForms.stream()
                         .flatMap(sf -> sf.getAnswerDependencies().stream()
                                  .filter(dep -> dep.getCategory().isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)")) ||
