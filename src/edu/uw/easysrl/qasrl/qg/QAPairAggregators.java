@@ -96,12 +96,15 @@ public final class QAPairAggregators {
      */
     private static boolean isDependencySalient(ResolvedDependency dep, QuestionAnswerPair qaPair) {
         ImmutableList<Category> categories = ImmutableList.copyOf(qaPair.getParse().categories);
-        return Stream.of(dep.getHead(), dep.getArgument())
-            .anyMatch(index -> {
-                    Category cat = categories.get(index);
-                    return cat.isFunctionInto(Category.valueOf("S\\NP")) || // verb or adverb
-                        cat.isFunctionInto(Category.valueOf("NP\\NP")); // noun adjunct
-                });
+        ImmutableList<String> words = qaPair.getParse().syntaxTree.getLeaves().stream()
+            .map(l -> l.getWord())
+            .collect(toImmutableList());
+        int index = dep.getHead();
+        Category cat = categories.get(index);
+        return (qaPair.getTargetDependency() != null && dep.equals(qaPair.getTargetDependency())) ||
+            (cat.isFunctionInto(Category.valueOf("S\\NP")) && !cat.isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)"))) ||
+            (cat.isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)")) && dep.getArgNumber() == 2) ||
+            (cat.isFunctionInto(Category.valueOf("NP\\NP")) && dep.getArgNumber() == 1 && !words.get(index).equalsIgnoreCase("of"));
     }
     /**
      * Aggregates by question and answer deps connected to verbs or noun/verb adjuncts.

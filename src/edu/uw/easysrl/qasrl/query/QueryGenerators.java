@@ -58,22 +58,33 @@ public class QueryGenerators {
      */
     public static <QA extends QADependenciesSurfaceForm> QueryGenerator<QA, Query<QA>> answerAdjunctPartitioningQueryGenerator() {
         return qaPairs -> qaPairs.stream()
+            .collect(groupingBy(QA::getSentenceId))
+            .entrySet().stream()
+            .flatMap(e1 -> {
+                     int sentenceId = e1.getKey();
+                     return e1.getValue().stream()
             .collect(groupingBy(QA::getQuestion))
             .entrySet().stream()
-            .flatMap(e -> {
-                    String question = e.getKey();
-                    ImmutableList<QA> surfaceForms = ImmutableList.copyOf(e.getValue());
-                    int sentenceId = surfaceForms.get(0).getSentenceId();
+            .flatMap(e2 -> {
+                    String question = e2.getKey();
+                    ImmutableList<QA> surfaceForms = ImmutableList.copyOf(e2.getValue());
                     ImmutableList<QA> noAdjunctSurfaceForms = surfaceForms.stream()
                         .filter(sf -> !sf.getAnswerDependencies().stream()
                                 .anyMatch(dep -> dep.getCategory().isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)")) ||
                                           dep.getCategory().isFunctionInto(Category.valueOf("NP\\NP"))))
                         .collect(toImmutableList());
+
+                    // ImmutableList<String> answers = noAdjunctSurfaceForms.stream()
+                    //     .map(QA::getAnswer)
+                    //     .collect(toImmutableList());
+                    // return Stream.of(new BasicQuery<>(sentenceId, question, answers, noAdjunctSurfaceForms,
+                    //                                 false, true));
+
                     ImmutableSet<Integer> adjunctIndices = surfaceForms.stream()
                         .flatMap(sf -> sf.getAnswerDependencies().stream()
-                        .filter(dep -> dep.getCategory().isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)")) ||
-                                dep.getCategory().isFunctionInto(Category.valueOf("NP\\NP")))
-                        .map(dep -> dep.getHead()))
+                                 .filter(dep -> dep.getCategory().isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)")) ||
+                                         dep.getCategory().isFunctionInto(Category.valueOf("NP\\NP")))
+                                 .map(dep -> dep.getHead()))
                         .collect(toImmutableSet());
                     ImmutableList<ImmutableList<QA>> adjunctGroupedSurfaceForms = adjunctIndices.stream()
                         .map(adjunctIndex -> surfaceForms.stream()
@@ -83,20 +94,24 @@ public class QueryGenerators {
                         .collect(toImmutableList());
                     // each of these is a list of surface forms that will be in one query.
                     return Stream.concat(Stream.<ImmutableList<QA>>of(ImmutableList.<QA>of()), adjunctGroupedSurfaceForms.stream())
-                        .map(adjunctChoiceSurfaceForms -> {
-                                ImmutableList<QA> finalSurfaceForms = Stream
-                                    .concat(adjunctChoiceSurfaceForms.stream(), noAdjunctSurfaceForms.stream())
-                                    .collect(toImmutableList());
-                                ImmutableList<String> answers = finalSurfaceForms.stream()
-                                    .map(QA::getAnswer)
-                                    .distinct()
-                                    .collect(toImmutableList());
-                                return new BasicQuery<>(sentenceId, question, answers, finalSurfaceForms,
-                                                        false /* is jeopardy style */,
-                                                        true /* allow multiple */);
-                            });
-                })
-            .collect(toImmutableList());
+            .flatMap(adjunctChoiceSurfaceForms -> {
+                    ImmutableList<QA> finalSurfaceForms = Stream
+                        .concat(adjunctChoiceSurfaceForms.stream(), noAdjunctSurfaceForms.stream())
+                        .collect(toImmutableList());
+                    ImmutableList<String> answers = finalSurfaceForms.stream()
+                        .map(QA::getAnswer)
+                        .distinct()
+                        .collect(toImmutableList());
+                    if(answers.size() > 0) {
+                        return Stream.of(new BasicQuery<>(sentenceId, question, answers, finalSurfaceForms,
+                                                          false /* is jeopardy style */,
+                                                          true /* allow multiple */));
+                    } else {
+                        return Stream.empty();
+                    }
+                });
+                });
+                }).collect(toImmutableList());
     }
 
     public static <QA extends QAStructureSurfaceForm> QueryGenerator<QA, ScoredQuery<QA>> checkboxQueryGenerator() {

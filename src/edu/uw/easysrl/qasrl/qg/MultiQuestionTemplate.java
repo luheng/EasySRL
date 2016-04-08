@@ -459,7 +459,8 @@ public class MultiQuestionTemplate {
 
     public ImmutableList<BasicQuestionAnswerPair> getPPAttachmentQAPairs(Map<Integer, Optional<ResolvedDependency>> chosenArgDeps) {
         // verb must be our predicate.
-        if(type != QuestionType.VERB) {
+        if(type != QuestionType.VERB ||
+           VerbHelper.isCopulaVerb(words.get(predicateIndex).toLowerCase())) {
             return ImmutableList.of();
         } else if(cantAskQuestion(1, chosenArgDeps)) { // TODO maybe get rid of this check
             return ImmutableList.of();
@@ -640,6 +641,7 @@ public class MultiQuestionTemplate {
             }
         } else if(Category.valueOf("((S\\NP)/PP)/NP").matches(predicateCategory)) {
             // TODO noun attachment to object of preposition
+            // TODO just noun, no preposition
             Optional<ResolvedDependency> objDepOpt = chosenArgDeps.get(3);
             if(!objDepOpt.isPresent()) {
                 nounQAPairs = ImmutableList.of();
@@ -679,7 +681,7 @@ public class MultiQuestionTemplate {
                 }
 
 
-                nounQAPairs = Stream.concat(ppTWDs.stream()
+                Stream<BasicQuestionAnswerPair> nounAnswerQAPairsWithPPs = ppTWDs.stream()
                     .flatMap(ppTWD -> Stream.concat(justNounAnswers.stream(), modifiedNounAnswers.stream())
                     .map(answerTWD -> {
                             ImmutableList<String> nounQuestion = Stream
@@ -694,7 +696,9 @@ public class MultiQuestionTemplate {
                                                                predicateIndex, null, // maybe should get rid of QuestionType?
                                                                questionDeps, nounQuestion,
                                                                subjDependencyOpt.orElse(null), answerTWD);
-                        })), Stream.concat(justNounAnswers.stream()
+                        }));
+
+                Stream<BasicQuestionAnswerPair> ppAnswerQAPairsWithNouns = justNounAnswers.stream()
                     .flatMap(nounArgTWD -> ppArgsTWDs.stream()
                     .map(answerTWD -> {
                             final ResolvedDependency ppDep = ppDepOpt.get(); // this will be present if we ever reach this part of the code
@@ -712,7 +716,9 @@ public class MultiQuestionTemplate {
                                                                predicateIndex, null, // maybe should get rid of QuestionType?
                                                                questionDeps, nounQuestion,
                                                                subjDependencyOpt.orElse(null), answerTWD);
-                        })), ppArgsTWDs.stream()
+                        }));
+
+                Stream<BasicQuestionAnswerPair> ppAnswerQAPairsWithoutNouns = ppArgsTWDs.stream()
                     .map(answerTWD -> {
                             final ResolvedDependency ppDep = ppDepOpt.get(); // this will be present if we ever reach this part of the code
                             final String ppWord = words.get(ppDep.getArgument());
@@ -728,7 +734,20 @@ public class MultiQuestionTemplate {
                                                                predicateIndex, null, // maybe should get rid of QuestionType?
                                                                questionDeps, nounQuestion,
                                                                subjDependencyOpt.orElse(null), answerTWD);
-                        })))
+                        });
+
+                Stream<BasicQuestionAnswerPair> nounAnswerQAPairsWithoutPPs = Stream
+                    .concat(justNounAnswers.stream(), modifiedNounAnswers.stream())
+                    .map(answerTWD -> new BasicQuestionAnswerPair(sentenceId, parseId, parse,
+                                                                  predicateIndex, predicateCategory, 1, // TODO perhaps change predicate index and cat to adverb's
+                                                                  predicateIndex, null, // maybe should get rid of QuestionType?
+                                                                  ImmutableSet.copyOf(subject.dependencies), nounQuestionWithoutArgs,
+                                                                  subjDependencyOpt.orElse(null), answerTWD));
+
+                nounQAPairs = Stream.concat(nounAnswerQAPairsWithPPs,
+                              Stream.concat(ppAnswerQAPairsWithNouns,
+                              Stream.concat(ppAnswerQAPairsWithoutNouns,
+                                            nounAnswerQAPairsWithoutPPs)))
                     .collect(toImmutableList());
             }
         } else {
@@ -736,6 +755,7 @@ public class MultiQuestionTemplate {
         }
 
         return Stream.concat(justVerbQAPairs.stream(), Stream.concat(verbAndAdverbQAPairs.stream(), nounQAPairs.stream()));
+        // return nounQAPairs.stream();
                     
         }).collect(toImmutableList());
     }
