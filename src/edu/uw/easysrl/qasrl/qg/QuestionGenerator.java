@@ -5,14 +5,12 @@ import edu.uw.easysrl.qasrl.query.*;
 import edu.uw.easysrl.qasrl.qg.surfaceform.*;
 
 import edu.uw.easysrl.dependencies.ResolvedDependency;
-import edu.uw.easysrl.syntax.grammar.Category;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import static edu.uw.easysrl.util.GuavaCollectors.*;
 
 import java.util.*;
-import java.util.stream.Collector;
 import java.util.stream.IntStream;
 
 /**
@@ -51,59 +49,36 @@ public class QuestionGenerator {
     public static ImmutableList<QuestionAnswerPair> generateAllQAPairs(int sentenceId,
                                                                        ImmutableList<String> words,
                                                                        NBestList nBestList) {
-        /*
-        return IntStream.range(0, words.size()).boxed()
-                .flatMap(predId -> IntStream.range(0, nBestList.getN()).boxed()
-                        .flatMap(parseId -> {
-                            final Parse parse = nBestList.getParse(parseId);
-                            final Category category = parse.categories.get(predId);
-                            return IntStream.range(1, category.getNumberOfArguments() + 1).boxed()
-                                    .flatMap(argNum -> QuestionGenerator
-                                            .generateAllQAPairs(sentenceId, parseId, predId, argNum, words, parse)
-                                            .stream());
-                        })
-                ).collect(toImmutableList());*/
         return IntStream.range(0, nBestList.getN()).boxed()
-                .flatMap(parseId -> generateAllQAPairs(sentenceId, parseId, words, nBestList.getParse(parseId)).stream())
+                .flatMap(parseId -> generateQAPairsForParse(sentenceId, parseId, words, nBestList.getParse(parseId)).stream())
                 .collect(toImmutableList());
     }
 
-    public static ImmutableList<QuestionAnswerPair> generateAllQAPairs(int sentenceId,
-                                                                       int parseId,
-                                                                       ImmutableList<String> words,
-                                                                       Parse parse) {
-        if(askPPAttachmentQuestions) {
-            return IntStream.range(0, words.size())
+    public static ImmutableList<QuestionAnswerPair> generateQAPairsForParse(int sentenceId,
+                                                                            int parseId,
+                                                                            ImmutableList<String> words,
+                                                                            Parse parse) {
+        return IntStream.range(0, words.size())
                 .mapToObj(Integer::new)
-                .flatMap(predIndex -> {
-                        MultiQuestionTemplate template =
-                                new MultiQuestionTemplate(sentenceId, parseId, predIndex, words, parse);
-                        return template.getAllPPAttachmentQAPairs().stream();
-                    })
+                .flatMap(predIndex -> generateQAPairsForPredicate(sentenceId, parseId, predIndex, words, parse).stream())
                 .collect(toImmutableList());
-        } else {
-            return IntStream.range(0, words.size())
-                .mapToObj(Integer::new)
-                .flatMap(predIndex -> IntStream.range(1, parse.categories.get(predIndex).getNumberOfArguments() + 1)
-                         .boxed()
-                         .flatMap(argNum -> QuestionGenerator
-                                 .generateAllQAPairs(sentenceId, parseId, predIndex, argNum, words, parse)
-                                 .stream()))
-                .collect(toImmutableList());
-        }
     }
 
-    private static ImmutableList<QuestionAnswerPair> generateAllQAPairs(int sentenceId,
-                                                                        int parseId,
-                                                                        int predicateIdx,
-                                                                        int argumentNumber,
-                                                                        List<String> words,
-                                                                        Parse parse) {
-        MultiQuestionTemplate template = new MultiQuestionTemplate(sentenceId, parseId, predicateIdx, words, parse);
-        return ImmutableList.copyOf(template.getAllQAPairsForArgument(argumentNumber,
-                                                                      indefinitesOnly,
-                                                                      askAllStandardQuestions,
-                                                                      includeSupersenseQuestions));
+    private static ImmutableList<QuestionAnswerPair> generateQAPairsForPredicate(int sentenceId,
+                                                                                 int parseId,
+                                                                                 int predicateIdx,
+                                                                                 List<String> words,
+                                                                                 Parse parse) {
+        final MultiQuestionTemplate template = new MultiQuestionTemplate(sentenceId, parseId, predicateIdx, words, parse);
+        return askPPAttachmentQuestions ?
+                template.getAllPPAttachmentQAPairs()
+                        .stream()
+                        .collect(toImmutableList()) :
+                IntStream.range(1, parse.categories.get(predicateIdx).getNumberOfArguments() + 1)
+                        .boxed()
+                        .flatMap(argNum -> template.getAllQAPairsForArgument(argNum, indefinitesOnly,
+                                askAllStandardQuestions, includeSupersenseQuestions).stream())
+                        .collect(toImmutableList());
     }
 
     /**
@@ -121,7 +96,7 @@ public class QuestionGenerator {
                 Parse goldParse = devData.getGoldParses().get(sentenceId);
                 System.out.println(String.format("========== SID = %04d ==========", sentenceId));
                 System.out.println(TextGenerationHelper.renderString(words));
-                for(QuestionAnswerPair qaPair : generateAllQAPairs(sentenceId, -1, words, goldParse)) {
+                for(QuestionAnswerPair qaPair : generateQAPairsForParse(sentenceId, -1, words, goldParse)) {
                     printQAPair(words, qaPair);
                 }
             }
@@ -135,18 +110,18 @@ public class QuestionGenerator {
                 System.out.println(String.format("========== SID = %04d ==========", sentenceId));
                 ImmutableList<String> words = devData.getSentences().get(sentenceId);
                 System.out.println(TextGenerationHelper.renderString(words));
-                System.out.println(String.format("--------- Gold QA Pairs --------", sentenceId));
+                System.out.println("--------- Gold QA Pairs --------");
                 Parse goldParse = devData.getGoldParses().get(sentenceId);
-                for(QuestionAnswerPair qaPair : generateAllQAPairs(sentenceId, -1, words, goldParse)) {
+                for(QuestionAnswerPair qaPair : generateQAPairsForParse(sentenceId, -1, words, goldParse)) {
                     printQAPair(words, qaPair);
                 }
-                System.out.println(String.format("--------- All QA Pairs ---------", sentenceId));
+                System.out.println("--------- All QA Pairs ---------");
                 NBestList nBestList = nBestLists.get(sentenceId);
                 ImmutableList<QuestionAnswerPair> qaPairs = generateAllQAPairs(sentenceId, words, nBestList);
                 for(QuestionAnswerPair qaPair : qaPairs) {
                     printQAPair(words, qaPair);
                 }
-                System.out.println(String.format("------- All Pair Queries -------", sentenceId));
+                System.out.println("------- All Pair Queries -------");
                 ImmutableList<QAPairSurfaceForm> surfaceForms = QAPairAggregators.aggregateByString().aggregate(qaPairs);
                 ImmutableList<Query<QAPairSurfaceForm>> queries = QueryGenerators.maximalForwardGenerator().generate(surfaceForms);
                 for(Query<QAPairSurfaceForm> query : queries) {
@@ -165,7 +140,7 @@ public class QuestionGenerator {
                 }
                 ImmutableList<String> words = devData.getSentences().get(sentenceId);
                 NBestList nBestList = nBestLists.get(sentenceId);
-                System.out.println(String.format("--------- All Queries --------", sentenceId));
+                System.out.println("--------- All Queries --------");
                 System.out.println(TextGenerationHelper.renderString(words));
                 ImmutableList<QuestionAnswerPair> qaPairs = generateAllQAPairs(sentenceId, words, nBestList);
                 if(args.length > 1 && args[1].equalsIgnoreCase("aggDeps")) {
