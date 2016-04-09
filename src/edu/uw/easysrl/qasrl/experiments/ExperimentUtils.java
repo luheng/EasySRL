@@ -28,13 +28,15 @@ public class ExperimentUtils {
         }
     }
 
+    @Deprecated
     public static ImmutableList<ScoredQuery<QAStructureSurfaceForm>> generateAllRadioButtonQueries(
             final int sentenceId,
             final ImmutableList<String> sentence,
             final NBestList nBestList,
             final QueryPruningParameters queryPruningParameters) {
+        QuestionGenerator.setIndefinitesOnly(false);
         final ImmutableList<QuestionAnswerPair> rawQAPairs = QuestionGenerator
-                .generateAllQAPairs(sentenceId, sentence, nBestList, false /* no pronoun */);
+                .generateAllQAPairs(sentenceId, sentence, nBestList);
         return QueryFilters.scoredQueryFilter()
                 .filter(QueryGenerators.radioButtonQueryGenerator()
                         .generate(QAPairAggregators.aggregateForSingleChoiceQA()
@@ -42,13 +44,15 @@ public class ExperimentUtils {
                         nBestList, queryPruningParameters);
     }
 
+    @Deprecated
     public static ImmutableList<ScoredQuery<QAStructureSurfaceForm>> generateAllCheckboxQueries(
             final int sentenceId,
             final ImmutableList<String> sentence,
             final NBestList nBestList,
             final QueryPruningParameters queryPruningParameters) {
+        QuestionGenerator.setIndefinitesOnly(false);
         final ImmutableList<QuestionAnswerPair> rawQAPairs = QuestionGenerator
-                .generateAllQAPairs(sentenceId, sentence, nBestList, false /* no pronoun */);
+                .generateAllQAPairs(sentenceId, sentence, nBestList);
         return QueryFilters.scoredQueryFilter()
                 .filter(QueryGenerators.checkboxQueryGenerator()
                         .generate(QAPairAggregators.aggregateForMultipleChoiceQA()
@@ -93,10 +97,12 @@ public class ExperimentUtils {
             final NBestList nBestList,
             final boolean usePronouns,
             final QueryPruningParameters queryPruningParameters) {
+        QuestionGenerator.setAskPPAttachmentQuestions(false);
+        QuestionGenerator.setIndefinitesOnly(usePronouns);
         return queryFilter.filter(
                     queryGenerator.generate(
                             qaPairAggregator.aggregate(
-                                    QuestionGenerator.generateAllQAPairs(sentenceId, sentence, nBestList, usePronouns))),
+                                    QuestionGenerator.generateAllQAPairs(sentenceId, sentence, nBestList))),
                 nBestList, queryPruningParameters);
     }
 
