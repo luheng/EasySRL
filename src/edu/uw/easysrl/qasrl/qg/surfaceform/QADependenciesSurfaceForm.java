@@ -16,21 +16,31 @@ public class QADependenciesSurfaceForm extends BasicQAPairSurfaceForm {
         return questionDeps;
     }
 
-    public ImmutableSet<ResolvedDependency> getAnswerDependencies() {
-        return answerDeps;
+    public ImmutableSet<ResolvedDependency> getAllPossibleAnswerDependencies() {
+        return allPossibleAnswerDeps;
+    }
+
+    public ImmutableSet<ImmutableSet<ResolvedDependency>> getAnswerDependencySets() {
+        return answerDepSets;
     }
 
     private ImmutableSet<ResolvedDependency> questionDeps;
-    private ImmutableSet<ResolvedDependency> answerDeps;
+    private ImmutableSet<ResolvedDependency> allPossibleAnswerDeps;
+    private ImmutableSet<ImmutableSet<ResolvedDependency>> answerDepSets;
 
     public QADependenciesSurfaceForm(int sentenceId,
                                      String question,
                                      String answer,
                                      ImmutableList<QuestionAnswerPair> qaPairs,
                                      ImmutableSet<ResolvedDependency> questionDeps,
-                                     ImmutableSet<ResolvedDependency> answerDeps) {
+                                     ImmutableSet<ImmutableSet<ResolvedDependency>> answerDepSets) {
         super(sentenceId, question, answer, qaPairs);
         this.questionDeps = questionDeps;
-        this.answerDeps = answerDeps;
+        this.answerDepSets = answerDepSets;
+        ImmutableSet.Builder<ResolvedDependency> allPossibleAnswerDepsBuilder = new ImmutableSet.Builder<ResolvedDependency>();
+        for(ImmutableSet<ResolvedDependency> answerDeps : answerDepSets) {
+            allPossibleAnswerDepsBuilder.addAll(answerDeps);
+        }
+        this.allPossibleAnswerDeps = allPossibleAnswerDepsBuilder.build();
     }
 }
