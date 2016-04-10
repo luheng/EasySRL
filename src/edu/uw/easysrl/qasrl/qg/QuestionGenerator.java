@@ -145,7 +145,7 @@ public class QuestionGenerator {
                 ImmutableList<QuestionAnswerPair> qaPairs = generateAllQAPairs(sentenceId, words, nBestList);
                 if(args.length > 1 && args[1].equalsIgnoreCase("aggDeps")) {
                     ImmutableList<QADependenciesSurfaceForm> surfaceForms = QAPairAggregators
-                        .aggregateBySalientDeps().aggregate(qaPairs);
+                        .aggregateBySalientDependencies().aggregate(qaPairs);
                     ImmutableList<Query<QADependenciesSurfaceForm>> queries = QueryGenerators
                         .answerAdjunctPartitioningQueryGenerator().generate(surfaceForms);
                     for(Query<QADependenciesSurfaceForm> query : queries) {

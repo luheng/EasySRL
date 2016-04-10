@@ -2,11 +2,13 @@ package edu.uw.easysrl.qasrl.qg;
 
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Table;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.qg.syntax.AnswerStructure;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
 import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.*;
@@ -22,11 +24,11 @@ import static java.util.stream.Collectors.*;
 public class QAPairAggregatorUtils {
     public static String answerDelimiter = " _AND_ ";
 
-    public static String getQuestionLabelString(final QuestionAnswerPair qa) {
+    static String getQuestionLabelString(final QuestionAnswerPair qa) {
         return qa.getPredicateIndex() + "\t" + qa.getPredicateCategory() + "\t" + qa.getArgumentNumber() + "\t";
     }
 
-    public static String getQuestionDependenciesString(final QuestionAnswerPair qa) {
+    static String getQuestionDependenciesString(final QuestionAnswerPair qa) {
         // If the QA is a pp-arg question (i.e. What did X sell Y to?), then we need to include all dependencies.
         final boolean isPPArg = qa.getPredicateCategory().getArgument(qa.getArgumentNumber()) == Category.PP;
         return qa.getQuestionDependencies().stream()
@@ -42,11 +44,11 @@ public class QAPairAggregatorUtils {
                 .collect(Collectors.joining("\t"));
     }
 
-    public static String getFullQuestionStructureString(final QuestionAnswerPair qa) {
+    static String getFullQuestionStructureString(final QuestionAnswerPair qa) {
         return getQuestionLabelString(qa) + "\t" + getQuestionDependenciesString(qa);
     }
 
-    public static QuestionSurfaceFormToStructure getQuestionSurfaceFormToStructure(
+    static QuestionSurfaceFormToStructure getQuestionSurfaceFormToStructure(
             final List<QuestionAnswerPair> qaList) {
         final List<QuestionAnswerPair> bestSurfaceFormQAs = getQAListWithBestQuestionSurfaceForm(qaList);
         return new QuestionSurfaceFormToStructure(
@@ -55,7 +57,7 @@ public class QAPairAggregatorUtils {
                 qaList);
     }
 
-    public static AnswerSurfaceFormToStructure getAnswerSurfaceFormToSingleHeadedStructure(
+    static AnswerSurfaceFormToStructure getAnswerSurfaceFormToSingleHeadedStructure(
             final List<QuestionAnswerPair> qaList) {
         final AnswerStructure answerStructure = new AnswerStructure(
                 ImmutableList.of(qaList.get(0).getArgumentIndex()),
@@ -67,7 +69,7 @@ public class QAPairAggregatorUtils {
                 qaList);
     }
 
-    public static ImmutableList<AnswerSurfaceFormToStructure> getAnswerSurfaceFormToMultiHeadedStructures(
+    static ImmutableList<AnswerSurfaceFormToStructure> getAnswerSurfaceFormToMultiHeadedStructures(
             final List<QuestionAnswerPair> qaList) {
         // Get answer indices list.
         Table<ImmutableList<Integer>, String, Double> argListToAnswerToScore = HashBasedTable.create();
@@ -102,6 +104,52 @@ public class QAPairAggregatorUtils {
                             new AnswerStructure(argList, false /* not single headed */),
                             qaList2);
                 }).collect(GuavaCollectors.toImmutableList());
+    }
+
+    static SurfaceFormToDependencies getQuestionSurfaceFormToDependencies(final List<QuestionAnswerPair> qaList) {
+        final List<QuestionAnswerPair> bestSurfaceFormQAs = getQAListWithBestQuestionSurfaceForm(qaList);
+        return new SurfaceFormToDependencies(
+                bestSurfaceFormQAs.get(0).getQuestion(),
+                getSalientQuestionDependencies(qaList.get(0)),
+                qaList);
+    }
+
+    static SurfaceFormToDependencies getAnswerSurfaceFormToDependencies(final List<QuestionAnswerPair> qaList) {
+        final List<QuestionAnswerPair> bestSurfaceFormQAs = getQAListWithBestAnswerSurfaceForm(qaList);
+        return new SurfaceFormToDependencies(
+                bestSurfaceFormQAs.get(0).getAnswer(),
+                getSalientAnswerDependencies(qaList.get(0)),
+                qaList);
+    }
+
+    static ImmutableSet<ResolvedDependency> getSalientQuestionDependencies(final QuestionAnswerPair qa) {
+        return qa.getQuestionDependencies().stream()
+                .filter(dep -> isDependencySalient(dep, qa))
+                .collect(GuavaCollectors.toImmutableSet());
+    }
+
+    static ImmutableSet<ResolvedDependency> getSalientAnswerDependencies(final QuestionAnswerPair qa) {
+        return qa.getAnswerDependencies().stream()
+                .filter(dep -> isDependencySalient(dep, qa))
+                .collect(GuavaCollectors.toImmutableSet());
+    }
+
+    /**
+     * Tells us whether we want to group based on a dependency.
+     */
+    private static boolean isDependencySalient(ResolvedDependency dep, QuestionAnswerPair qaPair) {
+        ImmutableList<Category> categories = ImmutableList.copyOf(qaPair.getParse().categories);
+        ImmutableList<String> words = qaPair.getParse().syntaxTree.getLeaves().stream()
+                .map(SyntaxTreeNode::getWord)
+                .collect(toImmutableList());
+        int index = dep.getHead();
+        Category cat = categories.get(index);
+        return (qaPair.getTargetDependency() != null && dep.equals(qaPair.getTargetDependency())) ||
+                (cat.isFunctionInto(Category.valueOf("S\\NP")) && !cat.isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)"))) ||
+                (cat.isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)")) && dep.getArgNumber() == 2) ||
+                (cat.isFunctionInto(Category.valueOf("NP\\NP")) && dep.getArgNumber() == 1 && !words.get(index).equalsIgnoreCase("of"));
+        // (Category.valueOf("((S\\NP)\\(S\\NP))/NP").matches(cat) && dep.getArgNumber() == 2) ||
+        // (Category.valueOf("(NP\\NP)/NP").matches(cat) && dep.getArgNumber() == 1 && !words.get(index).equalsIgnoreCase("of"));
     }
 
     private static List<QuestionAnswerPair> getQAListWithBestQuestionSurfaceForm(Collection<QuestionAnswerPair> qaList) {
@@ -148,6 +196,19 @@ public class QAPairAggregatorUtils {
         AnswerSurfaceFormToStructure(String answer, AnswerStructure structure, Collection<QuestionAnswerPair> qaList) {
             this.answer = answer;
             this.structure = structure;
+            this.qaList = qaList;
+        }
+    }
+
+    static class SurfaceFormToDependencies {
+        public final String surfaceForm;
+        public final ImmutableSet<ResolvedDependency> dependencies;
+        public final Collection<QuestionAnswerPair> qaList;
+
+        SurfaceFormToDependencies(String surfaceForm, final ImmutableSet<ResolvedDependency> dependencies,
+                                 final Collection<QuestionAnswerPair> qaList) {
+            this.surfaceForm = surfaceForm;
+            this.dependencies = dependencies;
             this.qaList = qaList;
         }
     }
