@@ -11,6 +11,7 @@ import com.google.common.collect.ImmutableMap;
 import static edu.uw.easysrl.util.GuavaCollectors.*;
 
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
@@ -134,7 +135,7 @@ public class QuestionGenerator {
         } else if (args[0].equalsIgnoreCase("queries")) {
             System.out.println("All queries:\n");
             ImmutableMap<Integer, NBestList> nBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 100).get();
-            for(int sentenceId = 0; sentenceId < 50; sentenceId++) {
+            for(int sentenceId = 0; sentenceId < 5; sentenceId++) {
                 if(!nBestLists.containsKey(sentenceId)) {
                     continue;
                 }
@@ -143,6 +144,15 @@ public class QuestionGenerator {
                 System.out.println("--------- All Queries --------");
                 System.out.println(TextGenerationHelper.renderString(words));
                 ImmutableList<QuestionAnswerPair> qaPairs = generateAllQAPairs(sentenceId, words, nBestList);
+
+                qaPairs.forEach(qa -> {
+                    System.out.println(qa.getQuestion() + "\t" + qa.getAnswer());
+                    System.out.println(qa.getQuestionDependencies().stream().map(dep -> dep.toString(words)).collect(Collectors.joining(";\t")));
+                    System.out.println(qa.getTargetDependency().toString(words));
+                    System.out.println(qa.getAnswerDependencies().stream().map(dep -> dep.toString(words)).collect(Collectors.joining(";\t")));
+                    System.out.println();
+                });
+
                 if(args.length > 1 && args[1].equalsIgnoreCase("aggDeps")) {
                     ImmutableList<QADependenciesSurfaceForm> surfaceForms = QAPairAggregators
                         .aggregateBySalientDependencies().aggregate(qaPairs);

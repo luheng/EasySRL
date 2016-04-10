@@ -13,6 +13,7 @@ import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static edu.uw.easysrl.util.GuavaCollectors.toImmutableList;
 import static java.util.stream.Collectors.*;
@@ -123,7 +124,7 @@ public class QAPairAggregatorUtils {
     }
 
     static ImmutableSet<ResolvedDependency> getSalientQuestionDependencies(final QuestionAnswerPair qa) {
-        return qa.getQuestionDependencies().stream()
+        return Stream.concat(qa.getQuestionDependencies().stream(), Stream.of(qa.getTargetDependency()))
                 .filter(dep -> isDependencySalient(dep, qa))
                 .collect(GuavaCollectors.toImmutableSet());
     }
