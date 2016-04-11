@@ -76,7 +76,9 @@ public class ResponseSimulatorGold {
                          if (query.allowMultipleChoices()) {
                              IntStream.range(0, qaOptions.size())
                                      .filter(optionId -> qaOptions.get(optionId).getAnswerStructures().stream()
-                                             .anyMatch(astr -> goldArgIds.containsAll(astr.argumentIndices)))
+                                             .anyMatch(astr ->
+                                                     goldArgIds.containsAll(astr.argumentIndices) &&
+                                                     goldParse.dependencies.containsAll(astr.adjunctDependencies)))
                                      .forEach(chosenOptions::add);
                          }
                          // Radio Button version.

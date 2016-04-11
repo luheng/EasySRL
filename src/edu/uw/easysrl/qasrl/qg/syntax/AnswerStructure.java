@@ -81,8 +81,7 @@ public class AnswerStructure {
     public String toString(final ImmutableList<String> words) {
         String argIdsStr = argumentIndices.stream().map(String::valueOf).collect(Collectors.joining(","));
         String argHeadsStr = argumentIndices.stream().map(words::get).collect(Collectors.joining(","));
-        String adjDepsStr = adjunctDependencies == null ? "" :
-                adjunctDependencies.stream()
+        String adjDepsStr = adjunctDependencies.stream()
                         .map(dep -> String.format("%s->%s", words.get(dep.getHead()),words.get(dep.getArgument())))
                         .collect(Collectors.joining(";"));
         return argIdsStr + ":" + argHeadsStr + "," + adjDepsStr;

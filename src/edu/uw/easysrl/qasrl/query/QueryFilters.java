@@ -83,7 +83,7 @@ public class QueryFilters {
                             query.getPrompt(),
                             ImmutableList.copyOf(filteredOptions),
                             ImmutableList.copyOf(filteredQAList),
-                            query.isJeopardyStyle(),
+                            query.getQueryType(),
                             query.allowMultipleChoices());
                 })
                 .filter(query -> {
@@ -107,16 +107,12 @@ public class QueryFilters {
                 })
                 .map(query -> {
                     query.computeScores(nBestList);
-                    final ImmutableList<String> options = query.getOptions().stream()
-                            .filter(op -> !op.isEmpty())
-                            .collect(GuavaCollectors.toImmutableList());
                     // Prune answer options.
                     final int numQAOptions = query.getQAPairSurfaceForms().size();
                     final List<Integer> filteredOptionIds =
                             IntStream.range(0, numQAOptions).boxed()
                                     .filter(i -> !query.getOptions().get(i).isEmpty())
                                     .filter(i -> query.getOptionScores().get(i) > queryPruningParameters.minOptionConfidence)
-                                    .filter(i -> !canBeSplitted(query.getOptions().get(i), options))
                                     .collect(Collectors.toList());
                     // TODO: handle max number of options
                     final List<QAStructureSurfaceForm> filteredQAList = filteredOptionIds.stream()
@@ -131,10 +127,11 @@ public class QueryFilters {
                             query.getPrompt(),
                             ImmutableList.copyOf(filteredOptions),
                             ImmutableList.copyOf(filteredQAList),
-                            query.isJeopardyStyle(),
+                            query.getQueryType(),
                             query.allowMultipleChoices());
                 })
                 .filter(query -> {
+                    // Every query should contain at least one option with pp dependency.
                     if (!query.getQAPairSurfaceForms().stream().anyMatch(
                             qa -> qa.getAnswerStructures().stream().flatMap(astr -> astr.adjunctDependencies.stream())
                                     .map(ResolvedDependency::getCategory)
@@ -176,7 +173,7 @@ public class QueryFilters {
                             query.getPrompt(),
                             filteredOptions.stream().map(query.getOptions()::get).collect(toImmutableList()),
                             filteredQAOptions.stream().map(query.getQAPairSurfaceForms()::get).collect(toImmutableList()),
-                            query.isJeopardyStyle(),
+                            query.getQueryType(),
                             query.allowMultipleChoices());
                 })
                 .filter(query -> {

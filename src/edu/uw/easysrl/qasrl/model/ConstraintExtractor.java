@@ -5,6 +5,7 @@ import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.util.PronounList;
 import edu.uw.easysrl.qasrl.query.QueryGeneratorUtils;
+import edu.uw.easysrl.qasrl.query.QueryType;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.syntax.grammar.Category;
 
@@ -51,7 +52,7 @@ public class ConstraintExtractor {
                                                      Collection<Integer> chosenOptions,
                                                      boolean doNotPenalizePronouns) {
         final int numQAOptions = query.getQAPairSurfaceForms().size();
-        if (query.isJeopardyStyle()) {
+        if (query.getQueryType() == QueryType.Jeopardy || query.getQueryType() == QueryType.Clefted) {
             // 0: listed. 1: chosen.
             Table<Integer, Integer, Integer> attachments = HashBasedTable.create();
             for (int i = 0; i < numQAOptions; i++) {

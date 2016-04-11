@@ -1,15 +1,13 @@
 package edu.uw.easysrl.qasrl.query;
 
 import edu.uw.easysrl.qasrl.qg.surfaceform.*;
-import edu.uw.easysrl.qasrl.qg.*;
 import edu.uw.easysrl.syntax.grammar.Category;
-import edu.uw.easysrl.dependencies.ResolvedDependency;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.ImmutableMap;
 import edu.uw.easysrl.util.GuavaCollectors;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -69,7 +67,7 @@ public class QueryGenerators {
                                              qaList.get(0).getQuestion(),
                                              ImmutableList.copyOf(options),
                                              sortedQAList,
-                                             false, /* is jeopardy style */
+                                             QueryType.Forward,
                                              true /* allow multiple */);
                 }).collect(toImmutableList());
     }
@@ -81,18 +79,19 @@ public class QueryGenerators {
                 .values()
                 .stream()
                 .map(qaList -> {
-                    ImmutableList<QAStructureSurfaceForm> sortedQAList = qaList.stream()
-                            .sorted((qa1, qa2) -> Integer.compare(qa1.getArgumentIndices().get(0),
-                                    qa2.getArgumentIndices().get(0)))
+                    final ImmutableList<QAStructureSurfaceForm> sortedQAList = qaList.stream()
+                            //.sorted((qa1, qa2) -> StringComparable))
+                            .sorted(Comparator.comparing(QAStructureSurfaceForm::getAnswer))
                             .collect(GuavaCollectors.toImmutableList());
-                    List<String> options = sortedQAList.stream().map(QAStructureSurfaceForm::getAnswer).collect(toList());
-                    //options.add(QueryGeneratorUtils.kBadQuestionOptionString);
+                    final List<String> options = sortedQAList.stream()
+                            .map(QAStructureSurfaceForm::getAnswer)
+                            .collect(toList());
                     options.add(QueryGeneratorUtils.kNoneApplicableString);
                     return new ScoredQuery<>(qaList.get(0).getSentenceId(),
                             qaList.get(0).getQuestion(),
                             ImmutableList.copyOf(options),
                             sortedQAList,
-                            false, /* is jeopardy style */
+                            QueryType.Clefted,
                             true /* allow multiple */);
                 }).collect(toImmutableList());
     }
@@ -112,7 +111,7 @@ public class QueryGenerators {
                             qaList.get(0).getQuestion(),
                             ImmutableList.copyOf(options),
                             ImmutableList.copyOf(qaList),
-                            false, /* is jeopardy style */
+                            QueryType.Forward,
                             false /* allow multiple */);
                 }).collect(toImmutableList());
     }
@@ -134,7 +133,7 @@ public class QueryGenerators {
                             qaList.get(0).getAnswer(),
                             ImmutableList.copyOf(options),
                             ImmutableList.copyOf(qaList),
-                            true, /* is jeopardy style */
+                            QueryType.Jeopardy,
                             true /* allow multiple */);
                 }).collect(toImmutableList());
     }
