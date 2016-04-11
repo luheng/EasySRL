@@ -130,7 +130,8 @@ public class QAPairAggregatorUtils {
     }
 
     static ImmutableSet<ResolvedDependency> getSalientAnswerDependencies(final QuestionAnswerPair qa) {
-        return qa.getAnswerDependencies().stream()
+        return //Stream.concat(qa.getAnswerDependencies().stream(), Stream.of(qa.getTargetDependency()))
+                qa.getAnswerDependencies().stream()
                 .filter(dep -> isDependencySalient(dep, qa))
                 .collect(GuavaCollectors.toImmutableSet());
     }
