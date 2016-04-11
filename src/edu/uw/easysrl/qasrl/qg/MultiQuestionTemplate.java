@@ -619,7 +619,7 @@ public class MultiQuestionTemplate {
                     .build();
                 nounQAPairs = getAllCandidateNounTWDs(objIndex).stream()
                     .map(answerTWD -> new BasicQuestionAnswerPair(sentenceId, parseId, parse,
-                                                                  predicateIndex, predicateCategory, 1, // TODO perhaps change predicate index and cat to adverb's
+                                                                  predicateIndex, predicateCategory, 2, // TODO perhaps change predicate index and cat to adverb's
                                                                   predicateIndex, null, // maybe should get rid of QuestionType?
                                                                   questionDeps, nounQuestionWithoutArgs,
                                                                   objDep, answerTWD))
@@ -652,7 +652,7 @@ public class MultiQuestionTemplate {
                                 .add(ppDep)
                                 .build();
                                 return new BasicQuestionAnswerPair(sentenceId, parseId, parse,
-                                                                   predicateIndex, predicateCategory, 1, // TODO ? change predicate index and cat to prep's in that case?
+                                                                   predicateIndex, predicateCategory, 2, // TODO ? change predicate index and cat to prep's in that case?
                                                                    predicateIndex, null, // maybe should get rid of QuestionType?
                                                                    questionDeps, nounQuestion,
                                                                    ppObjDep, ppObjTWD);
@@ -675,7 +675,7 @@ public class MultiQuestionTemplate {
                             .addAll(subjDependencyOpt.isPresent() ? ImmutableList.of(subjDependencyOpt.get()) : ImmutableList.of())
                             .build();
                             return new BasicQuestionAnswerPair(sentenceId, parseId, parse,
-                                                               predicateIndex, predicateCategory, 1, // TODO perhaps change predicate index and cat to adverb's
+                                                               predicateIndex, predicateCategory, 3, // TODO perhaps change predicate index and cat to adverb's
                                                                predicateIndex, null, // maybe should get rid of QuestionType?
                                                                questionDeps, nounQuestionWithoutArgs,
                                                                objDep, answerTWD);
@@ -709,7 +709,7 @@ public class MultiQuestionTemplate {
                                     .add(ppDep)
                                     .build();
                                     return new BasicQuestionAnswerPair(sentenceId, parseId, parse,
-                                                                       predicateIndex, predicateCategory, 1, // TODO ? change predicate index and cat?
+                                                                       predicateIndex, predicateCategory, 3, // TODO ? change predicate index and cat?
                                                                        predicateIndex, null, // maybe should get rid of QuestionType?
                                                                        questionDeps, nounQuestion,
                                                                        ppObjDep, answerTWD);

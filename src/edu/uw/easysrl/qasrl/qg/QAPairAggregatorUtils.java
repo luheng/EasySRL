@@ -110,16 +110,19 @@ public class QAPairAggregatorUtils {
 
     static AnswerSurfaceFormToStructure getAnswerSurfaceFormToAdjunctHeadsStructure(
             final List<QuestionAnswerPair> qaList) {
-        final ImmutableList<Integer> argIds = Stream.concat(getSalientAnswerDependencies(qaList.get(0)).stream(),
-                                                            Stream.of(qaList.get(0).getTargetDependency()))
-                .map(ResolvedDependency::getArgument)
+        final QuestionAnswerPair qa = qaList.get(0);
+        final int answerHead = qa.getArgumentNumber() == 1 ?
+                qa.getPredicateIndex() :
+                qa.getTargetDependency().getArgument();
+        final ImmutableList<Integer> argIds = Stream.concat(
+                    getSalientAnswerDependencies(qaList.get(0)).stream().map(ResolvedDependency::getHead),
+                    Stream.of(answerHead))
                 .distinct().sorted()
                 .collect(toImmutableList());
         return new AnswerSurfaceFormToStructure(
                 getQAListWithBestAnswerSurfaceForm(qaList).get(0).getAnswer(),
                 new AnswerStructure(argIds, false /* single headed */),
                 qaList);
-
     }
 
     static SurfaceFormToDependencies getQuestionSurfaceFormToDependencies(final List<QuestionAnswerPair> qaList) {
@@ -145,7 +148,7 @@ public class QAPairAggregatorUtils {
     }
 
     static ImmutableSet<ResolvedDependency> getSalientAnswerDependencies(final QuestionAnswerPair qa) {
-        return Stream.concat(qa.getAnswerDependencies().stream(), Stream.of(qa.getTargetDependency()))
+        return qa.getAnswerDependencies().stream()
                 .filter(dep -> isDependencySalient(dep, qa))
                 .collect(GuavaCollectors.toImmutableSet());
     }
