@@ -613,12 +613,16 @@ public class MultiQuestionTemplate {
             } else {
                 ResolvedDependency objDep = objDepOpt.get();
                 int objIndex = objDep.getArgument();
+                final ImmutableSet<ResolvedDependency> questionDeps = new ImmutableSet.Builder<ResolvedDependency>()
+                    .addAll(subject.dependencies)
+                    .addAll(subjDependencyOpt.isPresent() ? ImmutableList.of(subjDependencyOpt.get()) : ImmutableList.of())
+                    .build();
                 nounQAPairs = getAllCandidateNounTWDs(objIndex).stream()
                     .map(answerTWD -> new BasicQuestionAnswerPair(sentenceId, parseId, parse,
                                                                   predicateIndex, predicateCategory, 1, // TODO perhaps change predicate index and cat to adverb's
                                                                   predicateIndex, null, // maybe should get rid of QuestionType?
-                                                                  ImmutableSet.copyOf(subject.dependencies), nounQuestionWithoutArgs,
-                                                                  subjDependencyOpt.orElse(null), answerTWD))
+                                                                  questionDeps, nounQuestionWithoutArgs,
+                                                                  objDep, answerTWD))
                     .collect(toImmutableList());
             }
         } else if(Category.valueOf("((S\\NP)/PP)").matches(predicateCategory)) {
