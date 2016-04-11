@@ -96,7 +96,7 @@ public class ExperimentUtils {
             final QueryPruningParameters queryPruningParameters) {
         QuestionGenerator.setAskPPAttachmentQuestions(true);
         QuestionGenerator.setIndefinitesOnly(usePronouns);
-        return QueryFilters.scoredQueryFilter().filter(
+        return QueryFilters.cleftedQueryFilter().filter(
                 QueryGenerators.cleftedQueryGenerator().generate(
                         QAPairAggregators.aggregateWithAnswerAdjunctDependencies().aggregate(
                                 QuestionGenerator.generateAllQAPairs(sentenceId, sentence, nBestList))),
