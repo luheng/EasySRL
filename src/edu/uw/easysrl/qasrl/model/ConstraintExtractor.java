@@ -53,11 +53,20 @@ public class ConstraintExtractor {
                                                      boolean doNotPenalizePronouns) {
         final int numQAOptions = query.getQAPairSurfaceForms().size();
         if (query.getQueryType() == QueryType.Jeopardy || query.getQueryType() == QueryType.Clefted) {
+            if (query.getQueryType() == QueryType.Clefted &&
+                    chosenOptions.contains(query.getBadQuestionOptionId().getAsInt())) {
+                final int predicateId = query.getPredicateId().getAsInt();
+                final int argHead = query.getQAPairSurfaceForms().get(0).getArgumentIndices().get(0);
+                return ImmutableSet.of(new Constraint.AttachmentConstraint(predicateId, argHead, false, 1.0));
+            }
             // 0: listed. 1: chosen.
             Table<Integer, Integer, Integer> attachments = HashBasedTable.create();
             for (int i = 0; i < numQAOptions; i++) {
                 final boolean chosen = chosenOptions.contains(i);
-                AttachmentHelper.getPPAttachments(query.getQAPairSurfaceForms().get(i)).forEach(a -> {
+                final List<int[]> extractedAttachments = query.getQueryType() == QueryType.Jeopardy ?
+                        AttachmentHelper.getPPAttachments(query.getQAPairSurfaceForms().get(i)) :
+                        AttachmentHelper.getAnswerPPAttachments(query.getQAPairSurfaceForms().get(i));
+                extractedAttachments.forEach(a -> {
                     if (!attachments.contains(a[0], a[1])) {
                         attachments.put(a[0], a[1], 0);
                     }

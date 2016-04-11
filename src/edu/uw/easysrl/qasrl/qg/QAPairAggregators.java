@@ -1,17 +1,14 @@
 package edu.uw.easysrl.qasrl.qg;
 
 import com.google.common.collect.*;
-import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.qg.surfaceform.*;
 
 import static edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils.*;
-import edu.uw.easysrl.syntax.grammar.Category;
 
 import static edu.uw.easysrl.util.GuavaCollectors.*;
 import static java.util.stream.Collectors.*;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Helper class where we put all of our useful QAPairAggregator instances
@@ -77,35 +74,32 @@ public final class QAPairAggregators {
                 }).collect(toImmutableList());
     }
 
-
     public static QAPairAggregator<QAStructureSurfaceForm> aggregateWithAnswerAdjunctDependencies() {
         return qaPairs ->  qaPairs
                 .stream()
-                .collect(groupingBy(QAPairAggregatorUtils::getQuestionLabelString))
+                .collect(groupingBy(QuestionAnswerPair::getPredicateIndex))
                 .values().stream()
-                .map(QAPairAggregatorUtils::getQuestionSurfaceFormToStructure)
-                .collect(groupingBy(qs2s -> qs2s.question))
-                .values().stream()
-                .flatMap(qs2sEntries -> {
-                    final ImmutableList<QuestionAnswerPair> questionQAPairs = qs2sEntries.stream()
-                            .flatMap(qs -> qs.qaList.stream())
-                            .collect(toImmutableList());
+                .flatMap(samePredicateQAs -> samePredicateQAs
+                        .stream()
+                        .collect(groupingBy(QAPairAggregatorUtils::getQuestionLabelString))
+                        .values().stream()
+                        .map(QAPairAggregatorUtils::getQuestionSurfaceFormToStructure)
+                        .collect(groupingBy(qs2s -> qs2s.question))
+                        .values().stream()
+                        .flatMap(qs2sEntries -> {
+                            final ImmutableList<QuestionAnswerPair> questionQAPairs = qs2sEntries.stream()
+                                    .flatMap(qs -> qs.qaList.stream())
+                                    .collect(toImmutableList());
 
-                    return questionQAPairs.stream()
-                            .collect(groupingBy(QAPairAggregatorUtils::getSalientAnswerDependencies))
-                            .values().stream()
-                            .map(QAPairAggregatorUtils::getAnswerSurfaceFormToAdjunctHeadsStructure)
-                            .collect(groupingBy(as2s -> as2s.answer))
-                            .values().stream()
-                            .map(as2sEntries -> new QAStructureSurfaceForm(
-                                    questionQAPairs.get(0).getSentenceId(),
-                                    qs2sEntries.get(0).question,
-                                    as2sEntries.get(0).answer,
-                                    as2sEntries.stream().flatMap(as2s -> as2s.qaList.stream()).collect(toImmutableList()),
-                                    qs2sEntries.stream().map(qs2s -> qs2s.structure).distinct().collect(toImmutableList()),
-                                    as2sEntries.stream().map(as2s -> as2s.structure).distinct().collect(toImmutableList())));
-                })
-                .collect(toImmutableList());
+                            return questionQAPairs.stream()
+                                    .collect(groupingBy(QAPairAggregatorUtils::getPrepositionalAnswerDependencies))
+                                    .values().stream()
+                                    .map(QAPairAggregatorUtils::getAnswerSurfaceFormToAdjunctHeadsStructure)
+                                    .collect(groupingBy(as2s -> as2s.answer))
+                                    .values().stream()
+                                    .map(as2sEntries -> getQAStructureSurfaceForm(qs2sEntries, as2sEntries));
+                        })
+                ).collect(toImmutableList());
     }
 
     /**
@@ -129,14 +123,7 @@ public final class QAPairAggregators {
                             .stream()
                             .collect(groupingBy(as2s -> as2s.answer))
                             .values().stream()
-                            .map(as2sEntries -> new QAStructureSurfaceForm(
-                                    questionQAList.get(0).getSentenceId(),
-                                    qs2sEntries.get(0).question,
-                                    as2sEntries.get(0).answer,
-                                    as2sEntries.stream().flatMap(asts -> asts.qaList.stream()).collect(toImmutableList()),
-                                    qs2sEntries.stream().map(qs2s -> qs2s.structure).distinct().collect(toImmutableList()),
-                                    as2sEntries.stream().map(as2s -> as2s.structure).distinct().collect(toImmutableList()))
-                            );
+                            .map(as2sEntries -> getQAStructureSurfaceForm(qs2sEntries, as2sEntries));
                 })
                 .collect(toImmutableList());
     }
@@ -154,26 +141,16 @@ public final class QAPairAggregators {
                 .map(QAPairAggregatorUtils::getQuestionSurfaceFormToStructure)
                 .collect(groupingBy(qs2s -> qs2s.question))
                 .values().stream()
-                .flatMap(qs2sEntries -> {
-                    final ImmutableList<QuestionAnswerPair> questionQAPairs = qs2sEntries.stream()
-                            .flatMap(qs -> qs.qaList.stream())
-                            .collect(toImmutableList());
-
-                    return questionQAPairs.stream()
-                            .collect(groupingBy(QuestionAnswerPair::getArgumentIndex))
-                            .values().stream()
-                            .map(QAPairAggregatorUtils::getAnswerSurfaceFormToSingleHeadedStructure)
-                            .collect(groupingBy(as2s -> as2s.answer))
-                            .values().stream()
-                            .map(as2sEntries -> new QAStructureSurfaceForm(
-                                    questionQAPairs.get(0).getSentenceId(),
-                                    qs2sEntries.get(0).question,
-                                    as2sEntries.get(0).answer,
-                                    as2sEntries.stream().flatMap(asts -> asts.qaList.stream()).collect(toImmutableList()),
-                                    qs2sEntries.stream().map(qsts -> qsts.structure).distinct().collect(toImmutableList()),
-                                    as2sEntries.stream().map(asts -> asts.structure).distinct().collect(toImmutableList())));
-                })
-                .collect(toImmutableList());
+                .flatMap(qs2sEntries -> qs2sEntries
+                        .stream()
+                        .flatMap(qs -> qs.qaList.stream())
+                        .collect(groupingBy(QuestionAnswerPair::getArgumentIndex))
+                        .values().stream()
+                        .map(QAPairAggregatorUtils::getAnswerSurfaceFormToSingleHeadedStructure)
+                        .collect(groupingBy(as2s -> as2s.answer))
+                        .values().stream()
+                        .map(as2sEntries -> getQAStructureSurfaceForm(qs2sEntries, as2sEntries))
+                ).collect(toImmutableList());
     }
 
     /**

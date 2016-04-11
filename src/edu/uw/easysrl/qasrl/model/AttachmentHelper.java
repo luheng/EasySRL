@@ -65,6 +65,15 @@ public class AttachmentHelper {
         return attachments;
     }
 
+    public static List<int[]> getAnswerPPAttachments(QAStructureSurfaceForm qa) {
+        final List<int[]> attachments = new ArrayList<>();
+        qa.getAnswerStructures().stream()
+                .flatMap(astr -> astr.adjunctDependencies.stream())
+                .distinct()
+                .forEach(dep -> attachments.add(new int[]{ dep.getHead(), dep.getArgument() }));
+        return attachments;
+    }
+
     private static ImmutableSet<Integer> getPronounArgumentIds(final QAStructureSurfaceForm qa) {
         final String[] answerSpans = qa.getAnswer().split(QAPairAggregatorUtils.answerDelimiter);
         return qa.getAnswerStructures().stream()

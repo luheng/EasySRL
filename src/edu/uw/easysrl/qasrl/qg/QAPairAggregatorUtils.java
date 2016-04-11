@@ -5,8 +5,11 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Table;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
+import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.syntax.AnswerStructure;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
+import edu.uw.easysrl.qasrl.qg.util.Prepositions;
+import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.util.GuavaCollectors;
@@ -48,6 +51,20 @@ public class QAPairAggregatorUtils {
 
     static String getFullQuestionStructureString(final QuestionAnswerPair qa) {
         return getQuestionLabelString(qa) + "\t" + getQuestionDependenciesString(qa);
+    }
+
+    static QAStructureSurfaceForm getQAStructureSurfaceForm(final List<QuestionSurfaceFormToStructure> qs2sEntries,
+                                                            final List<AnswerSurfaceFormToStructure> as2sEntries) {
+        final ImmutableList<QuestionAnswerPair> qaPairs = as2sEntries.stream()
+                .flatMap(as2s -> as2s.qaList.stream())
+                .collect(toImmutableList());
+        return new QAStructureSurfaceForm(
+                qaPairs.get(0).getSentenceId(),
+                qs2sEntries.get(0).question,
+                as2sEntries.get(0).answer,
+                qaPairs,
+                qs2sEntries.stream().map(qs2s -> qs2s.structure).distinct().collect(toImmutableList()),
+                as2sEntries.stream().map(as2s -> as2s.structure).distinct().collect(toImmutableList()));
     }
 
     static QuestionSurfaceFormToStructure getQuestionSurfaceFormToStructure(
@@ -144,6 +161,13 @@ public class QAPairAggregatorUtils {
     static ImmutableSet<ResolvedDependency> getSalientAnswerDependencies(final QuestionAnswerPair qa) {
         return qa.getAnswerDependencies().stream()
                 .filter(dep -> isDependencySalient(dep, qa))
+                .collect(GuavaCollectors.toImmutableSet());
+    }
+
+    static ImmutableSet<ResolvedDependency> getPrepositionalAnswerDependencies(final QuestionAnswerPair qa) {
+        return qa.getAnswerDependencies().stream()
+                .filter(dep -> Prepositions.prepositionalCategories.contains(dep.getCategory()) ||
+                                dep.getCategory().getArgument(dep.getArgNumber()) == Category.PP)
                 .collect(GuavaCollectors.toImmutableSet());
     }
 

@@ -66,8 +66,7 @@ public class CrowdFlowerDataWriterClefted {
             history.addSentence(sid);
             for (ScoredQuery<QAStructureSurfaceForm> query : queries) {
                 final ImmutableList<String> sentence = hitlParser.getSentence(sid);
-                //final ImmutableList<Integer> goldOptionIds = hitlParser.getGoldOptions(query);
-                final ImmutableList<Integer> oracleOptionIds = hitlParser.getOracleOptions(query);
+                final ImmutableList<Integer> goldOptionIds = hitlParser.getGoldOptions(query);
                 CrowdFlowerDataUtils.printQueryToCSVFileNew(
                         query,
                         sentence,
@@ -76,7 +75,7 @@ public class CrowdFlowerDataWriterClefted {
                         true, // highlight predicate
                         "",
                         csvPrinter);
-                history.addEntry(sid, query, oracleOptionIds, hitlParser.getConstraints(query, oracleOptionIds));
+                history.addEntry(sid, query, goldOptionIds, hitlParser.getConstraints(query, goldOptionIds));
                 history.printLatestHistory();
                 if (lineCounter.get() % maxNumQueriesPerFile == 0) {
                     csvPrinter.close();
