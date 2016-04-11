@@ -74,6 +74,29 @@ public class QueryGenerators {
                 }).collect(toImmutableList());
     }
 
+    public static QueryGenerator<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> cleftedQueryGenerator() {
+        return qaPairs -> qaPairs
+                .stream()
+                .collect(groupingBy(qa -> qa.getQuestion() + " ### " + qa.getArgumentIndices().get(0)))
+                .values()
+                .stream()
+                .map(qaList -> {
+                    ImmutableList<QAStructureSurfaceForm> sortedQAList = qaList.stream()
+                            .sorted((qa1, qa2) -> Integer.compare(qa1.getArgumentIndices().get(0),
+                                    qa2.getArgumentIndices().get(0)))
+                            .collect(GuavaCollectors.toImmutableList());
+                    List<String> options = sortedQAList.stream().map(QAStructureSurfaceForm::getAnswer).collect(toList());
+                    //options.add(QueryGeneratorUtils.kBadQuestionOptionString);
+                    options.add(QueryGeneratorUtils.kNoneApplicableString);
+                    return new ScoredQuery<>(qaList.get(0).getSentenceId(),
+                            qaList.get(0).getQuestion(),
+                            ImmutableList.copyOf(options),
+                            sortedQAList,
+                            false, /* is jeopardy style */
+                            true /* allow multiple */);
+                }).collect(toImmutableList());
+    }
+
     public static QueryGenerator<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> radioButtonQueryGenerator() {
         return qaPairs -> qaPairs
                 .stream()

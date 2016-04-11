@@ -89,8 +89,7 @@ public class QAStructureSurfaceForm implements QAPairSurfaceForm {
                 .filter(qStr -> parse.categories.get(qStr.predicateIndex) == qStr.category)
                 .map(qStr -> qStr.filter(parse.dependencies))
                 .anyMatch(qdeps -> answerStructures.stream()
-                        .anyMatch(aStr ->
-                                !aStr.filter(qdeps).isEmpty() &&
+                        .anyMatch(aStr -> !aStr.filter(qdeps).isEmpty() &&
                                     parse.dependencies.containsAll(aStr.adjunctDependencies)));
     }
 }

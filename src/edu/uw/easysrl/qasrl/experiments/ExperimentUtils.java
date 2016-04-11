@@ -97,7 +97,7 @@ public class ExperimentUtils {
         QuestionGenerator.setAskPPAttachmentQuestions(true);
         QuestionGenerator.setIndefinitesOnly(usePronouns);
         return QueryFilters.scoredQueryFilter().filter(
-                QueryGenerators.checkboxQueryGenerator().generate(
+                QueryGenerators.cleftedQueryGenerator().generate(
                         QAPairAggregators.aggregateWithAnswerAdjunctDependencies().aggregate(
                                 QuestionGenerator.generateAllQAPairs(sentenceId, sentence, nBestList))),
                 nBestList, queryPruningParameters);
