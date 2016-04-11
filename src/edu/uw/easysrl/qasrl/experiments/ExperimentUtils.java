@@ -88,6 +88,21 @@ public class ExperimentUtils {
                 sentenceId, sentence, nBestList, usePronouns, queryPruningParameters);
     }
 
+    public static ImmutableList<ScoredQuery<QAStructureSurfaceForm>> generateCleftedQueries(
+            final int sentenceId,
+            final ImmutableList<String> sentence,
+            final NBestList nBestList,
+            final boolean usePronouns,
+            final QueryPruningParameters queryPruningParameters) {
+        QuestionGenerator.setAskPPAttachmentQuestions(true);
+        QuestionGenerator.setIndefinitesOnly(usePronouns);
+        return QueryFilters.scoredQueryFilter().filter(
+                QueryGenerators.checkboxQueryGenerator().generate(
+                        QAPairAggregators.aggregateWithAnswerAdjunctDependencies().aggregate(
+                                QuestionGenerator.generateAllQAPairs(sentenceId, sentence, nBestList))),
+                nBestList, queryPruningParameters);
+    }
+
     private static ImmutableList<ScoredQuery<QAStructureSurfaceForm>> generateAllQueries(
             QAPairAggregator<QAStructureSurfaceForm> qaPairAggregator,
             QueryGenerator<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> queryGenerator,

@@ -108,6 +108,19 @@ public class HITLParser {
 
     /****************************** Pre-set "recipes" for query generation. *************************/
 
+    public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getCleftedQuestionsForSentence(int sentenceId) {
+        QueryPruningParameters queryPruningParams = new QueryPruningParameters(queryPruningParameters);
+        queryPruningParams.skipPPQuestions = false;
+        ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList =
+                ExperimentUtils.generateCleftedQueries(
+                        sentenceId, sentences.get(sentenceId), nbestLists.get(sentenceId),
+                        false /* usePronouns */,
+                        queryPruningParams);
+        // Assign query ids.
+        IntStream.range(0, queryList.size()).forEach(i -> queryList.get(i).setQueryId(i));
+        return queryList;
+    }
+
     public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getPronounCoreArgQueriesForSentence(int sentenceId) {
         final QueryPruningParameters queryPruningParams = new QueryPruningParameters(queryPruningParameters);
         queryPruningParams.skipPPQuestions = true;
@@ -163,6 +176,7 @@ public class HITLParser {
      * @param sentenceId
      * @return
      */
+    @Deprecated
     public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getAdjunctQueriesForSentence(int sentenceId,
                                                                                            boolean isCheckboxStyle) {
         QueryPruningParameters queryPruningParams = new QueryPruningParameters(queryPruningParameters);
@@ -183,6 +197,7 @@ public class HITLParser {
         return queryList;
     }
 
+    @Deprecated
     public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getPPAttachmentQueriesForSentence(int sentenceId) {
         QueryPruningParameters queryPruningParams = new QueryPruningParameters(queryPruningParameters);
         queryPruningParams.skipPPQuestions = false;
@@ -198,6 +213,7 @@ public class HITLParser {
         return queryList;
     }
 
+    @Deprecated
     public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getPronounPPAttachmentQueriesForSentence(int sentenceId) {
         QueryPruningParameters queryPruningParams = new QueryPruningParameters(queryPruningParameters);
         queryPruningParams.skipPPQuestions = false;

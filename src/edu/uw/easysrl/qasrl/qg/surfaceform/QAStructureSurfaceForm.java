@@ -81,13 +81,6 @@ public class QAStructureSurfaceForm implements QAPairSurfaceForm {
         this.answer     =  answer;
         this.qaPairs    =  qaPairs;
         this.questionStructures = questionStructures;
-        /*
-        this.questionStructures = questionStructures.stream()
-                .collect(Collectors.groupingBy(QuestionStructure::hashCode))
-                .values().stream()
-                .map(qs -> qs.get(0))
-                .collect(GuavaCollectors.toImmutableList());
-                */
         this.answerStructures = answerStructures;
     }
 
@@ -96,6 +89,8 @@ public class QAStructureSurfaceForm implements QAPairSurfaceForm {
                 .filter(qStr -> parse.categories.get(qStr.predicateIndex) == qStr.category)
                 .map(qStr -> qStr.filter(parse.dependencies))
                 .anyMatch(qdeps -> answerStructures.stream()
-                        .anyMatch(aStr -> !aStr.filter(qdeps).isEmpty()));
+                        .anyMatch(aStr ->
+                                !aStr.filter(qdeps).isEmpty() &&
+                                    parse.dependencies.containsAll(aStr.adjunctDependencies)));
     }
 }

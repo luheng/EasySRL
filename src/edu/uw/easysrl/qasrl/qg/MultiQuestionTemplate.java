@@ -709,7 +709,7 @@ public class MultiQuestionTemplate {
                                     .add(ppDep)
                                     .build();
                                     return new BasicQuestionAnswerPair(sentenceId, parseId, parse,
-                                                                       predicateIndex, predicateCategory, 3, // TODO ? change predicate index and cat?
+                                                                       predicateIndex, predicateCategory, 2, // TODO ? change predicate index and cat?
                                                                        predicateIndex, null, // maybe should get rid of QuestionType?
                                                                        questionDeps, nounQuestion,
                                                                        ppObjDep, answerTWD);

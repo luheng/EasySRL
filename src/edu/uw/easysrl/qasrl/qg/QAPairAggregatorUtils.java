@@ -111,17 +111,11 @@ public class QAPairAggregatorUtils {
     static AnswerSurfaceFormToStructure getAnswerSurfaceFormToAdjunctHeadsStructure(
             final List<QuestionAnswerPair> qaList) {
         final QuestionAnswerPair qa = qaList.get(0);
-        final int answerHead = qa.getArgumentNumber() == 1 ?
-                qa.getPredicateIndex() :
-                qa.getTargetDependency().getArgument();
-        final ImmutableList<Integer> argIds = Stream.concat(
-                    getSalientAnswerDependencies(qaList.get(0)).stream().map(ResolvedDependency::getHead),
-                    Stream.of(answerHead))
-                .distinct().sorted()
-                .collect(toImmutableList());
+        final boolean answerIsVP = qa.getArgumentNumber() == 1;
+        final int answerHead =  answerIsVP ? qa.getPredicateIndex() : qa.getTargetDependency().getArgument();
         return new AnswerSurfaceFormToStructure(
                 getQAListWithBestAnswerSurfaceForm(qaList).get(0).getAnswer(),
-                new AnswerStructure(argIds, false /* single headed */),
+                new AnswerStructure(ImmutableList.of(answerHead), getSalientAnswerDependencies(qaList.get(0)), answerIsVP),
                 qaList);
     }
 

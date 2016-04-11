@@ -14,6 +14,7 @@ import edu.uw.easysrl.qasrl.qg.surfaceform.QADependenciesSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAPairSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.Query;
+import edu.uw.easysrl.qasrl.query.QueryFilters;
 import edu.uw.easysrl.qasrl.query.QueryGenerators;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 
@@ -46,11 +47,11 @@ public class CleftingQuestionExperiment {
                 System.out.println();
             });*/
 
-
             ImmutableList<QAStructureSurfaceForm> surfaceForms = QAPairAggregators
                     .aggregateWithAnswerAdjunctDependencies()
                     .aggregate(qaPairs);
-            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries = QueryGenerators
+            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries =
+                    QueryGenerators
                     .checkboxQueryGenerator()
                     .generate(surfaceForms);
 

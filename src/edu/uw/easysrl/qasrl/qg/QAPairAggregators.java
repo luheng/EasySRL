@@ -101,9 +101,9 @@ public final class QAPairAggregators {
                                     questionQAPairs.get(0).getSentenceId(),
                                     qs2sEntries.get(0).question,
                                     as2sEntries.get(0).answer,
-                                    as2sEntries.stream().flatMap(asts -> asts.qaList.stream()).collect(toImmutableList()),
-                                    qs2sEntries.stream().map(qsts -> qsts.structure).distinct().collect(toImmutableList()),
-                                    as2sEntries.stream().map(asts -> asts.structure).distinct().collect(toImmutableList())));
+                                    as2sEntries.stream().flatMap(as2s -> as2s.qaList.stream()).collect(toImmutableList()),
+                                    qs2sEntries.stream().map(qs2s -> qs2s.structure).distinct().collect(toImmutableList()),
+                                    as2sEntries.stream().map(as2s -> as2s.structure).distinct().collect(toImmutableList())));
                 })
                 .collect(toImmutableList());
     }
