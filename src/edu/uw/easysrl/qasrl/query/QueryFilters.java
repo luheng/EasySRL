@@ -1,7 +1,7 @@
 package edu.uw.easysrl.qasrl.query;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
+import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
 import edu.uw.easysrl.syntax.grammar.Category;
@@ -21,9 +21,9 @@ import static edu.uw.easysrl.util.GuavaCollectors.toImmutableList;
  * Created by luheng on 3/22/16.
  */
 public class QueryFilters {
-    private static Set<Category> propositionalCategories = new HashSet<>();
+    private static Set<Category> prepositionalCategories = new HashSet<>();
     static {
-        Collections.addAll(propositionalCategories,
+        Collections.addAll(prepositionalCategories,
                 Category.valueOf("((S\\NP)\\(S\\NP))/NP"),
                 Category.valueOf("(NP\\NP)/NP"),
                 Category.valueOf("((S\\NP)\\(S\\NP))/S[dcl]"));
@@ -55,7 +55,7 @@ public class QueryFilters {
                     return (!queryPruningParameters.skipSAdjQuestions ||
                                 !qstrs.stream().anyMatch(q -> q.category.isFunctionInto(Category.valueOf("S[adj]")))) &&
                             (!queryPruningParameters.skipPPQuestions || qstrs.stream()
-                                    .anyMatch(q -> !propositionalCategories.contains(q.category)));
+                                    .anyMatch(q -> !prepositionalCategories.contains(q.category)));
                 })
                 .map(query -> {
                     query.computeScores(nBestList);
@@ -95,7 +95,60 @@ public class QueryFilters {
                 .collect(toImmutableList());
     }
 
-    // FIXME
+    public static QueryFilter<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> cleftedQueryFilter() {
+        return (queries, nBestList, queryPruningParameters) -> queries.stream()
+                .filter(query -> {
+                    final ImmutableList<QuestionStructure> qstrs = query.getQAPairSurfaceForms().stream()
+                            .flatMap(qa -> qa.getQuestionStructures().stream())
+                            .distinct()
+                            .collect(GuavaCollectors.toImmutableList());
+                    return (!queryPruningParameters.skipSAdjQuestions ||
+                            !qstrs.stream().anyMatch(q -> q.category.isFunctionInto(Category.valueOf("S[adj]"))));
+                })
+                .map(query -> {
+                    query.computeScores(nBestList);
+                    final ImmutableList<String> options = query.getOptions().stream()
+                            .filter(op -> !op.isEmpty())
+                            .collect(GuavaCollectors.toImmutableList());
+                    // Prune answer options.
+                    final int numQAOptions = query.getQAPairSurfaceForms().size();
+                    final List<Integer> filteredOptionIds =
+                            IntStream.range(0, numQAOptions).boxed()
+                                    .filter(i -> !query.getOptions().get(i).isEmpty())
+                                    .filter(i -> query.getOptionScores().get(i) > queryPruningParameters.minOptionConfidence)
+                                    .filter(i -> !canBeSplitted(query.getOptions().get(i), options))
+                                    .collect(Collectors.toList());
+                    // TODO: handle max number of options
+                    final List<QAStructureSurfaceForm> filteredQAList = filteredOptionIds.stream()
+                            .map(query.getQAPairSurfaceForms()::get)
+                            .collect(Collectors.toList());
+                    final List<String> filteredOptions = IntStream.range(0, query.getOptions().size()).boxed()
+                            .filter(i -> i >= numQAOptions || filteredOptionIds.contains(i))
+                            .map(query.getOptions()::get)
+                            .collect(Collectors.toList());
+                    return new ScoredQuery<>(
+                            query.getSentenceId(),
+                            query.getPrompt(),
+                            ImmutableList.copyOf(filteredOptions),
+                            ImmutableList.copyOf(filteredQAList),
+                            query.isJeopardyStyle(),
+                            query.allowMultipleChoices());
+                })
+                .filter(query -> {
+                    if (!query.getQAPairSurfaceForms().stream().anyMatch(
+                            qa -> qa.getAnswerStructures().stream().flatMap(astr -> astr.adjunctDependencies.stream())
+                                    .map(ResolvedDependency::getCategory)
+                                    .anyMatch(prepositionalCategories::contains))) {
+                        return false;
+                    }
+                    query.computeScores(nBestList);
+                    return query.getPromptScore() > queryPruningParameters.minPromptConfidence
+                            && query.getOptionEntropy() > queryPruningParameters.minOptionEntropy
+                            && (!queryPruningParameters.skipBinaryQueries || query.getQAPairSurfaceForms().size() > 1);
+                })
+                .collect(toImmutableList());
+    }
+
     public static QueryFilter<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> jeopardyPPQueryFilter() {
         return (queries, nBestList, queryPruningParameters) -> queries.stream()
                 .map(query -> {
