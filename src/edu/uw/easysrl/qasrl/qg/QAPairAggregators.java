@@ -77,6 +77,37 @@ public final class QAPairAggregators {
                 }).collect(toImmutableList());
     }
 
+
+    public static QAPairAggregator<QAStructureSurfaceForm> aggregateWithAnswerAdjunctDependencies() {
+        return qaPairs ->  qaPairs
+                .stream()
+                .collect(groupingBy(QAPairAggregatorUtils::getQuestionLabelString))
+                .values().stream()
+                .map(QAPairAggregatorUtils::getQuestionSurfaceFormToStructure)
+                .collect(groupingBy(qs2s -> qs2s.question))
+                .values().stream()
+                .flatMap(qs2sEntries -> {
+                    final ImmutableList<QuestionAnswerPair> questionQAPairs = qs2sEntries.stream()
+                            .flatMap(qs -> qs.qaList.stream())
+                            .collect(toImmutableList());
+
+                    return questionQAPairs.stream()
+                            .collect(groupingBy(QAPairAggregatorUtils::getSalientAnswerDependencies))
+                            .values().stream()
+                            .map(QAPairAggregatorUtils::getAnswerSurfaceFormToAdjunctHeadsStructure)
+                            .collect(groupingBy(as2s -> as2s.answer))
+                            .values().stream()
+                            .map(as2sEntries -> new QAStructureSurfaceForm(
+                                    questionQAPairs.get(0).getSentenceId(),
+                                    qs2sEntries.get(0).question,
+                                    as2sEntries.get(0).answer,
+                                    as2sEntries.stream().flatMap(asts -> asts.qaList.stream()).collect(toImmutableList()),
+                                    qs2sEntries.stream().map(qsts -> qsts.structure).distinct().collect(toImmutableList()),
+                                    as2sEntries.stream().map(asts -> asts.structure).distinct().collect(toImmutableList())));
+                })
+                .collect(toImmutableList());
+    }
+
     /**
      * The input should be all the queryPrompt-answer pairs given a sentence and its n-best list.
      * This is too crazy...

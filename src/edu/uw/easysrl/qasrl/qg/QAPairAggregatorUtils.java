@@ -16,6 +16,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static edu.uw.easysrl.util.GuavaCollectors.toImmutableList;
+import static edu.uw.easysrl.util.GuavaCollectors.toImmutableSet;
 import static java.util.stream.Collectors.*;
 
 /**
@@ -107,6 +108,20 @@ public class QAPairAggregatorUtils {
                 }).collect(GuavaCollectors.toImmutableList());
     }
 
+    static AnswerSurfaceFormToStructure getAnswerSurfaceFormToAdjunctHeadsStructure(
+            final List<QuestionAnswerPair> qaList) {
+        final ImmutableList<Integer> argIds = Stream.concat(getSalientAnswerDependencies(qaList.get(0)).stream(),
+                                                            Stream.of(qaList.get(0).getTargetDependency()))
+                .map(ResolvedDependency::getArgument)
+                .distinct().sorted()
+                .collect(toImmutableList());
+        return new AnswerSurfaceFormToStructure(
+                getQAListWithBestAnswerSurfaceForm(qaList).get(0).getAnswer(),
+                new AnswerStructure(argIds, false /* single headed */),
+                qaList);
+
+    }
+
     static SurfaceFormToDependencies getQuestionSurfaceFormToDependencies(final List<QuestionAnswerPair> qaList) {
         final List<QuestionAnswerPair> bestSurfaceFormQAs = getQAListWithBestQuestionSurfaceForm(qaList);
         return new SurfaceFormToDependencies(
@@ -130,8 +145,7 @@ public class QAPairAggregatorUtils {
     }
 
     static ImmutableSet<ResolvedDependency> getSalientAnswerDependencies(final QuestionAnswerPair qa) {
-        return //Stream.concat(qa.getAnswerDependencies().stream(), Stream.of(qa.getTargetDependency()))
-                qa.getAnswerDependencies().stream()
+        return Stream.concat(qa.getAnswerDependencies().stream(), Stream.of(qa.getTargetDependency()))
                 .filter(dep -> isDependencySalient(dep, qa))
                 .collect(GuavaCollectors.toImmutableSet());
     }
