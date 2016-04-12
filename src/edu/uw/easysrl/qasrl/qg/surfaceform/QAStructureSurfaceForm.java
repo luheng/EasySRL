@@ -10,6 +10,7 @@ import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.GuavaCollectors;
 
+import java.util.Collection;
 import java.util.stream.Collectors;
 
 /**
@@ -89,7 +90,16 @@ public class QAStructureSurfaceForm implements QAPairSurfaceForm {
                 .filter(qStr -> parse.categories.get(qStr.predicateIndex) == qStr.category)
                 .map(qStr -> qStr.filter(parse.dependencies))
                 .anyMatch(qdeps -> answerStructures.stream()
-                        .anyMatch(aStr -> !aStr.filter(qdeps).isEmpty() &&
-                                    parse.dependencies.containsAll(aStr.adjunctDependencies)));
+                        .anyMatch(aStr -> !aStr.filter(qdeps).isEmpty())) &&
+              answerStructures.stream()
+                      .anyMatch(aStr -> aStr.adjunctDependencies.stream()
+                              .allMatch(d -> coveredUndirected(d, parse.dependencies)));
+    }
+
+    private boolean coveredUndirected(final ResolvedDependency dep, final Collection<ResolvedDependency> depSet) {
+        return depSet.stream().anyMatch(d ->
+            (d.getHead() == dep.getHead() && d.getArgument() == dep.getArgument()) ||
+                    (d.getArgument() == dep.getHead() && d.getHead() == dep.getArgument())
+        );
     }
 }

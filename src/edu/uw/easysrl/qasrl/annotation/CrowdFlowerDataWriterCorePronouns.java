@@ -124,7 +124,7 @@ public class CrowdFlowerDataWriterCorePronouns {
     }
 
     private static void printQuestionsToAnnotate() throws IOException {
-        final ImmutableList<Integer> sentenceIds = CrowdFlowerDataUtils.getRound2And3SentenceIds();
+        final ImmutableList<Integer> sentenceIds = CrowdFlowerDataUtils.getRound3SentenceIds();
         AtomicInteger lineCounter = new AtomicInteger(0),
                       fileCounter = new AtomicInteger(0);
 

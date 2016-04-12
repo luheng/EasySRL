@@ -45,11 +45,11 @@ public class CrowdFlowerDataWriterClefted {
         queryPruningParameters.skipSAdjQuestions = true;
         queryPruningParameters.minOptionConfidence = 0.1;
         queryPruningParameters.minOptionEntropy = 0.1;
-        queryPruningParameters.minPromptConfidence = 0.1;
+        queryPruningParameters.minPromptConfidence = 0.05;
     }
 
     private static void printQuestionsToAnnotate() throws IOException {
-        final ImmutableList<Integer> sentenceIds = CrowdFlowerDataUtils.getRound3SentenceIds();
+        final ImmutableList<Integer> sentenceIds = CrowdFlowerDataUtils.getRound2And3SentenceIds();
         AtomicInteger lineCounter = new AtomicInteger(0),
                 fileCounter = new AtomicInteger(0);
 

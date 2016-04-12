@@ -91,7 +91,7 @@ public final class QAPairAggregators {
                                     .flatMap(qs -> qs.qaList.stream())
                                     .collect(toImmutableList());
                             return questionQAPairs.stream()
-                                    .collect(groupingBy(QAPairAggregatorUtils::getSalientAnswerDependencies))
+                                    .collect(groupingBy(QAPairAggregatorUtils::getSalientAnswerDependenciesString))
                                     .values().stream()
                                     .map(QAPairAggregatorUtils::getAnswerSurfaceFormToAdjunctHeadsStructure)
                                     .collect(groupingBy(as2s -> as2s.answer))

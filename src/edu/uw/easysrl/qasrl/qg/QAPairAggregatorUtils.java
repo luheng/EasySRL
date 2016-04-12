@@ -53,6 +53,13 @@ public class QAPairAggregatorUtils {
         return getQuestionLabelString(qa) + "\t" + getQuestionDependenciesString(qa);
     }
 
+    static String getSalientAnswerDependenciesString(final QuestionAnswerPair qa) {
+        return getSalientAnswerDependencies(qa).stream()
+                .map(dep -> dep.getHead() + "->" + dep.getArgument())
+                .sorted()
+                .collect(Collectors.joining("\t"));
+    }
+
     static QAStructureSurfaceForm getQAStructureSurfaceForm(final List<QuestionSurfaceFormToStructure> qs2sEntries,
                                                             final List<AnswerSurfaceFormToStructure> as2sEntries) {
         final ImmutableList<QuestionAnswerPair> qaPairs = as2sEntries.stream()
