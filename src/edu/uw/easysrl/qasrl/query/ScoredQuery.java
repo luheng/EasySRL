@@ -37,7 +37,8 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
     private final String prompt;
     private final ImmutableList<String> options;
     private final ImmutableList<QA> qaPairSurfaceForms;
-    private boolean isJeopardyStyle, allowMultipleChoices;
+    private QueryType queryType;
+    private boolean allowMultipleChoices;
 
     private int queryId;
     private double promptScore, optionEntropy;
@@ -48,13 +49,13 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
                        String prompt,
                        ImmutableList<String> options,
                        ImmutableList<QA> qaPairSurfaceForms,
-                       boolean isJeopardyStyle,
+                       QueryType queryType,
                        boolean allowMultipleChoices) {
         this.sentenceId = sentenceId;
         this.prompt = prompt;
         this.options = options;
         this.qaPairSurfaceForms = qaPairSurfaceForms;
-        this.isJeopardyStyle = isJeopardyStyle;
+        this.queryType = queryType;
         this.allowMultipleChoices = allowMultipleChoices;
         this.optionScores = null;
         this.optionToParseIds = null;
@@ -65,11 +66,11 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
                        String prompt,
                        ImmutableList<String> options,
                        ImmutableList<QA> qaPairSurfaceForms,
-                       boolean isJeopardyStyle,
+                       QueryType queryType,
                        boolean allowMultipleChoices,
                        ImmutableList<ImmutableSet<Integer>> optionToParseIds,
                        ImmutableList<Double> optionScores) {
-        this(sentenceId, prompt, options, qaPairSurfaceForms, isJeopardyStyle, allowMultipleChoices);
+        this(sentenceId, prompt, options, qaPairSurfaceForms, queryType, allowMultipleChoices);
         this.optionToParseIds = optionToParseIds;
         this.optionScores = optionScores;
     }
@@ -118,7 +119,9 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
         return optionEntropy;
     }
 
-    public boolean isJeopardyStyle() { return isJeopardyStyle; }
+    public boolean isJeopardyStyle() { return queryType == QueryType.Jeopardy; }
+
+    public QueryType getQueryType() { return queryType; }
 
     public boolean allowMultipleChoices() {
         return allowMultipleChoices;
@@ -133,7 +136,7 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
     }
 
     public String getQueryKey() {
-        return !isJeopardyStyle ?
+        return !isJeopardyStyle() ?
                 qaPairSurfaceForms.get(0).getPredicateIndex() + "\t" + prompt :
                 qaPairSurfaceForms.get(0).getArgumentIndices().stream().map(String::valueOf)
                         .collect(Collectors.joining(",")) + "\t" + prompt;
@@ -152,15 +155,15 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
     }
 
     public OptionalInt getPredicateId() {
-        return isJeopardyStyle ? OptionalInt.empty() : OptionalInt.of(qaPairSurfaceForms.get(0).getPredicateIndex());
+        return isJeopardyStyle() ? OptionalInt.empty() : OptionalInt.of(qaPairSurfaceForms.get(0).getPredicateIndex());
     }
 
     public Optional<Category> getPredicateCategory() {
-        return isJeopardyStyle ? Optional.empty() : Optional.of(qaPairSurfaceForms.get(0).getCategory());
+        return isJeopardyStyle() ? Optional.empty() : Optional.of(qaPairSurfaceForms.get(0).getCategory());
     }
 
     public OptionalInt getArgumentNumber() {
-        return isJeopardyStyle ? OptionalInt.empty() : OptionalInt.of(qaPairSurfaceForms.get(0).getArgumentNumber());
+        return isJeopardyStyle()? OptionalInt.empty() : OptionalInt.of(qaPairSurfaceForms.get(0).getArgumentNumber());
     }
 
     /**
@@ -173,7 +176,7 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
         String result = String.format("SID=%d\t%s\n", sentenceId, sentence.stream().collect(Collectors.joining(" ")));
 
         // Prompt structure.
-        String promptStructStr = isJeopardyStyle ?
+        String promptStructStr = isJeopardyStyle() ?
                 qaPairSurfaceForms.stream()
                         .flatMap(qa -> qa.getAnswerStructures().stream())
                         .distinct()
@@ -205,9 +208,9 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
             String structStr = "";
             if (i < qaPairSurfaceForms.size()) {
                 final QAStructureSurfaceForm qa = qaPairSurfaceForms.get(i);
-                structStr = isJeopardyStyle ?
-                        qa.getQuestionStructures().stream().map(s -> s.toString(sentence)).collect(Collectors.joining(",")) :
-                        qa.getAnswerStructures().stream().map(s -> s.toString(sentence)).collect(Collectors.joining(","));
+                structStr = isJeopardyStyle() ?
+                        qa.getQuestionStructures().stream().map(s -> s.toString(sentence)).collect(Collectors.joining(" / ")) :
+                        qa.getAnswerStructures().stream().map(s -> s.toString(sentence)).collect(Collectors.joining(" / "));
             }
             String parseIdsStr = DebugPrinter.getShortListString(optionToParseIds.get(i));
             result += String.format("[%d]\t%-10s\t%.2f\t%s\t%s\t%s\n", i, matchingStr, optionScores.get(i),

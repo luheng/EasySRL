@@ -6,6 +6,7 @@ import edu.uw.easysrl.qasrl.NBestList;
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 
+import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.Collection;
@@ -26,6 +27,13 @@ public class QueryGeneratorUtils {
                 .filter(i -> qaPair.canBeGeneratedBy(nBestList.getParse(i)))
                 .boxed()
                 .collect(GuavaCollectors.toImmutableSet());
+    }
+
+    static boolean containsPrepositionalDependency(final ImmutableSet<ResolvedDependency> dependencies) {
+        return dependencies.stream()
+                .anyMatch(dep ->
+                        dep.getCategory().isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)")) ||
+                        dep.getCategory().isFunctionInto(Category.valueOf("NP\\NP")));
     }
 
     static double computeEntropy(Collection<Double> scores) {

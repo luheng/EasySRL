@@ -37,7 +37,7 @@ public class QADependenciesSurfaceForm extends BasicQAPairSurfaceForm {
         super(sentenceId, question, answer, qaPairs);
         this.questionDeps = questionDeps;
         this.answerDepSets = answerDepSets;
-        ImmutableSet.Builder<ResolvedDependency> allPossibleAnswerDepsBuilder = new ImmutableSet.Builder<ResolvedDependency>();
+        ImmutableSet.Builder<ResolvedDependency> allPossibleAnswerDepsBuilder = new ImmutableSet.Builder<>();
         for(ImmutableSet<ResolvedDependency> answerDeps : answerDepSets) {
             allPossibleAnswerDepsBuilder.addAll(answerDeps);
         }

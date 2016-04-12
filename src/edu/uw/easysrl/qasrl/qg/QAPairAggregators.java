@@ -1,11 +1,9 @@
 package edu.uw.easysrl.qasrl.qg;
 
 import com.google.common.collect.*;
-import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.qg.surfaceform.*;
 
 import static edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils.*;
-import edu.uw.easysrl.syntax.grammar.Category;
 
 import static edu.uw.easysrl.util.GuavaCollectors.*;
 import static java.util.stream.Collectors.*;
@@ -45,133 +43,63 @@ public final class QAPairAggregators {
             .collect(toImmutableList());
     }
 
-    public static QAPairAggregator<TargetDependencySurfaceForm> aggregateByTargetDependency() {
-        return qaPairs -> qaPairs
-            .stream()
-            .collect(groupingBy(QuestionAnswerPair::getTargetDependency))
-            .entrySet()
-            .stream()
-            .map(e -> {
-                final ResolvedDependency targetDep = e.getKey();
-                final Collection<QuestionAnswerPair> qaList = e.getValue();
-                assert qaList.size() > 0
-                        : "list in group should always be nonempty";
-                int sentenceId = e.getValue().get(0).getSentenceId();
-                // plurality vote on question and answer
-                String pluralityQuestion = HashMultiset
-                        .create(qaList.stream()
-                                .map(QuestionAnswerPair::getQuestion)
-                                .collect(toList()))
-                        .entrySet()
-                        .stream()
-                        .max(Comparator.comparing(Multiset.Entry::getCount))
-                        .map(Multiset.Entry::getElement)
-                        .get(); // there should always be one because our list is nonempty
-                String pluralityAnswer = HashMultiset
-                        .create(qaList.stream()
-                                .map(QuestionAnswerPair::getAnswer)
-                                .collect(toList()))
-                        .entrySet()
-                        .stream()
-                        .max(Comparator.comparing(Multiset.Entry::getCount))
-                        .map(Multiset.Entry::getElement)
-                        .get(); // there should always be one because our list is nonempty
-                return new TargetDependencySurfaceForm(sentenceId,
-                                                       pluralityQuestion,
-                                                       pluralityAnswer,
-                                                       ImmutableList.copyOf(qaList),
-                                                       targetDep);
-            })
-            .collect(toImmutableList());
-    }
-
-
-    /**
-     * for the below aggregator. tells us whether we want to group based on a dependency.
-     */
-    private static boolean isDependencySalient(ResolvedDependency dep, QuestionAnswerPair qaPair) {
-        ImmutableList<Category> categories = ImmutableList.copyOf(qaPair.getParse().categories);
-        ImmutableList<String> words = qaPair.getParse().syntaxTree.getLeaves().stream()
-            .map(l -> l.getWord())
-            .collect(toImmutableList());
-        int index = dep.getHead();
-        Category cat = categories.get(index);
-        return (qaPair.getTargetDependency() != null && dep.equals(qaPair.getTargetDependency())) ||
-            (cat.isFunctionInto(Category.valueOf("S\\NP")) && !cat.isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)"))) ||
-            (cat.isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)")) && dep.getArgNumber() == 2) ||
-            (cat.isFunctionInto(Category.valueOf("NP\\NP")) && dep.getArgNumber() == 1 && !words.get(index).equalsIgnoreCase("of"));
-            // (Category.valueOf("((S\\NP)\\(S\\NP))/NP").matches(cat) && dep.getArgNumber() == 2) ||
-            // (Category.valueOf("(NP\\NP)/NP").matches(cat) && dep.getArgNumber() == 1 && !words.get(index).equalsIgnoreCase("of"));
-    }
     /**
      * Aggregates by question and answer deps connected to verbs or noun/verb adjuncts.
      */
-    public static QAPairAggregator<QADependenciesSurfaceForm> aggregateBySalientDeps() {
+    public static QAPairAggregator<QADependenciesSurfaceForm> aggregateBySalientDependencies() {
         return qaPairs -> qaPairs
-            .stream()
-            .collect(groupingBy(QuestionAnswerPair::getSentenceId))
-            .entrySet()
-            .stream()
-            .flatMap(e -> {
-                    int sentenceId = e.getKey();
-                    ImmutableList<QADependenciesSurfaceForm> answerDepsSurfaceForms = e.getValue().stream()
-                        .collect(groupingBy(qaPair -> qaPair.getQuestionDependencies().stream()
-                                            .filter(dep -> isDependencySalient(dep, qaPair))
-                                            .collect(toImmutableSet())))
-                        .entrySet()
+                .stream()
+                .collect(groupingBy(QAPairAggregatorUtils::getSalientQuestionDependencies))
+                .values().stream()
+                .map(QAPairAggregatorUtils::getQuestionSurfaceFormToDependencies)
+                .collect(groupingBy(q2d -> q2d.surfaceForm))
+                .values().stream()
+                .flatMap(q2dEntries -> {
+                    final ImmutableList<QuestionAnswerPair> questionQAPairs = q2dEntries.stream()
+                            .flatMap(qs -> qs.qaList.stream())
+                            .collect(toImmutableList());
+                    return questionQAPairs.stream()
+                            .collect(groupingBy(QAPairAggregatorUtils::getSalientAnswerDependencies))
+                            .values().stream()
+                            .map(QAPairAggregatorUtils::getAnswerSurfaceFormToDependencies)
+                            .collect(groupingBy(a2d -> a2d.surfaceForm))
+                            .values().stream()
+                            .map(a2dEntries -> new QADependenciesSurfaceForm(
+                                    questionQAPairs.get(0).getSentenceId(),
+                                    q2dEntries.get(0).surfaceForm,
+                                    a2dEntries.get(0).surfaceForm,
+                                    a2dEntries.stream().flatMap(a2d -> a2d.qaList.stream()).collect(toImmutableList()),
+                                    q2dEntries.get(0).dependencies,
+                                    a2dEntries.stream().map(a2d -> a2d.dependencies).collect(toImmutableSet())));
+                }).collect(toImmutableList());
+    }
+
+    public static QAPairAggregator<QAStructureSurfaceForm> aggregateWithAnswerAdjunctDependencies() {
+        return qaPairs ->  qaPairs
+                .stream()
+                .collect(groupingBy(QuestionAnswerPair::getPredicateIndex))
+                .values().stream()
+                .flatMap(samePredicateQAs -> samePredicateQAs
                         .stream()
-                        .flatMap(eQuestion -> eQuestion.getValue().stream()
-                                 .collect(groupingBy(qaPair -> qaPair.getAnswerDependencies().stream()
-                                                     .filter(dep -> isDependencySalient(dep, qaPair))
-                                                     .collect(toImmutableSet())))
-                        .entrySet()
-                        .stream()
-                        .map(eAnswer -> {
-                                assert eAnswer.getValue().size() > 0
-                                : "list in group should always be nonempty";
-                                QuestionAnswerPair bestQAPair = eAnswer.getValue().stream()
-                                .collect(maxBy((qaPair1, qaPair2) -> Double.compare(qaPair1.getParse().score, qaPair2.getParse().score)))
-                                .get();
-                                String question = bestQAPair.getQuestion();
-                                String answer = bestQAPair.getAnswer();
-                                return new QADependenciesSurfaceForm(sentenceId,
-                                                                     question,
-                                                                     answer,
-                                                                     ImmutableList.copyOf(eAnswer.getValue()),
-                                                                     eQuestion.getKey(),
-                                                                     ImmutableSet.of(eAnswer.getKey()));
-                            }))
-                        .collect(toImmutableList());
-                    // now we group by string form.
-                    ImmutableList<QADependenciesSurfaceForm> groupedAnswerDepsSurfaceForms = answerDepsSurfaceForms.stream()
-                        .collect(groupingBy(sf -> sf.getQuestion() + "\n" + sf.getAnswer()))
-                        .entrySet().stream()
-                        .map(surfaceFormsGroupedByString -> {
-                                String[] qaStrings = surfaceFormsGroupedByString.getKey().split("\n");
-                                String question = qaStrings[0];
-                                String answer = qaStrings[1];
-                                ImmutableList<QADependenciesSurfaceForm> surfaceForms = ImmutableList
-                                .copyOf(surfaceFormsGroupedByString.getValue());
-                                ImmutableList<QuestionAnswerPair> allQAPairsForString = surfaceForms.stream()
-                                .flatMap(sf -> sf.getQAPairs().stream())
-                                .collect(toImmutableList());
-                                // NOTE: assuming question dependencies are the same when string is the same.
-                                // This will be true in our case, I think.
-                                ImmutableSet<ResolvedDependency> questionDeps = surfaceForms.get(0).getQuestionDependencies();
-                                ImmutableSet<ImmutableSet<ResolvedDependency>> answerDepSets = surfaceForms.stream()
-                                .map(sf -> sf.getAnswerDependencySets().iterator().next())
-                                .collect(toImmutableSet());
-                                return new QADependenciesSurfaceForm(sentenceId,
-                                                                     question,
-                                                                     answer,
-                                                                     allQAPairsForString,
-                                                                     questionDeps, // question deps
-                                                                     answerDepSets);
-                            })
-                        .collect(toImmutableList());
-                    return groupedAnswerDepsSurfaceForms.stream();
+                        .collect(groupingBy(QAPairAggregatorUtils::getQuestionLabelString))
+                        .values().stream()
+                        .map(QAPairAggregatorUtils::getQuestionSurfaceFormToStructure)
+                        .collect(groupingBy(qs2s -> qs2s.question))
+                        .values().stream()
+                        .flatMap(qs2sEntries -> {
+                            final ImmutableList<QuestionAnswerPair> questionQAPairs = qs2sEntries.stream()
+                                    .flatMap(qs -> qs.qaList.stream())
+                                    .collect(toImmutableList());
+
+                            return questionQAPairs.stream()
+                                    .collect(groupingBy(QAPairAggregatorUtils::getPrepositionalAnswerDependencies))
+                                    .values().stream()
+                                    .map(QAPairAggregatorUtils::getAnswerSurfaceFormToAdjunctHeadsStructure)
+                                    .collect(groupingBy(as2s -> as2s.answer))
+                                    .values().stream()
+                                    .map(as2sEntries -> getQAStructureSurfaceForm(qs2sEntries, as2sEntries));
                         })
-            .collect(toImmutableList());
+                ).collect(toImmutableList());
     }
 
     /**
@@ -185,7 +113,7 @@ public final class QAPairAggregators {
                 .collect(groupingBy(QAPairAggregatorUtils::getQuestionLabelString))
                 .values().stream()
                 .map(QAPairAggregatorUtils::getQuestionSurfaceFormToStructure)
-                .collect(groupingBy(qsts -> qsts.question))
+                .collect(groupingBy(qs2s -> qs2s.question))
                 .values().stream()
                 .flatMap(qs2sEntries -> {
                     final ImmutableList<QuestionAnswerPair> questionQAList = qs2sEntries.stream()
@@ -193,16 +121,9 @@ public final class QAPairAggregators {
                             .collect(toImmutableList());
                     return QAPairAggregatorUtils.getAnswerSurfaceFormToMultiHeadedStructures(questionQAList)
                             .stream()
-                            .collect(groupingBy(asts -> asts.answer))
+                            .collect(groupingBy(as2s -> as2s.answer))
                             .values().stream()
-                            .map(as2sEntries -> new QAStructureSurfaceForm(
-                                    questionQAList.get(0).getSentenceId(),
-                                    qs2sEntries.get(0).question,
-                                    as2sEntries.get(0).answer,
-                                    as2sEntries.stream().flatMap(asts -> asts.qaList.stream()).collect(toImmutableList()),
-                                    qs2sEntries.stream().map(qsts -> qsts.structure).distinct().collect(toImmutableList()),
-                                    as2sEntries.stream().map(asts -> asts.structure).distinct().collect(toImmutableList()))
-                            );
+                            .map(as2sEntries -> getQAStructureSurfaceForm(qs2sEntries, as2sEntries));
                 })
                 .collect(toImmutableList());
     }
@@ -218,28 +139,18 @@ public final class QAPairAggregators {
                 .collect(groupingBy(QAPairAggregatorUtils::getQuestionLabelString))
                 .values().stream()
                 .map(QAPairAggregatorUtils::getQuestionSurfaceFormToStructure)
-                .collect(groupingBy(qsts -> qsts.question))
+                .collect(groupingBy(qs2s -> qs2s.question))
                 .values().stream()
-                .flatMap(qs2sEntries -> {
-                    final ImmutableList<QuestionAnswerPair> questionQAPairs = qs2sEntries.stream()
-                            .flatMap(qs -> qs.qaList.stream())
-                            .collect(toImmutableList());
-
-                    return questionQAPairs.stream()
-                            .collect(groupingBy(QuestionAnswerPair::getArgumentIndex))
-                            .values().stream()
-                            .map(QAPairAggregatorUtils::getAnswerSurfaceFormToSingleHeadedStructure)
-                            .collect(groupingBy(asts -> asts.answer))
-                            .values().stream()
-                            .map(as2sEntries -> new QAStructureSurfaceForm(
-                                    questionQAPairs.get(0).getSentenceId(),
-                                    qs2sEntries.get(0).question,
-                                    as2sEntries.get(0).answer,
-                                    as2sEntries.stream().flatMap(asts -> asts.qaList.stream()).collect(toImmutableList()),
-                                    qs2sEntries.stream().map(qsts -> qsts.structure).distinct().collect(toImmutableList()),
-                                    as2sEntries.stream().map(asts -> asts.structure).distinct().collect(toImmutableList())));
-                })
-                .collect(toImmutableList());
+                .flatMap(qs2sEntries -> qs2sEntries
+                        .stream()
+                        .flatMap(qs -> qs.qaList.stream())
+                        .collect(groupingBy(QuestionAnswerPair::getArgumentIndex))
+                        .values().stream()
+                        .map(QAPairAggregatorUtils::getAnswerSurfaceFormToSingleHeadedStructure)
+                        .collect(groupingBy(as2s -> as2s.answer))
+                        .values().stream()
+                        .map(as2sEntries -> getQAStructureSurfaceForm(qs2sEntries, as2sEntries))
+                ).collect(toImmutableList());
     }
 
     /**
