@@ -112,6 +112,25 @@ public class BasicQuestionAnswerPair implements QuestionAnswerPair {
         this.parse = parse;
     }
 
+    public BasicQuestionAnswerPair(int sentenceId, int parseId, Parse parse,
+                                   int predicateIndex, Category predicateCategory, int argumentNumber,
+                                   int questionMainIndex, TextWithDependencies question,
+                                   ResolvedDependency targetDep, TextWithDependencies answer) {
+        this.predicateIndex = predicateIndex;
+        this.predicateCategory = predicateCategory;
+        this.argumentNumber = argumentNumber;
+        this.questionMainIndex = questionMainIndex;
+        this.questionType = null;
+        this.questionDeps = question.dependencies;
+        this.question = question.tokens;
+        this.targetDep = targetDep;
+        this.answer = answer.tokens;
+        this.answerDeps = answer.dependencies;
+        this.parseId = parseId;
+        this.sentenceId = sentenceId;
+        this.parse = parse;
+    }
+
     public String renderQuestion() {
         if(questionString == null) {
             String str = TextGenerationHelper.renderString(question);
