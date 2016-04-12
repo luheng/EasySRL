@@ -90,7 +90,6 @@ public final class QAPairAggregators {
                             final ImmutableList<QuestionAnswerPair> questionQAPairs = qs2sEntries.stream()
                                     .flatMap(qs -> qs.qaList.stream())
                                     .collect(toImmutableList());
-
                             return questionQAPairs.stream()
                                     .collect(groupingBy(QAPairAggregatorUtils::getSalientAnswerDependencies))
                                     .values().stream()

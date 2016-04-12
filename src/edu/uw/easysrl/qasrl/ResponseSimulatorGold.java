@@ -11,6 +11,7 @@ import edu.uw.easysrl.qasrl.qg.surfaceform.QAPairSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.syntax.AnswerStructure;
 import edu.uw.easysrl.qasrl.query.Query;
+import edu.uw.easysrl.qasrl.query.QueryType;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.util.GuavaCollectors;
 
@@ -53,7 +54,7 @@ public class ResponseSimulatorGold {
 
          Set<Integer> chosenOptions = new HashSet<>();
 
-         if (!query.isJeopardyStyle()) {
+         if (query.getQueryType() == QueryType.Forward) {
              final ImmutableList<QAStructureSurfaceForm> qaOptions = query.getQAPairSurfaceForms();
              // The gold considers labeled dependency. If the dependency labels don't match, gold outputs "bad queryPrompt".
              // So the gold outputs "bad queryPrompt" in case of dropped pp argument.

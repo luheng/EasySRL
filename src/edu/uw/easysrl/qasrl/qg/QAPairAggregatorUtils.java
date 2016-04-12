@@ -162,7 +162,11 @@ public class QAPairAggregatorUtils {
         return qa.getAnswerDependencies().stream()
                 .filter(dep -> {
                     //isDependencySalient(dep, qa)
-                    return dep.getHead() == qa.getPredicateIndex() || dep.getArgument() == qa.getPredicateIndex();
+                    final boolean answerIsVP = qa.getArgumentNumber() == 1;
+                    return answerIsVP ?
+                            dep.getHead() == qa.getPredicateIndex() || dep.getArgument() == qa.getPredicateIndex() :
+                            dep.getArgument() == qa.getTargetDependency().getArgument() &&
+                                           dep.getCategory().isFunctionInto(Category.valueOf("NP\\NP"));
                 })
                 .collect(GuavaCollectors.toImmutableSet());
     }
