@@ -654,5 +654,25 @@ public class TextGenerationHelper {
             newDependencies.addAll(other.dependencies);
             return new TextWithDependencies(newTokens, newDependencies);
         }
+
+        public TextWithDependencies concatWithDep(TextWithDependencies other, Optional<ResolvedDependency> depOpt) {
+            if(depOpt.isPresent()) {
+                return concatWithDep(other, depOpt.get());
+            } else {
+                return concat(other);
+            }
+        }
+
+        public TextWithDependencies concatWithDep(TextWithDependencies other, ResolvedDependency dep) {
+            TextWithDependencies newTWD = this.concat(other);
+            other.dependencies.add(dep);
+            return newTWD;
+        }
+
+        public static TextWithDependencies fromWord(String word) {
+            List<String> tokens = new LinkedList<>();
+            tokens.add(word);
+            return new TextWithDependencies(tokens, new HashSet<>());
+        }
     }
 }

@@ -12,6 +12,7 @@ import edu.uw.easysrl.qasrl.TextGenerationHelper.TextWithDependencies;
 
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.stream.IntStream;
 import static java.util.stream.Collectors.*;
 import static edu.uw.easysrl.util.GuavaCollectors.*;
 
@@ -490,74 +491,38 @@ public class MultiQuestionTemplate {
         }
         final ImmutableList<String> auxiliaries = ImmutableList.copyOf(getAuxiliariesForArgVerb(predicateIndex));
         final ImmutableList<String> verbPlaceholder = ImmutableList.copyOf(getTargetMainVerbPlaceholder(predicateIndex));
-        final ImmutableList<String> verb = ImmutableList.copyOf(getNonTargetBareArgumentVerb(predicateIndex));
+        final ImmutableList<String> verb = ImmutableList.copyOf(getAnswerVerb(predicateIndex));
         final Optional<ResolvedDependency> subjDependencyOpt = chosenArgDeps.get(1);
         final Optional<Integer> subjIndexOpt = subjDependencyOpt.map(ResolvedDependency::getArgument);
 
         TextWithDependencies verbTWD = new TextWithDependencies(verb, new HashSet<>());
-        final ImmutableList<TextWithDependencies> verbAnswerTWDs;
-        if(Category.valueOf("S\\NP").matches(predicateCategory)) {
-            verbAnswerTWDs = ImmutableList.of(verbTWD);
-        } else if(Category.valueOf("(S\\NP)/NP").matches(predicateCategory)) {
-            Optional<ResolvedDependency> objDepOpt = chosenArgDeps.get(2);
-            Optional<Integer> objIndexOpt = objDepOpt.map(ResolvedDependency::getArgument);
-            Stream<TextWithDependencies> bareVerbAnswers = Stream.of(verbTWD);
-            Stream<TextWithDependencies> verbObjAnswers = TextGenerationHelper
-                .getRepresentativePhrases(objIndexOpt, Category.NP, parse).stream()
-                .map(objTWD -> {
-                        TextWithDependencies answerTWD = verbTWD.concat(objTWD);
-                        objDepOpt.ifPresent(answerTWD.dependencies::add);
-                        return answerTWD;
-                    });
-            verbAnswerTWDs = Stream.concat(bareVerbAnswers, verbObjAnswers)
-                .collect(toImmutableList());
-        } else if(Category.valueOf("((S\\NP)/PP)").matches(predicateCategory)) {
-            Optional<ResolvedDependency> ppDepOpt = chosenArgDeps.get(2);
-            Optional<Integer> ppIndexOpt = ppDepOpt.map(ResolvedDependency::getArgument);
-            Stream<TextWithDependencies> bareVerbAnswers = Stream.of(verbTWD);
-            Stream<TextWithDependencies> verbPPAnswers = TextGenerationHelper
-                .getRepresentativePhrases(ppIndexOpt, Category.PP, parse).stream()
-                .map(ppTWD -> {
-                        TextWithDependencies answerTWD = verbTWD.concat(ppTWD);
-                        ppDepOpt.ifPresent(answerTWD.dependencies::add);
-                        return answerTWD;
-                    });
-            verbAnswerTWDs = Stream.concat(bareVerbAnswers, verbPPAnswers)
-                .collect(toImmutableList());
-        } else if(Category.valueOf("((S\\NP)/PP)/NP").matches(predicateCategory)) {
-            Optional<ResolvedDependency> objDepOpt = chosenArgDeps.get(3);
-            Optional<Integer> objIndexOpt = objDepOpt.map(ResolvedDependency::getArgument);
-            Optional<ResolvedDependency> ppDepOpt = chosenArgDeps.get(2);
-            Optional<Integer> ppIndexOpt = ppDepOpt.map(ResolvedDependency::getArgument);
-            Stream<TextWithDependencies> bareVerbAnswers = Stream.of(verbTWD);
-            Stream<TextWithDependencies> objOnlyAnswers = TextGenerationHelper
-                .getRepresentativePhrases(objIndexOpt, Category.NP, parse).stream()
-                .map(objTWD -> {
-                        TextWithDependencies answerTWD = verbTWD.concat(objTWD);
-                        objDepOpt.ifPresent(answerTWD.dependencies::add);
-                        return answerTWD;
-                    });
-            Stream<TextWithDependencies> objAndPPAnswers = TextGenerationHelper
-                .getRepresentativePhrases(objIndexOpt, Category.NP, parse).stream()
-                .flatMap(objTWD -> TextGenerationHelper.getRepresentativePhrases(ppIndexOpt, Category.PP, parse).stream()
-                         .map(ppTWD -> {
-                                 TextWithDependencies answerTWD = verbTWD.concat(objTWD).concat(ppTWD);
-                                 objDepOpt.ifPresent(answerTWD.dependencies::add);
-                                 ppDepOpt.ifPresent(answerTWD.dependencies::add);
-                                 return answerTWD;
-                             }));
-            Stream<TextWithDependencies> ppOnlyAnswers = TextGenerationHelper
-                .getRepresentativePhrases(ppIndexOpt, Category.PP, parse).stream()
-                .map(ppTWD -> {
-                        TextWithDependencies answerTWD = verbTWD.concat(ppTWD);
-                        ppDepOpt.ifPresent(answerTWD.dependencies::add);
-                        return answerTWD;
-                    });
-            verbAnswerTWDs = Stream.concat(bareVerbAnswers, Stream.concat(objOnlyAnswers, Stream.concat(objAndPPAnswers, ppOnlyAnswers)))
-                .collect(toImmutableList());
-        } else {
-            verbAnswerTWDs = ImmutableList.of();
-        }
+        final ImmutableList<TextWithDependencies> verbArgumentTWDs = IntStream
+            .range(2, predicateCategory.getNumberOfArguments() + 1) // skip the subject
+            .boxed()
+            .flatMap(argNum -> {
+                    Category argCat = predicateCategory.getArgument(argNum);
+                    Optional<ResolvedDependency> argDepOpt = chosenArgDeps.get(argNum);
+                    Optional<Integer> argIndexOpt = argDepOpt.map(ResolvedDependency::getArgument);
+                    return TextGenerationHelper.getRepresentativePhrases(argIndexOpt, argCat, parse).stream()
+                    .map(argTWD -> verbTWD.concatWithDep(argTWD, argDepOpt));
+                })
+            .collect(toImmutableList());
+
+        ImmutableList<TextWithDependencies> verbAdjunctTWDs = parse.dependencies.stream()
+            .filter(dep -> categories.get(dep.getHead()).isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)")) &&
+                    dep.getArgument() == predicateIndex &&
+                    dep.getArgument() != dep.getHead() &&
+                    dep.getArgNumber() == 2)
+            .flatMap(targetDep -> TextGenerationHelper
+                     .getRepresentativePhrases(Optional.of(targetDep.getHead()), Category.valueOf("(S\\NP)\\(S\\NP)"), parse).stream()
+            .map(adverbTWD -> {
+                    TextWithDependencies answerTWD = verbTWD.concat(adverbTWD);
+                    answerTWD.dependencies.add(targetDep);
+                    return answerTWD;
+                }))
+            .collect(toImmutableList());
+
+        // final ImmutableList<TextWithDependencies> nounObjectTWDs;
 
         return TextGenerationHelper.getRepresentativePhrases(subjIndexOpt, Category.NP, parse).stream().flatMap(subject -> {
 
@@ -569,7 +534,7 @@ public class MultiQuestionTemplate {
             .addAll(verbPlaceholder)
             .build();
 
-        ImmutableList<BasicQuestionAnswerPair> justVerbQAPairs = verbAnswerTWDs.stream()
+        ImmutableList<BasicQuestionAnswerPair> verbArgumentQAPairs = verbArgumentTWDs.stream()
             .flatMap(answerTWD -> Stream.of(new BasicQuestionAnswerPair(sentenceId, parseId, parse,
                                                                         predicateIndex, predicateCategory, 1,
                                                                         predicateIndex, null, // maybe should get rid of QuestionType?
@@ -577,26 +542,14 @@ public class MultiQuestionTemplate {
                                                                         subjDependencyOpt.orElse(null), answerTWD))
                      ).collect(toImmutableList());
 
-        ImmutableList<TextWithDependencies> verbAndAdverbAnswerTWDs = parse.dependencies.stream()
-            .filter(dep -> categories.get(dep.getHead()).isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)")) &&
-                    dep.getArgument() == predicateIndex &&
-                    dep.getArgument() != dep.getHead() &&
-                    dep.getArgNumber() == 2)
-            .flatMap(targetDep -> TextGenerationHelper.getRepresentativePhrases(Optional.of(targetDep.getHead()), Category.valueOf("(S\\NP)\\(S\\NP)"), parse).stream()
-            .flatMap(adverbTWD -> verbAnswerTWDs.stream()
-            .map(verbAnswerTWD -> {
-                    TextWithDependencies answerTWD = verbAnswerTWD.concat(adverbTWD);
-                    answerTWD.dependencies.add(targetDep);
-                    return answerTWD;
-                })))
+        ImmutableList<BasicQuestionAnswerPair> verbAdjunctQAPairs = verbAdjunctTWDs.stream()
+            .map(answerTWD -> new BasicQuestionAnswerPair(sentenceId, parseId, parse,
+                                                          predicateIndex, predicateCategory, 1,
+                                                          predicateIndex, null, // maybe should get rid of QuestionType?
+                                                          ImmutableSet.copyOf(subject.dependencies), verbAttachmentQuestion,
+                                                          subjDependencyOpt.orElse(null), answerTWD))
             .collect(toImmutableList());
 
-        ImmutableList<BasicQuestionAnswerPair> verbAndAdverbQAPairs = verbAndAdverbAnswerTWDs.stream()
-            .map(answerTWD -> new BasicQuestionAnswerPair(sentenceId, parseId, parse,
-                                                          predicateIndex, predicateCategory, 1, // TODO perhaps change predicate index and cat to adverb's
-                                                          predicateIndex, null, // maybe should get rid of QuestionType?
-                                                          ImmutableSet.copyOf(subject.dependencies), verbAttachmentQuestion, subjDependencyOpt.orElse(null), answerTWD))
-            .collect(toImmutableList());
 
         final ImmutableList<String> nounQuestionWithoutArgs = new ImmutableList.Builder<String>()
             .add("What").add("is").add("it").add("that")
@@ -724,8 +677,8 @@ public class MultiQuestionTemplate {
             nounQAPairs = ImmutableList.of();
         }
 
-        return Stream.concat(justVerbQAPairs.stream(), Stream.concat(verbAndAdverbQAPairs.stream(), nounQAPairs.stream()));
-        // return nounQAPairs.stream();
+
+        return Stream.concat(nounQAPairs.stream(), Stream.concat(verbArgumentQAPairs.stream(), verbAdjunctQAPairs.stream()));
         }).collect(toImmutableList());
     }
 
@@ -1013,6 +966,35 @@ public class MultiQuestionTemplate {
             result.add(words.get(argIndex));
         }
         // otherwise maybe it's an S[dcl] or something, in which case we don't want a placeholder.
+        return result;
+    }
+
+    public List<String> getAnswerVerb(int argIndex) {
+        ArrayList<String> result = new ArrayList<>();
+        if(type == QuestionType.NOUN_ADJUNCT) {
+            return result;
+        }
+        SyntaxTreeNode verbLeaf = tree.getLeaves().get(argIndex);
+        String verb = TextGenerationHelper.getNodeWords(verbLeaf, Optional.empty(), Optional.empty()).get(0);
+        String uninflectedVerb = verbHelper.getUninflected(verb).orElse(verb);
+        // category of actual arg as it appears in the sentence.
+        Category argCategory = categories.get(argIndex);
+        if (argCategory.isFunctionInto(Category.valueOf("S[to]\\NP"))) {
+            result.add(verb);
+        } else if (argCategory.isFunctionInto(Category.valueOf("S[ng]\\NP"))) {
+            result.add(verb);
+        } else if (argCategory.isFunctionInto(Category.valueOf("S[pss]\\NP")) ||
+                   argCategory.isFunctionInto(Category.valueOf("S[adj]\\NP"))) {
+            result.add("be");
+            result.add(verb);
+        } else if (argCategory.isFunctionInto(Category.valueOf("S[pt]\\NP"))) {
+            result.add(verb);
+        } else if (argCategory.isFunctionInto(Category.valueOf("S[dcl]\\NP"))) {
+            result.add(uninflectedVerb);
+        } else if (argCategory.isFunctionInto(Category.valueOf("S\\NP"))) { // catch-all for verbs
+            result.add(uninflectedVerb);
+        }
+        // TODO maybe add preposition
         return result;
     }
 
