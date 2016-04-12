@@ -6,6 +6,7 @@ import edu.uw.easysrl.qasrl.model.HITLParser;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
+import edu.uw.easysrl.syntax.grammar.Category;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 
@@ -14,6 +15,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 /**
  * Create Crowdflower data for pronoun-style core questions.
@@ -75,8 +77,22 @@ public class CrowdFlowerDataWriterClefted {
                         true, // highlight predicate
                         "",
                         csvPrinter);
+
                 history.addEntry(sid, query, goldOptionIds, hitlParser.getConstraints(query, goldOptionIds));
                 history.printLatestHistory();
+                final int predId = query.getPredicateId().getAsInt();
+                final List<Category> goldCats = hitlParser.getGoldParse(sid).categories;
+                query.getQAPairSurfaceForms().forEach(qa -> {
+                    System.out.println(qa.getAnswer() + "\t" + qa.getAnswerStructures().stream()
+                            .flatMap(astr -> astr.adjunctDependencies.stream())
+                            .distinct()
+                            .map(dep -> dep.getHead() == predId ?
+                                sentence.get(dep.getArgument()) + "." + goldCats.get(dep.getArgument()) :
+                                sentence.get(dep.getHead()) + "." + goldCats.get(dep.getHead()))
+                            .collect(Collectors.joining(" / "))
+                    );
+                });
+
                 if (lineCounter.get() % maxNumQueriesPerFile == 0) {
                     csvPrinter.close();
                     csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter(
