@@ -665,7 +665,7 @@ public class TextGenerationHelper {
 
         public TextWithDependencies concatWithDep(TextWithDependencies other, ResolvedDependency dep) {
             TextWithDependencies newTWD = this.concat(other);
-            other.dependencies.add(dep);
+            newTWD.dependencies.add(dep);
             return newTWD;
         }
 

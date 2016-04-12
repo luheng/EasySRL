@@ -491,11 +491,13 @@ public class MultiQuestionTemplate {
         }
         final ImmutableList<String> auxiliaries = ImmutableList.copyOf(getAuxiliariesForArgVerb(predicateIndex));
         final ImmutableList<String> verbPlaceholder = ImmutableList.copyOf(getTargetMainVerbPlaceholder(predicateIndex));
-        final ImmutableList<String> verb = ImmutableList.copyOf(getAnswerVerb(predicateIndex));
+        final ImmutableList<String> verbForAnswer = ImmutableList.copyOf(getAnswerVerb(predicateIndex));
+        final ImmutableList<String> verbForQuestion = ImmutableList.copyOf(getNonTargetBareArgumentVerb(predicateIndex));
         final Optional<ResolvedDependency> subjDependencyOpt = chosenArgDeps.get(1);
         final Optional<Integer> subjIndexOpt = subjDependencyOpt.map(ResolvedDependency::getArgument);
 
-        TextWithDependencies verbTWD = new TextWithDependencies(verb, new HashSet<>());
+        TextWithDependencies verbQuestionTWD = new TextWithDependencies(verbForQuestion, new HashSet<>());
+        TextWithDependencies verbAnswerTWD = new TextWithDependencies(verbForAnswer, new HashSet<>());
         final ImmutableList<TextWithDependencies> verbArgumentTWDs = IntStream
             .range(2, predicateCategory.getNumberOfArguments() + 1) // skip the subject
             .boxed()
@@ -504,7 +506,7 @@ public class MultiQuestionTemplate {
                     Optional<ResolvedDependency> argDepOpt = chosenArgDeps.get(argNum);
                     Optional<Integer> argIndexOpt = argDepOpt.map(ResolvedDependency::getArgument);
                     return TextGenerationHelper.getRepresentativePhrases(argIndexOpt, argCat, parse).stream()
-                    .map(argTWD -> verbTWD.concatWithDep(argTWD, argDepOpt));
+                    .map(argTWD -> verbAnswerTWD.concatWithDep(argTWD, argDepOpt));
                 })
             .collect(toImmutableList());
 
@@ -516,7 +518,7 @@ public class MultiQuestionTemplate {
             .flatMap(targetDep -> TextGenerationHelper
                      .getRepresentativePhrases(Optional.of(targetDep.getHead()), Category.valueOf("(S\\NP)\\(S\\NP)"), parse).stream()
             .map(adverbTWD -> {
-                    TextWithDependencies answerTWD = verbTWD.concat(adverbTWD);
+                    TextWithDependencies answerTWD = verbAnswerTWD.concat(adverbTWD);
                     answerTWD.dependencies.add(targetDep);
                     return answerTWD;
                 }))
@@ -555,7 +557,7 @@ public class MultiQuestionTemplate {
             .add("What").add("is").add("it").add("that")
             .addAll(subject.tokens)
             .addAll(auxiliaries)
-            .addAll(verb)
+            .addAll(verbForQuestion)
             .build();
 
         final ImmutableList<BasicQuestionAnswerPair> nounQAPairs;
