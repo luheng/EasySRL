@@ -495,8 +495,9 @@ public class MultiQuestionTemplate {
         final Optional<Integer> subjIndexOpt = subjDependencyOpt.map(ResolvedDependency::getArgument);
 
         TextWithDependencies verbTWD = new TextWithDependencies(verb, new HashSet<>());
-        final ImmutableList<TextWithDependencies> verbAnswerTWDs;
+        final ImmutableList<TextWithDependencies> verbArgumentTWDs;
         if(Category.valueOf("S\\NP").matches(predicateCategory)) {
+            // TODO maybe we don't want this
             verbAnswerTWDs = ImmutableList.of(verbTWD);
         } else if(Category.valueOf("(S\\NP)/NP").matches(predicateCategory)) {
             Optional<ResolvedDependency> objDepOpt = chosenArgDeps.get(2);
@@ -1013,6 +1014,35 @@ public class MultiQuestionTemplate {
             result.add(words.get(argIndex));
         }
         // otherwise maybe it's an S[dcl] or something, in which case we don't want a placeholder.
+        return result;
+    }
+
+    public List<String> getAnswerVerb(int argIndex) {
+        ArrayList<String> result = new ArrayList<>();
+        if(type == QuestionType.NOUN_ADJUNCT) {
+            return result;
+        }
+        SyntaxTreeNode verbLeaf = tree.getLeaves().get(argIndex);
+        String verb = TextGenerationHelper.getNodeWords(verbLeaf, Optional.empty(), Optional.empty()).get(0);
+        String uninflectedVerb = verbHelper.getUninflected(verb).orElse(verb);
+        // category of actual arg as it appears in the sentence.
+        Category argCategory = categories.get(argIndex);
+        if (argCategory.isFunctionInto(Category.valueOf("S[to]\\NP"))) {
+            result.add(verb);
+        } else if (argCategory.isFunctionInto(Category.valueOf("S[ng]\\NP"))) {
+            result.add(verb);
+        } else if (argCategory.isFunctionInto(Category.valueOf("S[pss]\\NP")) ||
+                   argCategory.isFunctionInto(Category.valueOf("S[adj]\\NP"))) {
+            result.add("be");
+            result.add(verb);
+        } else if (argCategory.isFunctionInto(Category.valueOf("S[pt]\\NP"))) {
+            result.add(verb);
+        } else if (argCategory.isFunctionInto(Category.valueOf("S[dcl]\\NP"))) {
+            result.add(uninflectedVerb);
+        } else if (argCategory.isFunctionInto(Category.valueOf("S\\NP"))) { // catch-all for verbs
+            result.add(uninflectedVerb);
+        }
+        // TODO maybe add preposition
         return result;
     }
 
