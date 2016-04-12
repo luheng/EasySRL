@@ -160,14 +160,10 @@ public class QAPairAggregatorUtils {
 
     static ImmutableSet<ResolvedDependency> getSalientAnswerDependencies(final QuestionAnswerPair qa) {
         return qa.getAnswerDependencies().stream()
-                .filter(dep -> isDependencySalient(dep, qa))
-                .collect(GuavaCollectors.toImmutableSet());
-    }
-
-    static ImmutableSet<ResolvedDependency> getPrepositionalAnswerDependencies(final QuestionAnswerPair qa) {
-        return qa.getAnswerDependencies().stream()
-                .filter(dep -> Prepositions.prepositionalCategories.contains(dep.getCategory()) ||
-                                dep.getCategory().getArgument(dep.getArgNumber()) == Category.PP)
+                .filter(dep -> {
+                    //isDependencySalient(dep, qa)
+                    return dep.getHead() == qa.getPredicateIndex() || dep.getArgument() == qa.getPredicateIndex();
+                })
                 .collect(GuavaCollectors.toImmutableSet());
     }
 

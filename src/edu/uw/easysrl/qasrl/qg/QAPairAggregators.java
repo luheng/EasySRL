@@ -92,7 +92,7 @@ public final class QAPairAggregators {
                                     .collect(toImmutableList());
 
                             return questionQAPairs.stream()
-                                    .collect(groupingBy(QAPairAggregatorUtils::getPrepositionalAnswerDependencies))
+                                    .collect(groupingBy(QAPairAggregatorUtils::getSalientAnswerDependencies))
                                     .values().stream()
                                     .map(QAPairAggregatorUtils::getAnswerSurfaceFormToAdjunctHeadsStructure)
                                     .collect(groupingBy(as2s -> as2s.answer))
