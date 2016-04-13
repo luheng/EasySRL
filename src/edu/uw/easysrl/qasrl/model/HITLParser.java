@@ -114,7 +114,7 @@ public class HITLParser {
         ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList =
                 ExperimentUtils.generateCleftedQueries(
                         sentenceId, sentences.get(sentenceId), nbestLists.get(sentenceId),
-                        false /* usePronouns */,
+                        true /* usePronouns */,
                         queryPruningParams);
         // Assign query ids.
         IntStream.range(0, queryList.size()).forEach(i -> queryList.get(i).setQueryId(i));

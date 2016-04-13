@@ -53,8 +53,15 @@ public class QAPairAggregatorUtils {
         return getQuestionLabelString(qa) + "\t" + getQuestionDependenciesString(qa);
     }
 
-    static String getSalientAnswerDependenciesString(final QuestionAnswerPair qa) {
-        return getSalientAnswerDependencies(qa).stream()
+    /**
+     * Including answer head and dependencies.
+     * @param qa
+     * @return
+     */
+    static String getAnswerDependenciesStructureString(final QuestionAnswerPair qa) {
+        final boolean answerIsVP = qa.getArgumentNumber() == 1;
+        final int answerHead =  answerIsVP ? qa.getPredicateIndex() : qa.getTargetDependency().getArgument();
+        return answerHead + "\t" + getSalientAnswerDependencies(qa).stream()
                 .map(dep -> dep.getHead() + "->" + dep.getArgument())
                 .sorted()
                 .collect(Collectors.joining("\t"));
@@ -170,10 +177,14 @@ public class QAPairAggregatorUtils {
                 .filter(dep -> {
                     //isDependencySalient(dep, qa)
                     final boolean answerIsVP = qa.getArgumentNumber() == 1;
+                    final int headId = dep.getHead(), argId = dep.getArgument();
+                    final String headWord = qa.getParse().syntaxTree.getLeaves().get(headId).getWord();
                     return answerIsVP ?
-                            dep.getHead() == qa.getPredicateIndex() || dep.getArgument() == qa.getPredicateIndex() :
-                            dep.getArgument() == qa.getTargetDependency().getArgument() &&
-                                           dep.getCategory().isFunctionInto(Category.valueOf("NP\\NP"));
+                            headId == qa.getPredicateIndex() ||
+                                    argId == qa.getPredicateIndex() :
+                            argId == qa.getTargetDependency().getArgument() &&
+                                    dep.getCategory() == Category.valueOf("(NP\\NP)/NP") &&
+                                    !headWord.equalsIgnoreCase("of");
                 })
                 .collect(GuavaCollectors.toImmutableSet());
     }

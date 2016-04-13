@@ -3,6 +3,7 @@ package edu.uw.easysrl.qasrl.annotation;
 import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.qasrl.experiments.ReparsingHistory;
 import edu.uw.easysrl.qasrl.model.HITLParser;
+import edu.uw.easysrl.qasrl.model.HITLParsingParameters;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
@@ -49,6 +50,12 @@ public class CrowdFlowerDataWriterClefted {
         queryPruningParameters.minOptionEntropy = 0.1;
         queryPruningParameters.minPromptConfidence = 0.05;
     }
+    static HITLParsingParameters reparsingParamters;
+    static {
+        reparsingParamters = new HITLParsingParameters();
+        reparsingParamters.attachmentPenaltyWeight = 5.0;
+        reparsingParamters.supertagPenaltyWeight = 5.0;
+    }
 
     private static void printQuestionsToAnnotate() throws IOException {
         final ImmutableList<Integer> sentenceIds = CrowdFlowerDataUtils.getRound2And3SentenceIds();
@@ -56,6 +63,7 @@ public class CrowdFlowerDataWriterClefted {
                 fileCounter = new AtomicInteger(0);
 
         hitlParser.setQueryPruningParameters(queryPruningParameters);
+        hitlParser.setReparsingParameters(reparsingParamters);
 
         CSVPrinter csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter(
                 String.format("%s_%03d.csv", csvOutputFilePrefix, fileCounter.getAndAdd(1)))),
@@ -67,6 +75,11 @@ public class CrowdFlowerDataWriterClefted {
                     hitlParser.getCleftedQuestionsForSentence(sid);
             history.addSentence(sid);
             for (ScoredQuery<QAStructureSurfaceForm> query : queries) {
+                // Skip certain type of questions.
+                if (query.getQAPairSurfaceForms().get(0).getAnswerStructures().get(0).headIsVP) {
+                    continue;
+                }
+
                 final ImmutableList<String> sentence = hitlParser.getSentence(sid);
                 final ImmutableList<Integer> goldOptionIds = hitlParser.getGoldOptions(query);
                 CrowdFlowerDataUtils.printQueryToCSVFileNew(
@@ -92,6 +105,7 @@ public class CrowdFlowerDataWriterClefted {
                             .collect(Collectors.joining(" / "))
                     );
                 });
+                System.out.println();
 
                 if (lineCounter.get() % maxNumQueriesPerFile == 0) {
                     csvPrinter.close();

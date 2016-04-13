@@ -2,9 +2,13 @@ package edu.uw.easysrl.qasrl.query;
 
 import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
+import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
+import edu.uw.easysrl.qasrl.qg.util.Prepositions;
 import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.syntax.grammar.Preposition;
+import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.Collections;
@@ -34,13 +38,28 @@ public class QueryFilters {
             for (String op2 : allOptions) {
                 if (option.equalsIgnoreCase(op1 + ", " + op2) ||
                         option.equalsIgnoreCase(op1 + " and " + op2) ||
-                        option.equalsIgnoreCase(op1 + " or " + op2)) {
+                        option.equalsIgnoreCase(op1 + " or " + op2) ||
+                        option.equalsIgnoreCase(op1 + ", and " + op2) ||
+                        option.equalsIgnoreCase(op1 + ", or " + op2)) {
                     System.err.println(option);
                     return true;
                 }
             }
         }
         return false;
+    }
+
+    /**
+     * Filtering for clefted query only.
+     * @param qa
+     * @return
+     */
+    private static boolean hasBadPrepositionDepenendecy(final QAStructureSurfaceForm qa) {
+        final List<SyntaxTreeNode.SyntaxTreeNodeLeaf> leaves = qa.getQAPairs().get(0).getParse().syntaxTree.getLeaves();
+        return qa.getAnswerStructures().stream()
+                .flatMap(astr -> astr.adjunctDependencies.stream())
+                .anyMatch(dep -> Prepositions.prepositionCategories.contains(dep.getCategory()) &&
+                        !Prepositions.prepositionWords.contains(leaves.get(dep.getHead()).getWord().toLowerCase()));
     }
 
     // TODO: filter answers that is a superspan of two non-overlapping answers. i.e.
@@ -113,6 +132,7 @@ public class QueryFilters {
                             IntStream.range(0, numQAOptions).boxed()
                                     .filter(i -> !query.getOptions().get(i).isEmpty())
                                     .filter(i -> query.getOptionScores().get(i) > queryPruningParameters.minOptionConfidence)
+                                    .filter(i -> !hasBadPrepositionDepenendecy(query.getQAPairSurfaceForms().get(i)))
                                     .collect(Collectors.toList());
                     // TODO: handle max number of options
                     final List<QAStructureSurfaceForm> filteredQAList = filteredOptionIds.stream()
