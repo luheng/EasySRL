@@ -19,7 +19,7 @@ import java.util.stream.IntStream;
  */
 public class QuestionGenerator {
 
-    private static boolean indefinitesOnly = false; // if true: only ask questions with indefinite noun args
+    private static boolean indefinitesOnly = true; // if true: only ask questions with indefinite noun args
     public static void setIndefinitesOnly(boolean flag) {
         indefinitesOnly = flag;
     }
@@ -72,7 +72,7 @@ public class QuestionGenerator {
                                                                                  Parse parse) {
         final MultiQuestionTemplate template = new MultiQuestionTemplate(sentenceId, parseId, predicateIdx, words, parse);
         return askPPAttachmentQuestions ?
-                template.getAllPPAttachmentQAPairs()
+                template.getAllPPAttachmentQAPairs(indefinitesOnly)
                         .stream()
                         .collect(toImmutableList()) :
                 IntStream.range(1, parse.categories.get(predicateIdx).getNumberOfArguments() + 1)
@@ -104,7 +104,8 @@ public class QuestionGenerator {
         } else if (args[0].equalsIgnoreCase("tricky")) {
             System.out.println("\nQA Pairs for tricky sentences:\n");
             ImmutableList<Integer> trickySentences = new ImmutableList.Builder<Integer>()
-                .add(42).add(1489).add(36)
+                // .add(42).add(1489).add(36)
+                .add(90)
                 .build();
             ImmutableMap<Integer, NBestList> nBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 100).get();
             for(int sentenceId : trickySentences) {
@@ -121,6 +122,11 @@ public class QuestionGenerator {
                 ImmutableList<QuestionAnswerPair> qaPairs = generateAllQAPairs(sentenceId, words, nBestList);
                 for(QuestionAnswerPair qaPair : qaPairs) {
                     printQAPair(words, qaPair);
+                    // for(int i = 0; i < words.size(); i++) {
+                    //     System.out.println(words.get(i) + "\t" + qaPair.getParse().categories.get(i));
+                    // }
+                    // System.out.println(qaPair.getParse().syntaxTree);
+                    // System.out.println();
                 }
                 System.out.println("------- All Pair Queries -------");
                 ImmutableList<QAPairSurfaceForm> surfaceForms = QAPairAggregators.aggregateByString().aggregate(qaPairs);
