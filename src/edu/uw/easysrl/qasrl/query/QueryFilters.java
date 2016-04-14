@@ -51,12 +51,16 @@ public class QueryFilters {
 
     /**
      * Filtering for clefted query only.
+     * Removing options that has "bad" prepositions, i.e. words that's not in the pp list.
      * @param qa
      * @return
      */
     private static boolean hasBadPrepositionDepenendecy(final QAStructureSurfaceForm qa) {
         final List<SyntaxTreeNode.SyntaxTreeNodeLeaf> leaves = qa.getQAPairs().get(0).getParse().syntaxTree.getLeaves();
+        // Filtering phrases such as "controlling in".
         return qa.getAnswerStructures().stream()
+                .anyMatch(astr -> astr.adjunctDependencies.size() == 1) ||
+               qa.getAnswerStructures().stream()
                 .flatMap(astr -> astr.adjunctDependencies.stream())
                 .anyMatch(dep -> Prepositions.prepositionCategories.contains(dep.getCategory()) &&
                         !Prepositions.prepositionWords.contains(leaves.get(dep.getHead()).getWord().toLowerCase()));

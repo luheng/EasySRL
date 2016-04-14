@@ -68,9 +68,13 @@ public class AttachmentHelper {
     public static List<int[]> getAnswerPPAttachments(QAStructureSurfaceForm qa) {
         final List<int[]> attachments = new ArrayList<>();
         qa.getAnswerStructures().stream()
-                .flatMap(astr -> astr.adjunctDependencies.stream())
-                .distinct()
-                .forEach(dep -> attachments.add(new int[]{ dep.getHead(), dep.getArgument() }));
+                .forEach(astr -> astr.adjunctDependencies.stream()
+                        .filter(d -> {
+                            final int answerHead = astr.argumentIndices.get(0);
+                            return d.getArgument() == answerHead || (d.getHead() == answerHead &&
+                                    d.getCategory().getArgument(d.getArgNumber()) == Category.PP);
+                        })
+                        .forEach(dep -> attachments.add(new int[]{ dep.getHead(), dep.getArgument() })));
         return attachments;
     }
 

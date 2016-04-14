@@ -173,10 +173,24 @@ public class QAPairAggregatorUtils {
     }
 
     static ImmutableSet<ResolvedDependency> getSalientAnswerDependencies(final QuestionAnswerPair qa) {
+        final boolean answerIsVP = qa.getArgumentNumber() == 1;
+        final Optional<Integer> ppIdOpt = qa.getAnswerDependencies().stream()
+                .filter(d -> answerIsVP ?
+                        d.getArgument() == qa.getPredicateIndex() :
+                        d.getArgument() == qa.getTargetDependency().getArgument() &&
+                                d.getCategory() == Category.valueOf("(NP\\NP)/NP") &&
+                                !qa.getParse().syntaxTree.getLeaves().get(d.getHead()).getWord().equalsIgnoreCase("of"))
+                .map(ResolvedDependency::getHead)
+                .findFirst();
+        return ppIdOpt.isPresent() ?
+                qa.getAnswerDependencies().stream()
+                        .filter(d -> d.getHead() == qa.getPredicateIndex() || d.getHead() == ppIdOpt.get())
+                        .collect(toImmutableSet()) :
+                ImmutableSet.of();
+        /*
         return qa.getAnswerDependencies().stream()
                 .filter(dep -> {
                     //isDependencySalient(dep, qa)
-                    final boolean answerIsVP = qa.getArgumentNumber() == 1;
                     final int headId = dep.getHead(), argId = dep.getArgument();
                     final String headWord = qa.getParse().syntaxTree.getLeaves().get(headId).getWord();
                     return answerIsVP ?
@@ -187,6 +201,7 @@ public class QAPairAggregatorUtils {
                                     !headWord.equalsIgnoreCase("of");
                 })
                 .collect(GuavaCollectors.toImmutableSet());
+        */
     }
 
     /**
