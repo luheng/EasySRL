@@ -547,7 +547,7 @@ public class TextGenerationHelper {
         final int maxIndex = node.getEndIndex();
         for (ResolvedDependency dep : parse.dependencies) {
             if (dep.getHead() >= minIndex && dep.getHead() < maxIndex &&
-                dep.getArgument() >= minIndex && dep.getArgument() <= maxIndex) {
+                dep.getArgument() >= minIndex && dep.getArgument() < maxIndex) {
                 deps.add(dep);
             }
         }
