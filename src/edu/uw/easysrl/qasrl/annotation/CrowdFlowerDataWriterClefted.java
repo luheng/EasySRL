@@ -33,13 +33,14 @@ public class CrowdFlowerDataWriterClefted {
     static final boolean usePronouns = false;
     static final int maxNumQueriesPerFile = 100;
 
-    private final static HITLParser hitlParser = new HITLParser(nBest);
-    private final static ReparsingHistory history = new ReparsingHistory(hitlParser);
-
-    private static final String csvOutputFilePrefix = "./Crowdflower_unannotated/clefted_100best";
+    private static HITLParser hitlParser = null;
+    private static ReparsingHistory history = null;
 
     private static final String[] reviewedTestQuestionFiles = new String[] {
+            "./Crowdflower_unannotated/test_questions/test_questions_np_clefting_r01.tsv",
     };
+
+    private static final String csvOutputFilePrefix = "./Crowdflower_unannotated/np_clefting_100best";
 
     static QueryPruningParameters queryPruningParameters;
     static {
@@ -48,7 +49,7 @@ public class CrowdFlowerDataWriterClefted {
         queryPruningParameters.skipSAdjQuestions = true;
         queryPruningParameters.minOptionConfidence = 0.1;
         queryPruningParameters.minOptionEntropy = 0.1;
-        queryPruningParameters.minPromptConfidence = 0.05;
+        queryPruningParameters.minPromptConfidence = 0.3;
     }
     static HITLParsingParameters reparsingParamters;
     static {
@@ -69,13 +70,6 @@ public class CrowdFlowerDataWriterClefted {
                         annotations.get(annot.sentenceId).add(annot);
                     });
         }
-
-        QueryPruningParameters queryPruningParams = new QueryPruningParameters();
-        queryPruningParams.skipSAdjQuestions = true;
-        queryPruningParams.minOptionConfidence = 0;
-        queryPruningParams.minOptionEntropy = -1;
-        queryPruningParams.minPromptConfidence = -1;
-        //hitlParser.setQueryPruningParameters(queryPruningParams);
 
         final String testQuestionsFile = String.format("%s_test.csv", csvOutputFilePrefix);
         CSVPrinter csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter(testQuestionsFile)),
@@ -103,10 +97,12 @@ public class CrowdFlowerDataWriterClefted {
     }
 
     private static void printQuestionsToAnnotate() throws IOException {
-        final ImmutableList<Integer> sentenceIds = CrowdFlowerDataUtils.getTestSentenceIds();
+        final ImmutableList<Integer> sentenceIds = CrowdFlowerDataUtils.getRound2And3SentenceIds();
         AtomicInteger lineCounter = new AtomicInteger(0),
                 fileCounter = new AtomicInteger(0);
 
+        hitlParser = new HITLParser(nBest);
+        history = new ReparsingHistory(hitlParser);
         hitlParser.setQueryPruningParameters(queryPruningParameters);
         hitlParser.setReparsingParameters(reparsingParamters);
 
@@ -168,6 +164,6 @@ public class CrowdFlowerDataWriterClefted {
     public static void main(String[] args) throws IOException {
         //final ImmutableList<Integer> testSentenceIds = CrowdFlowerDataUtils.getTestSentenceIds();
         printTestQuestions();
-        // printQuestionsToAnnotate();
+        //printQuestionsToAnnotate();
     }
 }
