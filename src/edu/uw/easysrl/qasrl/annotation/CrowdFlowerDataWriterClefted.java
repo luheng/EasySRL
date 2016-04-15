@@ -36,7 +36,7 @@ public class CrowdFlowerDataWriterClefted {
     private final static HITLParser hitlParser = new HITLParser(nBest);
     private final static ReparsingHistory history = new ReparsingHistory(hitlParser);
 
-    private static final String csvOutputFilePrefix = "./Crowdflower_temp/clefted_100best";
+    private static final String csvOutputFilePrefix = "./Crowdflower_unannotated/clefted_100best";
 
     private static final String[] reviewedTestQuestionFiles = new String[] {
     };
@@ -57,8 +57,53 @@ public class CrowdFlowerDataWriterClefted {
         reparsingParamters.supertagPenaltyWeight = 5.0;
     }
 
+    private static void printTestQuestions() throws IOException {
+        // Load test questions prepared by the UI.
+        Map<Integer, List<RecordedAnnotation>> annotations = new HashMap<>();
+        for (String testQuestionFile : reviewedTestQuestionFiles) {
+            AnnotationReader.readReviewedTestQuestionsFromTSV(testQuestionFile)
+                    .forEach(annot -> {
+                        if (!annotations.containsKey(annot.sentenceId)) {
+                            annotations.put(annot.sentenceId, new ArrayList<>());
+                        }
+                        annotations.get(annot.sentenceId).add(annot);
+                    });
+        }
+
+        QueryPruningParameters queryPruningParams = new QueryPruningParameters();
+        queryPruningParams.skipSAdjQuestions = true;
+        queryPruningParams.minOptionConfidence = 0;
+        queryPruningParams.minOptionEntropy = -1;
+        queryPruningParams.minPromptConfidence = -1;
+        //hitlParser.setQueryPruningParameters(queryPruningParams);
+
+        final String testQuestionsFile = String.format("%s_test.csv", csvOutputFilePrefix);
+        CSVPrinter csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter(testQuestionsFile)),
+                CSVFormat.EXCEL.withRecordSeparator("\n"));
+        csvPrinter.printRecord((Object[]) CrowdFlowerDataUtils.csvHeaderNew);
+
+        AtomicInteger lineCounter = new AtomicInteger(0);
+        for (int sid : annotations.keySet()) {
+            //if (sid > 2000) {
+            annotations.get(sid).stream().forEach(annot -> {
+                try {
+                    System.out.println(annot);
+                    CrowdFlowerDataUtils.printRecordToCSVFile(
+                            annot,
+                            10000 + lineCounter.getAndAdd(1),
+                            true, // highlight predicate
+                            csvPrinter);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+        }
+        csvPrinter.close();
+        System.out.println(String.format("Wrote %d test questions to file %s.", lineCounter.get(), testQuestionsFile));
+    }
+
     private static void printQuestionsToAnnotate() throws IOException {
-        final ImmutableList<Integer> sentenceIds = CrowdFlowerDataUtils.getRound2And3SentenceIds();
+        final ImmutableList<Integer> sentenceIds = CrowdFlowerDataUtils.getTestSentenceIds();
         AtomicInteger lineCounter = new AtomicInteger(0),
                 fileCounter = new AtomicInteger(0);
 
@@ -122,7 +167,7 @@ public class CrowdFlowerDataWriterClefted {
 
     public static void main(String[] args) throws IOException {
         //final ImmutableList<Integer> testSentenceIds = CrowdFlowerDataUtils.getTestSentenceIds();
-        // printTestQuestions();
-        printQuestionsToAnnotate();
+        printTestQuestions();
+        // printQuestionsToAnnotate();
     }
 }

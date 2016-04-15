@@ -135,6 +135,7 @@ public class QueryFilters {
                     final List<Integer> filteredOptionIds =
                             IntStream.range(0, numQAOptions).boxed()
                                     .filter(i -> !query.getOptions().get(i).isEmpty())
+                                    // Do not filter "standalone" options, such as "pasta".
                                     .filter(i -> query.getOptionScores().get(i) > queryPruningParameters.minOptionConfidence)
                                     .filter(i -> !hasBadPrepositionDepenendecy(query.getQAPairSurfaceForms().get(i)))
                                     .collect(Collectors.toList());
