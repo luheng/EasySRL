@@ -11,6 +11,10 @@ import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeBinary;
 import java.util.*;
 import java.util.stream.Collectors;
 import static java.util.stream.Collectors.*;
+import static edu.uw.easysrl.util.GuavaCollectors.*;
+
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableList;
 
 /**
  * Tools for generating text from trees, dependencies, and lists of tokens.
@@ -386,7 +390,7 @@ public class TextGenerationHelper {
         // until he exactly matches the category we're looking for.
         // using this method will capture and appropriately rearrange extracted arguments and such.
 
-        Category currentCategory = node.getCategory();
+        final Category currentCategory = node.getCategory();
 
         if(neededCategory.matches(currentCategory)) {
             // if we already have the right kind of phrase, consider adding a trailing "of"-phrase.
@@ -430,12 +434,11 @@ public class TextGenerationHelper {
                  i++) {
                 allArgDeps.put(i, new HashSet<ResolvedDependency>());
             }
-            final Category curCat = currentCategory; // for lambda below
             parse.dependencies
                 .stream()
                 .filter(dep -> dep.getHead() == headIndex)
                 .filter(dep -> dep.getArgNumber() > neededCategory.getNumberOfArguments())
-                .filter(dep -> dep.getArgNumber() <= curCat.getNumberOfArguments())
+                .filter(dep -> dep.getArgNumber() <= currentCategory.getNumberOfArguments())
                 .forEach(dep -> allArgDeps.get(dep.getArgNumber()).add(dep));
             List<Map<Integer, Optional<ResolvedDependency>>> argumentChoicePaths = getAllArgumentChoicePaths(allArgDeps);
 
@@ -450,11 +453,12 @@ public class TextGenerationHelper {
 
                 Set<ResolvedDependency> localDeps = new HashSet<>();
 
-                for(int currentArgNum = currentCategory.getNumberOfArguments();
+                Category shrinkingCategory = currentCategory;
+                for(int currentArgNum = shrinkingCategory.getNumberOfArguments();
                     currentArgNum > neededCategory.getNumberOfArguments();
                     currentArgNum--) {
                     // otherwise, add arguments on either side until done, according to CCG category.
-                    Category argCat = currentCategory.getRight();
+                    Category argCat = shrinkingCategory.getRight();
                     Optional<ResolvedDependency> argDepOpt = chosenArgDeps.get(currentArgNum);
                     Optional<Integer> argIndexOpt = argDepOpt.map(ResolvedDependency::getArgument);
                     // recover dep using the fact that we know the head leaf, arg num, and arg index.
@@ -462,7 +466,7 @@ public class TextGenerationHelper {
                     List<TextWithDependencies> argTWDs =
                         getRepresentativePhrases(argIndexOpt, argCat, parse, replacementIndexOpt, replacementWord, lookForOf);
                     // add the argument on the left or right side, depending on the slash
-                    Slash slash = currentCategory.getSlash();
+                    Slash slash = shrinkingCategory.getSlash();
                     switch(slash) {
                     case FWD:
                         rights = rights.stream()
@@ -481,7 +485,7 @@ public class TextGenerationHelper {
                         break;
                     }
                     // proceed to the next argument
-                    currentCategory = currentCategory.getLeft();
+                    shrinkingCategory = shrinkingCategory.getLeft();
                 }
                 for(TextWithDependencies left : lefts) {
                     for(TextWithDependencies right : rights) {
@@ -642,6 +646,10 @@ public class TextGenerationHelper {
         public TextWithDependencies(List<String> tokens, Set<ResolvedDependency> dependencies) {
             this.tokens = tokens;
             this.dependencies = dependencies;
+        }
+
+        public String toString() {
+            return tokens.toString() + ", " + dependencies.toString();
         }
 
         // functional concat
