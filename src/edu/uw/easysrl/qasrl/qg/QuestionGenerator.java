@@ -122,11 +122,6 @@ public class QuestionGenerator {
                 ImmutableList<QuestionAnswerPair> qaPairs = generateAllQAPairs(sentenceId, words, nBestList);
                 for(QuestionAnswerPair qaPair : qaPairs) {
                     printQAPair(words, qaPair);
-                    // for(int i = 0; i < words.size(); i++) {
-                    //     System.out.println(words.get(i) + "\t" + qaPair.getParse().categories.get(i));
-                    // }
-                    // System.out.println(qaPair.getParse().syntaxTree);
-                    // System.out.println();
                 }
                 System.out.println("------- All Pair Queries -------");
                 ImmutableList<QAPairSurfaceForm> surfaceForms = QAPairAggregators.aggregateByString().aggregate(qaPairs);

@@ -175,6 +175,10 @@ public class QAPairAggregatorUtils {
      * Tells us whether we want to group based on a dependency.
      */
     private static boolean isDependencySalient(ResolvedDependency dep, QuestionAnswerPair qaPair) {
+        if(dep == null) {
+            System.err.println("asking for null salient dependency; might be due to a \"what would something do\" question with null target dependency");
+            return false;
+        }
         ImmutableList<Category> categories = ImmutableList.copyOf(qaPair.getParse().categories);
         ImmutableList<String> words = qaPair.getParse().syntaxTree.getLeaves().stream()
                 .map(SyntaxTreeNode::getWord)
