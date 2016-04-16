@@ -74,7 +74,12 @@ public class AnnotationReader {
                     line = reader.readLine().trim();
                 }
                 info = line.split("\\t");
-                curr.comment = info[1].trim().isEmpty() ? info[2] : info[1];
+                for (int i = 1; i < info.length; i++) {
+                    if (!info[i].isEmpty()) {
+                        curr.comment = info[i];
+                        break;
+                    }
+                }
 
                 // Empty line.
                 reader.readLine();
