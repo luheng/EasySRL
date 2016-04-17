@@ -5,6 +5,7 @@ import com.google.common.collect.ImmutableSet;
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
 import edu.uw.easysrl.qasrl.annotation.AnnotationUtils;
+import edu.uw.easysrl.qasrl.evaluation.Accuracy;
 import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils.*;
 import edu.uw.easysrl.qasrl.model.Constraint;
@@ -19,6 +20,7 @@ import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * Round1-3: We can change about 10% of the sentences and improve about 5%.
@@ -32,11 +34,11 @@ public class ReparsingExperiment {
     private static Map<Integer, List<AlignedAnnotation>> annotations;
 
     private static final String[] annotationFiles = {
-            "./Crowdflower_data/f878213.csv",                // Round1: radio-button, core + pp
-            "./Crowdflower_data/f882410.csv",                // Round2: radio-button, core only
-            "./Crowdflower_data/all-checkbox-responses.csv", // Round3: checkbox, core + pp
+          //  "./Crowdflower_data/f878213.csv",                // Round1: radio-button, core + pp
+          //  "./Crowdflower_data/f882410.csv",                // Round2: radio-button, core only
+          //  "./Crowdflower_data/all-checkbox-responses.csv", // Round3: checkbox, core + pp
           //  "./Crowdflower_data/f891522.csv",                // Round4: jeopardy checkbox, pp only
-            "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
+          //  "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
             "./Crowdflower_data/f897179.csv"                 // Round2-3: NP clefting questions.
     };
 
@@ -54,8 +56,8 @@ public class ReparsingExperiment {
         reparsingParameters.minAgreement = 2;
         reparsingParameters.skipPronounEvidence = true;
         reparsingParameters.jeopardyQuestionWeight = 1.0;
-        reparsingParameters.attachmentPenaltyWeight = 1.5;
-        reparsingParameters.supertagPenaltyWeight = 1.5;
+        reparsingParameters.attachmentPenaltyWeight = 5.0;
+        reparsingParameters.supertagPenaltyWeight = 5.0;
     }
 
     public static void main(String[] args) {
@@ -82,6 +84,15 @@ public class ReparsingExperiment {
                         .sorted()
                         .collect(GuavaCollectors.toImmutableSet());
         annotators.stream().forEach(System.err::println); */
+
+        // Stats.
+        ImmutableList<Results> optionAccuracy = IntStream.range(0, 5).boxed()
+                .map(ignore -> new Results())
+                .collect(GuavaCollectors.toImmutableList());
+        ImmutableList<Accuracy> goldStrictMatch = IntStream.range(0, 5).boxed()
+                .map(ignore -> new Accuracy())
+                .collect(GuavaCollectors.toImmutableList());
+        int numMatchedAnnotations = 0;
 
         List<DebugBlock> debugging = new ArrayList<>();
         for (int sentenceId : sentenceIds) {
@@ -119,6 +130,21 @@ public class ReparsingExperiment {
                                        oneBestOptions = myHTILParser.getOneBestOptions(query),
                                        oracleOptions  = myHTILParser.getOracleOptions(query),
                                        userOptions    = myHTILParser.getUserOptions(query, annotation);
+
+                // Update stats.
+                for (int i = 0; i < 5; i++) {
+                    final int minAgr = i + 1;
+                    ImmutableList<Integer> options = IntStream.range(0, optionDist.length).boxed()
+                            .filter(id -> optionDist[id] >= minAgr)
+                            .collect(GuavaCollectors.toImmutableList());
+                    if (options.size() > 0) {
+                        goldStrictMatch.get(i).add(options.containsAll(goldOptions) && goldOptions.containsAll(options));
+                        optionAccuracy.get(i).add(new Results(options.size(),
+                                (int) options.stream().filter(goldOptions::contains).count(), goldOptions.size()));
+                    }
+                }
+                numMatchedAnnotations ++;
+
                 if (userOptions.size() == 0) {
                     continue;
                 }
@@ -184,5 +210,12 @@ public class ReparsingExperiment {
                 .sorted((b1, b2) -> Double.compare(b1.deltaF1, b2.deltaF1))
                 // .filter(b -> Math.abs(b.deltaF1) > 1e-3)
                 .forEach(b -> System.out.println(b.block));
+
+        System.out.println("Num. matched annotations:\t" + numMatchedAnnotations);
+        for (int i = 0; i < 5; i++) {
+            System.out.println(String.format("Min agreement=%d\tCoverage=%.2f%%\t%s\t%s",
+                    i + 1, 100.0 * goldStrictMatch.get(i).getNumTotal() / numMatchedAnnotations,
+                    goldStrictMatch.get(i), optionAccuracy.get(i)));
+        }
     }
 }

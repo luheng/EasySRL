@@ -40,6 +40,10 @@ public class CrowdFlowerDataReader {
                 final String[] qkeyInfo = record.get("question_key").split("\\.");
                 annotation.predicateCategory = Category.valueOf(qkeyInfo[1]);
                 annotation.argumentNumber = parseIntOrElse(qkeyInfo[2], -1);
+                // Do not include pp questions in agreement count.
+                if (AnnotationUtils.propositionalCategories.contains(annotation.predicateCategory)) {
+                    continue;
+                }
             } else {
                 String qkey = record.get("query_key");
                 annotation.predicateId = Integer.parseInt(qkey.split(":")[0]);
@@ -89,9 +93,9 @@ public class CrowdFlowerDataReader {
         Arrays.fill(strictAgreementCount, 0);
 
         alignedAnnotations.forEach(annotation -> {
-            /*if (annotation.getNumAnnotated() != 5) {
-                System.out.println(annotation);
-            }*/
+            //if (annotation.getNumAnnotated() != 5) {
+            //    System.err.println(annotation);
+            //}
             int maxAgree = 0;
             for (int agr : annotation.answerDist) {
                 maxAgree = Math.max(maxAgree, agr);

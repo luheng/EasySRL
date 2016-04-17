@@ -56,8 +56,8 @@ public class ResponseSimulatorGold {
 
          if (query.getQueryType() == QueryType.Forward) {
              final ImmutableList<QAStructureSurfaceForm> qaOptions = query.getQAPairSurfaceForms();
-             // The gold considers labeled dependency. If the dependency labels don't match, gold outputs "bad queryPrompt".
-             // So the gold outputs "bad queryPrompt" in case of dropped pp argument.
+             // The gold considers labeled dependency. If the dependency labels don't match, gold outputs "bad question".
+             // So the gold outputs "bad question" in case of dropped pp argument.
              AtomicBoolean nonEmptyGoldArgs = new AtomicBoolean(false);
              qaOptions.stream().flatMap(qa -> qa.getQuestionStructures().stream())
                      .forEach(qstr -> {

@@ -5,7 +5,7 @@ package edu.uw.easysrl.qasrl.evaluation;
  * Created by luheng on 1/11/16.
  */
 public class Accuracy {
-    int numCorrect, numTotal;
+    private int numCorrect, numTotal;
 
     public Accuracy() {
         numCorrect = 0;
@@ -26,6 +26,14 @@ public class Accuracy {
 
     public double getAccuracy() {
         return 1.0 * numCorrect / numTotal;
+    }
+
+    public int getNumCorrect() {
+        return numCorrect;
+    }
+
+    public int getNumTotal() {
+        return numTotal;
     }
 
     public String toString() {

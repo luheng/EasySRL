@@ -78,15 +78,6 @@ public class AnnotationUtils {
                 query.isJeopardyStyle();
     }
 
-    public static int getAgreementNumber(Query query, AlignedAnnotation annotation) {
-        int[] optionDist = getUserResponseDistribution(query, annotation);
-        int agreement = 1;
-        for (int i = 0; i < optionDist.length; i++) {
-            agreement = Math.max(agreement, optionDist[i]);
-        }
-        return agreement;
-    }
-
     public static int[] getUserResponseDistribution(Query query, AlignedAnnotation annotation) {
         int numOptions = query.getOptions().size();
         int[] optionDist = new int[numOptions];

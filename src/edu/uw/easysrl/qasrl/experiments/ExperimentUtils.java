@@ -145,11 +145,18 @@ public class ExperimentUtils {
 
     static AlignedAnnotation getAlignedAnnotation(ScoredQuery<QAStructureSurfaceForm> query,
                                                   List<AlignedAnnotation> annotations) {
+        AlignedAnnotation bestAligned = null;
+        int maxNumOverlappingOptions = 1;
         for (AlignedAnnotation annotation : annotations) {
             if (query.getPrompt().equals(annotation.queryPrompt)) {
-                return annotation;
+                int numOverlappingOptions = (int) annotation.answerOptions.stream()
+                        .filter(op -> query.getOptions().contains(op))
+                        .count();
+                if (numOverlappingOptions > maxNumOverlappingOptions) {
+                    bestAligned = annotation;
+                }
             }
         }
-        return null;
+        return bestAligned;
     }
 }
