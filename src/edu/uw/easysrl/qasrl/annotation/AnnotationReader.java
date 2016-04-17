@@ -1,6 +1,8 @@
 package edu.uw.easysrl.qasrl.annotation;
 
 import com.google.common.collect.ImmutableList;
+import edu.uw.easysrl.qasrl.query.QueryGenerator;
+import edu.uw.easysrl.qasrl.query.QueryGeneratorUtils;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.io.BufferedReader;
@@ -68,6 +70,9 @@ public class AnnotationReader {
                 }
                 curr.userOptionIds = ImmutableList.copyOf(optionIds);
                 curr.goldOptionIds = ImmutableList.of();
+                if (!curr.optionStrings.contains(QueryGeneratorUtils.kNoneApplicableString)) {
+                    curr.optionStrings.add(QueryGeneratorUtils.kNoneApplicableString);
+                }
 
                 // \t Reason: {reason}
                 if (line.isEmpty()) {

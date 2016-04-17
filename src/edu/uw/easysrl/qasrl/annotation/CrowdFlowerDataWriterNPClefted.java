@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
  * 4. Write candidate test questions to csv.
  * Created by luheng on 3/25/16.
  */
-public class CrowdFlowerDataWriterClefted {
+public class CrowdFlowerDataWriterNPClefted {
 
     static final int nBest = 100;
     static final boolean usePronouns = false;
@@ -141,8 +141,8 @@ public class CrowdFlowerDataWriterClefted {
                             .flatMap(astr -> astr.adjunctDependencies.stream())
                             .distinct()
                             .map(dep -> dep.getHead() == predId ?
-                                sentence.get(dep.getArgument()) + "." + goldCats.get(dep.getArgument()) :
-                                sentence.get(dep.getHead()) + "." + goldCats.get(dep.getHead()))
+                                    sentence.get(dep.getArgument()) + "." + goldCats.get(dep.getArgument()) :
+                                    sentence.get(dep.getHead()) + "." + goldCats.get(dep.getHead()))
                             .collect(Collectors.joining(" / "))
                     );
                 });

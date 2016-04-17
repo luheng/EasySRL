@@ -25,26 +25,19 @@ import java.util.stream.Collectors;
  * Average cost: if we don't ask PP questions, avg cost is about 30c per sentence ...
  * Created by luheng on 3/20/16.
  */
-public class ReparsingExperiment {
+public class ReparsingExperimentClefting {
     private static final int nBest = 100;
     private static HITLParser myHTILParser;
     private static ReparsingHistory myHistory;
     private static Map<Integer, List<AlignedAnnotation>> annotations;
 
     private static final String[] annotationFiles = {
-            "./Crowdflower_data/f878213.csv",                // Round1: radio-button, core + pp
-            "./Crowdflower_data/f882410.csv",                // Round2: radio-button, core only
-          //  "./Crowdflower_data/all-checkbox-responses.csv", // Round3: checkbox, core + pp
-          //  "./Crowdflower_data/f891522.csv",                // Round4: jeopardy checkbox, pp only
-            "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
-            "./Crowdflower_data/f897179.csv"                 // Round2-3: NP clefting questions.
+            "./Crowdflower_data/f897179.csv"
     };
 
     private static QueryPruningParameters queryPruningParameters;
     static {
         queryPruningParameters = new QueryPruningParameters();
-        queryPruningParameters.skipPPQuestions = false;
-        queryPruningParameters.skipSAdjQuestions = true;
     }
 
     private static HITLParsingParameters reparsingParameters;
@@ -52,17 +45,15 @@ public class ReparsingExperiment {
         reparsingParameters = new HITLParsingParameters();
         reparsingParameters.jeopardyQuestionMinAgreement = 1;
         reparsingParameters.minAgreement = 2;
-        reparsingParameters.skipPronounEvidence = true;
         reparsingParameters.jeopardyQuestionWeight = 1.0;
-        reparsingParameters.attachmentPenaltyWeight = 1.5;
-        reparsingParameters.supertagPenaltyWeight = 1.5;
+        reparsingParameters.attachmentPenaltyWeight = 1.0;
     }
 
     public static void main(String[] args) {
+        annotations = ExperimentUtils.loadCrowdflowerAnnotation(annotationFiles);
         myHTILParser = new HITLParser(nBest);
         myHTILParser.setQueryPruningParameters(queryPruningParameters);
         myHTILParser.setReparsingParameters(reparsingParameters);
-        annotations = ExperimentUtils.loadCrowdflowerAnnotation(annotationFiles);
         assert annotations != null;
         myHistory = new ReparsingHistory(myHTILParser);
         runExperiment();
@@ -72,16 +63,7 @@ public class ReparsingExperiment {
         List<Integer> sentenceIds = annotations.keySet().stream().sorted().collect(Collectors.toList());
         System.out.println(sentenceIds.stream().map(String::valueOf).collect(Collectors.joining(", ")));
         System.out.println("Queried " + sentenceIds.size() + " sentences. Total number of questions:\t" +
-            annotations.entrySet().stream().mapToInt(e -> e.getValue().size()).sum());
-
-        /*
-        ImmutableSet<String> annotators =
-                annotations.values().stream()
-                        .flatMap(al -> al.stream())
-                        .flatMap(annot -> annot.annotatorToAnswerIds.keySet().stream())
-                        .sorted()
-                        .collect(GuavaCollectors.toImmutableSet());
-        annotators.stream().forEach(System.err::println); */
+                annotations.entrySet().stream().mapToInt(e -> e.getValue().size()).sum());
 
         List<DebugBlock> debugging = new ArrayList<>();
         for (int sentenceId : sentenceIds) {
@@ -89,14 +71,7 @@ public class ReparsingExperiment {
             final NBestList nBestList = myHTILParser.getNBestList(sentenceId);
 
             final List<AlignedAnnotation> annotated = annotations.get(sentenceId);
-            boolean isCheckboxStyle = !annotated.stream()
-                    .anyMatch(annot -> annot.answerOptions.stream()
-                            .anyMatch(op -> op.contains(QAPairAggregatorUtils.answerDelimiter)));
-
             List<ScoredQuery<QAStructureSurfaceForm>> queryList = new ArrayList<>();
-            queryList.addAll(myHTILParser.getCoreArgumentQueriesForSentence(sentenceId, isCheckboxStyle));
-            // queryList.addAll(myHTILParser.getPPAttachmentQueriesForSentence(sentenceId));
-            queryList.addAll(myHTILParser.getPronounCoreArgQueriesForSentence(sentenceId));
             queryList.addAll(myHTILParser.getCleftedQuestionsForSentence(sentenceId));
 
             final Results baselineF1 = nBestList.getResults(0);
@@ -110,7 +85,7 @@ public class ReparsingExperiment {
 
             myHistory.addSentence(sentenceId);
             for (ScoredQuery<QAStructureSurfaceForm> query : queryList) {
-                AlignedAnnotation annotation = ExperimentUtils.getAlignedAnnotation(query, annotations.get(sentenceId));
+                AlignedAnnotation annotation = ExperimentUtils.getAlignedAnnotation(query, annotated);
                 if (annotation == null) {
                     continue;
                 }
@@ -134,9 +109,11 @@ public class ReparsingExperiment {
                 int rerankedId = myHTILParser.getRerankedParseId(sentenceId, allConstraintSet);
                 Parse reparse = myHTILParser.getReparsed(sentenceId, allConstraintSet);
                 Results rerankedF1 = nBestList.getResults(rerankedId);
-                Results reparsedF1 = CcgEvaluation.evaluate(reparse.dependencies, myHTILParser.getGoldParse(sentenceId).dependencies);
+                Results reparsedF1 = CcgEvaluation.evaluate(reparse.dependencies,
+                        myHTILParser.getGoldParse(sentenceId).dependencies);
 
-                myHistory.addEntry(sentenceId, query, userOptions, constraintSet, reparse, rerankedId, reparsedF1, rerankedF1);
+                myHistory.addEntry(sentenceId, query, userOptions, constraintSet, reparse, rerankedId, reparsedF1,
+                        rerankedF1);
 
                 // Print debugging information.
                 String result = query.toString(sentence,
