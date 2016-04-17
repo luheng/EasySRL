@@ -53,11 +53,11 @@ public class ReparsingExperiment {
     static {
         reparsingParameters = new HITLParsingParameters();
         reparsingParameters.jeopardyQuestionMinAgreement = 1;
-        reparsingParameters.minAgreement = 2;
-        reparsingParameters.skipPronounEvidence = true;
+        reparsingParameters.minAgreement = 3;
+        reparsingParameters.skipPronounEvidence = false;
         reparsingParameters.jeopardyQuestionWeight = 1.0;
-        reparsingParameters.attachmentPenaltyWeight = 5.0;
-        reparsingParameters.supertagPenaltyWeight = 5.0;
+        reparsingParameters.attachmentPenaltyWeight = 1.0;
+        reparsingParameters.supertagPenaltyWeight = 1.0;
     }
 
     public static void main(String[] args) {
@@ -152,9 +152,9 @@ public class ReparsingExperiment {
                     continue;
                 }
                 ImmutableSet<Constraint> constraintSet = myHTILParser.getConstraints(query, userOptions);
-                if (constraintSet == null || constraintSet.isEmpty()) {
+                /*if (constraintSet == null || constraintSet.isEmpty()) {
                     continue;
-                }
+                }*/
                 allConstraintSet.addAll(constraintSet);
 
                 int rerankedId = myHTILParser.getRerankedParseId(sentenceId, allConstraintSet);
@@ -175,7 +175,7 @@ public class ReparsingExperiment {
                 // result += "-----\n" + annotation.toString() + "\n";
 
                 // Evidence.
-                result += constraintSet.stream()
+                result += allConstraintSet.stream()
                         .map(ev -> "Penalizing:\t \t" + ev.toString(sentence))
                         .collect(Collectors.joining("\n")) + "\n";
                 // Improvement.

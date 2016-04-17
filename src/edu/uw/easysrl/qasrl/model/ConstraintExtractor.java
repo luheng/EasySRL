@@ -8,6 +8,7 @@ import edu.uw.easysrl.qasrl.query.QueryGeneratorUtils;
 import edu.uw.easysrl.qasrl.query.QueryType;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -53,11 +54,17 @@ public class ConstraintExtractor {
                                                      boolean doNotPenalizePronouns) {
         final int numQAOptions = query.getQAPairSurfaceForms().size();
         if (query.getQueryType() == QueryType.Jeopardy || query.getQueryType() == QueryType.Clefted) {
+            // Option contains "none of the above".
             if (query.getQueryType() == QueryType.Clefted &&
                     chosenOptions.contains(query.getBadQuestionOptionId().getAsInt())) {
-                final int predicateId = query.getPredicateId().getAsInt();
                 final int argHead = query.getQAPairSurfaceForms().get(0).getArgumentIndices().get(0);
-                return ImmutableSet.of(new Constraint.AttachmentConstraint(predicateId, argHead, false, 1.0));
+                return query.getQAPairSurfaceForms().stream()
+                        .flatMap(qa -> qa.getQuestionStructures().stream())
+                        .distinct()
+                        .map(q -> q.targetPrepositionIndex >= 0 ?
+                            new Constraint.AttachmentConstraint(q.targetPrepositionIndex, argHead, false, 1.0) :
+                            new Constraint.AttachmentConstraint(q.predicateIndex, argHead, false, 1.0))
+                        .collect(Collectors.toSet());
             }
             // 0: listed. 1: chosen.
             Table<Integer, Integer, Integer> attachments = HashBasedTable.create();
