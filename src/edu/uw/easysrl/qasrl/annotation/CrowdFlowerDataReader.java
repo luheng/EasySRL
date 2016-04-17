@@ -3,12 +3,14 @@ package edu.uw.easysrl.qasrl.annotation;
 import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.GuavaCollectors;
+import gnu.trove.map.hash.TObjectIntHashMap;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
 
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -73,34 +75,51 @@ public class CrowdFlowerDataReader {
             annotation.trust = Double.parseDouble(record.get("_trust"));
             annotations.add(annotation);
         }
-        System.out.println("Read " + annotations.size() + " annotation records.");
+        System.out.println(String.format("Read %d annotation records from %s.", annotations.size(), filePath));
 
         // Align and aggregated annotations.
         List<AlignedAnnotation> alignedAnnotations = AlignedAnnotation.getAlignedAnnotations(annotations);
         System.out.println("Getting " + alignedAnnotations.size() + " aligned annotations.");
         int maxNumAnnotators = alignedAnnotations.stream()
-                .map(annot -> annot.annotatorToAnswerIds.size())
+                .map(AlignedAnnotation::getNumAnnotated)
                 .max(Integer::compare).get();
-        int[] agreementCount = new int[maxNumAnnotators + 1];
+        int[] agreementCount = new int[maxNumAnnotators + 1],
+              strictAgreementCount = new int[maxNumAnnotators + 1];
         Arrays.fill(agreementCount, 0);
+        Arrays.fill(strictAgreementCount, 0);
+
         alignedAnnotations.forEach(annotation -> {
-            if (annotation.getNumAnnotated() != 5) {
+            /*if (annotation.getNumAnnotated() != 5) {
                 System.out.println(annotation);
-            }
+            }*/
             int maxAgree = 0;
             for (int agr : annotation.answerDist) {
                 maxAgree = Math.max(maxAgree, agr);
             }
             agreementCount[maxAgree] ++;
+            final int strictAgreement = annotation.annotatorToAnswerIds.values().stream()
+                    .collect(Collectors.groupingBy(Function.identity()))
+                    .values().stream()
+                    .map(Collection::size)
+                    .max(Integer::compare).get();
+            strictAgreementCount[strictAgreement] ++;
         });
 
+        System.out.println("Agreement:");
         for (int i = 0; i < agreementCount.length; i++) {
-            System.out.println(i + "\t" + agreementCount[i] + "\t" + 100.0 * agreementCount[i] / alignedAnnotations.size());
+            if (agreementCount[i] > 0) {
+                System.out.println(String.format("%d\t%d\t%.2f%%", i, agreementCount[i],
+                        100.0 * agreementCount[i] / alignedAnnotations.size()));
+            }
+        }
+        System.out.println("Strict Agreement:");
+        for (int i = 0; i < strictAgreementCount.length; i++) {
+            if (strictAgreementCount[i] > 0) {
+                System.out.println(String.format("%d\t%d\t%.2f%%", i, strictAgreementCount[i],
+                        100.0 * strictAgreementCount[i] / alignedAnnotations.size()));
+            }
         }
 
-        // TODO: recover IAA ..
-        //double[] iaa = computeAgreement(alignedAnnotations, maxNumAnnotators);
-        //InterAnnotatorAgreement.printKappa(iaa);
         return ImmutableList.copyOf(alignedAnnotations);
     }
 
@@ -173,6 +192,7 @@ public class CrowdFlowerDataReader {
         readAggregatedAnnotationFromFile(args[0]);
     }
 
+    @Deprecated
     public static double[] computeAgreement(final List<AlignedAnnotation> alignedAnnotations, int maxNumAnnotators) {
         int[] annotationCount = new int[maxNumAnnotators + 1];
         double[] agreement = new double[maxNumAnnotators + 1];

@@ -43,7 +43,8 @@ public class AlignedAnnotation extends RecordedAnnotation {
             answerOptions = annotation.optionStrings;
         }
         // Some annotation records may contain duplicates.
-        if (this.isSameQuestionAs(annotation) && !annotatorToAnswerIds.containsKey(annotator)) {
+        //if (this.isSameQuestionAs(annotation) && !annotatorToAnswerIds.containsKey(annotator)) {
+        if (!annotatorToAnswerIds.containsKey(annotator)) {
             annotatorToAnswerIds.put(annotator, annotation.userOptionIds);
             annotation.userOptionIds.forEach(answerId -> {
                 answerDist[answerId]++;
@@ -93,7 +94,6 @@ public class AlignedAnnotation extends RecordedAnnotation {
                 alignedAnnotations.put(queryKey, new AlignedAnnotation(annotation));
             }
             AlignedAnnotation alignedAnnotation = alignedAnnotations.get(queryKey);
-            assert alignedAnnotation.isSameQuestionAs(annotation);
             alignedAnnotation.addAnnotation(annotation.annotatorId, annotation);
         });
         return new ArrayList<>(alignedAnnotations.values());
