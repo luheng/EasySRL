@@ -40,7 +40,7 @@ public class HITLParser {
         this.reparsingParameters = reparsingParameters;
     }
 
-    private BaseCcgParser.ConstrainedCcgParser reparser;
+    private BaseCcgParser.ConstrainedCcgParser2 reparser;
     private ResponseSimulatorGold goldSimulator;
 
     /**
@@ -58,7 +58,7 @@ public class HITLParser {
         nbestLists = NBestList.loadNBestListsFromFile(preparsedFile, nBest).get();
         System.out.println(String.format("Load pre-parsed %d-best lists for %d sentences.", nBest, nbestLists.size()));
 
-        reparser = new BaseCcgParser.ConstrainedCcgParser(BaseCcgParser.modelFolder, BaseCcgParser.rootCategories,
+        reparser = new BaseCcgParser.ConstrainedCcgParser2(BaseCcgParser.modelFolder, BaseCcgParser.rootCategories,
                 reparsingParameters.maxTagsPerWord, 1 /* nbest */);
         goldSimulator = new ResponseSimulatorGold(parseData);
 

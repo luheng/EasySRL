@@ -21,8 +21,10 @@ import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeBinary;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeUnary;
 import edu.uw.easysrl.syntax.model.AgendaItem;
+import edu.uw.easysrl.syntax.model.ConstrainedParsingModel.ConstrainedParsingModelFactory;
 import edu.uw.easysrl.syntax.model.ConstrainedSupertagFactoredModel.ConstrainedSupertagModelFactory;
 import edu.uw.easysrl.syntax.model.Model;
+import edu.uw.easysrl.syntax.model.Model.ModelFactory;
 import edu.uw.easysrl.syntax.parser.ChartCell.Cell1Best;
 import edu.uw.easysrl.syntax.parser.ChartCell.Cell1BestTreeBased;
 import edu.uw.easysrl.syntax.parser.ChartCell.ChartCellFactory;
@@ -31,12 +33,12 @@ import edu.uw.easysrl.util.Util.Scored;
 
 public class ConstrainedParserAStar extends AbstractParser {
 
-    private final ConstrainedSupertagModelFactory modelFactory;
+    private final ModelFactory modelFactory;
     private final int maxChartSize;
     private final ChartCellFactory cellFactory;
     private final boolean usingDependencies;
 
-    public ConstrainedParserAStar(final ConstrainedSupertagModelFactory modelFactory, final int maxSentenceLength,
+    public ConstrainedParserAStar(final ModelFactory modelFactory, final int maxSentenceLength,
                                   final int nbest, final List<Category> validRootCategories, final File modelFolder,
                                   final int maxChartSize)
             throws IOException {
@@ -49,12 +51,19 @@ public class ConstrainedParserAStar extends AbstractParser {
                 (modelFactory.isUsingDependencies() ? Cell1Best.factory() : Cell1BestTreeBased.factory());
     }
 
-
     public List<Scored<SyntaxTreeNode>> parseAstarWithConstraints(final InputToParser input,
                                                                   Set<Constraint> constraintSet,
                                                                   DependencyGenerator dependencyGenerator) {
         cellFactory.newSentence();
-        return parseAstar(input.getInputWords(), modelFactory.make(input, constraintSet, dependencyGenerator));
+        return parseAstar(input.getInputWords(),
+                ((ConstrainedSupertagModelFactory) modelFactory).make(input, constraintSet, dependencyGenerator));
+    }
+
+    public List<Scored<SyntaxTreeNode>> parseAstarWithConstraints(final InputToParser input,
+                                                                  Set<Constraint> constraintSet) {
+        cellFactory.newSentence();
+        return parseAstar(input.getInputWords(),
+                ((ConstrainedParsingModelFactory) modelFactory).make(input, constraintSet));
     }
 
     @Override

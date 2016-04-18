@@ -34,11 +34,11 @@ public class ReparsingExperiment {
     private static Map<Integer, List<AlignedAnnotation>> annotations;
 
     private static final String[] annotationFiles = {
-          //  "./Crowdflower_data/f878213.csv",                // Round1: radio-button, core + pp
-          //  "./Crowdflower_data/f882410.csv",                // Round2: radio-button, core only
+            "./Crowdflower_data/f878213.csv",                // Round1: radio-button, core + pp
+            "./Crowdflower_data/f882410.csv",                // Round2: radio-button, core only
           //  "./Crowdflower_data/all-checkbox-responses.csv", // Round3: checkbox, core + pp
           //  "./Crowdflower_data/f891522.csv",                // Round4: jeopardy checkbox, pp only
-          //  "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
+            "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
             "./Crowdflower_data/f897179.csv"                 // Round2-3: NP clefting questions.
     };
 
@@ -53,7 +53,7 @@ public class ReparsingExperiment {
     static {
         reparsingParameters = new HITLParsingParameters();
         reparsingParameters.jeopardyQuestionMinAgreement = 1;
-        reparsingParameters.minAgreement = 3;
+        reparsingParameters.minAgreement = 2;
         reparsingParameters.skipPronounEvidence = false;
         reparsingParameters.jeopardyQuestionWeight = 1.0;
         reparsingParameters.attachmentPenaltyWeight = 1.0;
