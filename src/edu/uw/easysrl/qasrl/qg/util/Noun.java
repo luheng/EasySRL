@@ -44,12 +44,8 @@ public abstract class Noun extends Predication {
 
     /* factory methods */
 
-    public static Noun getFullNPFromHead(Optional<Integer> headIndexOpt, Parse parse) {
-        if(!headIndexOpt.isPresent()) {
-            return Pronoun.fromString("something").get();
-        }
+    public static Noun getFromParse(Integer headIndex, Parse parse) {
         final SyntaxTreeNode tree = parse.syntaxTree;
-        final int headIndex = headIndexOpt.get();
         final SyntaxTreeNodeLeaf headLeaf = tree.getLeaves().get(headIndex);
         final String predicate = TextGenerationHelper.renderString(TextGenerationHelper.getNodeWords(headLeaf, Optional.empty(), Optional.empty()));
 
@@ -72,16 +68,44 @@ public abstract class Noun extends Predication {
         /* extract grammatical features. */
         // this is fine because none of our nouns take arguments, right?
         final ImmutableMap<Integer, Predication> argPreds = ImmutableMap.of();
+
         // only pronouns are case marked
         final Optional<Case> caseMarking = Optional.empty();
-        // TODO we should predict this.
-        final Optional<Number> number = null;
-        // TODO we should predict this.
-        final Optional<Gender> gender = null;
+
+        final String nounPOS = headLeaf.getPos();
+        final Optional<Number> number;
+        if(nounPOS.equals("NN") || nounPOS.equals("NNP")) {
+            number = Optional.of(Number.SINGULAR);
+        } else if(nounPOS.equals("NNS") || nounPOS.equals("NNPS")) {
+            number = Optional.of(Number.PLURAL);
+        } else {
+            System.err.println(String.format("noun %s has mysterious POS %s", headLeaf.getWord(), nounPOS));
+            number = Optional.empty();
+        }
+
+        // TODO we could try and predict this... not clear how though
+        final Optional<Gender> gender = Optional.empty();
+
         // only pronouns can be non-third person
         final Person person = Person.THIRD;
-        // TODO we should predict this.
-        final Definiteness definiteness = null;
+
+        final Definiteness definiteness;
+        npNode.getLeaves().stream()
+            .filter(leaf -> leaf.getPos().equals("DT") || leaf.getPos("WDT"))
+            .findFirst()
+            .flatMap(leaf -> {
+                    if(leaf.getWord().equalsIgnoreCase("the")) {
+                        return Optional.of(Definiteness.DEFINITE);
+                    } else if(leaf.getWord().equalsIgnoreCase("a") || leaf.getWord().equalsIgnoreCase("an")) {
+                        return Optional.of(Definiteness.INDEFINITE);
+                    } else if(leaf.getPos().equals("WDT")) {
+                        return Optional.of(Definiteness.FOCAL);
+                    }
+                })
+            .orElse(null);
+        if(definiteness == null) {
+            System.err.println("couldn't establish definiteness for [" + npNode.getWord() + "]");
+        }
 
         /* include an of-phrase if necessary. */
         final ImmutableList<String> words;

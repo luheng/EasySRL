@@ -31,6 +31,31 @@ public final class Verb extends Predication {
         ACTIVE, PASSIVE, ADJECTIVE
     }
 
+    /* factory methods */
+
+    public static Verb getFromParse(Integer headIndex, PredicateCache preds, Parse parse) {
+        final SyntaxTreeNode tree = parse.syntaxTree;
+        final SyntaxTreeNodeLeaf headLeaf = tree.getLeaves().get(headIndex);
+        // stem the verb
+        final String predicate = VerbHelper
+            .getStem(TextGenerationHelper
+            .renderString(TextGenerationHelper
+            .getNodeWords(headLeaf, Optional.empty(), Optional.empty())));
+        final Category predicateCategory = parse.categories.get(headIndex);
+
+        final ImmutableMap<Integer, ImmutableList<Predication>> argPreds = null; // TODO XXX
+
+        final Tense tense;
+        final Voice voice;
+        final boolean isPerfect;
+        final boolean isProgressive;
+        final boolean isNegated;
+
+        return new Verb(predicate, predicateCategory, argPreds,
+                        tense, modal, voice,
+                        isPerfect, isProgressive, isNegated);
+    }
+
     // overrides
 
     @Override
@@ -131,7 +156,7 @@ public final class Verb extends Predication {
 
     protected Verb(String predicate,
                    Category predicateCategory,
-                   ImmutableMap<Integer, Predication> argPreds,
+                   ImmutableMap<Integer, ImmutableList<Predication>> argPreds,
                    Tense tense,
                    Optional<String> modal,
                    Voice voice,

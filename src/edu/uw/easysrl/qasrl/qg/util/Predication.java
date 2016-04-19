@@ -53,11 +53,14 @@ public abstract class Predication {
      */
     public abstract ImmutableList<String> getCompletePhrase();
 
+    // consider
+    // public abstract ImmutableList<String> getPhrase(Category desiredCategory);
+
     public abstract QuestionData getQuestionData();
 
     /* protected methods and fields */
 
-    protected ImmutableMap<Integer, Predication> getArgPreds() {
+    protected ImmutableMap<Integer, ImmutableList<Predication>> getArgPreds() {
         return argPreds;
     }
 
@@ -71,7 +74,7 @@ public abstract class Predication {
 
     /* private fields */
 
-    private final Category predicateCategory;
     private final String predicate;
-    private final ImmutableMap<Integer, Predication> argPreds;
+    private final Category predicateCategory;
+    private final ImmutableMap<Integer, ImmutableList<Predication>> argPreds;
 }
