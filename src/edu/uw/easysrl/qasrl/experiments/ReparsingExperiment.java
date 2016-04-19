@@ -53,7 +53,8 @@ public class ReparsingExperiment {
     static {
         reparsingParameters = new HITLParsingParameters();
         reparsingParameters.jeopardyQuestionMinAgreement = 1;
-        reparsingParameters.minAgreement = 2;
+        reparsingParameters.positiveConstraintMinAgreement = 5;
+        reparsingParameters.negativeConstraintMaxAgreement = 1;
         reparsingParameters.skipPronounEvidence = false;
         reparsingParameters.jeopardyQuestionWeight = 1.0;
         reparsingParameters.attachmentPenaltyWeight = 1.0;
@@ -114,7 +115,7 @@ public class ReparsingExperiment {
             Results currentF1 = nBestList.getResults(0);
 
             final int numParses = nBestList.getN();
-            final Set<Constraint> allConstraintSet = new HashSet<>();
+            final Set<Constraint> allConstraints = new HashSet<>();
             String sentenceDebuggingString = "";
             double[] penalty = new double[numParses];
             Arrays.fill(penalty, 0);
@@ -151,18 +152,21 @@ public class ReparsingExperiment {
                 if (query.isJeopardyStyle() && userOptions.contains(query.getBadQuestionOptionId().getAsInt())) {
                     continue;
                 }
-                ImmutableSet<Constraint> constraintSet = myHTILParser.getConstraints(query, userOptions);
+                ImmutableSet<Constraint> constraints = myHTILParser.getConstraints(query, annotation),
+                                         oracleConstraints = myHTILParser.getOracleConstraints(query, goldOptions);
                 /*if (constraintSet == null || constraintSet.isEmpty()) {
                     continue;
                 }*/
-                allConstraintSet.addAll(constraintSet);
+                allConstraints.addAll(constraints);
 
-                int rerankedId = myHTILParser.getRerankedParseId(sentenceId, allConstraintSet);
-                Parse reparse = myHTILParser.getReparsed(sentenceId, allConstraintSet);
+                int rerankedId = myHTILParser.getRerankedParseId(sentenceId, allConstraints);
+                Parse reparse = myHTILParser.getReparsed(sentenceId, allConstraints),
+                      oracleReparse = myHTILParser.getReparsed(sentenceId, oracleConstraints);
                 Results rerankedF1 = nBestList.getResults(rerankedId);
                 Results reparsedF1 = CcgEvaluation.evaluate(reparse.dependencies, myHTILParser.getGoldParse(sentenceId).dependencies);
-
-                myHistory.addEntry(sentenceId, query, userOptions, constraintSet, reparse, rerankedId, reparsedF1, rerankedF1);
+                Results oracleF1 = CcgEvaluation.evaluate(oracleReparse.dependencies, myHTILParser.getGoldParse(sentenceId).dependencies);
+                myHistory.addEntry(sentenceId, query, userOptions, constraints, oracleConstraints, reparse,
+                                   oracleReparse, rerankedId, reparsedF1, rerankedF1, oracleF1);
 
                 // Print debugging information.
                 String result = query.toString(sentence,
@@ -175,8 +179,8 @@ public class ReparsingExperiment {
                 // result += "-----\n" + annotation.toString() + "\n";
 
                 // Evidence.
-                result += allConstraintSet.stream()
-                        .map(ev -> "Penalizing:\t \t" + ev.toString(sentence))
+                result += allConstraints.stream()
+                        .map(c -> "Penalizing:\t \t" + c.toString(sentence))
                         .collect(Collectors.joining("\n")) + "\n";
                 // Improvement.
                 String f1Impv = " ";
@@ -191,6 +195,7 @@ public class ReparsingExperiment {
                         100.0 * currentF1.getF1(), 100.0 * reparsedF1.getF1(), f1Impv);
                 result += String.format("Reranked F1: %.3f%%\n", 100.0 * rerankedF1.getF1());
                 result += String.format("Reparsed F1: %.3f%%\n", 100.0 * reparsedF1.getF1());
+                result += String.format("Oracle F1: %.3f%%\n",   100.0 * oracleF1.getF1());
                 sentenceDebuggingString += result + "\n";
                 currentF1 = reparsedF1;
             }

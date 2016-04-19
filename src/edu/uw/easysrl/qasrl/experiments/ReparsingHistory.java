@@ -14,18 +14,19 @@ import edu.uw.easysrl.util.GuavaCollectors;
 import java.util.*;
 
 /**
+ * Reparsing history and stats.
  * Created by luheng on 3/26/16.
  */
 public class ReparsingHistory {
-    final HITLParser hitlParser;
+    private final HITLParser hitlParser;
 
-    final List<Integer> sentenceIds;
-    final Map<Integer, List<ScoredQuery<QAStructureSurfaceForm>>> queries;
-    final Map<Integer, List<ImmutableSet<Constraint>>> constraints;
-    final Map<Integer, List<ImmutableList<Integer>>> userOptions;
-    final Map<Integer, List<Parse>> reparses;
-    final Map<Integer, List<Integer>> rerankedParseIds;
-    final Map<Integer, List<Results>> rerankingResults, reparsingResults;
+    private final List<Integer> sentenceIds;
+    private final Map<Integer, List<ScoredQuery<QAStructureSurfaceForm>>> queries;
+    private final Map<Integer, List<ImmutableSet<Constraint>>> constraints, oracleConstraints;
+    private final Map<Integer, List<ImmutableList<Integer>>> userOptions;
+    private final Map<Integer, List<Parse>> reparses, oracleReparses;
+    private final Map<Integer, List<Integer>> rerankedParseIds;
+    private final Map<Integer, List<Results>> rerankingResults, reparsingResults, oracleResults;
 
     public ReparsingHistory(HITLParser parser) {
         hitlParser = parser;
@@ -34,10 +35,13 @@ public class ReparsingHistory {
         queries = new HashMap<>();
         userOptions = new HashMap<>();
         constraints = new HashMap<>();
+        oracleConstraints = new HashMap<>();
         reparses = new HashMap<>();
+        oracleReparses = new HashMap<>();
         rerankedParseIds = new HashMap<>();
         reparsingResults = new HashMap<>();
         rerankingResults = new HashMap<>();
+        oracleResults = new HashMap<>();
     }
 
     public void addSentence(int sentenceId) {
@@ -46,34 +50,45 @@ public class ReparsingHistory {
             queries.put(sentenceId, new ArrayList<>());
             userOptions.put(sentenceId, new ArrayList<>());
             constraints.put(sentenceId, new ArrayList<>());
+            oracleConstraints.put(sentenceId, new ArrayList<>());
             reparses.put(sentenceId, new ArrayList<>());
+            oracleReparses.put(sentenceId, new ArrayList<>());
             rerankedParseIds.put(sentenceId, new ArrayList<>());
             reparsingResults.put(sentenceId, new ArrayList<>());
             rerankingResults.put(sentenceId, new ArrayList<>());
+            oracleResults.put(sentenceId, new ArrayList<>());
 
             queries.get(sentenceId).add(null /* no query */);
             userOptions.get(sentenceId).add(null /* no options */);
             constraints.get(sentenceId).add(null /* no options */);
+            oracleConstraints.get(sentenceId).add(null /* no options */);
             reparses.get(sentenceId).add(hitlParser.getNBestList(sentenceId).getParse(0));
+            oracleReparses.get(sentenceId).add(hitlParser.getNBestList(sentenceId).getParse(0));
             rerankedParseIds.get(sentenceId).add(0);
             final Results baseline = hitlParser.getNBestList(sentenceId).getResults(0);
             reparsingResults.get(sentenceId).add(baseline);
             rerankingResults.get(sentenceId).add(baseline);
+            oracleResults.get(sentenceId).add(baseline);
         }
     }
 
     public void addEntry(int sentenceId, final ScoredQuery<QAStructureSurfaceForm> query,
-                         final ImmutableList<Integer> options, final ImmutableSet<Constraint> constraintSet,
-                         final Parse reparsed, int reranked, final Results reparsedResult,
-                         final Results rerankedResult) {
+                         final ImmutableList<Integer> options,
+                         final ImmutableSet<Constraint> constraintSet,
+                         final ImmutableSet<Constraint> oracleConstraintSet,
+                         final Parse reparsed, final Parse oracleReparsed, int reranked, final Results reparsedResult,
+                         final Results rerankedResult, final Results oracleResult) {
         addSentence(sentenceId);
         queries.get(sentenceId).add(query);
         userOptions.get(sentenceId).add(options);
         constraints.get(sentenceId).add(constraintSet);
+        oracleConstraints.get(sentenceId).add(oracleConstraintSet);
         reparses.get(sentenceId).add(reparsed);
+        oracleReparses.get(sentenceId).add(oracleReparsed);
         rerankedParseIds.get(sentenceId).add(reranked);
         reparsingResults.get(sentenceId).add(reparsedResult);
         rerankingResults.get(sentenceId).add(rerankedResult);
+        oracleResults.get(sentenceId).add(oracleResult);
     }
 
     public void addEntry(int sentenceId, final ScoredQuery<QAStructureSurfaceForm> query,
@@ -82,14 +97,19 @@ public class ReparsingHistory {
         queries.get(sentenceId).add(query);
         userOptions.get(sentenceId).add(options);
         constraints.get(sentenceId).add(constraintSet);
-        final ImmutableSet<Constraint> allConstraints = getAllConstraints(sentenceId);
+        oracleConstraints.get(sentenceId).add(hitlParser.getOracleConstraints(query, hitlParser.getGoldOptions(query)));
+        final ImmutableSet<Constraint> allConstraints = getAllConstraints(constraints, sentenceId),
+                                       allOracleConstraints = getAllConstraints(oracleConstraints, sentenceId);
         final Parse reparsed = hitlParser.getReparsed(sentenceId, allConstraints);
+        final Parse oracleReparsed = hitlParser.getReparsed(sentenceId, allOracleConstraints);
         final int reranked = hitlParser.getRerankedParseId(sentenceId, allConstraints);
-        final Results reparsingResult = CcgEvaluation.evaluate(reparsed.dependencies,
-                hitlParser.getGoldParse(sentenceId).dependencies);
+        final Results reparsingResult = CcgEvaluation.evaluate(reparsed.dependencies, hitlParser.getGoldParse(sentenceId).dependencies);
+        final Results oracleResult = CcgEvaluation.evaluate(oracleReparsed.dependencies, hitlParser.getGoldParse(sentenceId).dependencies);
         reparses.get(sentenceId).add(reparsed);
+        oracleReparses.get(sentenceId).add(oracleReparsed);
         rerankedParseIds.get(sentenceId).add(reranked);
         reparsingResults.get(sentenceId).add(reparsingResult);
+        oracleResults.get(sentenceId).add(oracleResult);
         rerankingResults.get(sentenceId).add(hitlParser.getNBestList(sentenceId).getResults(reranked));
     }
 
@@ -99,6 +119,7 @@ public class ReparsingHistory {
         final ScoredQuery<QAStructureSurfaceForm> query = getLast(queries.get(sentId));
         final Results reparsedF1 = getLast(reparsingResults.get(sentId));
         final Results rerankedF1 = getLast(rerankingResults.get(sentId));
+        final Results oracleF1 = getLast(oracleResults.get(sentId));
         final Results currentF1  = reparsingResults.get(sentId).get(reparsingResults.get(sentId).size() - 2);
         if (!(currentF1.getF1() > reparsedF1.getF1() + 1e-8)) return;
         System.out.println(query.toString(words,
@@ -113,6 +134,7 @@ public class ReparsingHistory {
                 100.0 * reparsedF1.getF1(), f1Impv));
         System.out.println(String.format("Reranked F1: %.3f%%", 100.0 * rerankedF1.getF1()));
         System.out.println(String.format("Reparsed F1: %.3f%%", 100.0 * reparsedF1.getF1()));
+        System.out.println(String.format("Oracle F1: %.3f%%", 100.0 * oracleF1.getF1()));
         System.out.println();
     }
 
@@ -136,18 +158,24 @@ public class ReparsingHistory {
                 "Processed:\t" + queries.values().stream().mapToInt(q -> q.size() - 1).sum() + " queries.\n");
 
         System.out.println(
-                "Num modified: " + getNumModifiedSentences() + "\n" +
-                "Num improved: " + getNumImprovedSentences() + "\n" +
-                "Num worsened: " + getNumWorsenedSentences() + "\n");
+                "Num modified: " + getNumModifiedSentences(reparsingResults) + "\n" +
+                "Num improved: " + getNumImprovedSentences(reparsingResults) + "\n" +
+                "Num worsened: " + getNumWorsenedSentences(reparsingResults) + "\n");
+
+        System.out.println(
+                "Num modified (oracle): " + getNumModifiedSentences(oracleResults) + "\n" +
+                "Num improved (oracle): " + getNumImprovedSentences(oracleResults) + "\n" +
+                "Num worsened (oracle): " + getNumWorsenedSentences(oracleResults) + "\n");
     }
 
     private <O extends Object> O getLast(final List<O> history) {
         return history.get(history.size() - 1);
     }
 
-    public ImmutableSet<Constraint> getAllConstraints(int sentenceId) {
-        return constraints.containsKey(sentenceId) && !constraints.get(sentenceId).isEmpty()?
-                constraints.get(sentenceId).stream()
+    public ImmutableSet<Constraint> getAllConstraints(final Map<Integer, List<ImmutableSet<Constraint>>> constraintsMap,
+                                                      int sentenceId) {
+        return constraintsMap.containsKey(sentenceId) && !constraintsMap.get(sentenceId).isEmpty()?
+                constraintsMap.get(sentenceId).stream()
                         .filter(s -> s != null)
                         .flatMap(ImmutableSet::stream)
                         .collect(GuavaCollectors.toImmutableSet()) : ImmutableSet.of();
@@ -169,7 +197,7 @@ public class ReparsingHistory {
     public Results getAvgOracle() {
         Results avg = new Results();
         sentenceIds.stream()
-                .map(sid -> hitlParser.getNBestList(sid).getResults(hitlParser.getNBestList(sid).getOracleId()))
+                .map(sid -> getLast(oracleResults.get(sid)))
                 .forEach(avg::add);
         return avg;
     }
@@ -192,7 +220,7 @@ public class ReparsingHistory {
 
     public Results getAvgBaselineOnModifiedSentences() {
         Results avg = new Results();
-        getModifiedSentences().stream()
+        getModifiedSentences(reparses).stream()
                 .map(sid -> hitlParser.getNBestList(sid).getResults(0))
                 .forEach(avg::add);
         return avg;
@@ -200,7 +228,7 @@ public class ReparsingHistory {
 
     public Results getAvgRerankedOnModifiedSentences() {
         Results avg = new Results();
-        getModifiedSentences().stream()
+        getModifiedSentences(reparses).stream()
                 .map(sid -> getLast(rerankingResults.get(sid)))
                 .forEach(avg::add);
         return avg;
@@ -208,7 +236,7 @@ public class ReparsingHistory {
 
     public Results getAvgReparsedOnModifiedSentences() {
         Results avg = new Results();
-        getModifiedSentences().stream()
+        getModifiedSentences(reparses).stream()
                 .map(sid -> getLast(reparsingResults.get(sid)))
                 .forEach(avg::add);
         return avg;
@@ -216,34 +244,35 @@ public class ReparsingHistory {
 
     public Results getAvgOracleOnModifiedSentences() {
         Results avg = new Results();
-        getModifiedSentences().stream()
-                .map(sid -> hitlParser.getNBestList(sid).getResults(hitlParser.getNBestList(sid).getOracleId()))
+        getModifiedSentences(reparses).stream()
+                .map(sid -> getLast(oracleResults.get(sid)))
                 .forEach(avg::add);
         return avg;
     }
 
-    public ImmutableList<Integer> getModifiedSentences() {
+    public ImmutableList<Integer> getModifiedSentences(final Map<Integer, List<Parse>> parsesMap) {
         return sentenceIds.stream()
-                .filter(sid -> CcgEvaluation.evaluate(getLast(reparses.get(sid)).dependencies,
-                        hitlParser.getNBestList(sid).getParse(0).dependencies).getF1() < 1.0 - 1e-6)
+                .filter(sid -> CcgEvaluation.evaluate(getLast(parsesMap.get(sid)).dependencies,
+                                                      //hitlParser.getNBestList(sid).getParse(0).dependencies).getF1() < 1.0 - 1e-6)
+                        parsesMap.get(sid).get(0).dependencies).getF1() < 1.0 - 1e-6)
                 .collect(GuavaCollectors.toImmutableList());
     }
 
-    public int getNumWorsenedSentences() {
+    public int getNumWorsenedSentences(final Map<Integer, List<Results>> resultsMap) {
         return (int) sentenceIds.stream()
-                .filter(sid -> getLast(reparsingResults.get(sid)).getF1() + 1e-6 <
-                        hitlParser.getNBestList(sid).getResults(0).getF1())
+                .filter(sid -> getLast(resultsMap.get(sid)).getF1() + 1e-6 < resultsMap.get(sid).get(0).getF1())
                 .count();
     }
 
-    public int getNumImprovedSentences() {
+    public int getNumImprovedSentences(final Map<Integer, List<Results>> resultsMap) {
         return (int) sentenceIds.stream()
-                .filter(sid -> getLast(reparsingResults.get(sid)).getF1() - 1e-6 >
-                        hitlParser.getNBestList(sid).getResults(0).getF1())
+                .filter(sid -> getLast(resultsMap.get(sid)).getF1() - 1e-6 > resultsMap.get(sid).get(0).getF1())
                 .count();
     }
 
-    public int getNumModifiedSentences() {
-        return getModifiedSentences().size();
+    public int getNumModifiedSentences(final Map<Integer, List<Results>> resultsMap) {
+        return (int) sentenceIds.stream()
+                .filter(sid -> Math.abs(getLast(resultsMap.get(sid)).getF1() - resultsMap.get(sid).get(0).getF1()) < 1e-6)
+                .count();
     }
 }

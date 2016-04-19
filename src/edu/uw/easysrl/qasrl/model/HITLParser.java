@@ -280,14 +280,41 @@ public class HITLParser {
                                                  final AlignedAnnotation annotation) {
         final int[] optionDist = AnnotationUtils.getUserResponseDistribution(query, annotation);
         return IntStream.range(0, query.getOptions().size())
-                .filter(i -> (!query.isJeopardyStyle() && optionDist[i] >= reparsingParameters.minAgreement) ||
+                .filter(i -> (!query.isJeopardyStyle()
+                                    && optionDist[i] > reparsingParameters.negativeConstraintMaxAgreement) ||
                              (query.isJeopardyStyle()
                                      && optionDist[i] >= reparsingParameters.jeopardyQuestionMinAgreement))
                 .boxed()
                 .collect(GuavaCollectors.toImmutableList());
     }
 
-    // TODO: inject constraint strength classifier.
+    /**
+     * Directly get constraints from annotation.
+     * @param query
+     * @param annotation
+     * @return
+     */
+    public ImmutableSet<Constraint> getConstraints(final ScoredQuery<QAStructureSurfaceForm> query,
+                                                   final AlignedAnnotation annotation) {
+        final int[] optionDist = AnnotationUtils.getUserResponseDistribution(query, annotation);
+        final Set<Constraint> constraints = new HashSet<>();
+        final Set<Integer> hitOptions = IntStream.range(0, optionDist.length).boxed()
+                .filter(i -> optionDist[i] >= reparsingParameters.positiveConstraintMinAgreement)
+                .collect(Collectors.toSet());
+        final Set<Integer> skipOptions = IntStream.range(0, optionDist.length).boxed()
+                .filter(i -> optionDist[i] > reparsingParameters.negativeConstraintMaxAgreement)
+                .collect(Collectors.toSet());
+        ConstraintExtractor.extractPositiveConstraints(query, hitOptions)
+                .forEach(constraints::add);
+        ConstraintExtractor.extractNegativeConstraints(query, skipOptions, reparsingParameters.skipPronounEvidence)
+                .forEach(constraints::add);
+        constraints.forEach(c -> c.setStrength(
+                (Constraint.SupertagConstraint.class.isInstance(c) ?
+                        reparsingParameters.supertagPenaltyWeight :
+                        reparsingParameters.attachmentPenaltyWeight)));
+        return ImmutableSet.copyOf(constraints);
+    }
+
     public ImmutableSet<Constraint> getConstraints(final ScoredQuery<QAStructureSurfaceForm> query,
                                                    final ImmutableList<Integer> options) {
         if (query.isJeopardyStyle() && reparsingParameters.skipJeopardyQuestions) {
@@ -311,7 +338,7 @@ public class HITLParser {
         final Set<Constraint> constraints = new HashSet<>();
         constraints.addAll(ConstraintExtractor.extractPositiveConstraints(query, options));
         constraints.addAll(ConstraintExtractor.extractNegativeConstraints(query, options, false /* dont skip pronouns */));
-        constraints.forEach(c -> c.setStrength(reparsingParameters.attachmentPenaltyWeight));
+        constraints.forEach(c -> c.setStrength(reparsingParameters.oraclePenaltyWeight));
         return ImmutableSet.copyOf(constraints);
     }
 
