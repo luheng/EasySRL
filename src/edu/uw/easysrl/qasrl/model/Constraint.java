@@ -1,5 +1,6 @@
 package edu.uw.easysrl.qasrl.model;
 
+import com.google.common.hash.HashCode;
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.syntax.grammar.Category;
 
@@ -70,7 +71,8 @@ public abstract class Constraint {
         }
 
         public String toString(List<String> sentence) {
-            return strength + "\t" + predId + ":" + sentence.get(predId) + "\t" + category;
+            return (isPositive ? "[+]" : "[-]") + "\t" + strength + "\t" + predId + ":" + sentence.get(predId) + "\t"
+                    + category;
         }
     }
 
@@ -102,11 +104,12 @@ public abstract class Constraint {
         }
 
         public String toString() {
-            return headId + "\t" + argId;
+            return isPositive ? "[+]" : "[-]" + "\t" + strength + "\t" + headId + "\t" + argId;
         }
 
         public String toString(List<String> sentence) {
-            return strength + "\t" + headId + ":" + sentence.get(headId) + "-->" + argId + ":" + sentence.get(argId);
+            return (isPositive ? "[+]" : "[-]") + "\t" + strength + "\t" + headId + ":" + sentence.get(headId) + "-->"
+                    + argId + ":" + sentence.get(argId);
         }
     }
 }

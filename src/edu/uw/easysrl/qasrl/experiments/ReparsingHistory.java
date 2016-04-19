@@ -100,21 +100,20 @@ public class ReparsingHistory {
         final Results reparsedF1 = getLast(reparsingResults.get(sentId));
         final Results rerankedF1 = getLast(rerankingResults.get(sentId));
         final Results currentF1  = reparsingResults.get(sentId).get(reparsingResults.get(sentId).size() - 2);
-        //if (currentF1.getF1() > reparsedF1.getF1() + 1e-8) {
-            System.out.println(query.toString(words,
-                    'G', hitlParser.getGoldOptions(query),
-                    'O', hitlParser.getOracleOptions(query),
-                    'B', hitlParser.getOneBestOptions(query),
-                    'U', getLast(userOptions.get(sentId))));
-            getLast(constraints.get(sentId)).forEach(ev -> System.out.println(ev.toString(words)));
-            String f1Impv = reparsedF1.getF1() < currentF1.getF1() - 1e-8 ? "[-]" :
-                    (reparsedF1.getF1() > currentF1.getF1() + 1e-8 ? "[+]" : " ");
-            System.out.println(String.format("F1: %.3f%% -> %.3f%% %s", 100.0 * currentF1.getF1(),
-                    100.0 * reparsedF1.getF1(), f1Impv));
-            System.out.println(String.format("Reranked F1: %.3f%%", 100.0 * rerankedF1.getF1()));
-            System.out.println(String.format("Reparsed F1: %.3f%%", 100.0 * reparsedF1.getF1()));
-            System.out.println();
-        //}
+        if (!(currentF1.getF1() > reparsedF1.getF1() + 1e-8)) return;
+        System.out.println(query.toString(words,
+                'G', hitlParser.getGoldOptions(query),
+                'O', hitlParser.getOracleOptions(query),
+                'B', hitlParser.getOneBestOptions(query),
+                'U', getLast(userOptions.get(sentId))));
+        getLast(constraints.get(sentId)).forEach(ev -> System.out.println(ev.toString(words)));
+        String f1Impv = reparsedF1.getF1() < currentF1.getF1() - 1e-8 ? "[-]" :
+                (reparsedF1.getF1() > currentF1.getF1() + 1e-8 ? "[+]" : " ");
+        System.out.println(String.format("F1: %.3f%% -> %.3f%% %s", 100.0 * currentF1.getF1(),
+                100.0 * reparsedF1.getF1(), f1Impv));
+        System.out.println(String.format("Reranked F1: %.3f%%", 100.0 * rerankedF1.getF1()));
+        System.out.println(String.format("Reparsed F1: %.3f%%", 100.0 * reparsedF1.getF1()));
+        System.out.println();
     }
 
     public void printSummary() {

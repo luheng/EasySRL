@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableSet;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.NBestList;
 import edu.uw.easysrl.qasrl.Parse;
+import edu.uw.easysrl.qasrl.qg.surfaceform.QAPairSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 
 import edu.uw.easysrl.syntax.grammar.Category;
@@ -43,6 +44,15 @@ public class QueryGeneratorUtils {
                 .filter(p -> p > 0)
                 .map(p -> p * Math.log(p))
                 .sum() / Math.log(2);
+    }
+
+    static String getQueryKey(final QAStructureSurfaceForm qa) {
+        return qa.getSentenceId() + "\t" + qa.getPredicateIndex() + "\t" + qa.getQuestion();
+    }
+
+    static String getCleftedQueryKey(final QAStructureSurfaceForm qa) {
+        return qa.getSentenceId() + "\t" + qa.getPredicateIndex() + "\t" + qa.getArgumentIndices().get(0) + "\t"
+                + qa.getQuestion();
     }
 
     static boolean isNAOption(final String optionStr) {

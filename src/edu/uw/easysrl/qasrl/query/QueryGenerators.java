@@ -52,7 +52,7 @@ public class QueryGenerators {
     public static QueryGenerator<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> checkboxQueryGenerator() {
         return qaPairs -> qaPairs
                 .stream()
-                .collect(groupingBy(QAStructureSurfaceForm::getQuestion))
+                .collect(groupingBy(QueryGeneratorUtils::getQueryKey))
                 .values()
                 .stream()
                 .map(qaList -> {
@@ -75,7 +75,7 @@ public class QueryGenerators {
     public static QueryGenerator<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> cleftedQueryGenerator() {
         return qaPairs -> qaPairs
                 .stream()
-                .collect(groupingBy(qa -> qa.getQuestion() + " ### " + qa.getArgumentIndices().get(0)))
+                .collect(groupingBy(QueryGeneratorUtils::getCleftedQueryKey))
                 .values()
                 .stream()
                 .map(qaList -> {
@@ -99,7 +99,7 @@ public class QueryGenerators {
     public static QueryGenerator<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> radioButtonQueryGenerator() {
         return qaPairs -> qaPairs
                 .stream()
-                .collect(groupingBy(QAStructureSurfaceForm::getQuestion))
+                .collect(groupingBy(QueryGeneratorUtils::getQueryKey))
                 .values()
                 .stream()
                 .map(qaList -> {

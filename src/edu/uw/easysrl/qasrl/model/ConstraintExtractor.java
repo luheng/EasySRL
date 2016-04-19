@@ -77,9 +77,9 @@ public class ConstraintExtractor {
         return constraints;
     }
 
-    public static Set<Constraint> extractConstraints(ScoredQuery<QAStructureSurfaceForm> query,
-                                                     Collection<Integer> chosenOptions,
-                                                     boolean doNotPenalizePronouns) {
+    public static Set<Constraint> extractNegativeConstraints(ScoredQuery<QAStructureSurfaceForm> query,
+                                                             Collection<Integer> chosenOptions,
+                                                             boolean doNotPenalizePronouns) {
         final int numQAOptions = query.getQAPairSurfaceForms().size();
         if (query.getQueryType() == QueryType.Jeopardy || query.getQueryType() == QueryType.Clefted) {
             // Option contains "none of the above".
@@ -122,14 +122,10 @@ public class ConstraintExtractor {
         }
 
         final Set<Constraint> constraintList = new HashSet<>();
-        boolean questionIsNA = false;
         Set<Integer> chosenArgIds = new HashSet<>(), listedArgIds = new HashSet<>();
         Map<Integer, String> argIdToSpan = new HashMap<>();
         for (int i = 0; i < query.getOptions().size(); i++) {
             final String option = query.getOptions().get(i);
-            if (chosenOptions.contains(i) && option.equals(QueryGeneratorUtils.kBadQuestionOptionString)) {
-                questionIsNA = true;
-            }
             if (i < numQAOptions) {
                 final QAStructureSurfaceForm qa = query.getQAPairSurfaceForms().get(i);
                 final ImmutableList<Integer> argIds = qa.getArgumentIndices();
@@ -145,24 +141,24 @@ public class ConstraintExtractor {
                 }
             }
         }
-        final int predId = query.getQAPairSurfaceForms().get(0).getPredicateIndex();
-        final Category category = query.getQAPairSurfaceForms().get(0).getCategory();
+        final boolean questionIsNA = chosenOptions.contains(query.getBadQuestionOptionId().getAsInt());
         if (questionIsNA) {
-            constraintList.add(new Constraint.SupertagConstraint(predId, category, false, 1.0));
-        }
-        // TODO: take into account co-ordinations.
-        else {
-            for (int argId : listedArgIds) {
-                if (!chosenArgIds.contains(argId)) {
-                    if (doNotPenalizePronouns) {
-                        String argSpan = argIdToSpan.get(argId).toLowerCase();
-                        if (PronounList.englishPronounSet.contains(argSpan)) {
-                            continue;
-                        }
-                    }
-                    constraintList.add(new Constraint.AttachmentConstraint(predId, argId, false, 1.0));
-                }
-            }
+            query.getQAPairSurfaceForms().stream()
+                    .flatMap(qa -> qa.getQuestionStructures().stream())
+                    .forEach(qstr -> constraintList.add(
+                            new Constraint.SupertagConstraint(qstr.predicateIndex, qstr.category, false, 1.0)));
+        } else {
+            query.getQAPairSurfaceForms().stream()
+                    .flatMap(qa -> qa.getQuestionStructures().stream())
+                    .map(qstr -> qstr.targetPrepositionIndex >= 0 ? qstr.targetPrepositionIndex : qstr.predicateIndex)
+                    .distinct()
+                    .forEach(headId -> listedArgIds.stream()
+                            .filter(argId -> !chosenArgIds.contains(argId))
+                            .filter(argId -> !doNotPenalizePronouns ||
+                                    !PronounList.englishPronounSet.contains(argIdToSpan.get(argId).toLowerCase()))
+                            .forEach(argId -> constraintList.add(
+                                    new Constraint.AttachmentConstraint(headId, argId, false, 1.0)))
+                    );
         }
         return constraintList;
     }

@@ -292,7 +292,7 @@ public class HITLParser {
         }
         final double questionTypeWeight = query.isJeopardyStyle() ? reparsingParameters.jeopardyQuestionWeight : 1.0;
         final ImmutableSet<Constraint> constraintSet = ConstraintExtractor
-                .extractConstraints(query, options, reparsingParameters.skipPronounEvidence)
+                .extractNegativeConstraints(query, options, reparsingParameters.skipPronounEvidence)
                 .stream()
                 .collect(GuavaCollectors.toImmutableSet());
         constraintSet.forEach(ev -> ev.setStrength(
@@ -305,13 +305,11 @@ public class HITLParser {
     public ImmutableSet<Constraint> getOracleConstraints(final ScoredQuery<QAStructureSurfaceForm> query,
                                                          final ImmutableList<Integer> options) {
         // Extract positive constraints.
-
-        final ImmutableSet<Constraint> constraintSet = ConstraintExtractor
-                .extractPositiveConstraints(query, options)
-                .stream()
-                .collect(GuavaCollectors.toImmutableSet());
-        constraintSet.forEach(ev -> ev.setStrength(reparsingParameters.attachmentPenaltyWeight));
-        return constraintSet;
+        final Set<Constraint> constraints = new HashSet<>();
+        constraints.addAll(ConstraintExtractor.extractPositiveConstraints(query, options));
+        constraints.addAll(ConstraintExtractor.extractNegativeConstraints(query, options, false /* dont skip pronouns */));
+        constraints.forEach(c -> c.setStrength(reparsingParameters.attachmentPenaltyWeight));
+        return ImmutableSet.copyOf(constraints);
     }
 
 }
