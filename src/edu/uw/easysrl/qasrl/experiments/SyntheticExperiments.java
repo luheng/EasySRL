@@ -12,19 +12,17 @@ import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Simulation experiments for PP Attachment questions (jeopardy style)
+ * Simulation experiments with oracle parsing.
  * Created by luheng on 3/29/16.
  */
 public class SyntheticExperiments {
     // Parameters.
     private static int nBest = 100;
-    private static int maxNumSentences = 2000;
+    private static int maxNumSentences = 1000;
 
     // Shared data: nBestList, sentences, etc.
     private static HITLParser myHITLParser;
     private static ReparsingHistory myHITLHistory;
-
-    private static boolean isCheckboxVersion = true;
 
     private static QueryPruningParameters queryPruningParameters;
     static {
@@ -49,41 +47,17 @@ public class SyntheticExperiments {
 
         myHITLHistory = new ReparsingHistory(myHITLParser);
         AtomicInteger numCoreQueries = new AtomicInteger(0),
-                      numPPQueries = new AtomicInteger(0),
-                      coreQueryAcc = new AtomicInteger(0),
-                      ppQueryAcc = new AtomicInteger(0);
+                      coreQueryAcc = new AtomicInteger(0);
 
         AtomicInteger sentenceCounter = new AtomicInteger(0);
         for (int sentenceId : myHITLParser.getAllSentenceIds()) {
             ImmutableList<ScoredQuery<QAStructureSurfaceForm>> coreQueries = myHITLParser
                     .getPronounCoreArgQueriesForSentence(sentenceId);
 
-            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> adjunctQueries = myHITLParser
-                    .getAdjunctQueriesForSentence(sentenceId, isCheckboxVersion);
-
-            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> ppQueries = myHITLParser
-                    .getPPAttachmentQueriesForSentence(sentenceId);
-
-            // Get gold results.
-            /*
-            coreQueries.forEach(query -> {
-                ImmutableList<Integer> goldOptions = myHITLParser.getGoldOptions(query);
-                ImmutableSet<Evidence> evidences = myHITLParser.getConstraints(query, goldOptions);
-                myHITLHistory.addEntry(sentenceId, query, goldOptions, evidences);
-                myHITLHistory.printLatestHistory();
-
-                ImmutableList<Integer> onebestOptions = myHITLParser.getOneBestOptions(query);
-                if (goldOptions.containsAll(onebestOptions) && onebestOptions.containsAll(goldOptions)) {
-                    coreQueryAcc.getAndAdd(1);
-                }
-                numCoreQueries.getAndAdd(1);
-            });
-            */
-
             myHITLHistory.addSentence(sentenceId);
             coreQueries.forEach(query -> {
                 ImmutableList<Integer> goldOptions = myHITLParser.getGoldOptions(query);
-                ImmutableSet<Constraint> constraints = myHITLParser.getConstraints(query, goldOptions);
+                ImmutableSet<Constraint> constraints = myHITLParser.getOracleConstraints(query, goldOptions);
                 myHITLHistory.addEntry(sentenceId, query, goldOptions, constraints);
                 myHITLHistory.printLatestHistory();
 
@@ -101,9 +75,6 @@ public class SyntheticExperiments {
         }
 
         myHITLHistory.printSummary();
-        System.out.println("Num. core queries:\t" + numCoreQueries + "\tAcc:\t" +
-                            1.0 * coreQueryAcc.get() / numCoreQueries.get());
-        System.out.println("Num. pp queries:\t" + numPPQueries + "\tAcc:\t" +
-                            1.0 * ppQueryAcc.get() / numPPQueries.get());
+        System.out.println("Num. core queries:\t" + numCoreQueries + "\tAcc:\t" + 1.0 * coreQueryAcc.get() / numCoreQueries.get());
     }
 }

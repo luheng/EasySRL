@@ -302,4 +302,16 @@ public class HITLParser {
         return constraintSet;
     }
 
+    public ImmutableSet<Constraint> getOracleConstraints(final ScoredQuery<QAStructureSurfaceForm> query,
+                                                         final ImmutableList<Integer> options) {
+        // Extract positive constraints.
+
+        final ImmutableSet<Constraint> constraintSet = ConstraintExtractor
+                .extractPositiveConstraints(query, options)
+                .stream()
+                .collect(GuavaCollectors.toImmutableSet());
+        constraintSet.forEach(ev -> ev.setStrength(reparsingParameters.attachmentPenaltyWeight));
+        return constraintSet;
+    }
+
 }

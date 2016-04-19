@@ -49,6 +49,34 @@ public class ConstraintExtractor {
                 .collect(Collectors.toSet());
     }*/
 
+    public static Set<Constraint> extractPositiveConstraints(ScoredQuery<QAStructureSurfaceForm> query,
+                                                             Collection<Integer> chosenOptions) {
+        Set<Constraint> constraints = new HashSet<>();
+        if (query.getQueryType() == QueryType.Forward) {
+            chosenOptions.stream()
+                    .filter(op -> op < query.getQAPairSurfaceForms().size())
+                    .map(query.getQAPairSurfaceForms()::get)
+                    .forEach(qa -> qa.getQuestionStructures().stream()
+                            .forEach(qstr -> {
+                                final int headId = qstr.targetPrepositionIndex >= 0 ?
+                                        qstr.targetPrepositionIndex : qstr.predicateIndex;
+                                qa.getAnswerStructures().stream()
+                                        .flatMap(astr -> astr.argumentIndices.stream())
+                                        .distinct()
+                                        .forEach(argId -> constraints.add(
+                                                new Constraint.AttachmentConstraint(headId, argId, true, 1.0)));
+                                if (qstr.targetPrepositionIndex >= 0) {
+                                    constraints.add(new Constraint.AttachmentConstraint(qstr.predicateIndex,
+                                            qstr.targetPrepositionIndex, true, 1.0));
+                                }
+                            })
+                    );
+        }
+        // if (query.getQueryType() == QueryType.Clefted) {
+        // }
+        return constraints;
+    }
+
     public static Set<Constraint> extractConstraints(ScoredQuery<QAStructureSurfaceForm> query,
                                                      Collection<Integer> chosenOptions,
                                                      boolean doNotPenalizePronouns) {
