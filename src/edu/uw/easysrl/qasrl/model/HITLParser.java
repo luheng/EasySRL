@@ -234,9 +234,18 @@ public class HITLParser {
 
     // FIXME: A bug where reparsing with empty constraint set makes results worse.
     public Parse getReparsed(int sentenceId, Set<Constraint> constraintSet) {
-        return constraintSet.isEmpty() ?
-                nbestLists.get(sentenceId).getParse(0) :
-                reparser.parseWithConstraint(inputSentences.get(sentenceId), constraintSet);
+        if (constraintSet.isEmpty()) {
+            nbestLists.get(sentenceId).getParse(0);
+        }
+        final Parse reparsed = reparser.parseWithConstraint(inputSentences.get(sentenceId), constraintSet);
+        if (reparsed == null) {
+            System.err.println(String.format("Unable to parse sentence %d with constraints: %s", sentenceId,
+                    constraintSet.stream()
+                            .map(c -> c.toString(getSentence(sentenceId)))
+                            .collect(Collectors.joining("\n"))));
+            return nbestLists.get(sentenceId).getParse(0);
+        }
+        return reparsed;
     }
 
     public int getRerankedParseId(int sentenceId, Set<Constraint> constraintSet) {
