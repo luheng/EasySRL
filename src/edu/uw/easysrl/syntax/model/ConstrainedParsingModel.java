@@ -24,7 +24,8 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
     private static final boolean kIncludeDependencies = true;
     private final List<List<Tagger.ScoredCategory>> tagsForWords;
     private Table<Integer, Integer, Double> mustLinks, cannotLinks;
-    private ImmutableSet<Constraint.AttachmentConstraint> positiveConstraints, negativeConstraints;
+    private Table<Integer, Category, Double> mustSupertags, cannotSupertags;
+    //private ImmutableSet<Constraint.AttachmentConstraint> positiveConstraints, negativeConstraints;
 
     public ConstrainedParsingModel(final List<List<Tagger.ScoredCategory>> tagsForWords,
                                    final Set<Constraint> constraints) {
@@ -37,6 +38,9 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
     private void initializeConstraints(final Set<Constraint> constraints) {
         mustLinks = HashBasedTable.create();
         cannotLinks = HashBasedTable.create();
+        mustSupertags = HashBasedTable.create();
+        cannotSupertags = HashBasedTable.create();
+        /*
         positiveConstraints = constraints.stream()
                 .filter(c -> !Constraint.SupertagConstraint.class.isInstance(c) && c.isPositive())
                 .map(c -> (Constraint.AttachmentConstraint) c)
@@ -45,23 +49,39 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                 .filter(c -> !Constraint.SupertagConstraint.class.isInstance(c) && !c.isPositive())
                 .map(c -> (Constraint.AttachmentConstraint) c)
                 .collect(GuavaCollectors.toImmutableSet());
+        */
+        constraints.stream()
+                .filter(Constraint.AttachmentConstraint.class::isInstance)
+                .map(c -> (Constraint.AttachmentConstraint) c)
+                .forEach(constraint -> {
+                    final int headId = constraint.getHeadId();
+                    final int argId = constraint.getArgId();
+                    final double penalty = constraint.getStrength();
+                    if (constraint.isPositive()) {
+                        mustLinks.put(headId, argId, mustLinks.contains(headId, argId) ?
+                                Math.max(mustLinks.get(headId, argId), penalty) : penalty);
+                    } else {
+                        cannotLinks.put(headId, argId, cannotLinks.contains(headId, argId) ?
+                                Math.max(cannotLinks.get(headId, argId), penalty) : penalty);
+                    }
+                });
 
-        positiveConstraints.forEach(constraint -> {
-            final int headId = constraint.getHeadId();
-            final int argId = constraint.getArgId();
-            final double penalty = constraint.getStrength();
-            mustLinks.put(headId, argId, mustLinks.contains(headId, argId) ?
-                    Math.max(mustLinks.get(headId, argId), penalty) : penalty);
-        });
-
-        negativeConstraints.forEach(constraint -> {
-            final int headId = constraint.getHeadId();
-            final int argId = constraint.getArgId();
-            final double penalty = constraint.getStrength();
-            cannotLinks.put(headId, argId, cannotLinks.contains(headId, argId) ?
-                    Math.max(cannotLinks.get(headId, argId), penalty) : penalty);
-        });
-        // Normalize attachment evidence.
+        constraints.stream()
+                .filter(Constraint.SupertagConstraint.class::isInstance)
+                .map(c -> (Constraint.SupertagConstraint) c)
+                .forEach(constraint -> {
+                    final int headId = constraint.getPredId();
+                    final Category category = constraint.getCategory();
+                    final double penalty = constraint.getStrength();
+                    if (constraint.isPositive()) {
+                        mustSupertags.put(headId, category, mustLinks.contains(headId, category) ?
+                                Math.max(mustLinks.get(headId, category), penalty) : penalty);
+                    } else {
+                        cannotSupertags.put(headId, category, cannotLinks.contains(headId, category) ?
+                                Math.max(cannotLinks.get(headId, category), penalty) : penalty);
+                    }
+                });
+        //TODO: Normalize supertag and attachment evidence.
         /*
         mustLinks.rowKeySet().stream().forEach(head -> {
             int numArgs = mustLinks.row(head).size();
@@ -80,11 +100,20 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
         for (int i = 0; i < words.size(); i++) {
             final InputReader.InputWord word = words.get(i);
             for (final Tagger.ScoredCategory cat : tagsForWords.get(i)) {
+                final Category category = cat.getCategory();
+                double supertagPenalty = .0;
+                if (mustSupertags.containsRow(i) && !mustSupertags.row(i).containsKey(category)) {
+                    // Get arbitrary penalty value.
+                    supertagPenalty += mustSupertags.row(i).values().iterator().next();
+                }
+                if (cannotSupertags.contains(i, cat.getCategory())) {
+                    supertagPenalty += cannotSupertags.get(i, category);
+                }
                 agenda.add(
                         new AgendaItem(
-                                new SyntaxTreeNode.SyntaxTreeNodeLeaf(word.word, word.pos, word.ner, cat.getCategory(),
-                                        i, kIncludeDependencies),
-                                cat.getScore(), /* inside score */
+                                new SyntaxTreeNode.SyntaxTreeNodeLeaf(word.word, word.pos, word.ner, category, i,
+                                        kIncludeDependencies),
+                                cat.getScore() - supertagPenalty, /* inside score */
                                 getOutsideUpperBound(i, i + 1),   /* outside score upperbound */
                                 i, /* start index */
                                 1, /* length */

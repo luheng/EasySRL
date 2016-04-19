@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
 /**
  * Created by luheng on 3/10/16.
  */
+@Deprecated
 public class ConstrainedSupertagFactoredModel extends SupertagFactoredModel {
 
     private final List<List<Tagger.ScoredCategory>> tagsForWords;
