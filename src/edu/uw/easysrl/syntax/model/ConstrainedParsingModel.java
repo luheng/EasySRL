@@ -25,7 +25,6 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
     private final List<List<Tagger.ScoredCategory>> tagsForWords;
     private Table<Integer, Integer, Double> mustLinks, cannotLinks;
     private Table<Integer, Category, Double> mustSupertags, cannotSupertags;
-    //private ImmutableSet<Constraint.AttachmentConstraint> positiveConstraints, negativeConstraints;
 
     public ConstrainedParsingModel(final List<List<Tagger.ScoredCategory>> tagsForWords,
                                    final Set<Constraint> constraints) {
@@ -40,16 +39,35 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
         cannotLinks = HashBasedTable.create();
         mustSupertags = HashBasedTable.create();
         cannotSupertags = HashBasedTable.create();
+
+        constraints.stream()
+                .filter(Constraint::isPositive)
+                .filter(Constraint.AttachmentConstraint.class::isInstance)
+                .map(c -> (Constraint.AttachmentConstraint) c)
+                .forEach(c -> mustLinks.put(c.getHeadId(), c.getArgId(), c.getStrength()));
+        constraints.stream()
+                .filter(Constraint::isPositive)
+                .filter(Constraint.SupertagConstraint.class::isInstance)
+                .map(c -> (Constraint.SupertagConstraint) c)
+                .forEach(c -> mustSupertags.put(c.getPredId(), c.getCategory(), c.getStrength()));
+
+        // Positive evidence can override negative evidence.
+        constraints.stream()
+                .filter(c -> !c.isPositive())
+                .filter(Constraint.AttachmentConstraint.class::isInstance)
+                .map(c -> (Constraint.AttachmentConstraint) c)
+                .filter(c -> !mustLinks.contains(c.getHeadId(), c.getArgId()) &&
+                             !mustLinks.contains(c.getArgId(), c.getHeadId()))
+                .forEach(c -> cannotLinks.put(c.getHeadId(), c.getArgId(), c.getStrength()));
+
+        constraints.stream()
+                .filter(c -> !c.isPositive())
+                .filter(Constraint.SupertagConstraint.class::isInstance)
+                .map(c -> (Constraint.SupertagConstraint) c)
+                .filter(c -> !mustSupertags.contains(c.getPredId(), c.getCategory()))
+                .forEach(c -> cannotSupertags.put(c.getPredId(), c.getCategory(), c.getStrength()));
+
         /*
-        positiveConstraints = constraints.stream()
-                .filter(c -> !Constraint.SupertagConstraint.class.isInstance(c) && c.isPositive())
-                .map(c -> (Constraint.AttachmentConstraint) c)
-                .collect(GuavaCollectors.toImmutableSet());
-        negativeConstraints = constraints.stream()
-                .filter(c -> !Constraint.SupertagConstraint.class.isInstance(c) && !c.isPositive())
-                .map(c -> (Constraint.AttachmentConstraint) c)
-                .collect(GuavaCollectors.toImmutableSet());
-        */
         constraints.stream()
                 .filter(Constraint.AttachmentConstraint.class::isInstance)
                 .map(c -> (Constraint.AttachmentConstraint) c)
@@ -65,7 +83,6 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                                 Math.max(cannotLinks.get(headId, argId), penalty) : penalty);
                     }
                 });
-
         constraints.stream()
                 .filter(Constraint.SupertagConstraint.class::isInstance)
                 .map(c -> (Constraint.SupertagConstraint) c)
@@ -81,6 +98,7 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                                 Math.max(cannotLinks.get(headId, category), penalty) : penalty);
                     }
                 });
+         */
         //TODO: Normalize supertag and attachment evidence.
         /*
         mustLinks.rowKeySet().stream().forEach(head -> {
@@ -139,6 +157,7 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
         // Penalize cannot-links.
         evidencePenalty += dependencies.stream()
                 .mapToDouble(dep -> dep.getArguments().stream()
+                        // Directed match.
                         .filter(argId -> cannotLinks.contains(dep.getHead(), argId))
                         .mapToDouble(argId -> cannotLinks.get(dep.getHead(), argId))
                         .sum())
@@ -146,10 +165,18 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
 
         // Penalize missed must-links.
         evidencePenalty += mustLinks.cellSet().stream()
-                .filter(c -> (indexInSpan(c.getRowKey(), leftChild) && indexInSpan(c.getColumnKey(), rightChild)) ||
-                             (indexInSpan(c.getColumnKey(), leftChild) && indexInSpan(c.getRowKey(), rightChild)))
-                .filter(c -> !dependencies.stream().anyMatch(dep -> dep.getHead() == c.getRowKey() &&
-                                                                    dep.getArguments().contains(c.getColumnKey())))
+                .filter(c -> {
+                    final int cHead = c.getRowKey(), cArg = c.getColumnKey();
+                    return (indexInSpan(cHead, leftChild) && indexInSpan(cArg, rightChild)) ||
+                            (indexInSpan(cArg, leftChild) && indexInSpan(cHead, rightChild));
+                })
+                .filter(c -> {
+                    final int cHead = c.getRowKey(), cArg = c.getColumnKey();
+                    return !dependencies.stream()
+                            // Undirected match.
+                            .anyMatch(dep -> (dep.getHead() == cHead && dep.getArguments().contains(cArg) ||
+                                             (dep.getHead() == cArg && dep.getArguments().contains(cHead))));
+                })
                 .mapToDouble(Table.Cell::getValue)
                 .sum();
 

@@ -348,7 +348,9 @@ public class HITLParser {
         constraints.addAll(ConstraintExtractor.extractPositiveConstraints(query, options));
         constraints.addAll(ConstraintExtractor.extractNegativeConstraints(query, options, false /* dont skip pronouns */));
         constraints.forEach(c -> c.setStrength(reparsingParameters.oraclePenaltyWeight));
-        return ImmutableSet.copyOf(constraints);
+        return constraints.stream()
+                .distinct()
+                .collect(GuavaCollectors.toImmutableSet());
     }
 
 }

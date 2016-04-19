@@ -41,6 +41,11 @@ public abstract class Constraint {
         return hashString.hashCode();
     }
 
+    @Override
+    public boolean equals(final Object other) {
+        return hashCode() == other.hashCode();
+    }
+
     /**
      * Supertag evidence.
      * Negative supertag evidence:

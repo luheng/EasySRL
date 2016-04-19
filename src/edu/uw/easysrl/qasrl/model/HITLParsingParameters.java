@@ -10,7 +10,7 @@ public class HITLParsingParameters {
     public double supertagPenaltyWeight = 1.0;
     public double attachmentPenaltyWeight = 1.0;
     // Like, really confident.
-    public double oraclePenaltyWeight = 1000.0;
+    public double oraclePenaltyWeight = 10.0;
 
     public int jeopardyQuestionMinAgreement = 4;
     public double jeopardyQuestionWeight = 1.0;
