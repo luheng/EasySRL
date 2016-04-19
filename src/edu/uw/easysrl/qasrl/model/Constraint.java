@@ -14,6 +14,7 @@ public abstract class Constraint {
     // Reward for positive evidence. Penalize for negative evidence. For the A* factored model we can only penalize.
     protected boolean isPositive;
     protected double strength;
+    protected String hashString;
 
     Constraint(boolean isPositive, double strength) {
         this.isPositive = isPositive;
@@ -37,7 +38,7 @@ public abstract class Constraint {
     public abstract String toString(List<String> sentence);
 
     public int hashCode() {
-        return toString().hashCode();
+        return hashString.hashCode();
     }
 
     /**
@@ -48,10 +49,12 @@ public abstract class Constraint {
     public static class SupertagConstraint extends Constraint {
         int predId;
         Category category;
+
         public SupertagConstraint(int predId, Category category, boolean isPositive, double confidence) {
             super(isPositive, confidence);
             this.predId = predId;
             this.category = category;
+            this.hashString = toString();
         }
 
         public int getPredId() {
@@ -67,7 +70,7 @@ public abstract class Constraint {
         }
 
         public String toString() {
-            return predId + "\t" + category;
+            return (isPositive ? "[+]" : "[-]") + "\t" + predId + "\t" + category;
         }
 
         public String toString(List<String> sentence) {
@@ -87,6 +90,7 @@ public abstract class Constraint {
             super(isPositive, confidence);
             this.headId = headId;
             this.argId = argId;
+            this.hashString = toString();
         }
 
         public int getHeadId() {
@@ -104,7 +108,7 @@ public abstract class Constraint {
         }
 
         public String toString() {
-            return isPositive ? "[+]" : "[-]" + "\t" + strength + "\t" + headId + "\t" + argId;
+            return (isPositive ? "[+]" : "[-]") + "\t" + strength + "\t" + headId + "\t" + argId;
         }
 
         public String toString(List<String> sentence) {

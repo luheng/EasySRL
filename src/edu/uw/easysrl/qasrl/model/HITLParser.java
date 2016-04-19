@@ -115,7 +115,10 @@ public class HITLParser {
                 ExperimentUtils.generateCleftedQueries(
                         sentenceId, sentences.get(sentenceId), nbestLists.get(sentenceId),
                         true /* usePronouns */,
-                        queryPruningParams);
+                        queryPruningParams)
+                        .stream()
+                        .filter(query -> !query.getQAPairSurfaceForms().get(0).getAnswerStructures().get(0).headIsVP)
+                        .collect(GuavaCollectors.toImmutableList());
         // Assign query ids.
         IntStream.range(0, queryList.size()).forEach(i -> queryList.get(i).setQueryId(i));
         return queryList;

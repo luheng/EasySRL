@@ -52,28 +52,37 @@ public class ConstraintExtractor {
     public static Set<Constraint> extractPositiveConstraints(ScoredQuery<QAStructureSurfaceForm> query,
                                                              Collection<Integer> chosenOptions) {
         Set<Constraint> constraints = new HashSet<>();
-        if (query.getQueryType() == QueryType.Forward) {
-            chosenOptions.stream()
-                    .filter(op -> op < query.getQAPairSurfaceForms().size())
-                    .map(query.getQAPairSurfaceForms()::get)
-                    .forEach(qa -> qa.getQuestionStructures().stream()
-                            .forEach(qstr -> {
-                                final int headId = qstr.targetPrepositionIndex >= 0 ?
-                                        qstr.targetPrepositionIndex : qstr.predicateIndex;
+
+        chosenOptions.stream()
+                .filter(op -> op < query.getQAPairSurfaceForms().size())
+                .map(query.getQAPairSurfaceForms()::get)
+                .forEach(qa -> qa.getQuestionStructures().stream()
+                        .forEach(qstr -> {
+                            final int headId = qstr.targetPrepositionIndex >= 0 ?
+                                    qstr.targetPrepositionIndex : qstr.predicateIndex;
+                            qa.getAnswerStructures().stream()
+                                    .flatMap(astr -> astr.argumentIndices.stream())
+                                    .distinct()
+                                    .forEach(argId -> constraints.add(
+                                            new Constraint.AttachmentConstraint(headId, argId, true, 1.0)));
+                            // Verb to PP dependency.
+                            if (qstr.targetPrepositionIndex >= 0) {
+                                constraints.add(new Constraint.AttachmentConstraint(qstr.predicateIndex,
+                                        qstr.targetPrepositionIndex, true, 1.0));
+                                // Undirected PP-Verb dependency.
+                                constraints.add(new Constraint.AttachmentConstraint(qstr.targetPrepositionIndex,
+                                        qstr.predicateIndex, true, 1.0));
+                            }
+                            // Adjunct dependencies in answer.
+                            if (query.getQueryType() == QueryType.Clefted) {
                                 qa.getAnswerStructures().stream()
-                                        .flatMap(astr -> astr.argumentIndices.stream())
+                                        .flatMap(astr -> astr.adjunctDependencies.stream())
                                         .distinct()
-                                        .forEach(argId -> constraints.add(
-                                                new Constraint.AttachmentConstraint(headId, argId, true, 1.0)));
-                                if (qstr.targetPrepositionIndex >= 0) {
-                                    constraints.add(new Constraint.AttachmentConstraint(qstr.predicateIndex,
-                                            qstr.targetPrepositionIndex, true, 1.0));
-                                }
-                            })
-                    );
-        }
-        // if (query.getQueryType() == QueryType.Clefted) {
-        // }
+                                        .forEach(dep -> constraints.add(
+                                                new Constraint.AttachmentConstraint(dep.getHead(), dep.getArgument(), true, 1.0)));
+                            }
+                        })
+                );
         return constraints;
     }
 

@@ -8,8 +8,11 @@ import edu.uw.easysrl.qasrl.model.HITLParsingParameters;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
+import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Simulation experiments with oracle parsing.
@@ -30,13 +33,14 @@ public class SyntheticExperiments {
         queryPruningParameters.minPromptConfidence = 0.1;
         queryPruningParameters.minOptionConfidence = 0.05;
         queryPruningParameters.minOptionEntropy = 0.05;
+        queryPruningParameters.skipBinaryQueries = true;
         queryPruningParameters.skipPPQuestions = false;
     }
     private static HITLParsingParameters reparsingParameters;
     static {
         reparsingParameters = new HITLParsingParameters();
-        reparsingParameters.attachmentPenaltyWeight = 5.0;
-        reparsingParameters.supertagPenaltyWeight = 5.0;
+        reparsingParameters.attachmentPenaltyWeight = 10.0;
+        reparsingParameters.supertagPenaltyWeight = 10.0;
         reparsingParameters.skipJeopardyQuestions = false;
     }
 
@@ -51,11 +55,13 @@ public class SyntheticExperiments {
 
         AtomicInteger sentenceCounter = new AtomicInteger(0);
         for (int sentenceId : myHITLParser.getAllSentenceIds()) {
-            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> coreQueries = myHITLParser
-                    .getPronounCoreArgQueriesForSentence(sentenceId);
+            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries = Stream.concat(
+                    myHITLParser.getPronounCoreArgQueriesForSentence(sentenceId).stream(),
+                    myHITLParser.getCleftedQuestionsForSentence(sentenceId).stream()
+            ).collect(GuavaCollectors.toImmutableList());
 
             myHITLHistory.addSentence(sentenceId);
-            coreQueries.forEach(query -> {
+            queries.forEach(query -> {
                 ImmutableList<Integer> goldOptions = myHITLParser.getGoldOptions(query);
                 ImmutableSet<Constraint> constraints = myHITLParser.getOracleConstraints(query, goldOptions);
                 myHITLHistory.addEntry(sentenceId, query, goldOptions, constraints);
