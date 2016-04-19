@@ -115,7 +115,7 @@ public class ReparsingExperiment {
             Results currentF1 = nBestList.getResults(0);
 
             final int numParses = nBestList.getN();
-            final Set<Constraint> allConstraints = new HashSet<>();
+            final Set<Constraint> allConstraints = new HashSet<>(), allOracleConstraints = new HashSet<>();
             String sentenceDebuggingString = "";
             double[] penalty = new double[numParses];
             Arrays.fill(penalty, 0);
@@ -158,10 +158,11 @@ public class ReparsingExperiment {
                     continue;
                 }*/
                 allConstraints.addAll(constraints);
+                allOracleConstraints.addAll(oracleConstraints);
 
                 int rerankedId = myHTILParser.getRerankedParseId(sentenceId, allConstraints);
                 Parse reparse = myHTILParser.getReparsed(sentenceId, allConstraints),
-                      oracleReparse = myHTILParser.getReparsed(sentenceId, oracleConstraints);
+                      oracleReparse = myHTILParser.getReparsed(sentenceId, allOracleConstraints);
                 Results rerankedF1 = nBestList.getResults(rerankedId);
                 Results reparsedF1 = CcgEvaluation.evaluate(reparse.dependencies, myHTILParser.getGoldParse(sentenceId).dependencies);
                 Results oracleF1 = CcgEvaluation.evaluate(oracleReparse.dependencies, myHTILParser.getGoldParse(sentenceId).dependencies);
