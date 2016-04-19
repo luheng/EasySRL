@@ -52,7 +52,6 @@ public class ConstraintExtractor {
     public static Set<Constraint> extractPositiveConstraints(ScoredQuery<QAStructureSurfaceForm> query,
                                                              Collection<Integer> chosenOptions) {
         Set<Constraint> constraints = new HashSet<>();
-
         chosenOptions.stream()
                 .filter(op -> op < query.getQAPairSurfaceForms().size())
                 .map(query.getQAPairSurfaceForms()::get)
