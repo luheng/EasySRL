@@ -272,7 +272,7 @@ public class ReparsingHistory {
 
     public int getNumModifiedSentences(final Map<Integer, List<Results>> resultsMap) {
         return (int) sentenceIds.stream()
-                .filter(sid -> Math.abs(getLast(resultsMap.get(sid)).getF1() - resultsMap.get(sid).get(0).getF1()) < 1e-6)
+                .filter(sid -> Math.abs(getLast(resultsMap.get(sid)).getF1() - resultsMap.get(sid).get(0).getF1()) > 1e-6)
                 .count();
     }
 }
