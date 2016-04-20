@@ -56,7 +56,7 @@ public class OracleExperiment {
         reparsingParameters.skipJeopardyQuestions = false;
     }
 
-    private static ImmutableList<Integer> skipSentenceIds = ImmutableList.of(604);
+    private static ImmutableList<Integer> skipSentenceIds = ImmutableList.of(449, 604, 662, 705);
 
     private static Set<Constraint> getAttachmentConstraints(final Stream <ProfiledDependency> dependencyStream) {
         return dependencyStream
@@ -74,7 +74,10 @@ public class OracleExperiment {
         myHITLHistory = new ReparsingHistory(myHITLParser);
         AtomicInteger sentenceCounter = new AtomicInteger(0);
         AtomicInteger numConstraints = new AtomicInteger(0);
-        Results avgBaseline = new Results(), avgOracle = new Results();
+        Results avgBaseline = new Results(),
+                avgOracle = new Results(),
+                avgUnlabeledBaseline = new Results(),
+                avgUnlabeledOracle = new Results();
 
         DependencyProfiler dependencyProfiler = new DependencyProfiler(
                 myHITLParser.getParseData(),
@@ -95,8 +98,14 @@ public class OracleExperiment {
                     final Set<ProfiledDependency> allDeps = dependencyProfiler.getAllDependencies(sentenceId);
 
                     final ImmutableSet<ProfiledDependency> confidentDeps = allDeps.stream()
-                            .filter(d -> d.score > 0.95)
+                            .filter(d -> d.score > 0.99)
                             .filter(d -> !dependencyProfiler.dependencyIsCore(d.dependency, false))
+                            .collect(GuavaCollectors.toImmutableSet());
+
+                    final ImmutableSet<ProfiledDependency> wrongDeps = goldDeps.stream()
+                            .filter(d -> !confidentDeps.stream()
+                                    .anyMatch(d2 -> d.dependency.getHead() == d2.dependency.getHead() &&
+                                                    d.dependency.getArgument() == d2.dependency.getArgument()))
                             .collect(GuavaCollectors.toImmutableSet());
 
                     final ImmutableSet<ProfiledDependency> coreDeps = goldDeps.stream()
@@ -128,7 +137,8 @@ public class OracleExperiment {
 
                     final Set<Constraint> constraints = getAttachmentConstraints(Stream.concat(
                             //coreDeps.stream(),
-                            goldDeps.stream(),
+                            //goldDeps.stream(),
+                            wrongDeps.stream(),
                             //uncoveredCoreDeps.stream()
                             Stream.empty()
                             //adjunctDeps.stream()
@@ -138,22 +148,32 @@ public class OracleExperiment {
                     ));
 
 
+                    System.out.println(sentenceId + "\t" + TextGenerationHelper.renderString(sentence));
+
                     //constraints.forEach(c -> System.out.println(c.toString(sentence)));
                     final Parse reparsed = myHITLParser.getReparsed(sentenceId,  constraints);
                     final Results baselineF1 = myHITLParser.getNBestList(sentenceId).getResults(0);
                     final Results oracleF1 = CcgEvaluation.evaluate(reparsed.dependencies, gold.dependencies);
+                    final Results unlabeledBaselineF1 = CcgEvaluation.evaluateUnlabeled(
+                            myHITLParser.getNBestList(sentenceId).getParse(0).dependencies, gold.dependencies);
+                    final Results unlabeledOracleF1 = CcgEvaluation.evaluateUnlabeled(reparsed.dependencies,
+                            gold.dependencies);
 
                     if (oracleF1.getF1() < 0.9) {
                         System.out.println(sentenceId + "\t" + TextGenerationHelper.renderString(sentence));
-                        otherDeps.forEach(d -> System.out.println(d.toString(sentence)));
+                        wrongDeps.forEach(d -> System.out.println(d.toString(sentence)));
 
                         System.out.println(baselineF1);
                         System.out.println(oracleF1);
+                        System.out.println(unlabeledBaselineF1);
+                        System.out.println(unlabeledOracleF1);
                         System.out.println();
                     }
 
                     avgBaseline.add(baselineF1);
                     avgOracle.add(oracleF1);
+                    avgUnlabeledBaseline.add(unlabeledBaselineF1);
+                    avgUnlabeledOracle.add(unlabeledOracleF1);
                     numConstraints.addAndGet(constraints.size());
                     sentenceCounter.addAndGet(1);
 
@@ -173,6 +193,8 @@ public class OracleExperiment {
 
         System.out.println(avgBaseline);
         System.out.println(avgOracle);
+        System.out.println(avgUnlabeledBaseline);
+        System.out.println(avgUnlabeledOracle);
         System.out.println(1.0 * numConstraints.get() / sentenceCounter.get());
         //System.out.println("Num. core queries:\t" + numCoreQueries + "\tAcc:\t" + 1.0 * coreQueryAcc.get() / numCoreQueries.get());
     }

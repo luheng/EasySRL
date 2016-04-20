@@ -22,6 +22,30 @@ public class CcgEvaluation {
         return new Results(predicted.size(), numMatches, gold.size());
     }
 
+    public static Results evaluateUnlabeled(final Set<ResolvedDependency> predicted, final Set<ResolvedDependency> gold) {
+        int numMatches = (int) gold.stream()
+                .filter(goldDep -> predicted.stream().anyMatch(predDep -> unlabeledMatch(goldDep, predDep)))
+                .count();
+        return new Results(predicted.size(), numMatches, gold.size());
+    }
+
+    // FIXME: might cause problem when both X->Y and Y->X exist.
+    public static Results evaluateUndirected(final Set<ResolvedDependency> predicted, final Set<ResolvedDependency> gold) {
+        int numMatches = (int) gold.stream()
+                .filter(goldDep -> predicted.stream().anyMatch(predDep -> undirectedMatch(goldDep, predDep)))
+                .count();
+        return new Results(predicted.size(), numMatches, gold.size());
+    }
+
+    public static boolean unlabeledMatch(final ResolvedDependency dep1, final ResolvedDependency dep2) {
+        return dep1.getHead() == dep2.getHead() && dep1.getArgument() == dep2.getArgument();
+    }
+
+    public static boolean undirectedMatch(final ResolvedDependency dep1, final ResolvedDependency dep2) {
+        return (dep1.getHead() == dep2.getHead() && dep1.getArgument() == dep2.getArgument()) ||
+                (dep1.getHead() == dep2.getArgument() && dep1.getArgument() == dep2.getHead());
+    }
+
     /**
      * Get the dependencies present in one but not the other.
      * Interpretable as either the "false positives" that hurt precision of `one`
