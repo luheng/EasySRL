@@ -78,6 +78,8 @@ public class HITLParser {
         return inputSentences.get(sentenceId);
     }
 
+    public ParseData getParseData() { return parseData; }
+
     public NBestList getNBestList(int sentenceId) {
         return nbestLists.get(sentenceId);
     }

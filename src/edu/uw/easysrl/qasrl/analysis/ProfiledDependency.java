@@ -28,10 +28,11 @@ public class ProfiledDependency {
     }
 
     public String toString(final ImmutableList<String> sentence) {
-        return String.format("%.3f\t%d:%s\t%s.%d\t%d:%s", score,
+        return String.format("%.3f\t%d:%s\t%s.%d\t%d:%s\t%b,%b,%b", score,
                 dependency.getHead(), sentence.get(dependency.getHead()),
                 dependency.getCategory(), dependency.getArgNumber(),
-                dependency.getArgument(), sentence.get(dependency.getArgument()));
+                dependency.getArgument(), sentence.get(dependency.getArgument()),
+                inGold, unlabeledInGold, undirectedInGold);
     }
 
 }

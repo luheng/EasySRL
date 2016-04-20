@@ -1,6 +1,7 @@
 package edu.uw.easysrl.qasrl.model;
 
 import com.google.common.collect.*;
+import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.util.PronounList;
@@ -18,36 +19,6 @@ import java.util.stream.Collectors;
  * Created by luheng on 4/1/16.
  */
 public class ConstraintExtractor {
-
-    /*
-    public static Set<Constraint> extractConstraints(ScoredQuery<QAStructureSurfaceForm> query,
-                                                     Collection<Integer> chosenOptions,
-                                                     boolean doNotPenalizePronouns) {
-        final int numQAOptions = query.getQAPairSurfaceForms().size();
-
-        // 0: listed. 1: chosen.
-        Table<Integer, Integer, Integer> attachments = HashBasedTable.create();
-        for (int i = 0; i < numQAOptions; i++) {
-            final boolean chosen = chosenOptions.contains(i);
-            AttachmentHelper.getAttachments(query.getQAPairSurfaceForms().get(i), doNotPenalizePronouns).forEach(a -> {
-                if (!attachments.contains(a[0], a[1])) {
-                    attachments.put(a[0], a[1], 0);
-                }
-                //if (!attachments.contains(a[1], a[0])) {
-                //    attachments.put(a[1], a[0], 0);
-                //}
-                if (chosen) {
-                    attachments.put(a[0], a[1], 1);
-                //    attachments.put(a[1], a[0], 1);
-                }
-            });
-        }
-        return attachments.cellSet().stream()
-                // listed but not chosen.
-                .filter(c -> c.getValue() == 0)
-                .map(c -> new Constraint.AttachmentConstraint(c.getRowKey(), c.getColumnKey(), false, 1.0))
-                .collect(Collectors.toSet());
-    }*/
 
     public static Set<Constraint> extractPositiveConstraints(ScoredQuery<QAStructureSurfaceForm> query,
                                                              Collection<Integer> chosenOptions) {
