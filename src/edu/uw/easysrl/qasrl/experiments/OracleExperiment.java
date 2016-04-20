@@ -88,28 +88,38 @@ public class OracleExperiment {
                 .forEach(sentenceId -> {
                     final ImmutableList<String> sentence = myHITLParser.getSentence(sentenceId);
                     final Parse gold = myHITLParser.getGoldParse(sentenceId);
-                    final Set<ProfiledDependency> allDeps = //dependencyProfiler.getAllDependencies(sentenceId);
-                            gold.dependencies.stream()
-                                    .map(d -> dependencyProfiler.getProfiledDependency(sentenceId, d, 1.0))
-                                    .collect(Collectors.toSet());
+                    final Set<ProfiledDependency> goldDeps = gold.dependencies.stream()
+                            .map(d -> dependencyProfiler.getProfiledDependency(sentenceId, d, 1.0))
+                            .collect(Collectors.toSet());
 
-                    final ImmutableSet<ProfiledDependency> coreDeps = allDeps.stream()
+                    final Set<ProfiledDependency> allDeps = dependencyProfiler.getAllDependencies(sentenceId);
+
+                    final ImmutableSet<ProfiledDependency> confidentDeps = allDeps.stream()
+                            .filter(d -> d.score > 0.95)
+                            .filter(d -> !dependencyProfiler.dependencyIsCore(d.dependency, false))
+                            .collect(GuavaCollectors.toImmutableSet());
+
+                    final ImmutableSet<ProfiledDependency> coreDeps = goldDeps.stream()
                             .filter(d -> dependencyProfiler.dependencyIsCore(d.dependency, false))
                             .collect(GuavaCollectors.toImmutableSet());
 
-                    final ImmutableSet<ProfiledDependency> uncoveredCoreDeps = allDeps.stream()
+                    final ImmutableSet<ProfiledDependency> uncoveredCoreDeps = goldDeps.stream()
                             .filter(d -> !dependencyProfiler.dependencyIsCore(d.dependency, false))
                             .filter(d -> dependencyProfiler.dependencyIsCore(d.dependency, true))
                             .collect(GuavaCollectors.toImmutableSet());
 
-                    final ImmutableSet<ProfiledDependency> adjunctDeps = allDeps.stream()
+                    final ImmutableSet<ProfiledDependency> adjunctDeps = goldDeps.stream()
                             .filter(d -> !dependencyProfiler.dependencyIsCore(d.dependency, true))
                             .filter(d -> dependencyProfiler.dependencyIsAdjunct(d.dependency, false))
                             .filter(d -> !(d.dependency.getCategory() == Category.valueOf("(NP\\NP)/NP") &&
                                             sentence.get(d.dependency.getHead()).equalsIgnoreCase("of")))
                             .collect(GuavaCollectors.toImmutableSet());
 
-                    final ImmutableSet<ProfiledDependency> otherDeps = allDeps.stream()
+                    final ImmutableSet<ProfiledDependency> clausalDeps = goldDeps.stream()
+                            .filter(d -> d.dependency.getCategory() == Category.valueOf("(NP\\NP)/(S[dcl]\\NP)"))
+                            .collect(GuavaCollectors.toImmutableSet());
+
+                    final ImmutableSet<ProfiledDependency> otherDeps = goldDeps.stream()
                             .filter(d -> !dependencyProfiler.dependencyIsCore(d.dependency, true))
                             .filter(d -> !dependencyProfiler.dependencyIsAdjunct(d.dependency, false))
                             .collect(GuavaCollectors.toImmutableSet());
@@ -120,7 +130,9 @@ public class OracleExperiment {
                             coreDeps.stream(),
                             //uncoveredCoreDeps.stream()
                             //Stream.empty()
-                            adjunctDeps.stream()
+                            //adjunctDeps.stream()
+                            //clausalDeps.stream()
+                            confidentDeps.stream()
                             //adjunctDeps.stream().filter(d -> d.dependency.getCategory() == Category.valueOf("(NP\\NP)/NP"))
                     ));
 
@@ -130,7 +142,7 @@ public class OracleExperiment {
                     final Results baselineF1 = myHITLParser.getNBestList(sentenceId).getResults(0);
                     final Results oracleF1 = CcgEvaluation.evaluate(reparsed.dependencies, gold.dependencies);
 
-                    if (oracleF1.getF1() < 99.0) {
+                    if (oracleF1.getF1() < 0.9) {
                         System.out.println(sentenceId + "\t" + TextGenerationHelper.renderString(sentence));
                         otherDeps.forEach(d -> System.out.println(d.toString(sentence)));
 
