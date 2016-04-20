@@ -51,7 +51,7 @@ public class OracleExperiment {
     private static HITLParsingParameters reparsingParameters;
     static {
         reparsingParameters = new HITLParsingParameters();
-        reparsingParameters.oraclePenaltyWeight = Integer.MAX_VALUE;
+        reparsingParameters.oraclePenaltyWeight = 10;// Integer.MAX_VALUE;
         reparsingParameters.skipPronounEvidence = false;
         reparsingParameters.skipJeopardyQuestions = false;
     }
@@ -127,12 +127,13 @@ public class OracleExperiment {
                     // TODO: check constraint violation.
 
                     final Set<Constraint> constraints = getAttachmentConstraints(Stream.concat(
-                            coreDeps.stream(),
+                            //coreDeps.stream(),
+                            goldDeps.stream(),
                             //uncoveredCoreDeps.stream()
-                            //Stream.empty()
+                            Stream.empty()
                             //adjunctDeps.stream()
                             //clausalDeps.stream()
-                            confidentDeps.stream()
+                            //confidentDeps.stream()
                             //adjunctDeps.stream().filter(d -> d.dependency.getCategory() == Category.valueOf("(NP\\NP)/NP"))
                     ));
 
