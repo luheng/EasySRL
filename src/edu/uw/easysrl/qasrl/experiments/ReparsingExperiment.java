@@ -61,10 +61,15 @@ public class ReparsingExperiment {
         reparsingParameters.supertagPenaltyWeight = 1.0;
     }
 
+    public static HITLParser makeHITLParser() {
+        HITLParser hitlParser = new HITLParser(nBest);
+        hitlParser.setQueryPruningParameters(queryPruningParameters);
+        hitlParser.setReparsingParameters(reparsingParameters);
+        return hitlParser;
+    }
+
     public static void main(String[] args) {
-        myHTILParser = new HITLParser(nBest);
-        myHTILParser.setQueryPruningParameters(queryPruningParameters);
-        myHTILParser.setReparsingParameters(reparsingParameters);
+        myHTILParser = makeHITLParser();
         annotations = ExperimentUtils.loadCrowdflowerAnnotation(annotationFiles);
         assert annotations != null;
         myHistory = new ReparsingHistory(myHTILParser);
