@@ -1,4 +1,4 @@
-package edu.uw.easysrl.qasrl.evaluation;
+package edu.uw.easysrl.qasrl.analysis;
 
 import edu.uw.easysrl.qasrl.ParseData;
 import edu.uw.easysrl.qasrl.Parse;
@@ -7,11 +7,14 @@ import edu.uw.easysrl.qasrl.NBestList;
 import static edu.uw.easysrl.util.GuavaCollectors.*;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.qasrl.analysis.DependencyProfiler;
+import edu.uw.easysrl.qasrl.analysis.ProfiledDependency;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.qasrl.model.Constraint;
 import edu.uw.easysrl.qasrl.model.HITLParser;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
 import edu.uw.easysrl.qasrl.experiments.ReparsingExperiment;
+import edu.uw.easysrl.qasrl.experiments.OracleExperiment;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 
@@ -23,6 +26,7 @@ import com.google.common.collect.Table;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.function.Function;
 import java.util.function.BiFunction;
@@ -112,7 +116,7 @@ public class DependencyErrorAnalysis {
 
         @FunctionalInterface
         public static interface DependencyClassifier {
-            public boolean isMember(ResolvedDependency dep, Parse parse);
+            public boolean isMember(ResolvedDependency dep);
         }
 
         public static MistakeExtractor<SingleDependencyMistake>
@@ -120,10 +124,10 @@ public class DependencyErrorAnalysis {
                                        DependencyClassifier depClass) {
             return (parse, goldParse) -> {
                 final Stream<SingleDependencyMistake> fp = falsePositives(parse, goldParse, depMatcher).stream()
-                    .filter(dep -> depClass.isMember(dep, parse))
+                    .filter(dep -> depClass.isMember(dep))
                     .map(dep -> new SingleDependencyMistake(dep, true));
                 final Stream<SingleDependencyMistake> fn = falseNegatives(parse, goldParse, depMatcher).stream()
-                    .filter(dep -> depClass.isMember(dep, goldParse))
+                    .filter(dep -> depClass.isMember(dep))
                     .map(dep -> new SingleDependencyMistake(dep, false));
                 return Stream.concat(fp, fn)
                     .collect(toImmutableList());
@@ -132,7 +136,7 @@ public class DependencyErrorAnalysis {
 
         @FunctionalInterface
         public static interface MistakeClassifier {
-            public boolean isMember(ResolvedDependency dep, Parse parse, Parse otherParse);
+            public boolean isMember(ResolvedDependency dep, Parse otherParse);
         }
 
         public static MistakeExtractor<SingleDependencyMistake>
@@ -140,17 +144,15 @@ public class DependencyErrorAnalysis {
                                        MistakeClassifier mistakeClass) {
             return (parse, goldParse) -> {
                 final Stream<SingleDependencyMistake> fp = falsePositives(parse, goldParse, depMatcher).stream()
-                    .filter(dep -> mistakeClass.isMember(dep, parse, goldParse))
+                    .filter(dep -> mistakeClass.isMember(dep, goldParse))
                     .map(dep -> new SingleDependencyMistake(dep, true));
                 final Stream<SingleDependencyMistake> fn = falseNegatives(parse, goldParse, depMatcher).stream()
-                    .filter(dep -> mistakeClass.isMember(dep, goldParse, parse))
+                    .filter(dep -> mistakeClass.isMember(dep, parse))
                     .map(dep -> new SingleDependencyMistake(dep, false));
                 return Stream.concat(fp, fn)
                     .collect(toImmutableList());
             };
         }
-
-        // TODO look around here. abstract out extractors like above.
 
         public static MistakeExtractor<SingleDependencyMistake> coreNPArgExtractor(DependencyMatcher depMatcher) {
             return extractorForDependencyType(depMatcher, SingleDependencyMistake::isVerbNPArgDep);
@@ -173,81 +175,77 @@ public class DependencyErrorAnalysis {
         }
 
         public static MistakeExtractor<SingleDependencyMistake> mysteryExtractor(DependencyMatcher depMatcher) {
-            return extractorForDependencyType(depMatcher, (dep, parse) -> !isVerbNPArgDep(dep, parse) && !isPPAttachment(dep, parse));
+            return extractorForDependencyType(depMatcher, (dep) -> !isVerbNPArgDep(dep) && !isPPAttachment(dep));
         }
 
-        private static boolean isPPAttachment(ResolvedDependency dep, Parse parse) {
-            return isPPArgDep(dep, parse) || isVerbAdjunctDep(dep, parse) || isNounAdjunctDep(dep, parse);
+        private static boolean isPPAttachment(ResolvedDependency dep) {
+            return isPPArgDep(dep) || isVerbAdjunctDep(dep) || isNounAdjunctDep(dep);
         }
 
-        private static boolean isVerbNPArgDep(ResolvedDependency dep, Parse parse) {
-            Category headCat = parse.categories.get(dep.getHead());
-            return (headCat.isFunctionInto(Category.valueOf("S\\NP")) &&
-                    headCat.getArgument(dep.getArgNumber()).matches(Category.NP));
+        private static boolean isVerbNPArgDep(ResolvedDependency dep) {
+            return (dep.getCategory().isFunctionInto(Category.valueOf("S\\NP")) &&
+                    dep.getCategory().getArgument(dep.getArgNumber()).matches(Category.NP));
         }
 
-        private static boolean isPPArgDep(ResolvedDependency dep, Parse parse) {
-            Category headCat = parse.categories.get(dep.getHead());
-            return (headCat.isFunctionInto(Category.valueOf("S\\NP")) &&
-                    headCat.getArgument(dep.getArgNumber()).matches(Category.PP));
+        private static boolean isPPArgDep(ResolvedDependency dep) {
+            return (dep.getCategory().isFunctionInto(Category.valueOf("S\\NP")) &&
+                    dep.getCategory().getArgument(dep.getArgNumber()).matches(Category.PP));
         }
 
-        private static boolean isVerbAdjunctDep(ResolvedDependency dep, Parse parse) {
-            Category headCat = parse.categories.get(dep.getHead());
-            return (headCat.isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)")) &&
+        private static boolean isVerbAdjunctDep(ResolvedDependency dep) {
+            return (dep.getCategory().isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)")) &&
                     dep.getArgNumber() == 2);
         }
 
-        private static boolean isNounAdjunctDep(ResolvedDependency dep, Parse parse) {
-            Category headCat = parse.categories.get(dep.getHead());
-            return (headCat.isFunctionInto(Category.valueOf("NP\\NP")) &&
+        private static boolean isNounAdjunctDep(ResolvedDependency dep) {
+            return (dep.getCategory().isFunctionInto(Category.valueOf("NP\\NP")) &&
                     dep.getArgNumber() == 1);
         }
 
-        private static boolean isPPAttachmentChoiceMistake(ResolvedDependency dep, Parse parse, Parse otherParse) {
-            Function<BiFunction<ResolvedDependency, Parse, Boolean>, Boolean> isMistake = (isDepOfType -> {
+        private static boolean isPPAttachmentChoiceMistake(ResolvedDependency dep, Parse otherParse) {
+            Function<DependencyClassifier, Boolean> isMistake = (depClass -> {
                     boolean otherHasSuchADep = otherParse.dependencies.stream()
                     .anyMatch(otherDep -> otherDep.getHead() == dep.getHead() &&
-                              isDepOfType.apply(otherDep, otherParse));
+                              depClass.isMember(otherDep));
                     boolean otherHasNotThisDep = otherParse.dependencies.stream()
                     .noneMatch(otherDep -> otherDep.getHead() == dep.getHead() &&
                                otherDep.getArgument() == dep.getArgument() &&
-                               isDepOfType.apply(otherDep, otherParse));
-                    return isDepOfType.apply(dep, parse) && otherHasSuchADep && otherHasNotThisDep;
+                               depClass.isMember(otherDep));
+                    return depClass.isMember(dep) && otherHasSuchADep && otherHasNotThisDep;
                 });
             return isMistake.apply(SingleDependencyMistake::isPPArgDep) ||
                 isMistake.apply(SingleDependencyMistake::isVerbAdjunctDep) ||
                 isMistake.apply(SingleDependencyMistake::isNounAdjunctDep);
         }
 
-        private static boolean isArgumentAdjunctMistake(ResolvedDependency dep, Parse parse, Parse otherParse) {
-            return (isPPArgDep(dep, parse) &&
+        private static boolean isArgumentAdjunctMistake(ResolvedDependency dep, Parse otherParse) {
+            return (isPPArgDep(dep) &&
                     otherParse.dependencies.stream()
                     .anyMatch(otherDep -> otherDep.getHead() == dep.getArgument() &&
                               otherDep.getArgument() == dep.getHead() &&
-                              isVerbAdjunctDep(otherDep, otherParse))) ||
-                (isVerbAdjunctDep(dep, parse) &&
+                              isVerbAdjunctDep(otherDep))) ||
+                (isVerbAdjunctDep(dep) &&
                  otherParse.dependencies.stream()
                  .anyMatch(otherDep -> otherDep.getHead() == dep.getArgument() &&
                            otherDep.getArgument() == dep.getHead() &&
-                           isPPArgDep(otherDep, otherParse)));
+                           isPPArgDep(otherDep)));
         }
 
-        private static boolean isNounOrVerbAttachmentMistake(ResolvedDependency dep, Parse parse, Parse otherParse) {
-            return (isVerbAdjunctDep(dep, parse) &&
+        private static boolean isNounOrVerbAttachmentMistake(ResolvedDependency dep, Parse otherParse) {
+            return (isVerbAdjunctDep(dep) &&
                     otherParse.dependencies.stream()
                     .anyMatch(otherDep -> otherDep.getHead() == dep.getHead() &&
-                              isNounAdjunctDep(otherDep, otherParse))) ||
-                (isPPArgDep(dep, parse) &&
+                              isNounAdjunctDep(otherDep))) ||
+                (isPPArgDep(dep) &&
                  otherParse.dependencies.stream()
                  .anyMatch(otherDep -> otherDep.getHead() == dep.getArgument() &&
-                           isNounAdjunctDep(otherDep, otherParse))) ||
-                (isNounAdjunctDep(dep, parse) &&
+                           isNounAdjunctDep(otherDep))) ||
+                (isNounAdjunctDep(dep) &&
                  otherParse.dependencies.stream()
                  .anyMatch(otherDep -> (otherDep.getHead() == dep.getHead() &&
-                                        isVerbAdjunctDep(otherDep, otherParse)) ||
+                                        isVerbAdjunctDep(otherDep)) ||
                            (otherDep.getArgument() == dep.getHead() &&
-                            isPPArgDep(otherDep, otherParse))));
+                            isPPArgDep(otherDep))));
         }
     }
 
@@ -320,6 +318,51 @@ public class DependencyErrorAnalysis {
     private static final ParseData parseData = ParseData.loadFromDevPool().get();
     private static final ImmutableList<Parse> goldParses = parseData.getGoldParses();
 
+    private static void runSupertagAnalysis(ImmutableMap<Integer, Parse> parses) {
+        final MistakeLogger<SupertagMistake> supertagMistakes = new MistakeLogger(parses, SupertagMistake.exactExtractor, "supertag");
+        System.out.println(supertagMistakes.log());
+
+        final Table<Category, Category, Integer> supertagMistakeCounts = HashBasedTable.create();
+        for(SupertagMistake mistake : supertagMistakes.getAllMistakes()) {
+            final Category goldTag = mistake.getGoldSupertag();
+            final Category predictedTag = mistake.getPredictedSupertag();
+            if(!supertagMistakeCounts.contains(goldTag, predictedTag)) {
+                supertagMistakeCounts.put(goldTag, predictedTag, 1);
+            } else {
+                int currentCount = supertagMistakeCounts.get(goldTag, predictedTag);
+                supertagMistakeCounts.put(goldTag, predictedTag, currentCount + 1);
+            }
+        }
+
+        final ImmutableSet<Category> mistakenSupertags = supertagMistakes.getAllMistakes().stream()
+            .flatMap(m -> Stream.of(m.getGoldSupertag(), m.getPredictedSupertag()))
+            .collect(toImmutableSet());
+        final ImmutableMap<Category, Long> numMistakesBySupertag = mistakenSupertags.stream()
+            .collect(toImmutableMap(tag -> tag, tag -> supertagMistakes.getAllMistakes().stream()
+                                    .filter(m -> tag.equals(m.getGoldSupertag()) || tag.equals(m.getPredictedSupertag()))
+                                    .collect(counting())));
+        final ImmutableList<Category> sortedSupertags = mistakenSupertags.stream()
+            .sorted((tag1, tag2) -> numMistakesBySupertag.get(tag2).compareTo(numMistakesBySupertag.get(tag1)))
+            .collect(toImmutableList());
+
+        int nMostProblematicSupertags = 20;
+        System.out.println();
+        System.out.println(nMostProblematicSupertags + " supertags with the most tagging errors:");
+        for(Category tag : sortedSupertags.subList(0, nMostProblematicSupertags)) {
+            System.out.println(tag + ": " + numMistakesBySupertag.get(tag));
+        }
+
+        final ImmutableList<Table.Cell<Category, Category, Integer>> sortedSupertagCells = supertagMistakeCounts.cellSet().stream()
+            .sorted((cell1, cell2) -> cell2.getValue().compareTo(cell1.getValue()))
+            .collect(toImmutableList());
+        int nMostCommonSupertaggingErrors = 20;
+        System.out.println();
+        System.out.println(nMostCommonSupertaggingErrors + " most common supertagging errors (gold --> predicted):");
+        for(Table.Cell<Category, Category, Integer> cell : sortedSupertagCells.subList(0, nMostCommonSupertaggingErrors)) {
+            System.out.println(cell.getRowKey() + " --> " + cell.getColumnKey() + ": " + cell.getValue());
+        }
+    }
+
     private static void runDependencyAnalysis(ImmutableMap<Integer, Parse> parses, DependencyMatcher depMatcher, String depMatchingLabel) {
         final MistakeLogger depMistakes =
             new MistakeLogger(parses,
@@ -371,48 +414,7 @@ public class DependencyErrorAnalysis {
     }
 
     public static void runFullAnalysis(ImmutableMap<Integer, Parse> parses) {
-        final MistakeLogger<SupertagMistake> supertagMistakes = new MistakeLogger(parses, SupertagMistake.exactExtractor, "supertag");
-        System.out.println(supertagMistakes.log());
-
-        final Table<Category, Category, Integer> supertagMistakeCounts = HashBasedTable.create();
-        for(SupertagMistake mistake : supertagMistakes.getAllMistakes()) {
-            final Category goldTag = mistake.getGoldSupertag();
-            final Category predictedTag = mistake.getPredictedSupertag();
-            if(!supertagMistakeCounts.contains(goldTag, predictedTag)) {
-                supertagMistakeCounts.put(goldTag, predictedTag, 1);
-            } else {
-                int currentCount = supertagMistakeCounts.get(goldTag, predictedTag);
-                supertagMistakeCounts.put(goldTag, predictedTag, currentCount + 1);
-            }
-        }
-
-        final ImmutableSet<Category> mistakenSupertags = supertagMistakes.getAllMistakes().stream()
-            .flatMap(m -> Stream.of(m.getGoldSupertag(), m.getPredictedSupertag()))
-            .collect(toImmutableSet());
-        final ImmutableMap<Category, Long> numMistakesBySupertag = mistakenSupertags.stream()
-            .collect(toImmutableMap(tag -> tag, tag -> supertagMistakes.getAllMistakes().stream()
-                                    .filter(m -> tag.equals(m.getGoldSupertag()) || tag.equals(m.getPredictedSupertag()))
-                                    .collect(counting())));
-        final ImmutableList<Category> sortedSupertags = mistakenSupertags.stream()
-            .sorted((tag1, tag2) -> numMistakesBySupertag.get(tag2).compareTo(numMistakesBySupertag.get(tag1)))
-            .collect(toImmutableList());
-
-        int nMostProblematicSupertags = 20;
-        System.out.println();
-        System.out.println(nMostProblematicSupertags + " supertags with the most tagging errors:");
-        for(Category tag : sortedSupertags.subList(0, nMostProblematicSupertags)) {
-            System.out.println(tag + ": " + numMistakesBySupertag.get(tag));
-        }
-
-        final ImmutableList<Table.Cell<Category, Category, Integer>> sortedSupertagCells = supertagMistakeCounts.cellSet().stream()
-            .sorted((cell1, cell2) -> cell2.getValue().compareTo(cell1.getValue()))
-            .collect(toImmutableList());
-        int nMostCommonSupertaggingErrors = 20;
-        System.out.println();
-        System.out.println(nMostCommonSupertaggingErrors + " most common supertagging errors (gold --> predicted):");
-        for(Table.Cell<Category, Category, Integer> cell : sortedSupertagCells.subList(0, nMostCommonSupertaggingErrors)) {
-            System.out.println(cell.getRowKey() + " --> " + cell.getColumnKey() + ": " + cell.getValue());
-        }
+        runSupertagAnalysis(parses);
 
         System.out.println();
         runDependencyAnalysis(parses, unlabeledDirectedDepMatcher, "unlabeled directed");
@@ -422,14 +424,14 @@ public class DependencyErrorAnalysis {
 
     }
 
-    private static void runFullAnalysisForQueries(HITLParser hitlParser,
-                                                  Function<Integer, ImmutableList<ScoredQuery<QAStructureSurfaceForm>>> queriesForSentence,
-                                                  ImmutableMap<Integer, List<AlignedAnnotation>> annotations) {
-        final ImmutableMap<Integer, Parse> parsesReparsedFromAnnotationSignal = annotations.entrySet().stream()
-            .collect(toImmutableMap(e -> e.getKey(), e -> {
-                        final int sentenceId = e.getKey();
-                        final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries = queriesForSentence.apply(sentenceId);
-                        final ImmutableSet<Constraint> annotationConstraints = queries.stream()
+    private static ImmutableMap<Integer, Parse>
+        reparsedFromAnnotationSignal(HITLParser hitlParser,
+                                     Function<Integer, ImmutableList<ScoredQuery<QAStructureSurfaceForm>>> queriesForSentence,
+                                     ImmutableMap<Integer, List<AlignedAnnotation>> annotations) {
+        return annotations.entrySet().stream().collect(toImmutableMap(e -> e.getKey(), e -> {
+                    final int sentenceId = e.getKey();
+                    final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries = queriesForSentence.apply(sentenceId);
+                    final ImmutableSet<Constraint> annotationConstraints = queries.stream()
                         .flatMap(query -> {
                                 AlignedAnnotation annotation = ExperimentUtils.getAlignedAnnotation(query, annotations.get(sentenceId));
                                 if(annotation == null) {
@@ -438,29 +440,63 @@ public class DependencyErrorAnalysis {
                                 return hitlParser.getConstraints(query, annotation).stream();
                             })
                         .collect(toImmutableSet());
-                        return hitlParser.getReparsed(sentenceId, annotationConstraints);
-                    }));
-        runFullAnalysis(parsesReparsedFromAnnotationSignal);
+                    return hitlParser.getReparsed(sentenceId, annotationConstraints);
+                }));
+    }
 
-        System.out.println("\n====== VERSION WITH ORACLE SIGNAL ======\n");
-
-        final ImmutableMap<Integer, Parse> parsesReparsedFromOracleSignal = annotations.entrySet().stream()
-            .collect(toImmutableMap(e -> e.getKey(), e -> {
-                        final int sentenceId = e.getKey();
-                        final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries = queriesForSentence.apply(sentenceId);
-                        final ImmutableSet<Constraint> goldConstraints = queries.stream()
+    private static ImmutableMap<Integer, Parse>
+        reparsedFromAnnotationSignalGold(HITLParser hitlParser,
+                                         Function<Integer, ImmutableList<ScoredQuery<QAStructureSurfaceForm>>> queriesForSentence,
+                                         ImmutableMap<Integer, List<AlignedAnnotation>> annotations) {
+        return annotations.entrySet().stream().collect(toImmutableMap(e -> e.getKey(), e -> {
+                    final int sentenceId = e.getKey();
+                    final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries = queriesForSentence.apply(sentenceId);
+                    final ImmutableSet<Constraint> annotationConstraints = queries.stream()
                         .flatMap(query -> {
                                 AlignedAnnotation annotation = ExperimentUtils.getAlignedAnnotation(query, annotations.get(sentenceId));
-                                if(annotation == null) { // we still want to skip if we didn't use the question
+                                if(annotation == null) {
                                     return Stream.of();
                                 }
                                 final ImmutableList<Integer> goldOptions = hitlParser.getGoldOptions(query);
                                 return hitlParser.getOracleConstraints(query, goldOptions).stream();
                             })
                         .collect(toImmutableSet());
-                        return hitlParser.getReparsed(sentenceId, goldConstraints);
+                    return hitlParser.getReparsed(sentenceId, annotationConstraints);
+                }));
+    }
+
+    private static ImmutableMap<Integer, Parse>
+        reparsedFromGoldQueryResponses(HITLParser hitlParser,
+                                       Function<Integer, ImmutableList<ScoredQuery<QAStructureSurfaceForm>>> queriesForSentence,
+                                       ImmutableMap<Integer, List<AlignedAnnotation>> annotations) {
+        return annotations.entrySet().stream().collect(toImmutableMap(e -> e.getKey(), e -> {
+                    final int sentenceId = e.getKey();
+                    final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries = queriesForSentence.apply(sentenceId);
+                    final ImmutableSet<Constraint> annotationConstraints = queries.stream()
+                        .flatMap(query -> {
+                                AlignedAnnotation annotation = ExperimentUtils.getAlignedAnnotation(query, annotations.get(sentenceId));
+                                final ImmutableList<Integer> goldOptions = hitlParser.getGoldOptions(query);
+                                return hitlParser.getOracleConstraints(query, goldOptions).stream();
+                            })
+                        .collect(toImmutableSet());
+                    return hitlParser.getReparsed(sentenceId, annotationConstraints);
+                }));
+    }
+
+    private static ImmutableMap<Integer, Parse>
+        reparsedWithGoldDepConstraints(HITLParser hitlParser,
+                                       ImmutableSet<Integer> targetSentenceIds,
+                                       DependencyProfiler dependencyProfiler,
+                                       Predicate<ProfiledDependency> isDepDesired) {
+        return targetSentenceIds.stream()
+            .collect(toImmutableMap(i -> i, sentenceId -> {
+                        final Parse goldParse = goldParses.get(sentenceId);
+                        final Stream<ProfiledDependency> chosenDeps = goldParse.dependencies.stream()
+                        .map(d -> dependencyProfiler.getProfiledDependency(sentenceId, d, 1.0))
+                        .filter(d -> isDepDesired.test(d));
+                        final Set<Constraint> constraints = OracleExperiment.getAttachmentConstraints(chosenDeps);
+                        return hitlParser.getReparsed(sentenceId, constraints);
                     }));
-        runFullAnalysis(parsesReparsedFromOracleSignal);
     }
 
     public static void main(String[] args) {
@@ -470,6 +506,7 @@ public class DependencyErrorAnalysis {
         final ImmutableMap<Integer, NBestList> originalOneBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 1).get();
         final ImmutableMap<Integer, Parse> parsesOriginal = originalOneBestLists.entrySet().stream()
             .collect(toImmutableMap(e -> e.getKey(), e -> e.getValue().getParse(0)));
+        System.out.println();
         System.out.println("=======================================================");
         System.out.println("=========== ORIGINAL ONE BEST: ALL DEV SET ============");
         System.out.println("=======================================================");
@@ -489,6 +526,8 @@ public class DependencyErrorAnalysis {
         final ImmutableMap<Integer, Parse> parsesOriginalForAnnotated = parsesOriginal.entrySet().stream()
             .filter(e -> annotations.containsKey(e.getKey()))
             .collect(toImmutableMap(e -> e.getKey(), e -> e.getValue()));
+
+        System.out.println();
         System.out.println("=======================================================");
         System.out.println("==== ORIGINAL ONE BEST: SENTENCES WITH ANNOTATIONS ====");
         System.out.println("=======================================================");
@@ -498,14 +537,72 @@ public class DependencyErrorAnalysis {
             .map(e -> e.getKey())
             .collect(toImmutableSet());
 
+        System.out.println();
         System.out.println("=======================================================");
         System.out.println("== REPARSED ONE BEST: CORE ARG AND CLEFTED QUESTIONS ==");
         System.out.println("=======================================================");
-        runFullAnalysisForQueries(hitlParser,
-                                  sentenceId -> new ImmutableList.Builder<ScoredQuery<QAStructureSurfaceForm>>()
-                                  .addAll(hitlParser.getPronounCoreArgQueriesForSentence(sentenceId))
-                                  .addAll(hitlParser.getCleftedQuestionsForSentence(sentenceId))
-                                  .build(),
-                                  annotations);
+        runFullAnalysis(reparsedFromAnnotationSignal(hitlParser,
+                                                     sentenceId -> new ImmutableList.Builder<ScoredQuery<QAStructureSurfaceForm>>()
+                                                     .addAll(hitlParser.getPronounCoreArgQueriesForSentence(sentenceId))
+                                                     .addAll(hitlParser.getCleftedQuestionsForSentence(sentenceId))
+                                                     .build(),
+                                                     annotations));
+
+        System.out.println();
+        System.out.println("=======================================================");
+        System.out.println("== REPARSED: CORE ARG/CLEFTED W/GOLD SIGNAL ON ANNO. ==");
+        System.out.println("=======================================================");
+        runFullAnalysis(reparsedFromAnnotationSignalGold(hitlParser,
+                                                         sentenceId -> new ImmutableList.Builder<ScoredQuery<QAStructureSurfaceForm>>()
+                                                         .addAll(hitlParser.getPronounCoreArgQueriesForSentence(sentenceId))
+                                                         .addAll(hitlParser.getCleftedQuestionsForSentence(sentenceId))
+                                                         .build(),
+                                                         annotations));
+
+        System.out.println();
+        System.out.println("=======================================================");
+        System.out.println("=== REPARSED: CORE ARG/CLEFTED W/GOLD SIGNAL ALL Q's ==");
+        System.out.println("=======================================================");
+        runFullAnalysis(reparsedFromGoldQueryResponses(hitlParser,
+                                                       sentenceId -> new ImmutableList.Builder<ScoredQuery<QAStructureSurfaceForm>>()
+                                                       .addAll(hitlParser.getPronounCoreArgQueriesForSentence(sentenceId))
+                                                       .addAll(hitlParser.getCleftedQuestionsForSentence(sentenceId))
+                                                       .build(),
+                                                       annotations));
+
+        final DependencyProfiler dependencyProfiler =
+            new DependencyProfiler(hitlParser.getParseData(),
+                                   hitlParser.getAllSentenceIds().stream()
+                                   .collect(toMap(Function.identity(), hitlParser::getNBestList)));
+
+        System.out.println();
+        System.out.println("=======================================================");
+        System.out.println("== REPARSED ONE BEST: ALL GOLD CORE ARG CONSTRAINTS ===");
+        System.out.println("=======================================================");
+        runFullAnalysis(reparsedWithGoldDepConstraints(hitlParser,
+                                                       annotatedSentenceIds,
+                                                       dependencyProfiler,
+                                                       d -> dependencyProfiler.dependencyIsCore(d.dependency, false)));
+
+
+        System.out.println();
+        System.out.println("=======================================================");
+        System.out.println("=== REPARSED ONE BEST: ALL GOLD ADJUNCT CONSTRAINTS ===");
+        System.out.println("=======================================================");
+        runFullAnalysis(reparsedWithGoldDepConstraints(hitlParser,
+                                                       annotatedSentenceIds,
+                                                       dependencyProfiler,
+                                                       d -> !dependencyProfiler.dependencyIsCore(d.dependency, false) &&
+                                                       dependencyProfiler.dependencyIsAdjunct(d.dependency, false)));
+
+        System.out.println();
+        System.out.println("=======================================================");
+        System.out.println("== REPARSED ONE BEST: GOLD CORE & ADJUNCT CONSTRAINTS =");
+        System.out.println("=======================================================");
+        runFullAnalysis(reparsedWithGoldDepConstraints(hitlParser,
+                                                       annotatedSentenceIds,
+                                                       dependencyProfiler,
+                                                       d -> dependencyProfiler.dependencyIsCore(d.dependency, false) ||
+                                                       dependencyProfiler.dependencyIsAdjunct(d.dependency, false)));
     }
 }
