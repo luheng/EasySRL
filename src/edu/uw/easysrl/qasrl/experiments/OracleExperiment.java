@@ -33,7 +33,7 @@ import java.util.stream.Stream;
 public class OracleExperiment {
     // Parameters.
     private static int nBest = 100;
-    private static int maxNumSentences = 1000;
+    private static int maxNumSentences = 2000;
 
     // Shared data: nBestList, sentences, etc.
     private static HITLParser myHITLParser;
@@ -51,12 +51,12 @@ public class OracleExperiment {
     private static HITLParsingParameters reparsingParameters;
     static {
         reparsingParameters = new HITLParsingParameters();
-        reparsingParameters.oraclePenaltyWeight = 10;// Integer.MAX_VALUE;
+        reparsingParameters.oraclePenaltyWeight = 100;// Integer.MAX_VALUE;
         reparsingParameters.skipPronounEvidence = false;
         reparsingParameters.skipJeopardyQuestions = false;
     }
 
-    private static ImmutableList<Integer> skipSentenceIds = ImmutableList.of(449, 604, 662, 705);
+    private static ImmutableList<Integer> skipSentenceIds = ImmutableList.of(449, 604, 662, 705, 1523, 1730);
 
     private static Set<Constraint> getAttachmentConstraints(final Stream <ProfiledDependency> dependencyStream) {
         return dependencyStream
@@ -99,7 +99,7 @@ public class OracleExperiment {
 
                     final ImmutableSet<ProfiledDependency> confidentDeps = allDeps.stream()
                             .filter(d -> d.score > 0.99)
-                            .filter(d -> !dependencyProfiler.dependencyIsCore(d.dependency, false))
+                            //.filter(d -> !dependencyProfiler.dependencyIsCore(d.dependency, false))
                             .collect(GuavaCollectors.toImmutableSet());
 
                     final ImmutableSet<ProfiledDependency> wrongDeps = goldDeps.stream()
@@ -107,6 +107,8 @@ public class OracleExperiment {
                                     .anyMatch(d2 -> d.dependency.getHead() == d2.dependency.getHead() &&
                                                     d.dependency.getArgument() == d2.dependency.getArgument()))
                             .collect(GuavaCollectors.toImmutableSet());
+
+                    final Parse oneBest = myHITLParser.getNBestList(sentenceId).getParse(0);
 
                     final ImmutableSet<ProfiledDependency> coreDeps = goldDeps.stream()
                             .filter(d -> dependencyProfiler.dependencyIsCore(d.dependency, false))
@@ -120,8 +122,8 @@ public class OracleExperiment {
                     final ImmutableSet<ProfiledDependency> adjunctDeps = goldDeps.stream()
                             .filter(d -> !dependencyProfiler.dependencyIsCore(d.dependency, true))
                             .filter(d -> dependencyProfiler.dependencyIsAdjunct(d.dependency, false))
-                            .filter(d -> !(d.dependency.getCategory() == Category.valueOf("(NP\\NP)/NP") &&
-                                            sentence.get(d.dependency.getHead()).equalsIgnoreCase("of")))
+                            //.filter(d -> !(d.dependency.getCategory() == Category.valueOf("(NP\\NP)/NP") &&
+                            //                sentence.get(d.dependency.getHead()).equalsIgnoreCase("of")))
                             .collect(GuavaCollectors.toImmutableSet());
 
                     final ImmutableSet<ProfiledDependency> clausalDeps = goldDeps.stream()
@@ -136,13 +138,12 @@ public class OracleExperiment {
                     // TODO: check constraint violation.
 
                     final Set<Constraint> constraints = getAttachmentConstraints(Stream.concat(
-                            //coreDeps.stream(),
+                            coreDeps.stream(),
                             //goldDeps.stream(),
-                            wrongDeps.stream(),
-                            //uncoveredCoreDeps.stream()
+                            // uncoveredCoreDeps.stream() //, clausalDeps.stream())
+                            //wrongDeps.stream(),
                             Stream.empty()
                             //adjunctDeps.stream()
-                            //clausalDeps.stream()
                             //confidentDeps.stream()
                             //adjunctDeps.stream().filter(d -> d.dependency.getCategory() == Category.valueOf("(NP\\NP)/NP"))
                     ));
@@ -152,6 +153,7 @@ public class OracleExperiment {
 
                     //constraints.forEach(c -> System.out.println(c.toString(sentence)));
                     final Parse reparsed = myHITLParser.getReparsed(sentenceId,  constraints);
+                            //myHITLParser.getNBestList(sentenceId).getParse(myHITLParser.getRerankedParseId(sentenceId, constraints));
                     final Results baselineF1 = myHITLParser.getNBestList(sentenceId).getResults(0);
                     final Results oracleF1 = CcgEvaluation.evaluate(reparsed.dependencies, gold.dependencies);
                     final Results unlabeledBaselineF1 = CcgEvaluation.evaluateUnlabeled(
@@ -159,12 +161,27 @@ public class OracleExperiment {
                     final Results unlabeledOracleF1 = CcgEvaluation.evaluateUnlabeled(reparsed.dependencies,
                             gold.dependencies);
 
-                    if (oracleF1.getF1() < 0.9) {
-                        System.out.println(sentenceId + "\t" + TextGenerationHelper.renderString(sentence));
-                        wrongDeps.forEach(d -> System.out.println(d.toString(sentence)));
+                    final ImmutableSet<ProfiledDependency> uncoveredWrongDeps = goldDeps.stream()
+                         //   .filter(d -> !dependencyProfiler.dependencyIsCore(d.dependency, true))
+                            .filter(d -> !dependencyProfiler.dependencyIsAdjunct(d.dependency, false))
+                            .filter(d -> !ImmutableSet.of(
+                                    Category.valueOf("NP[nb]/N"), // the, a
+                                    Category.valueOf("(NP[nb]/N)\\NP"), // 's
+                                    Category.valueOf("N/N"),
+                                    Category.valueOf("S/S")
+                            ).contains(d.dependency.getCategory()))
+                            .filter(d -> !reparsed.dependencies.stream()
+                                    .anyMatch(d2 -> d.dependency.getHead() == d2.getHead() &&
+                                            d.dependency.getArgument() == d2.getArgument()))
+                            .collect(GuavaCollectors.toImmutableSet());
 
-                        System.out.println(baselineF1);
-                        System.out.println(oracleF1);
+                    if (uncoveredWrongDeps.size() > 0) {
+                    //if (oracleF1.getF1() < 0.9) {
+                        System.out.println(sentenceId + "\t" + TextGenerationHelper.renderString(sentence));
+                        uncoveredWrongDeps.forEach(d -> System.out.println(d.toString(sentence)));
+
+                        //System.out.println(baselineF1);
+                        //System.out.println(oracleF1);
                         System.out.println(unlabeledBaselineF1);
                         System.out.println(unlabeledOracleF1);
                         System.out.println();
@@ -176,7 +193,6 @@ public class OracleExperiment {
                     avgUnlabeledOracle.add(unlabeledOracleF1);
                     numConstraints.addAndGet(constraints.size());
                     sentenceCounter.addAndGet(1);
-
 
                     /*
                     System.out.println(TextGenerationHelper.renderString(sentence));

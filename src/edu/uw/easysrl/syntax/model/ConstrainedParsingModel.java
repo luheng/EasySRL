@@ -67,38 +67,6 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                 .filter(c -> !mustSupertags.contains(c.getPredId(), c.getCategory()))
                 .forEach(c -> cannotSupertags.put(c.getPredId(), c.getCategory(), c.getStrength()));
 
-        /*
-        constraints.stream()
-                .filter(Constraint.AttachmentConstraint.class::isInstance)
-                .map(c -> (Constraint.AttachmentConstraint) c)
-                .forEach(constraint -> {
-                    final int headId = constraint.getHeadId();
-                    final int argId = constraint.getArgId();
-                    final double penalty = constraint.getStrength();
-                    if (constraint.isPositive()) {
-                        mustLinks.put(headId, argId, mustLinks.contains(headId, argId) ?
-                                Math.max(mustLinks.get(headId, argId), penalty) : penalty);
-                    } else {
-                        cannotLinks.put(headId, argId, cannotLinks.contains(headId, argId) ?
-                                Math.max(cannotLinks.get(headId, argId), penalty) : penalty);
-                    }
-                });
-        constraints.stream()
-                .filter(Constraint.SupertagConstraint.class::isInstance)
-                .map(c -> (Constraint.SupertagConstraint) c)
-                .forEach(constraint -> {
-                    final int headId = constraint.getPredId();
-                    final Category category = constraint.getCategory();
-                    final double penalty = constraint.getStrength();
-                    if (constraint.isPositive()) {
-                        mustSupertags.put(headId, category, mustLinks.contains(headId, category) ?
-                                Math.max(mustLinks.get(headId, category), penalty) : penalty);
-                    } else {
-                        cannotSupertags.put(headId, category, cannotLinks.contains(headId, category) ?
-                                Math.max(cannotLinks.get(headId, category), penalty) : penalty);
-                    }
-                });
-         */
         //TODO: Normalize supertag and attachment evidence.
         /*
         mustLinks.rowKeySet().stream().forEach(head -> {

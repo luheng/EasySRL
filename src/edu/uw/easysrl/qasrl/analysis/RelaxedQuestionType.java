@@ -13,7 +13,9 @@ public enum RelaxedQuestionType {
             ,Category.valueOf("(S\\NP)/PP")
             ,Category.valueOf("((S\\NP)/PP)/NP")
             ,Category.valueOf("(S\\NP)/(PP/NP)") // e.g., an action was called for
+            ,Category.valueOf("((S\\NP)/NP)/PP")
             ,Category.valueOf("((S\\NP)/NP)/PR")
+            ,Category.valueOf("((S\\NP)/PP)/PR")
             ,Category.valueOf("((S\\NP)/PP)/PR")
             // T1 said (that) T2
             ,Category.valueOf("(S[dcl]\\NP)/S")
