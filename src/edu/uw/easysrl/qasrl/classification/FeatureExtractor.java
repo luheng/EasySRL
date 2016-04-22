@@ -5,11 +5,9 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.AtomicDouble;
 import edu.uw.easysrl.qasrl.NBestList;
 import edu.uw.easysrl.qasrl.Parse;
-import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
 import edu.uw.easysrl.qasrl.corpora.CountDictionary;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.util.PronounList;
-import edu.uw.easysrl.qasrl.query.Query;
 import edu.uw.easysrl.qasrl.query.QueryType;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 
@@ -53,13 +51,13 @@ public class FeatureExtractor {
                                              final ImmutableList<String> sentence,
                                              final Parse gold,
                                              final NBestList nBestList) {
-        Map<Integer, Object> features = new HashMap<>();
+        Map<Integer, Double> features = new HashMap<>();
 
         final String argWord = sentence.get(argId);
         final int naOptionId = query.getBadQuestionOptionId().getAsInt();
 
-        addFeature(features, "ArgIsPronoun", PronounList.englishPronounSet.contains(argWord.toLowerCase()));
-        addFeature(features, "CleftingQuestion", query.getQueryType() == QueryType.Clefted);
+        addFeature(features, "ArgIsPronoun", PronounList.englishPronounSet.contains(argWord.toLowerCase()) ? 1 : 0);
+        addFeature(features, "CleftingQuestion", query.getQueryType() == QueryType.Clefted ? 1 : 0);
 
         //addFeature(features, "PrecedingComma", );
 
@@ -91,7 +89,7 @@ public class FeatureExtractor {
                         .anyMatch(dep -> dep.getHead() == headId && dep.getArgument() == argId));
     }
 
-    private boolean addFeature(final Map<Integer, Object> features, String featureName, Object featureValue) {
+    private boolean addFeature(final Map<Integer, Double> features, String featureName, double featureValue) {
         int featureId = featureMap.addString(featureName, acceptNewFeatures);
         if (featureId < 0) {
             return false;

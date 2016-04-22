@@ -18,8 +18,13 @@ import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.util.GuavaCollectors;
+import ml.dmlc.xgboost4j.java.Booster;
+import ml.dmlc.xgboost4j.java.DMatrix;
+import ml.dmlc.xgboost4j.java.XGBoost;
+import ml.dmlc.xgboost4j.java.XGBoostError;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -124,6 +129,31 @@ public class ClassificationExperiment {
                 .collect(GuavaCollectors.toImmutableList());
     }
 
+    private static DMatrix getDMatrix(ImmutableList<DependencyInstance> instances) throws XGBoostError {
+        final int numInstances = instances.size();
+        //float[] labels = new float[numInstances];
+        final long[] rowHeaders = new long[numInstances];
+        rowHeaders[0] = 0;
+        for (int i = 0; i < numInstances - 1; i++) {
+            rowHeaders[i + 1] = rowHeaders[i] + instances.get(i).features.size() + 1;
+        }
+        final int numValues = (int) rowHeaders[numInstances - 1] + instances.get(numInstances - 1).features.size();
+        final int[] colIndices = new int[numValues];
+        final float[] data = new float[numValues];
+        AtomicInteger ptr = new AtomicInteger(0);
+        for (int i = 0; i < numInstances; i++) {
+            final DependencyInstance instance = instances.get(i);
+            colIndices[ptr.get()] = 0;
+            data[ptr.getAndIncrement()] = instance.inGold ? 1 : 0;
+            instance.features.keySet().stream().sorted()
+                    .forEach(fid -> {
+                        colIndices[ptr.get()] = fid;
+                        data[ptr.getAndIncrement()] = instance.features.get(fid).floatValue();
+                    });
+        }
+        return new DMatrix(rowHeaders, colIndices, data, DMatrix.SparseType.CSR);
+    }
+
     private static void runExperiment() {
         List<Integer> sentenceIds = annotations.keySet().stream().sorted().collect(Collectors.toList());
         System.out.println(sentenceIds.stream().map(String::valueOf).collect(Collectors.joining(", ")));
@@ -137,11 +167,33 @@ public class ClassificationExperiment {
                 testSents = splitSents.get(2);
         System.out.println(trainSents.size() + "\t" + devSents.size() + "\t" + testSents.size());
 
-        ImmutableList<DependencyInstance> trainingInstances = getInstances(sentenceIds);
+        ImmutableList<DependencyInstance> trainingInstances = getInstances(trainSents);
         System.out.println(String.format("Extracted %d training samples and %d features.",
                 trainingInstances.size(), featureExtractor.featureMap.size()));
+        featureExtractor.freeze();
+
+        DMatrix trainData, devData;
+        try {
+            trainData = getDMatrix(trainingInstances);
+            devData = getDMatrix(getInstances(devSents));
+
+            final Map<String, Object> paramsMap = ImmutableMap.of(
+                    "eta", 0.1,
+                    "max_depth", 2,
+                    "objective", "binary:logistic"
+            );
+            final Map<String, DMatrix> watches = ImmutableMap.of(
+                    "train", trainData,
+                    "dev", devData
+            );
+            final int round = 2;
+            Booster booster = XGBoost.train(trainData, paramsMap, round, watches, null, null);
+        } catch (XGBoostError e) {
+            e.printStackTrace();
+        }
 
         // TODO: prepare samples.
 
     }
 }
+    

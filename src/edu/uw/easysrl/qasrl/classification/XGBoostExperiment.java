@@ -5,7 +5,6 @@ import ml.dmlc.xgboost4j.java.DMatrix;
 import ml.dmlc.xgboost4j.java.Booster;
 import ml.dmlc.xgboost4j.java.XGBoost;
 import ml.dmlc.xgboost4j.java.XGBoostError;
-import scala.tools.cmd.gen.AnyVals;
 
 import java.util.Map;
 
@@ -33,6 +32,8 @@ public class XGBoostExperiment {
         final int round = 2;
         Booster booster = XGBoost.train(trainData, paramsMap, round, watches, null, null);
 
+
+        //System.out.println(trainData.getLabel());
         float[][] predicts = booster.predict(testData);
         //float[][] leafPredicts = booster.predictLeaf(testData, 0, true);
     }

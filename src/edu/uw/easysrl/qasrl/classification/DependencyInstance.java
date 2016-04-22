@@ -14,9 +14,9 @@ import java.util.Map;
 public class DependencyInstance {
     final boolean inGold;
     final int sentenceId, headId, argId;
-    final ImmutableMap<Integer, Object> features;
+    final ImmutableMap<Integer, Double> features;
 
-    DependencyInstance(int sentenceId, int headId, int argId, boolean inGold, ImmutableMap<Integer, Object> features) {
+    DependencyInstance(int sentenceId, int headId, int argId, boolean inGold, ImmutableMap<Integer, Double> features) {
         this.sentenceId = sentenceId;
         this.headId = headId;
         this.argId = argId;
