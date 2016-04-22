@@ -137,7 +137,7 @@ public class ClassificationExperiment {
         for (int i = 0; i < numInstances - 1; i++) {
             rowHeaders[i + 1] = rowHeaders[i] + instances.get(i).features.size() + 1;
         }
-        final int numValues = (int) rowHeaders[numInstances - 1] + instances.get(numInstances - 1).features.size();
+        final int numValues = (int) rowHeaders[numInstances - 1] + instances.get(numInstances - 1).features.size() + 1;
         final int[] colIndices = new int[numValues];
         final float[] data = new float[numValues];
         AtomicInteger ptr = new AtomicInteger(0);
@@ -196,4 +196,3 @@ public class ClassificationExperiment {
 
     }
 }
-    
