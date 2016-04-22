@@ -131,27 +131,29 @@ public class ClassificationExperiment {
 
     private static DMatrix getDMatrix(ImmutableList<DependencyInstance> instances) throws XGBoostError {
         final int numInstances = instances.size();
-        //float[] labels = new float[numInstances];
+        final float[] labels = new float[numInstances];
         final long[] rowHeaders = new long[numInstances];
         rowHeaders[0] = 0;
         for (int i = 0; i < numInstances - 1; i++) {
-            rowHeaders[i + 1] = rowHeaders[i] + instances.get(i).features.size() + 1;
+            rowHeaders[i + 1] = rowHeaders[i] + instances.get(i).features.size();
         }
-        final int numValues = (int) rowHeaders[numInstances - 1] + instances.get(numInstances - 1).features.size() + 1;
+        final int numValues = (int) rowHeaders[numInstances - 1] + instances.get(numInstances - 1).features.size();
         final int[] colIndices = new int[numValues];
         final float[] data = new float[numValues];
         AtomicInteger ptr = new AtomicInteger(0);
         for (int i = 0; i < numInstances; i++) {
             final DependencyInstance instance = instances.get(i);
-            colIndices[ptr.get()] = 0;
-            data[ptr.getAndIncrement()] = instance.inGold ? 1 : 0;
+            labels[i] = instance.inGold ? 1 : 0;
             instance.features.keySet().stream().sorted()
                     .forEach(fid -> {
                         colIndices[ptr.get()] = fid;
                         data[ptr.getAndIncrement()] = instance.features.get(fid).floatValue();
                     });
         }
-        return new DMatrix(rowHeaders, colIndices, data, DMatrix.SparseType.CSR);
+
+        DMatrix dmat = new DMatrix(rowHeaders, colIndices, data, DMatrix.SparseType.CSR);
+        dmat.setLabel(labels);
+        return dmat;
     }
 
     private static void runExperiment() {
