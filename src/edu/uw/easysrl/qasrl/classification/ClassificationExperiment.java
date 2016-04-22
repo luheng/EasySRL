@@ -132,12 +132,12 @@ public class ClassificationExperiment {
     private static DMatrix getDMatrix(ImmutableList<DependencyInstance> instances) throws XGBoostError {
         final int numInstances = instances.size();
         final float[] labels = new float[numInstances];
-        final long[] rowHeaders = new long[numInstances];
+        final long[] rowHeaders = new long[numInstances + 1];
         rowHeaders[0] = 0;
-        for (int i = 0; i < numInstances - 1; i++) {
+        for (int i = 0; i < numInstances; i++) {
             rowHeaders[i + 1] = rowHeaders[i] + instances.get(i).features.size();
         }
-        final int numValues = (int) rowHeaders[numInstances - 1] + instances.get(numInstances - 1).features.size();
+        final int numValues = (int) rowHeaders[numInstances];
         final int[] colIndices = new int[numValues];
         final float[] data = new float[numValues];
         AtomicInteger ptr = new AtomicInteger(0);
