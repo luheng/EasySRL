@@ -3,6 +3,7 @@ package edu.uw.easysrl.qasrl.classification;
 import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.util.GuavaCollectors;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
