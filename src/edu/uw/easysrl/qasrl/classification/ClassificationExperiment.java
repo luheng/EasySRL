@@ -348,18 +348,16 @@ public class ClassificationExperiment {
         DMatrix testData = getDMatrix(testInstances);
         final Map<String, Object> paramsMap = ImmutableMap.of(
                 "eta", 0.1,
-                "max_depth", 10,
+                "max_depth", 5,
                 "objective", "binary:logistic"
         );
         final Map<String, DMatrix> watches = ImmutableMap.of(
                 "train", trainData,
-                "dev", devData,
-                "test", testData
+                "dev", devData
         );
         final int round = 10;
         Booster booster = XGBoost.train(trainData, paramsMap, round, watches, null, null);
-        reparse(booster, trainingInstances, trainData);
-        //reparse(booster, testInstances, testData);
+        reparse(booster, devInstances, devData);
 
         booster.saveModel("model.txt");
         //booster,("modelInfo.txt", "featureMap.txt", false)

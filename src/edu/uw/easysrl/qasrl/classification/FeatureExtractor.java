@@ -14,6 +14,7 @@ import edu.uw.easysrl.util.GuavaCollectors;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
@@ -54,7 +55,7 @@ public class FeatureExtractor {
         final String argWord = sentence.get(argId);
         final int naOptionId = query.getBadQuestionOptionId().getAsInt();
 
-        // Question Type
+        // Query Type
         addFeature(features, "QueryType=", query.getQueryType() == QueryType.Forward ? 1 : 2);
 
         // Dependency types.
@@ -62,13 +63,14 @@ public class FeatureExtractor {
                 .flatMap(qa -> qa.getQuestionStructures().stream())
                 .map(qstr -> String.format("%s.%d", qstr.category.getArgument(qstr.targetArgNum), qstr.targetArgNum))
                 .distinct()
-                .forEach(catArgNum -> addFeature(features, "ArgType", argTypeMap.addString(catArgNum)));
+                .forEach(catArgNum -> addFeature(features, "ArgType", argTypeMap.addString(catArgNum) + 1));
 
-        // Predicate argNum
-        query.getQAPairSurfaceForms().stream()
+        // Predicate type
+        /* query.getQAPairSurfaceForms().stream()
                 .flatMap(qa -> qa.getQuestionStructures().stream().map(q -> q.category.toString()))
                 .distinct()
-                .forEach(cat -> addFeature(features, "PredicateType", predicateTypeMap.addString(cat)));
+                .forEach(cat -> addFeature(features, "PredicateType", predicateTypeMap.addString(cat) + 1));
+                */
 
         // Dependency contain type
         addFeature(features, "DepContainedIn", DependencyInstanceHelper.getDependencyContainsType(query, headId, argId));
@@ -81,9 +83,9 @@ public class FeatureExtractor {
                                 (dep.getHead() == argId && dep.getArgument() == headId)))
                 .mapToDouble(p -> p.score)
                 .sum();
-        addFeature(features, "NBestScore", 10.0 * nBestScore / nBestScoreNorm);
+        addFeature(features, "NBestScore", nBestScore / nBestScoreNorm);
 
-        addFeature(features, "QueryConfidence", 10.0 * query.getPromptScore());
+        addFeature(features, "QueryConfidence", query.getPromptScore());
 
         // User votes.
         final int numQAOptions = query.getQAPairSurfaceForms().size();
@@ -94,17 +96,36 @@ public class FeatureExtractor {
                 .collect(GuavaCollectors.toImmutableList());
 
         addFeature(features, "ContainedByNumOptions", options.size());
+        int minVotes = options.stream()
+                .mapToInt(i -> (int) annotation.stream().filter(ops -> ops.contains(i)).count())
+                .min().orElse(0);
+        addFeature(features, "MinReceivedVotes", minVotes);
+
         int maxVotes = options.stream()
                 .mapToInt(i -> (int) annotation.stream().filter(ops -> ops.contains(i)).count())
-                .max().getAsInt();
+                .max().orElse(0);
         addFeature(features, "MaxReceivedVotes", maxVotes);
-        int superspanVotes = IntStream.range(0, numQAOptions)
+
+        int otherVotes = IntStream.range(0, numQAOptions)
+                .boxed()
+                .filter(i -> !options.contains(i))
+                .mapToInt(i -> (int) annotation.stream().filter(ops -> ops.contains(i)).count())
+                .max().orElse(0);
+        addFeature(features, "OtherReceivedVotes", otherVotes);
+
+        ImmutableList<Integer> superSpanOptions = IntStream.range(0, numQAOptions)
                 .boxed()
                 .filter(i -> options.stream().map(query.getOptions()::get)
                         .anyMatch(op -> query.getOptions().get(i).toLowerCase().contains(op.toLowerCase())))
+                .collect(GuavaCollectors.toImmutableList());
+        double superSpanScores = superSpanOptions.stream()
+                .mapToDouble(query.getOptionScores()::get)
+                .sum();
+        addFeature(features, "SuperSpanScores", superSpanScores);
+        int superSpanVotes = superSpanOptions.stream()
                 .mapToInt(i -> (int) annotation.stream().filter(ops -> ops.contains(i)).count())
-                .max().getAsInt();
-        addFeature(features, "SuperspanReceivedVotes", superspanVotes);
+                .max().orElse(0);
+        addFeature(features, "SuperSpanReceivedVotes", superSpanVotes);
 
         addFeature(features, "NAOptionReceivedVotes", (int) annotation.stream()
                 .filter(ops -> ops.contains(naOptionId)).count());
@@ -113,9 +134,18 @@ public class FeatureExtractor {
         if (PronounList.englishPronounSet.contains(argWord.toLowerCase())) {
             addFeature(features, "ArgIsPronoun", 1);
         }
-        if (query.getOptions().stream().anyMatch(op -> PronounList.englishPronounSet.contains(op.toLowerCase()))) {
-            addFeature(features, "OptionsContainPronoun", 1);
-        }
+        ImmutableList<Integer> pronounOptions = IntStream.range(0, numQAOptions)
+                .boxed()
+                .filter(i -> PronounList.englishPronounSet.contains(query.getOptions().get(i).toLowerCase()))
+                .collect(GuavaCollectors.toImmutableList());
+        double pronounScores = pronounOptions.stream()
+                .mapToDouble(query.getOptionScores()::get)
+                .sum();
+        addFeature(features, "PronounScores", pronounScores);
+        int pronounVotes = pronounOptions.stream()
+                .mapToInt(i -> (int) annotation.stream().filter(ops -> ops.contains(i)).count())
+                .max().orElse(0);
+        addFeature(features, "PronounVotes", pronounVotes);
 
         addFeature(features, "ArgRelativePosition", argId < headId ? 1 : (argId > headId ? 3 : 2));
 
