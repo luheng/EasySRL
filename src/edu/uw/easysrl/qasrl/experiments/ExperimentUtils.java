@@ -144,7 +144,7 @@ public class ExperimentUtils {
     }
 
     public static AlignedAnnotation getAlignedAnnotation(ScoredQuery<QAStructureSurfaceForm> query,
-                                                  List<AlignedAnnotation> annotations) {
+                                                         List<AlignedAnnotation> annotations) {
         AlignedAnnotation bestAligned = null;
         int maxNumOverlappingOptions = 1;
         for (AlignedAnnotation annotation : annotations) {

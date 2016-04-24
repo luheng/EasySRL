@@ -120,6 +120,7 @@ public class AnnotationUtils {
                         .filter(i -> i > -1)
                         .collect(GuavaCollectors.toImmutableList())
                 )
+                .filter(ops -> !ops.isEmpty())
                 .collect(GuavaCollectors.toImmutableList());
     }
 
