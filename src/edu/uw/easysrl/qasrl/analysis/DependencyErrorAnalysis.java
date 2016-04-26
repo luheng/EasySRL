@@ -605,10 +605,20 @@ public class DependencyErrorAnalysis {
                         "",
                         new StringBuilder()); // don't need to compare
 
+        final String[] coreArgAnnotationFiles = {
+            "./Crowdflower_data/f893900.csv"                 // Round3-pronouns: checkbox, core only, pronouns.
+        };
+        final String[] cleftedQuestionAnnotationFiles = {
+            "./Crowdflower_data/f897179.csv"                 // Round2-3: NP clefting questions.
+        };
         final String[] annotationFiles = {
             "./Crowdflower_data/f893900.csv",                // Round3-pronouns: checkbox, core only, pronouns.
             "./Crowdflower_data/f897179.csv"                 // Round2-3: NP clefting questions.
         };
+        final ImmutableMap<Integer, List<AlignedAnnotation>> coreArgAnnotations = ImmutableMap
+            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(coreArgAnnotationFiles));
+        final ImmutableMap<Integer, List<AlignedAnnotation>> cleftedQuestionAnnotations = ImmutableMap
+            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(cleftedQuestionAnnotationFiles));
         final ImmutableMap<Integer, List<AlignedAnnotation>> annotations = ImmutableMap
             .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(annotationFiles));
         assert annotations != null;
@@ -661,10 +671,10 @@ public class DependencyErrorAnalysis {
 
         int totalNumQueries = 0;
         int totalNumQueriesWithoutMatch = 0;
-        for(int sentenceId : annotations.keySet()) {
-            final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> allQueries = hitlParser.getPronounCoreArgQueriesForSentence(sentenceId);
+        for(int sentenceId : cleftedQuestionAnnotations.keySet()) {
+            final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> allQueries = hitlParser.getCleftedQuestionsForSentence(sentenceId);
             final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queriesWithoutMatch = allQueries.stream()
-                .filter(query -> ExperimentUtils.getAlignedAnnotation(query, annotations.get(sentenceId)) == null)
+                .filter(query -> ExperimentUtils.getAlignedAnnotation(query, cleftedQuestionAnnotations.get(sentenceId)) == null)
                 .collect(toImmutableList());
             totalNumQueries += allQueries.size();
             totalNumQueriesWithoutMatch += queriesWithoutMatch.size();
