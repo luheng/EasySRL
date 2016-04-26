@@ -664,7 +664,7 @@ public class DependencyErrorAnalysis {
         for(int sentenceId : annotations.keySet()) {
             final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> allQueries = hitlParser.getPronounCoreArgQueriesForSentence(sentenceId);
             final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queriesWithoutMatch = allQueries.stream()
-                .filter(query -> ExperimentUtils.getAlignedAnnotation(query, annotations.get(sentenceId)) != null)
+                .filter(query -> ExperimentUtils.getAlignedAnnotation(query, annotations.get(sentenceId)) == null)
                 .collect(toImmutableList());
             totalNumQueries += allQueries.size();
             totalNumQueriesWithoutMatch += queriesWithoutMatch.size();
