@@ -9,7 +9,6 @@ import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
 import edu.uw.easysrl.qasrl.qg.util.PronounList;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
-import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.HashMap;
@@ -52,8 +51,8 @@ public class FeatureExtractor {
         Map<Integer, Double> features = new HashMap<>();
 
         final String argWord = sentence.get(argId);
-        final int naOptionId = query.getBadQuestionOptionId().getAsInt();
-        final ImmutableList<QuestionStructure> questionStructures =   query.getQAPairSurfaceForms().stream()
+        //final int naOptionId = query.getBadQuestionOptionId().getAsInt();
+        final ImmutableList<QuestionStructure> questionStructures = query.getQAPairSurfaceForms().stream()
                 .flatMap(qa -> qa.getQuestionStructures().stream())
                 .distinct()
                 .collect(GuavaCollectors.toImmutableList());
@@ -62,10 +61,12 @@ public class FeatureExtractor {
         // addFeature(features, "QueryType=" + query.getQueryType(), 1);
 
         // Argument category.
+        /*
         questionStructures.stream()
                 .map(qstr -> qstr.category.getArgument(qstr.targetArgNum))
                 .distinct()
                 .forEach(argCat -> addFeature(features, "ArgumentCategory=" + argCat, 1));
+        */
 
         // Patient-agent
         questionStructures.stream()
@@ -83,12 +84,23 @@ public class FeatureExtractor {
         // addFeature(features, "DepContainedType=" + depQATApe, 1);
 
         // 1best score
+        /*
         final boolean oneBestContains = nBestList.getParse(0).dependencies.stream()
                 .anyMatch(dep -> (dep.getHead() == headId && dep.getArgument() == argId) ||
                                  (dep.getHead() == argId && dep.getArgument() == headId));
         if (oneBestContains) {
             addFeature(features, "1BestContains", 1);
         }
+        */
+
+        final int numAnnotators = annotation.size();
+        final int numQAOptions = query.getQAPairSurfaceForms().size();
+        final ImmutableList<Integer> options = IntStream.range(0, numQAOptions)
+                .boxed()
+                .filter(i -> DependencyInstanceHelper.containsDependency(query.getQAPairSurfaceForms().get(i),
+                        headId, argId))
+                .collect(GuavaCollectors.toImmutableList());
+
 
         // NBest score.
         /*
@@ -99,8 +111,11 @@ public class FeatureExtractor {
                                          (dep.getHead() == argId && dep.getArgument() == headId)))
                 .mapToDouble(p -> p.score)
                 .sum();
-        addFeature(features, "NBestScore", nBestScore / nBestScoreNorm);
-        */
+                */
+        final double nBestScore = options.stream()
+                .mapToDouble(i -> query.getOptionScores().get(i))
+                .sum() / query.getPromptScore();
+        addFeature(features, "NBestScore", nBestScore);
 
         final int firstEncounterInNBest = IntStream.range(0, nBestList.getN())
                 .filter(k -> nBestList.getParse(k).dependencies.stream()
@@ -110,14 +125,6 @@ public class FeatureExtractor {
         addFeature(features, "firstEncounterInNBest", 1.0 - firstEncounterInNBest / nBestList.getN());
 
         // User votes.
-        final int numAnnotators = annotation.size();
-        final int numQAOptions = query.getQAPairSurfaceForms().size();
-        final ImmutableList<Integer> options = IntStream.range(0, numQAOptions)
-                .boxed()
-                .filter(i -> DependencyInstanceHelper.containsDependency(query.getQAPairSurfaceForms().get(i),
-                        headId, argId))
-                .collect(GuavaCollectors.toImmutableList());
-
         int minVotes = options.stream()
                 .mapToInt(i -> (int) annotation.stream().filter(ops -> ops.contains(i)).count())
                 .min().orElse(0);

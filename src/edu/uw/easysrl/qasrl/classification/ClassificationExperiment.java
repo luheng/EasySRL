@@ -35,7 +35,7 @@ import java.util.stream.Stream;
  */
 public class ClassificationExperiment {
     private static final int nBest = 100;
-    private static final ImmutableList<Double> split = ImmutableList.of(0.7, 0.3, 0.0);
+    private static final ImmutableList<Double> split = ImmutableList.of(0.6, 0.4, 0.0);
     private static final int randomSeed = 12345;
     private static HITLParser myParser;
     private static ReparsingHistory myHistory;
@@ -54,7 +54,7 @@ public class ClassificationExperiment {
             "./Crowdflower_data/f882410.csv",                // Round2: radio-button, core only
             //  "./Crowdflower_data/all-checkbox-responses.csv", // Round3: checkbox, core + pp
             //  "./Crowdflower_data/f891522.csv",                // Round4: jeopardy checkbox, pp only
-            "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
+            // "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
             // "./Crowdflower_data/f897179.csv"                 // Round2-3: NP clefting questions.
     };
 
@@ -286,11 +286,11 @@ public class ClassificationExperiment {
             if (!heursticConstraints.containsKey(sentenceId)) {
                 heursticConstraints.put(sentenceId, new HashSet<>());
             }
-            if (pred[i][0] > 0.6) {
+            if (pred[i][0] > 0.5) {
                 constraints.get(sentenceId).add(
                         new Constraint.AttachmentConstraint(instance.headId, instance.argId, true, 5.0));
             }
-            if (pred[i][0] < 0.4) {
+            if (pred[i][0] < 0.5) {
                 constraints.get(sentenceId).add(
                         new Constraint.AttachmentConstraint(instance.headId, instance.argId, false, 5.0));
             }
