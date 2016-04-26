@@ -3,7 +3,6 @@ package edu.uw.easysrl.qasrl.classification;
 import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.util.GuavaCollectors;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
@@ -22,11 +21,12 @@ public class ClassificationUtils {
      * @param randomSeed
      * @return
      */
-    public static <O extends Object> List<List<O>> jackknife(final List<O> objectList, final List<Double> ratio,
-                                                             final int randomSeed) {
+    public static <O extends Object> ImmutableList<ImmutableList<O>> jackknife(final List<O> objectList,
+                                                                               final List<Double> ratio,
+                                                                               final int randomSeed) {
         final int totalNum = objectList.size();
         final List<Integer> shuffledIds = IntStream.range(0, totalNum).boxed().collect(Collectors.toList());
-        Collections.shuffle(shuffledIds,new Random(randomSeed));
+        Collections.shuffle(shuffledIds, new Random(randomSeed));
 
         assert ratio.stream().mapToDouble(r -> r).sum() <= 1.0;
 
@@ -40,7 +40,7 @@ public class ClassificationUtils {
                 .map(i -> shuffledIds.subList(splits.get(i), splits.get(i+1))
                         .stream()
                         .map(objectList::get)
-                        .collect(Collectors.toList()))
-                .collect(Collectors.toList());
+                        .collect(GuavaCollectors.toImmutableList()))
+                .collect(GuavaCollectors.toImmutableList());
     }
 }

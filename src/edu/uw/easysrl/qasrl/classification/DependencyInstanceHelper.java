@@ -12,10 +12,11 @@ public class DependencyInstanceHelper {
     static boolean containsDependency(QAStructureSurfaceForm qa, int headId, int argId) {
         for (QuestionStructure qstr : qa.getQuestionStructures()) {
             // Verb-PP argument (undirected).
+            /*
             if ((qstr.predicateIndex == headId && qstr.targetPrepositionIndex == argId) ||
                 (qstr.predicateIndex == argId && qstr.targetPrepositionIndex == headId)) {
                 return true;
-            }
+            }*/
             // Core/PP-NP dependencies.
             if ((qstr.predicateIndex == headId || qstr.targetPrepositionIndex == headId) &&
                     qa.getAnswerStructures().stream().anyMatch(astr -> astr.argumentIndices.contains(argId))) {
@@ -31,28 +32,28 @@ public class DependencyInstanceHelper {
         return false;
     }
 
-    static int getDependencyContainsType(ScoredQuery<QAStructureSurfaceForm> query, int headId, int argId) {
+    static String getDependencyContainsType(ScoredQuery<QAStructureSurfaceForm> query, int headId, int argId) {
         for (QAStructureSurfaceForm qa : query.getQAPairSurfaceForms()) {
             for (QuestionStructure qstr : qa.getQuestionStructures()) {
                 // Core/PP-NP dependencies.
                 if ((qstr.predicateIndex == headId || qstr.targetPrepositionIndex == headId) &&
                         qa.getAnswerStructures().stream().anyMatch(astr -> astr.argumentIndices.contains(argId))) {
-                    return 1; //"in_qa";
+                    return "in_qa";
                 }
                 // Verb-PP argument (undirected).
                 if ((qstr.predicateIndex == headId && qstr.targetPrepositionIndex == argId) ||
                         (qstr.predicateIndex == argId && qstr.targetPrepositionIndex == headId)) {
-                    return 2; // "pp_arg_in_question";
+                    return "pp_arg_in_question";
                 }
                 // NP adjunct dependencies.
                 if (qa.getAnswerStructures().stream()
                         .flatMap(astr -> astr.adjunctDependencies.stream())
                         .anyMatch(d -> d.getHead() == headId && d.getArgument() == argId)) {
-                    return 3; //"in_answer";
+                    return "in_answer";
                 }
             }
         }
-        return 0;
+        return "";
     }
 
 }
