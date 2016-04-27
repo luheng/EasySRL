@@ -39,6 +39,16 @@ public class CrowdFlowerDataUtils {
     public static final String cfRound1AnnotationFile =  "./Crowdflower_data/f878213.csv" ;
     public static final String cfRound2AnnotationFile =  "./Crowdflower_data/f882410.csv" ;
     public static final String cfRound3AnnotationFile =  "./Crowdflower_data/all-checkbox-responses.csv" ;
+    public static final String cfRound3PrnonounAnnotationFile = "./Crowdflower_data/f893900.csv";
+    public static final String cfRound3CleftingAnnotationFile = "./Crowdflower_data/f893900.csv";
+
+    public static final ImmutableList<String> allCfAnnotationFiles = ImmutableList.of(
+            cfRound1AnnotationFile,
+            cfRound2AnnotationFile,
+            cfRound3AnnotationFile,
+            cfRound3PrnonounAnnotationFile,
+            cfRound3CleftingAnnotationFile
+    );
 
     // Sentences that happened to appear in instructions ...
     public static final int[] otherHeldOutSentences = { 1695, };
@@ -89,6 +99,24 @@ public class CrowdFlowerDataUtils {
         return cfAnnotations.stream()
                 .map(annotation -> annotation.sentenceId).distinct().sorted()
                 .collect(GuavaCollectors.toImmutableList());
+    }
+
+    /**
+     * Sample unannotated sentence ids.
+     * @param numSentences
+     * @return
+     */
+    public static ImmutableList<Integer> getNewSentenceIds(int numSentences) {
+        List<AlignedAnnotation> cfAnnotations = new ArrayList<>();
+        //TODO
+        allCfAnnotationFiles.forEach(cfFile -> {
+            try {
+                cfAnnotations.addAll(CrowdFlowerDataReader.readAggregatedAnnotationFromFile(cfFile));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
+        return null;
     }
 
     public static void printQueryToCSVFile(final ScoredQuery<QAStructureSurfaceForm> query,

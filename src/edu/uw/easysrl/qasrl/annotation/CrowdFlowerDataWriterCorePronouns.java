@@ -33,7 +33,8 @@ public class CrowdFlowerDataWriterCorePronouns {
     private final static HITLParser hitlParser = new HITLParser(nBest);
     private final static ReparsingHistory history = new ReparsingHistory(hitlParser);
 
-    private static final String csvOutputFilePrefix = "./Crowdflower_unannotated/pronoun_core_r3_100best";
+    private static final String csvOutputFilePrefix = "./Crowdflower_temp/pronoun_core_r4_100best";
+    //"./Crowdflower_unannotated/pronoun_core_r3_100best";
 
     private static final String[] reviewedTestQuestionFiles = new String[] {
              "./Crowdflower_unannotated/test_questions/test_question_core_pronoun_r01.tsv",
@@ -167,7 +168,7 @@ public class CrowdFlowerDataWriterCorePronouns {
 
     public static void main(String[] args) throws IOException {
         //final ImmutableList<Integer> testSentenceIds = CrowdFlowerDataUtils.getTestSentenceIds();
-        printTestQuestions();
+        //printTestQuestions();
         printQuestionsToAnnotate();
     }
 }
