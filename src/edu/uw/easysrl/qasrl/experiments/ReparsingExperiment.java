@@ -19,6 +19,7 @@ import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.*;
+import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -39,7 +40,7 @@ public class ReparsingExperiment {
           //  "./Crowdflower_data/all-checkbox-responses.csv", // Round3: checkbox, core + pp
           //  "./Crowdflower_data/f891522.csv",                // Round4: jeopardy checkbox, pp only
             "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
-            "./Crowdflower_data/f897179.csv"                 // Round2-3: NP clefting questions.
+          //  "./Crowdflower_data/f897179.csv"                 // Round2-3: NP clefting questions.
     };
 
     private static QueryPruningParameters queryPruningParameters;
@@ -152,6 +153,12 @@ public class ReparsingExperiment {
                 if (query.isJeopardyStyle() && userOptions.contains(query.getBadQuestionOptionId().getAsInt())) {
                     continue;
                 }
+
+                ImmutableList<ImmutableList<Integer>> appositives = PatterDetector.getAppositives(query, sentence);
+                if (appositives.isEmpty()) {
+                    continue;
+                }
+
                 ImmutableSet<Constraint> constraints = myHTILParser.getConstraints(query, annotation),
                                          oracleConstraints = myHTILParser.getOracleConstraints(query, goldOptions);
                 /*if (constraintSet == null || constraintSet.isEmpty()) {
@@ -178,6 +185,9 @@ public class ReparsingExperiment {
                         '*', optionDist);
                 // Debugging.
                 // result += "-----\n" + annotation.toString() + "\n";
+                result += "-----\n" + appositives.stream()
+                        .map(ap -> ap.stream().map(query.getOptions()::get).collect(Collectors.joining("\t---\t")))
+                        .collect(Collectors.joining("\n")) + "\n";
 
                 // Evidence.
                 result += allConstraints.stream()

@@ -1,6 +1,7 @@
 package edu.uw.easysrl.qasrl.annotation;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableTable;
 import edu.uw.easysrl.qasrl.TextGenerationHelper;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
@@ -17,7 +18,9 @@ import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 import java.util.stream.Collectors;
 
 /**
@@ -106,9 +109,9 @@ public class CrowdFlowerDataUtils {
      * @param numSentences
      * @return
      */
-    public static ImmutableList<Integer> getNewSentenceIds(int numSentences) {
-        List<AlignedAnnotation> cfAnnotations = new ArrayList<>();
-        //TODO
+    public static ImmutableList<Integer> sampleNewSentenceIds(int numSentences, int randomSeed,
+                                                              final ImmutableList<Integer> excludeSentenceIds) {
+        final List<AlignedAnnotation> cfAnnotations = new ArrayList<>();
         allCfAnnotationFiles.forEach(cfFile -> {
             try {
                 cfAnnotations.addAll(CrowdFlowerDataReader.readAggregatedAnnotationFromFile(cfFile));
@@ -116,7 +119,16 @@ public class CrowdFlowerDataUtils {
                 e.printStackTrace();
             }
         });
-        return null;
+        System.out.println("Exclude sentences:\t" + excludeSentenceIds.size());
+        final List<Integer> sentIds = cfAnnotations.stream()
+                .map(annot -> annot.sentenceId)
+                .distinct().sorted()
+                .filter(id -> !excludeSentenceIds.contains(id))
+                .collect(Collectors.toList());
+        Collections.shuffle(sentIds, new Random(randomSeed));
+        return sentIds.stream().limit(numSentences)
+                .sorted()
+                .collect(GuavaCollectors.toImmutableList());
     }
 
     public static void printQueryToCSVFile(final ScoredQuery<QAStructureSurfaceForm> query,
