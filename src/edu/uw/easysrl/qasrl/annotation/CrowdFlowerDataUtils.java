@@ -1,6 +1,7 @@
 package edu.uw.easysrl.qasrl.annotation;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableTable;
 import edu.uw.easysrl.qasrl.TextGenerationHelper;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
@@ -104,13 +105,7 @@ public class CrowdFlowerDataUtils {
                 .collect(GuavaCollectors.toImmutableList());
     }
 
-    /**
-     * Sample unannotated sentence ids.
-     * @param numSentences
-     * @return
-     */
-    public static ImmutableList<Integer> sampleNewSentenceIds(int numSentences, int randomSeed,
-                                                              final ImmutableList<Integer> excludeSentenceIds) {
+    public static ImmutableList<Integer> getAllAnnotatedSentenceIds() {
         final List<AlignedAnnotation> cfAnnotations = new ArrayList<>();
         allCfAnnotationFiles.forEach(cfFile -> {
             try {
@@ -119,11 +114,24 @@ public class CrowdFlowerDataUtils {
                 e.printStackTrace();
             }
         });
-        System.out.println("Exclude sentences:\t" + excludeSentenceIds.size());
-        final List<Integer> sentIds = cfAnnotations.stream()
+        return cfAnnotations.stream()
                 .map(annot -> annot.sentenceId)
+                .distinct()
+                .collect(GuavaCollectors.toImmutableList());
+    }
+
+    /**
+     * Sample unannotated sentence ids.
+     * @param numSentences
+     * @return
+     */
+    public static ImmutableList<Integer> sampleNewSentenceIds(int numSentences, int randomSeed,
+                                                              final ImmutableList<Integer> allSentenceIds) {
+        final ImmutableList<Integer> annotatedSentenceIds = getAllAnnotatedSentenceIds();
+        System.out.println("Excluding sentences:\t" + annotatedSentenceIds.size());
+        final List<Integer> sentIds = allSentenceIds.stream()
                 .distinct().sorted()
-                .filter(id -> !excludeSentenceIds.contains(id))
+                .filter(id -> !annotatedSentenceIds.contains(id))
                 .collect(Collectors.toList());
         Collections.shuffle(sentIds, new Random(randomSeed));
         return sentIds.stream().limit(numSentences)
