@@ -121,7 +121,7 @@ public class ReparsingHistory {
         final Results rerankedF1 = getLast(rerankingResults.get(sentId));
         final Results oracleF1 = getLast(oracleResults.get(sentId));
         final Results currentF1  = reparsingResults.get(sentId).get(reparsingResults.get(sentId).size() - 2);
-        if (!(currentF1.getF1() > reparsedF1.getF1() + 1e-8)) return;
+        //if (!(currentF1.getF1() > reparsedF1.getF1() + 1e-8)) return;
         System.out.println(query.toString(words,
                 'G', hitlParser.getGoldOptions(query),
                 'O', hitlParser.getOracleOptions(query),

@@ -3,6 +3,7 @@ package edu.uw.easysrl.qasrl.annotation;
 import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.qasrl.experiments.ReparsingHistory;
 import edu.uw.easysrl.qasrl.model.HITLParser;
+import edu.uw.easysrl.qasrl.model.HITLParsingParameters;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
@@ -11,6 +12,7 @@ import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.*;
@@ -29,28 +31,36 @@ public class CrowdFlowerDataWriterCorePronouns {
 
     static final int nBest = 100;
     static final int maxNumQueriesPerFile = 100;
-    static final int numSentences = 400;
+    static final int numSentences = 500;
     static final int randomSeed = 12345;
 
     private final static HITLParser hitlParser = new HITLParser(nBest);
     private final static ReparsingHistory history = new ReparsingHistory(hitlParser);
 
-    private static final String csvOutputFilePrefix = "./Crowdflower_temp/pronoun_core_r4_100best";
+    private static final String csvOutputFilePrefix = "./Crowdflower_unannotated/pronoun_core_r4_100best";
     //"./Crowdflower_unannotated/pronoun_core_r3_100best";
+    private static final String sentenceIdsFile = "./Crowdflower_unannotated/pronoun_core_r4_100best.sent_ids.txt";
 
     private static final String[] reviewedTestQuestionFiles = new String[] {
-            "./Crowdflower_unannotated/test_questions/test_question_core_pronoun_r01.tsv",
+            "./Crowdflower_unannotated/test_questions/test_question_core_pronoun_r0123.tsv",
     };
 
     private static ImmutableList<Integer> testSentenceIds;
 
-    static QueryPruningParameters queryPruningParameters;
+    private static QueryPruningParameters queryPruningParameters;
     static {
         queryPruningParameters = new QueryPruningParameters();
         queryPruningParameters.skipSAdjQuestions = true;
         queryPruningParameters.minOptionConfidence = 0.05;
-        queryPruningParameters.minOptionEntropy = 0.1;
+        //queryPruningParameters.minOptionEntropy = 0.1;
         queryPruningParameters.minPromptConfidence = 0.1;
+    }
+
+    private static HITLParsingParameters reparsingParameters;
+    static {
+        reparsingParameters = new HITLParsingParameters();
+        reparsingParameters.attachmentPenaltyWeight = 10.0;
+        reparsingParameters.supertagPenaltyWeight = 10.0;
     }
 
     private static void printTestQuestions() throws IOException {
@@ -95,36 +105,6 @@ public class CrowdFlowerDataWriterCorePronouns {
                     e.printStackTrace();
                 }
             });
-            //    continue;
-            // }
-            /*
-            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries = hitlParser.getPronounCoreArgQueriesForSentence(sid);
-            queries.stream().forEach(query -> {
-                Optional<RecordedAnnotation> annotation = annotations.get(sid).stream()
-                        .filter(annot -> annot.queryPrompt.equals(query.getPrompt()))
-                        .findFirst();
-                if (annotation.isPresent()) {
-                    final ImmutableList<String> sentence = hitlParser.getSentence(sid);
-                    final ImmutableList<Integer> userOptions = annotation.get().userOptionIds;
-                    System.out.println(query.toString(sentence,
-                            'G', hitlParser.getGoldOptions(query),
-                            'U', userOptions));
-                    System.out.println("Reason:\t" + annotation.get().comment + "\n");
-                    try {
-                        CrowdFlowerDataUtils.printQueryToCSVFileNew(
-                                query,
-                                sentence,
-                                userOptions,
-                                10000 + lineCounter.getAndAdd(1),
-                                false, // highlight predicate
-                                annotation.get().comment,
-                                csvPrinter);
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-            });
-            */
         }
         csvPrinter.close();
         System.out.println(String.format("Wrote %d test questions to file %s.", lineCounter.get(), testQuestionsFile));
@@ -132,12 +112,23 @@ public class CrowdFlowerDataWriterCorePronouns {
 
     private static void printQuestionsToAnnotate() throws IOException {
         assert testSentenceIds != null;
+        final ImmutableList<Integer> allSentenceIds = hitlParser.getAllSentenceIds().stream()
+                .filter(id -> !testSentenceIds.contains(id))
+                .collect(GuavaCollectors.toImmutableList());
         final ImmutableList<Integer> sentenceIds = CrowdFlowerDataUtils
-                .sampleNewSentenceIds(numSentences, randomSeed, testSentenceIds);
+                .sampleNewSentenceIds(numSentences, randomSeed, allSentenceIds);
         AtomicInteger lineCounter = new AtomicInteger(0),
                 fileCounter = new AtomicInteger(0);
 
+        System.out.println("Num. sentences:\t" + sentenceIds.size());
+        BufferedWriter writer = new BufferedWriter(new FileWriter(new File(sentenceIdsFile)));
+        for (int id : sentenceIds) {
+            writer.write(id + "\n");
+        }
+        writer.close();
+
         hitlParser.setQueryPruningParameters(queryPruningParameters);
+        hitlParser.setReparsingParameters(reparsingParameters);
 
         CSVPrinter csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter(
                 String.format("%s_%03d.csv", csvOutputFilePrefix, fileCounter.getAndAdd(1)))),
