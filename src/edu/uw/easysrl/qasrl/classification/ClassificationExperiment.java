@@ -50,12 +50,13 @@ public class ClassificationExperiment {
     private static ImmutableList<DependencyInstance> trainingInstances, devInstances, testInstances;
 
     private static final String[] annotationFiles = {
-            "./Crowdflower_data/f878213.csv",                // Round1: radio-button, core + pp
-            "./Crowdflower_data/f882410.csv",                // Round2: radio-button, core only
+            //"./Crowdflower_data/f878213.csv",                // Round1: radio-button, core + pp
+            //"./Crowdflower_data/f882410.csv",                // Round2: radio-button, core only
             //  "./Crowdflower_data/all-checkbox-responses.csv", // Round3: checkbox, core + pp
             //  "./Crowdflower_data/f891522.csv",                // Round4: jeopardy checkbox, pp only
-            // "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
+             "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
             // "./Crowdflower_data/f897179.csv"                 // Round2-3: NP clefting questions.
+            "./Crowdflower_data/f902142.csv"                   // Round4: checkbox, pronouns, core only, 300 sentences.
     };
 
     private static QueryPruningParameters queryPruningParameters;
@@ -90,7 +91,9 @@ public class ClassificationExperiment {
         assert annotations != null;
 
         /**************** Prepare data ********************/
-        List<Integer> sentenceIds = annotations.keySet().stream().collect(Collectors.toList());
+        ImmutableList<Integer> sentenceIds = annotations.keySet().stream()
+                .sorted()
+                .collect(GuavaCollectors.toImmutableList());
         System.out.println(sentenceIds.stream().map(String::valueOf).collect(Collectors.joining(", ")));
         System.out.println("Queried " + sentenceIds.size() + " sentences. Total number of questions:\t" +
                 annotations.entrySet().stream().mapToInt(e -> e.getValue().size()).sum());
@@ -403,24 +406,31 @@ public class ClassificationExperiment {
         DMatrix devData = getDMatrix(devInstances);
         DMatrix testData = getDMatrix(testInstances);
         final Map<String, Object> paramsMap = ImmutableMap.of(
-                "eta", 0.3,
+                "eta", 0.1,
                 //"min_child_weight", 2,
-                "max_depth", 10,
+                "max_depth", 3,
                 "objective", "binary:logistic"
         );
         final Map<String, DMatrix> watches = ImmutableMap.of(
                 "train", trainData,
                 "dev", devData
         );
-        final int round = 10;
-        Booster booster = XGBoost.train(trainData, paramsMap, round, watches, null, null);
-        reparse(booster, devInstances, devData);
+        final int round = 100, nfold = 5;
+        //Booster booster = XGBoost.train(trainData, paramsMap, round, watches, null, null);
+
+        GridSearch.runGridSearch(trainData, nfold);
+
+        //String[] cv = XGBoost.crossValidation(trainData, paramsMap, round, nfold, null, null, null);
+        //System.out.println(ImmutableList.copyOf(cv).stream().collect(Collectors.joining("\n")));
+        //reparse(booster, devInstances, devData);
         //reparse(booster, testInstances, testData);
 
+        /*
         booster.saveModel("model.txt");
         //booster,("modelInfo.txt", "featureMap.txt", false)
         System.out.println(booster.getFeatureScore("").entrySet().stream()
                     .map(e -> String.format("%s:\t%d", e.getKey(), e.getValue()))
                     .collect(Collectors.joining("\n")));
+            */
     }
 }
