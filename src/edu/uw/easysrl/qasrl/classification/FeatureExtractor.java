@@ -51,7 +51,7 @@ public class FeatureExtractor {
         Map<Integer, Double> features = new HashMap<>();
 
         final String argWord = sentence.get(argId);
-        //final int naOptionId = query.getBadQuestionOptionId().getAsInt();
+        final int naOptionId = query.getBadQuestionOptionId().getAsInt();
         final ImmutableList<QuestionStructure> questionStructures = query.getQAPairSurfaceForms().stream()
                 .flatMap(qa -> qa.getQuestionStructures().stream())
                 .distinct()
@@ -61,12 +61,10 @@ public class FeatureExtractor {
         // addFeature(features, "QueryType=" + query.getQueryType(), 1);
 
         // Argument category.
-        /*
         questionStructures.stream()
                 .map(qstr -> qstr.category.getArgument(qstr.targetArgNum))
                 .distinct()
                 .forEach(argCat -> addFeature(features, "ArgumentCategory=" + argCat, 1));
-        */
 
         // Patient-agent
         questionStructures.stream()
@@ -84,14 +82,12 @@ public class FeatureExtractor {
         // addFeature(features, "DepContainedType=" + depQATApe, 1);
 
         // 1best score
-        /*
         final boolean oneBestContains = nBestList.getParse(0).dependencies.stream()
                 .anyMatch(dep -> (dep.getHead() == headId && dep.getArgument() == argId) ||
                                  (dep.getHead() == argId && dep.getArgument() == headId));
         if (oneBestContains) {
             addFeature(features, "1BestContains", 1);
         }
-        */
 
         final int numAnnotators = annotation.size();
         final int numQAOptions = query.getQAPairSurfaceForms().size();
@@ -171,10 +167,10 @@ public class FeatureExtractor {
                 .mapToInt(i -> (int) annotation.stream().filter(ops -> ops.contains(i)).count())
                 .max().orElse(0));
 
-        /*
+
         addFeature(features, "QueryConfidence", query.getPromptScore());
         addFeature(features, "NAOptionReceivedVotes", 1.0 * annotation.stream()
-                .filter(ops -> ops.contains(naOptionId)).count() / numAnnotators);*/
+                .filter(ops -> ops.contains(naOptionId)).count() / numAnnotators);
 
         // Pronoun stuff.
         if (PronounList.englishPronounSet.contains(argWord.toLowerCase())) {
@@ -218,7 +214,7 @@ public class FeatureExtractor {
             }
         }
 
-        //addFeature(features, argId < headId ? "ArgOnLeft" : "ArgOnRight", 1);
+        addFeature(features, argId < headId ? "ArgOnLeft" : "ArgOnRight", 1);
 
         return ImmutableMap.copyOf(features);
     }

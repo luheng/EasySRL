@@ -196,9 +196,10 @@ public class ClassificationExperiment {
                                 final int numNAVotes = (int) annotation.stream()
                                         .filter(ops -> ops.contains(naOptionId))
                                         .count();
+                                /*
                                 if (numNAVotes > 2) {
                                     return Stream.empty();
-                                }
+                                }*/
                                 return getAllAttachments(sentence, query).stream().map(attachment -> {
                                     final int headId = attachment[0];
                                     final int argId = attachment[1];
@@ -291,11 +292,11 @@ public class ClassificationExperiment {
             }
             if (pred[i][0] > 0.5) {
                 constraints.get(sentenceId).add(
-                        new Constraint.AttachmentConstraint(instance.headId, instance.argId, true, 5.0));
+                        new Constraint.AttachmentConstraint(instance.headId, instance.argId, true, 1.0));
             }
             if (pred[i][0] < 0.5) {
                 constraints.get(sentenceId).add(
-                        new Constraint.AttachmentConstraint(instance.headId, instance.argId, false, 5.0));
+                        new Constraint.AttachmentConstraint(instance.headId, instance.argId, false, 1.0));
             }
             IntStream.range(0, alignedQueries.get(sentenceId).size()).boxed()
                     .forEach(qid -> heursticConstraints.get(sentenceId).addAll(
@@ -406,22 +407,20 @@ public class ClassificationExperiment {
         DMatrix devData = getDMatrix(devInstances);
         DMatrix testData = getDMatrix(testInstances);
         final Map<String, Object> paramsMap = ImmutableMap.of(
-                "eta", 0.1,
-                //"min_child_weight", 2,
-                "max_depth", 3,
+                "eta", 0.3,
+                "min_child_weight", 5.0,
+                "max_depth", 15,
                 "objective", "binary:logistic"
         );
         final Map<String, DMatrix> watches = ImmutableMap.of(
                 "train", trainData,
                 "dev", devData
         );
-        final int round = 100, nfold = 5;
-        //Booster booster = XGBoost.train(trainData, paramsMap, round, watches, null, null);
+        final int round = 50, nfold = 5;
+        Booster booster = XGBoost.train(trainData, paramsMap, round, watches, null, null);
 
         GridSearch.runGridSearch(trainData, nfold);
 
-        //String[] cv = XGBoost.crossValidation(trainData, paramsMap, round, nfold, null, null, null);
-        //System.out.println(ImmutableList.copyOf(cv).stream().collect(Collectors.joining("\n")));
         //reparse(booster, devInstances, devData);
         //reparse(booster, testInstances, testData);
 

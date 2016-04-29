@@ -16,9 +16,9 @@ import java.util.stream.Collectors;
  */
 public class GridSearch {
 
-    final static ImmutableList<Double> etaValues = ImmutableList.of(0.05, 0.1, 0.2);
-    final static ImmutableList<Integer> treeDepthValues = ImmutableList.of(3, 4, 5, 7, 10);
-    final static ImmutableList<Double> minChildWeightValues = ImmutableList.of(1.0, 1.5, 2.0);
+    final static ImmutableList<Double> etaValues = ImmutableList.of(0.01, 0.05, 0.1, 0.2, 0.3);
+    final static ImmutableList<Integer> treeDepthValues = ImmutableList.of(3, 4, 5, 7, 10, 12, 15, 20);
+    final static ImmutableList<Double> minChildWeightValues = ImmutableList.of(0.1, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0);
     final static int numRounds = 50;
 
     public static void runGridSearch(final DMatrix trainData, final int numFolds) {
