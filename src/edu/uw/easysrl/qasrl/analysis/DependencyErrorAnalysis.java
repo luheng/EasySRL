@@ -5,13 +5,16 @@ import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.NBestList;
 
 import edu.uw.easysrl.dependencies.ResolvedDependency;
+import edu.uw.easysrl.qasrl.TextGenerationHelper;
 import edu.uw.easysrl.qasrl.analysis.DependencyProfiler;
 import edu.uw.easysrl.qasrl.analysis.ProfiledDependency;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
+import edu.uw.easysrl.qasrl.annotation.AnnotationUtils;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
 import edu.uw.easysrl.qasrl.experiments.ReparsingExperiment;
 import edu.uw.easysrl.qasrl.experiments.OracleExperiment;
 import edu.uw.easysrl.qasrl.model.Constraint;
+import static edu.uw.easysrl.qasrl.model.Constraint.AttachmentConstraint;
 import edu.uw.easysrl.qasrl.model.HITLParser;
 import edu.uw.easysrl.qasrl.model.HITLParsingParameters;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
@@ -26,9 +29,11 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Table;
+import com.google.common.collect.Sets;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.Optional;
 import java.util.function.BiFunction;
@@ -375,6 +380,47 @@ public class DependencyErrorAnalysis {
 
     private static final ParseData parseData = ParseData.loadFromDevPool().get();
     private static final ImmutableList<Parse> goldParses = parseData.getGoldParses();
+    private static final String[] coreArgAnnotationFiles = {
+        "./Crowdflower_data/f893900.csv"                 // Round3-pronouns: checkbox, core only, pronouns.
+    };
+    private static final String[] cleftedQuestionAnnotationFiles = {
+        "./Crowdflower_data/f897179.csv"                 // Round2-3: NP clefting questions.
+    };
+    private static final String[] round2To3AnnotationFiles = {
+        "./Crowdflower_data/f893900.csv",                // Round3-pronouns: checkbox, core only, pronouns.
+        "./Crowdflower_data/f897179.csv"                 // Round2-3: NP clefting questions.
+    };
+    private static final String[] round4AnnotationFiles = {
+        "./Crowdflower_data/f902142.csv"
+    };
+    private static final QueryPruningParameters queryPruningParameters = new QueryPruningParameters();
+    static {
+        queryPruningParameters.skipPPQuestions = false;
+        queryPruningParameters.skipSAdjQuestions = true;
+    }
+
+    private static final QueryPruningParameters noFilterQueryPruningParameters = new QueryPruningParameters();
+    static {
+        noFilterQueryPruningParameters.minPromptConfidence = 0.0;
+        noFilterQueryPruningParameters.minOptionConfidence = 0.0;
+        noFilterQueryPruningParameters.minOptionEntropy = 0.0;
+        noFilterQueryPruningParameters.maxNumOptionsPerQuery = 50;
+        noFilterQueryPruningParameters.skipBinaryQueries = false;
+        noFilterQueryPruningParameters.skipSAdjQuestions = false;
+        noFilterQueryPruningParameters.skipPPQuestions = false;
+        noFilterQueryPruningParameters.skipQueriesWithPronounOptions = false;
+    }
+
+    private static final HITLParsingParameters reparsingParameters = new HITLParsingParameters();
+    static {
+        reparsingParameters.jeopardyQuestionMinAgreement = 1;
+        reparsingParameters.positiveConstraintMinAgreement = 5;
+        reparsingParameters.negativeConstraintMaxAgreement = 1;
+        reparsingParameters.skipPronounEvidence = false;
+        reparsingParameters.jeopardyQuestionWeight = 1.0;
+        reparsingParameters.attachmentPenaltyWeight = 1.0;
+        reparsingParameters.supertagPenaltyWeight = 1.0;
+    }
 
     private static void runSupertagAnalysis(ImmutableMap<Integer, Parse> parses) {
         final MistakeLogger<SupertagMistake> supertagMistakes =
@@ -502,6 +548,556 @@ public class DependencyErrorAnalysis {
         logDependencyMistakes(mysteriousMistakes, csvStringBuilder, fullRunLabel, "non core NP arg or pp attachment scoring", Optional.of(depMistakes));
     }
 
+    private static void runQueryMatchingAnalysis() {
+        final ImmutableMap<Integer, List<AlignedAnnotation>> coreArgAnnotations = ImmutableMap
+            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(coreArgAnnotationFiles));
+        final ImmutableMap<Integer, List<AlignedAnnotation>> cleftedQuestionAnnotations = ImmutableMap
+            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(cleftedQuestionAnnotationFiles));
+        final ImmutableMap<Integer, List<AlignedAnnotation>> annotations = ImmutableMap
+            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(round2To3AnnotationFiles));
+
+        final HITLParser hitlParser = new HITLParser(100);
+        hitlParser.setQueryPruningParameters(queryPruningParameters);
+        hitlParser.setReparsingParameters(reparsingParameters);
+
+        int totalNumQueries = 0;
+        int totalNumQueriesWithoutMatch = 0;
+        for(int sentenceId : cleftedQuestionAnnotations.keySet()) {
+            final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> allQueries = hitlParser.getCleftedQuestionsForSentence(sentenceId);
+            final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queriesWithoutMatch = allQueries.stream()
+                .filter(query -> ExperimentUtils.getAlignedAnnotation(query, cleftedQuestionAnnotations.get(sentenceId)) == null)
+                .collect(toImmutableList());
+            totalNumQueries += allQueries.size();
+            totalNumQueriesWithoutMatch += queriesWithoutMatch.size();
+            System.out.println();
+            System.out.println(String.format("SID = %d\n" +
+                                             "Number of generated queries: %d\n" +
+                                             "Number of annotations: %d\n" +
+                                             "Number of queries without a match: %d (%.2f%%)",
+                                             sentenceId,
+                                             allQueries.size(),
+                                             annotations.get(sentenceId).size(),
+                                             queriesWithoutMatch.size(),
+                                             (100.0 * queriesWithoutMatch.size()) / allQueries.size()));
+            System.out.println("Queries without a match:");
+            for(ScoredQuery<QAStructureSurfaceForm> query : queriesWithoutMatch) {
+                ImmutableList<Integer> goldOptions = hitlParser.getGoldOptions(query);
+                System.out.println(query.toString(parseData.getSentences().get(sentenceId),
+                                                  'G', goldOptions));
+            }
+        }
+        System.out.println();
+        System.out.println(String.format("All sentences:\n" +
+                                         "Number of generated queries: %d\n" +
+                                         "Number of annotations: %d\n" +
+                                         "Number of queries without a match: %d (%.2f%%)",
+                                         totalNumQueries,
+                                         annotations.keySet().stream().mapToInt(id -> annotations.get(id).size()).sum(),
+                                         totalNumQueriesWithoutMatch,
+                                         (100.0 * totalNumQueriesWithoutMatch) / totalNumQueries));
+    }
+
+    private static void runGlobalConstraintAnalysis() {
+        final ImmutableMap<Integer, List<AlignedAnnotation>> coreArgAnnotations = ImmutableMap
+            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(coreArgAnnotationFiles));
+        final ImmutableMap<Integer, List<AlignedAnnotation>> cleftedQuestionAnnotations = ImmutableMap
+            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(cleftedQuestionAnnotationFiles));
+        final ImmutableMap<Integer, List<AlignedAnnotation>> annotations = ImmutableMap
+            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(round2To3AnnotationFiles));
+
+        final ImmutableMap<Integer, NBestList> originalOneBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 1).get();
+        final ImmutableMap<Integer, Parse> parsesOriginal = originalOneBestLists.entrySet().stream()
+            .collect(toImmutableMap(e -> e.getKey(), e -> e.getValue().getParse(0)));
+
+        final HITLParser hitlParser = new HITLParser(100);
+        hitlParser.setQueryPruningParameters(queryPruningParameters);
+        hitlParser.setReparsingParameters(reparsingParameters);
+
+        final DependencyProfiler dependencyProfiler =
+            new DependencyProfiler(hitlParser.getParseData(),
+                                   hitlParser.getAllSentenceIds().stream()
+                                   .collect(toMap(Function.identity(), hitlParser::getNBestList)));
+        // TODO: for each sentence get:
+        //*1. all gold core arg deps and constraints
+        // 2. baseline core arg deps, with errors
+        // 3. constraints we get from human annotation, with errors
+        // 4. constraints we get from gold annotation, with errors
+        // 5. constraints we get from gold all filtered, with errors
+        // 5. constraints we get from gold all unfiltered, with errors.
+        // all labeled/directed errors.
+        for(int sentenceId : coreArgAnnotations.keySet()) {
+            final ImmutableList<String> words = parseData.getSentences().get(sentenceId);
+            System.out.println("\nSID: " + sentenceId);
+            System.out.println(TextGenerationHelper.renderString(words));
+
+            final Parse goldParse = goldParses.get(sentenceId);
+            System.out.println("Gold verb categories:");
+            for(int i = 0; i < words.size(); i++) {
+                if(goldParse.categories.get(i).isFunctionInto(Category.valueOf("S\\NP")) &&
+                   !goldParse.categories.get(i).isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)"))) {
+                    System.out.println(words.get(i) + " " + goldParse.categories.get(i));
+                }
+            }
+
+            final ImmutableSet<ResolvedDependency> goldDeps = goldParse.dependencies.stream()
+                .filter(dep -> dependencyProfiler.dependencyIsCore(dep, false))
+                .collect(toImmutableSet());
+
+            System.out.println("Gold dependencies:");
+            for(ResolvedDependency dep : goldDeps) {
+                System.out.println("\t" + words.get(dep.getHead()) + "\t-"
+                                   + dep.getArgNumber() + "->\t"
+                                   + words.get(dep.getArgument()));
+            }
+
+            Set<Constraint> allGoldConstraints = OracleExperiment
+                .getAttachmentConstraints(goldDeps.stream().map(d -> dependencyProfiler.getProfiledDependency(sentenceId, d, 1.0)));
+            System.out.println("Gold constraints:");
+            for(Constraint c : allGoldConstraints ) {
+                if(c.isSatisfiedBy(goldParse)) {
+                    System.out.print(" ");
+                } else {
+                    System.out.print("*");
+                }
+                System.out.println(c.toString(words));
+            }
+
+            final ImmutableSet<ResolvedDependency> baselineDeps = parsesOriginal.get(sentenceId).dependencies.stream()
+                .filter(dep -> dependencyProfiler.dependencyIsCore(dep, false))
+                .collect(toImmutableSet());
+            System.out.println("Baseline false positive deps:");
+            for(DependencyMistake mistake : falsePositives(baselineDeps, goldDeps, labeledDirectedDepMatcher)) {
+                ResolvedDependency dep = mistake.getDependency();
+                System.out.println("\t" + words.get(dep.getHead()) + "\t-"
+                                   + dep.getArgNumber() + "->\t"
+                                   + words.get(dep.getArgument()));
+            }
+            System.out.println("Baseline false negative deps:");
+            for(DependencyMistake mistake : falseNegatives(baselineDeps, goldDeps, labeledDirectedDepMatcher)) {
+                ResolvedDependency dep = mistake.getDependency();
+                System.out.println("\t" + words.get(dep.getHead()) + "\t-"
+                                   + dep.getArgNumber() + "->\t"
+                                   + words.get(dep.getArgument()));
+            }
+
+            final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries = hitlParser.getPronounCoreArgQueriesForSentence(sentenceId);
+            final List<AlignedAnnotation> humanAnnotations = coreArgAnnotations.get(sentenceId);
+            final ImmutableSet<Constraint> humanAnnotationConstraints = queries.stream()
+                .flatMap(query -> {
+                        AlignedAnnotation annotation = ExperimentUtils.getAlignedAnnotation(query, annotations.get(sentenceId));
+                        if(annotation == null) {
+                            return Stream.of();
+                        }
+                        return hitlParser.getConstraints(query, annotation).stream();
+                    })
+                .collect(toImmutableSet());
+
+            System.out.println("Human annotation constraints:");
+            for(Constraint c : humanAnnotationConstraints) {
+                if(c.isSatisfiedBy(goldParse)) {
+                    System.out.print(" ");
+                } else {
+                    System.out.print("*");
+                }
+                System.out.println(c.toString(words));
+            }
+
+            final ImmutableSet<Constraint> goldAnnotationConstraints = queries.stream()
+                .flatMap(query -> {
+                        AlignedAnnotation annotation = ExperimentUtils.getAlignedAnnotation(query, annotations.get(sentenceId));
+                        if(annotation == null) {
+                            return Stream.of();
+                        }
+                        final ImmutableList<Integer> goldOptions = hitlParser.getGoldOptions(query);
+                        return hitlParser.getOracleConstraints(query, goldOptions).stream();
+                    })
+                .collect(toImmutableSet());
+            System.out.println("Gold annotation constraints:");
+            for(Constraint c : goldAnnotationConstraints) {
+                if(c.isSatisfiedBy(goldParse)) {
+                    System.out.print(" ");
+                } else {
+                    System.out.print("*");
+                }
+                System.out.println(c.toString(words));
+            }
+
+            final ImmutableSet<Constraint> goldAllQueryConstraints = queries.stream()
+                .flatMap(query -> hitlParser.getOracleConstraints(query, hitlParser.getGoldOptions(query)).stream())
+                .collect(toImmutableSet());
+            System.out.println("Gold all query constraints:");
+            for(Constraint c : goldAllQueryConstraints) {
+                if(c.isSatisfiedBy(goldParse)) {
+                    System.out.print(" ");
+                } else {
+                    System.out.print("*");
+                }
+                System.out.println(c.toString(words));
+            }
+
+            hitlParser.setQueryPruningParameters(noFilterQueryPruningParameters);
+            final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> unfilteredQueries = hitlParser.getPronounCoreArgQueriesForSentence(sentenceId);
+            hitlParser.setQueryPruningParameters(queryPruningParameters);
+
+            final ImmutableSet<Constraint> goldAllUnfilteredQueryConstraints = unfilteredQueries.stream()
+                .flatMap(query -> hitlParser.getOracleConstraints(query, hitlParser.getGoldOptions(query)).stream())
+                .collect(toImmutableSet());
+            final Set<Constraint> extraConstraintsFromUnfiltered = Sets.difference(goldAllUnfilteredQueryConstraints, goldAllQueryConstraints);
+            System.out.println("Gold all query constraints:");
+            for(Constraint c : extraConstraintsFromUnfiltered) {
+                if(c.isSatisfiedBy(goldParse)) {
+                    System.out.print(" ");
+                } else {
+                    System.out.print("*");
+                }
+                System.out.println(c.toString(words));
+            }
+        }
+    }
+
+    private static void runCoreArgQueryWiseConstraintAnalysis() {
+        final ImmutableMap<Integer, List<AlignedAnnotation>> coreArgAnnotations = ImmutableMap
+            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(coreArgAnnotationFiles));
+        final ImmutableMap<Integer, List<AlignedAnnotation>> cleftedQuestionAnnotations = ImmutableMap
+            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(cleftedQuestionAnnotationFiles));
+        final ImmutableMap<Integer, List<AlignedAnnotation>> annotations = ImmutableMap
+            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(round2To3AnnotationFiles));
+
+        final ImmutableMap<Integer, NBestList> originalOneBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 1).get();
+        final ImmutableMap<Integer, Parse> parsesOriginal = originalOneBestLists.entrySet().stream()
+            .collect(toImmutableMap(e -> e.getKey(), e -> e.getValue().getParse(0)));
+
+        final HITLParser hitlParser = new HITLParser(100);
+        hitlParser.setQueryPruningParameters(queryPruningParameters);
+        hitlParser.setReparsingParameters(reparsingParameters);
+
+        final DependencyProfiler dependencyProfiler =
+            new DependencyProfiler(hitlParser.getParseData(),
+                                   hitlParser.getAllSentenceIds().stream()
+                                   .collect(toMap(Function.identity(), hitlParser::getNBestList)));
+
+        for(int sentenceId : coreArgAnnotations.keySet()) {
+            final ImmutableList<String> words = parseData.getSentences().get(sentenceId);
+            System.out.println("\nSID: " + sentenceId);
+            System.out.println(TextGenerationHelper.renderString(words));
+
+            final Parse goldParse = goldParses.get(sentenceId);
+            System.out.println("Gold verb categories:");
+            for(int i = 0; i < words.size(); i++) {
+                if(goldParse.categories.get(i).isFunctionInto(Category.valueOf("S\\NP")) &&
+                   !goldParse.categories.get(i).isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)"))) {
+                    System.out.println(words.get(i) + " " + goldParse.categories.get(i));
+                }
+            }
+
+            final ImmutableSet<ResolvedDependency> goldDeps = goldParse.dependencies.stream()
+                .filter(dep -> dependencyProfiler.dependencyIsCore(dep, false))
+                .collect(toImmutableSet());
+
+            System.out.println("Gold dependencies:");
+            for(ResolvedDependency dep : goldDeps) {
+                System.out.println("\t" + words.get(dep.getHead()) + "\t-"
+                                   + dep.getArgNumber() + "->\t"
+                                   + words.get(dep.getArgument()));
+            }
+
+            Set<Constraint> allGoldConstraints = OracleExperiment
+                .getAttachmentConstraints(goldDeps.stream().map(d -> dependencyProfiler.getProfiledDependency(sentenceId, d, 1.0)));
+            System.out.println("Gold constraints:");
+            for(Constraint c : allGoldConstraints ) {
+                if(c.isSatisfiedBy(goldParse) ^ (!c.isPositive())) {
+                    System.out.print(" ");
+                } else {
+                    System.out.print("*");
+                }
+                System.out.println(c.toString(words));
+            }
+
+            final ImmutableSet<ResolvedDependency> baselineDeps = parsesOriginal.get(sentenceId).dependencies.stream()
+                .filter(dep -> dependencyProfiler.dependencyIsCore(dep, false))
+                .collect(toImmutableSet());
+            System.out.println("Baseline false positive deps:");
+            for(DependencyMistake mistake : falsePositives(baselineDeps, goldDeps, labeledDirectedDepMatcher)) {
+                ResolvedDependency dep = mistake.getDependency();
+                System.out.println("\t" + words.get(dep.getHead()) + "\t-"
+                                   + dep.getArgNumber() + "->\t"
+                                   + words.get(dep.getArgument()));
+            }
+            System.out.println("Baseline false negative deps:");
+            for(DependencyMistake mistake : falseNegatives(baselineDeps, goldDeps, labeledDirectedDepMatcher)) {
+                ResolvedDependency dep = mistake.getDependency();
+                System.out.println("\t" + words.get(dep.getHead()) + "\t-"
+                                   + dep.getArgNumber() + "->\t"
+                                   + words.get(dep.getArgument()));
+            }
+
+            final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries = hitlParser.getPronounCoreArgQueriesForSentence(sentenceId);
+
+            ImmutableSet.Builder<Constraint> allGoldAnnotationConstraintsBuilder = new ImmutableSet.Builder();
+
+            for(ScoredQuery<QAStructureSurfaceForm> query : queries) {
+                final ImmutableList<Integer> goldOptions = hitlParser.getGoldOptions(query);
+                final List<AlignedAnnotation> alignedAnnotations = coreArgAnnotations.get(sentenceId);
+                AlignedAnnotation annotation = ExperimentUtils.getAlignedAnnotation(query, alignedAnnotations);
+                if(annotation != null) {
+                    final ImmutableList<Integer> userOptions = hitlParser.getUserOptions(query, annotation);
+                    final int[] optionDist = AnnotationUtils.getUserResponseDistribution(query, annotation);
+                    System.out.println(query.toString(words,
+                                                      'G', goldOptions,
+                                                      'U', userOptions,
+                                                      '*', optionDist));
+                    final ImmutableSet<Constraint> humanAnnotationConstraints = ImmutableSet.copyOf(hitlParser.getConstraints(query, annotation));
+                    System.out.println("Human annotation constraints:");
+                    for(Constraint c : humanAnnotationConstraints) {
+                        if(c.isSatisfiedBy(goldParse) ^ (!c.isPositive())) {
+                            System.out.print(" ");
+                        } else {
+                            System.out.print("*");
+                        }
+                        System.out.println(c.toString(words));
+                    }
+                } else {
+                    System.out.println(query.toString(words,
+                                                      'G', goldOptions));
+                }
+                final ImmutableSet<Constraint> goldAnnotationConstraints = ImmutableSet.copyOf(hitlParser.getOracleConstraints(query, goldOptions));
+                System.out.println("Gold annotation constraints:");
+                for(Constraint c : goldAnnotationConstraints) {
+                    if(c.isSatisfiedBy(goldParse) ^ (!c.isPositive())) {
+                        System.out.print(" ");
+                    } else {
+                        System.out.print("*");
+                    }
+                    System.out.println(c.toString(words));
+                }
+                allGoldAnnotationConstraintsBuilder = allGoldAnnotationConstraintsBuilder.addAll(goldAnnotationConstraints);
+            }
+
+            ImmutableSet<Constraint> allGoldAnnotationConstraints = allGoldAnnotationConstraintsBuilder.build();
+
+            ImmutableSet<Constraint> remainingGoldConstraints = allGoldConstraints.stream()
+                .filter(rc -> allGoldAnnotationConstraints.stream().noneMatch(ac -> {
+                            if(!(rc instanceof AttachmentConstraint) || !(ac instanceof AttachmentConstraint)) {
+                                return false;
+                            }
+                            AttachmentConstraint attachmentRemainingConstraint = (AttachmentConstraint) rc;
+                            AttachmentConstraint attachmentAnnotationConstraint = (AttachmentConstraint) ac;
+                            return attachmentRemainingConstraint.getHeadId() == attachmentAnnotationConstraint.getHeadId() &&
+                            attachmentRemainingConstraint.getArgId() == attachmentAnnotationConstraint.getArgId();
+                        }))
+                .collect(toImmutableSet());
+
+            System.out.println("REMAINING gold constraints:");
+            for(Constraint c : remainingGoldConstraints) {
+                if(c.isSatisfiedBy(goldParse) ^ (!c.isPositive())) {
+                    System.out.print(" ");
+                } else {
+                    System.out.print("*");
+                }
+                System.out.println(c.toString(words));
+            }
+
+            ImmutableSet<Constraint> remainingGoldConstraintsNotSatByOneBest = remainingGoldConstraints.stream()
+                .filter(c -> !(c.isSatisfiedBy(parsesOriginal.get(sentenceId)) ^ !c.isPositive()))
+                .collect(toImmutableSet());
+            System.out.println("Remaining gold constraints NOT SAT by ONE BEST:");
+            for(Constraint c : remainingGoldConstraintsNotSatByOneBest) {
+                if(c.isSatisfiedBy(goldParse) ^ (!c.isPositive())) {
+                    System.out.print(" ");
+                } else {
+                    System.out.print("*");
+                }
+                System.out.println(c.toString(words));
+            }
+
+            Parse goldAnnotationReparse = hitlParser.getReparsed(sentenceId, allGoldAnnotationConstraints);
+            ImmutableSet<Constraint> remainingGoldConstraintsNotSatByReparsed = remainingGoldConstraints.stream()
+                .filter(c -> !(c.isSatisfiedBy(goldAnnotationReparse) ^ !c.isPositive()))
+                .collect(toImmutableSet());
+            System.out.println("Remaining gold constraints NOT SAT by REPARSED:");
+            for(Constraint c : remainingGoldConstraintsNotSatByReparsed) {
+                if(c.isSatisfiedBy(goldParse) ^ (!c.isPositive())) {
+                    System.out.print(" ");
+                } else {
+                    System.out.print("*");
+                }
+                System.out.println(c.toString(words));
+            }
+
+
+        }
+    }
+
+    private static void runCleftedQuestionQueryWiseConstraintAnalysis() {
+        final ImmutableMap<Integer, List<AlignedAnnotation>> cleftedQuestionAnnotations = ImmutableMap
+            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(cleftedQuestionAnnotationFiles));
+        final ImmutableMap<Integer, List<AlignedAnnotation>> annotations = ImmutableMap
+            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(round2To3AnnotationFiles));
+
+        final ImmutableMap<Integer, NBestList> originalOneBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 1).get();
+        final ImmutableMap<Integer, Parse> parsesOriginal = originalOneBestLists.entrySet().stream()
+            .collect(toImmutableMap(e -> e.getKey(), e -> e.getValue().getParse(0)));
+
+        final HITLParser hitlParser = new HITLParser(100);
+        hitlParser.setQueryPruningParameters(queryPruningParameters);
+        hitlParser.setReparsingParameters(reparsingParameters);
+
+        final DependencyProfiler dependencyProfiler =
+            new DependencyProfiler(hitlParser.getParseData(),
+                                   hitlParser.getAllSentenceIds().stream()
+                                   .collect(toMap(Function.identity(), hitlParser::getNBestList)));
+
+        for(int sentenceId : cleftedQuestionAnnotations.keySet()) {
+            final ImmutableList<String> words = parseData.getSentences().get(sentenceId);
+            System.out.println("\nSID: " + sentenceId);
+            System.out.println(TextGenerationHelper.renderString(words));
+
+            final Parse goldParse = goldParses.get(sentenceId);
+            System.out.println("Gold NP Modifier categories:");
+            for(int i = 0; i < words.size(); i++) {
+                if(goldParse.categories.get(i).isFunctionInto(Category.valueOf("NP\\NP"))) {
+                    System.out.println(words.get(i) + " " + goldParse.categories.get(i));
+                }
+            }
+
+            final ImmutableSet<ResolvedDependency> goldDeps = goldParse.dependencies.stream()
+                .filter(dep -> dependencyProfiler.dependencyIsAdjunct(dep, false))
+                .collect(toImmutableSet());
+
+            System.out.println("Gold dependencies:");
+            for(ResolvedDependency dep : goldDeps) {
+                System.out.println("\t" + words.get(dep.getHead()) + "\t-"
+                                   + dep.getArgNumber() + "->\t"
+                                   + words.get(dep.getArgument()));
+            }
+
+            Set<Constraint> allGoldConstraints = OracleExperiment
+                .getAttachmentConstraints(goldDeps.stream().map(d -> dependencyProfiler.getProfiledDependency(sentenceId, d, 1.0)));
+            System.out.println("Gold constraints:");
+            for(Constraint c : allGoldConstraints ) {
+                if(c.isSatisfiedBy(goldParse) ^ (!c.isPositive())) {
+                    System.out.print(" ");
+                } else {
+                    System.out.print("*");
+                }
+                System.out.println(c.toString(words));
+            }
+
+            final ImmutableSet<ResolvedDependency> baselineDeps = parsesOriginal.get(sentenceId).dependencies.stream()
+                .filter(dep -> dependencyProfiler.dependencyIsAdjunct(dep, false))
+                .collect(toImmutableSet());
+            System.out.println("Baseline false positive deps:");
+            for(DependencyMistake mistake : falsePositives(baselineDeps, goldDeps, labeledDirectedDepMatcher)) {
+                ResolvedDependency dep = mistake.getDependency();
+                System.out.println("\t" + words.get(dep.getHead()) + "\t-"
+                                   + dep.getArgNumber() + "->\t"
+                                   + words.get(dep.getArgument()));
+            }
+            System.out.println("Baseline false negative deps:");
+            for(DependencyMistake mistake : falseNegatives(baselineDeps, goldDeps, labeledDirectedDepMatcher)) {
+                ResolvedDependency dep = mistake.getDependency();
+                System.out.println("\t" + words.get(dep.getHead()) + "\t-"
+                                   + dep.getArgNumber() + "->\t"
+                                   + words.get(dep.getArgument()));
+            }
+
+            final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries = hitlParser.getCleftedQuestionsForSentence(sentenceId);
+
+            ImmutableSet.Builder<Constraint> allGoldAnnotationConstraintsBuilder = new ImmutableSet.Builder();
+
+            for(ScoredQuery<QAStructureSurfaceForm> query : queries) {
+                final ImmutableList<Integer> goldOptions = hitlParser.getGoldOptions(query);
+                final List<AlignedAnnotation> alignedAnnotations = cleftedQuestionAnnotations.get(sentenceId);
+                AlignedAnnotation annotation = ExperimentUtils.getAlignedAnnotation(query, alignedAnnotations);
+                if(annotation != null) {
+                    final ImmutableList<Integer> userOptions = hitlParser.getUserOptions(query, annotation);
+                    final int[] optionDist = AnnotationUtils.getUserResponseDistribution(query, annotation);
+                    System.out.println(query.toString(words,
+                                                      'G', goldOptions,
+                                                      'U', userOptions,
+                                                      '*', optionDist));
+                    final ImmutableSet<Constraint> humanAnnotationConstraints = ImmutableSet.copyOf(hitlParser.getConstraints(query, annotation));
+                    System.out.println("Human annotation constraints:");
+                    for(Constraint c : humanAnnotationConstraints) {
+                        if(c.isSatisfiedBy(goldParse) ^ (!c.isPositive())) {
+                            System.out.print(" ");
+                        } else {
+                            System.out.print("*");
+                        }
+                        System.out.println(c.toString(words));
+                    }
+                } else {
+                    System.out.println(query.toString(words,
+                                                      'G', goldOptions));
+                }
+                final ImmutableSet<Constraint> goldAnnotationConstraints = ImmutableSet.copyOf(hitlParser.getOracleConstraints(query, goldOptions));
+                System.out.println("Gold annotation constraints:");
+                for(Constraint c : goldAnnotationConstraints) {
+                    if(c.isSatisfiedBy(goldParse) ^ (!c.isPositive())) {
+                        System.out.print(" ");
+                    } else {
+                        System.out.print("*");
+                    }
+                    System.out.println(c.toString(words));
+                }
+                allGoldAnnotationConstraintsBuilder = allGoldAnnotationConstraintsBuilder.addAll(goldAnnotationConstraints);
+            }
+
+            ImmutableSet<Constraint> allGoldAnnotationConstraints = allGoldAnnotationConstraintsBuilder.build();
+
+            ImmutableSet<Constraint> remainingGoldConstraints = allGoldConstraints.stream()
+                .filter(rc -> allGoldAnnotationConstraints.stream().noneMatch(ac -> {
+                            if(!(rc instanceof AttachmentConstraint) || !(ac instanceof AttachmentConstraint)) {
+                                return false;
+                            }
+                            AttachmentConstraint attachmentRemainingConstraint = (AttachmentConstraint) rc;
+                            AttachmentConstraint attachmentAnnotationConstraint = (AttachmentConstraint) ac;
+                            return attachmentRemainingConstraint.getHeadId() == attachmentAnnotationConstraint.getHeadId() &&
+                            attachmentRemainingConstraint.getArgId() == attachmentAnnotationConstraint.getArgId();
+                        }))
+                .collect(toImmutableSet());
+
+            System.out.println("REMAINING gold constraints:");
+            for(Constraint c : remainingGoldConstraints) {
+                if(c.isSatisfiedBy(goldParse) ^ (!c.isPositive())) {
+                    System.out.print(" ");
+                } else {
+                    System.out.print("*");
+                }
+                System.out.println(c.toString(words));
+            }
+
+            ImmutableSet<Constraint> remainingGoldConstraintsNotSatByOneBest = remainingGoldConstraints.stream()
+                .filter(c -> !(c.isSatisfiedBy(parsesOriginal.get(sentenceId)) ^ !c.isPositive()))
+                .collect(toImmutableSet());
+            System.out.println("Remaining gold constraints NOT SAT by ONE BEST:");
+            for(Constraint c : remainingGoldConstraintsNotSatByOneBest) {
+                if(c.isSatisfiedBy(goldParse) ^ (!c.isPositive())) {
+                    System.out.print(" ");
+                } else {
+                    System.out.print("*");
+                }
+                System.out.println(c.toString(words));
+            }
+
+            Parse goldAnnotationReparse = hitlParser.getReparsed(sentenceId, allGoldAnnotationConstraints);
+            ImmutableSet<Constraint> remainingGoldConstraintsNotSatByReparsed = remainingGoldConstraints.stream()
+                .filter(c -> !(c.isSatisfiedBy(goldAnnotationReparse) ^ !c.isPositive()))
+                .collect(toImmutableSet());
+            System.out.println("Remaining gold constraints NOT SAT by REPARSED:");
+            for(Constraint c : remainingGoldConstraintsNotSatByReparsed) {
+                if(c.isSatisfiedBy(goldParse) ^ (!c.isPositive())) {
+                    System.out.print(" ");
+                } else {
+                    System.out.print("*");
+                }
+                System.out.println(c.toString(words));
+            }
+
+
+        }
+    }
+
     public static void runFullAnalysis(ImmutableMap<Integer, Parse> parses,
                                        String runLabel,
                                        StringBuilder csvStringBuilder) {
@@ -576,6 +1172,24 @@ public class DependencyErrorAnalysis {
     }
 
     private static ImmutableMap<Integer, Parse>
+        reparsedFromGoldQueryResponsesOnlyWithCorrectConstraints(HITLParser hitlParser,
+                                       Function<Integer, ImmutableList<ScoredQuery<QAStructureSurfaceForm>>> queriesForSentence,
+                                       ImmutableMap<Integer, List<AlignedAnnotation>> annotations) {
+        return annotations.entrySet().stream().collect(toImmutableMap(e -> e.getKey(), e -> {
+                    final int sentenceId = e.getKey();
+                    final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries = queriesForSentence.apply(sentenceId);
+                    final ImmutableSet<Constraint> annotationConstraints = queries.stream()
+                        .flatMap(query -> {
+                                final ImmutableList<Integer> goldOptions = hitlParser.getGoldOptions(query);
+                                return hitlParser.getOracleConstraints(query, goldOptions).stream()
+                                .filter(c -> c.isSatisfiedBy(goldParses.get(sentenceId)) ^ !c.isPositive());
+                            })
+                        .collect(toImmutableSet());
+                    return hitlParser.getReparsed(sentenceId, annotationConstraints);
+                }));
+    }
+
+    private static ImmutableMap<Integer, Parse>
         reparsedWithGoldDepConstraints(HITLParser hitlParser,
                                        ImmutableSet<Integer> targetSentenceIds,
                                        DependencyProfiler dependencyProfiler,
@@ -591,7 +1205,7 @@ public class DependencyErrorAnalysis {
                     }));
     }
 
-    public static void runIndependentAnalyses() {
+    private static void runIndependentAnalyses() {
         final StringBuilder csvStringBuilder = new StringBuilder();
         final ImmutableMap<Integer, NBestList> originalOneBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 1).get();
         final ImmutableMap<Integer, Parse> parsesOriginal = originalOneBestLists.entrySet().stream()
@@ -605,22 +1219,8 @@ public class DependencyErrorAnalysis {
                         "",
                         new StringBuilder()); // don't need to compare
 
-        final String[] coreArgAnnotationFiles = {
-            "./Crowdflower_data/f893900.csv"                 // Round3-pronouns: checkbox, core only, pronouns.
-        };
-        final String[] cleftedQuestionAnnotationFiles = {
-            "./Crowdflower_data/f897179.csv"                 // Round2-3: NP clefting questions.
-        };
-        final String[] annotationFiles = {
-            "./Crowdflower_data/f893900.csv",                // Round3-pronouns: checkbox, core only, pronouns.
-            "./Crowdflower_data/f897179.csv"                 // Round2-3: NP clefting questions.
-        };
-        final ImmutableMap<Integer, List<AlignedAnnotation>> coreArgAnnotations = ImmutableMap
-            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(coreArgAnnotationFiles));
-        final ImmutableMap<Integer, List<AlignedAnnotation>> cleftedQuestionAnnotations = ImmutableMap
-            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(cleftedQuestionAnnotationFiles));
         final ImmutableMap<Integer, List<AlignedAnnotation>> annotations = ImmutableMap
-            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(annotationFiles));
+            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(round4AnnotationFiles));
         assert annotations != null;
         System.err.println("\nSuccessfully read annotation files.");
         System.err.println("Number of annotated sentences: " + annotations.keySet().size());
@@ -648,18 +1248,6 @@ public class DependencyErrorAnalysis {
         System.err.println(String.format("Number of noun adjunct dependencies in annotated sentences: %d (%.2f%%)", numNounAdjunctDeps, (100.0 * numNounAdjunctDeps) / totalNumDeps));
 
         // these should be the same as in ReparsingExperiment
-        final QueryPruningParameters queryPruningParameters = new QueryPruningParameters();
-        queryPruningParameters.skipPPQuestions = false;
-        queryPruningParameters.skipSAdjQuestions = true;
-
-        final HITLParsingParameters reparsingParameters = new HITLParsingParameters();
-        reparsingParameters.jeopardyQuestionMinAgreement = 1;
-        reparsingParameters.positiveConstraintMinAgreement = 5;
-        reparsingParameters.negativeConstraintMaxAgreement = 1;
-        reparsingParameters.skipPronounEvidence = false;
-        reparsingParameters.jeopardyQuestionWeight = 1.0;
-        reparsingParameters.attachmentPenaltyWeight = 1.0;
-        reparsingParameters.supertagPenaltyWeight = 1.0;
 
         final HITLParser hitlParser = new HITLParser(100);
         hitlParser.setQueryPruningParameters(queryPruningParameters);
@@ -669,41 +1257,12 @@ public class DependencyErrorAnalysis {
             .filter(e -> annotations.containsKey(e.getKey()))
             .collect(toImmutableMap(e -> e.getKey(), e -> e.getValue()));
 
-        int totalNumQueries = 0;
-        int totalNumQueriesWithoutMatch = 0;
-        for(int sentenceId : cleftedQuestionAnnotations.keySet()) {
-            final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> allQueries = hitlParser.getCleftedQuestionsForSentence(sentenceId);
-            final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queriesWithoutMatch = allQueries.stream()
-                .filter(query -> ExperimentUtils.getAlignedAnnotation(query, cleftedQuestionAnnotations.get(sentenceId)) == null)
-                .collect(toImmutableList());
-            totalNumQueries += allQueries.size();
-            totalNumQueriesWithoutMatch += queriesWithoutMatch.size();
-            System.out.println();
-            System.out.println(String.format("SID = %d\n" +
-                                             "Number of generated queries: %d\n" +
-                                             "Number of annotations: %d\n" +
-                                             "Number of queries without a match: %d (%.2f%%)",
-                                             sentenceId,
-                                             allQueries.size(),
-                                             annotations.get(sentenceId).size(),
-                                             queriesWithoutMatch.size(),
-                                             (100.0 * queriesWithoutMatch.size()) / allQueries.size()));
-            System.out.println("Queries without a match:");
-            for(ScoredQuery<QAStructureSurfaceForm> query : queriesWithoutMatch) {
-                ImmutableList<Integer> goldOptions = hitlParser.getGoldOptions(query);
-                System.out.println(query.toString(parseData.getSentences().get(sentenceId),
-                                                  'G', goldOptions));
-            }
-        }
-        System.out.println();
-        System.out.println(String.format("All sentences:\n" +
-                                         "Number of generated queries: %d\n" +
-                                         "Number of annotations: %d\n" +
-                                         "Number of queries without a match: %d (%.2f%%)",
-                                         totalNumQueries,
-                                         annotations.keySet().stream().mapToInt(id -> annotations.get(id).size()).sum(),
-                                         totalNumQueriesWithoutMatch,
-                                         (100.0 * totalNumQueriesWithoutMatch) / totalNumQueries));
+
+        final DependencyProfiler dependencyProfiler =
+            new DependencyProfiler(hitlParser.getParseData(),
+                                   hitlParser.getAllSentenceIds().stream()
+                                   .collect(toMap(Function.identity(), hitlParser::getNBestList)));
+
 
         System.out.println();
         System.out.println("=======================================================");
@@ -760,43 +1319,43 @@ public class DependencyErrorAnalysis {
                         "human annotated Qs,core arg + adjunct signal",
                         csvStringBuilder);
 
-        System.out.println();
-        System.out.println("=======================================================");
-        System.out.println("== REPARSED: JUST CORE ARG Qs W/GOLD SIGNAL ON ANNO. ==");
-        System.out.println("=======================================================");
-        runFullAnalysis(reparsedFromAnnotationSignalGold(hitlParser,
-                                                         sentenceId -> new ImmutableList.Builder<ScoredQuery<QAStructureSurfaceForm>>()
-                                                         .addAll(hitlParser.getPronounCoreArgQueriesForSentence(sentenceId))
-                                                         .addAll(hitlParser.getCleftedQuestionsForSentence(sentenceId))
-                                                         .build(),
-                                                         annotations),
-                        "gold annotated Qs,core arg signal",
-                        csvStringBuilder);
+        // System.out.println();
+        // System.out.println("=======================================================");
+        // System.out.println("== REPARSED: JUST CORE ARG Qs W/GOLD SIGNAL ON ANNO. ==");
+        // System.out.println("=======================================================");
+        // runFullAnalysis(reparsedFromAnnotationSignalGold(hitlParser,
+        //                                                  sentenceId -> new ImmutableList.Builder<ScoredQuery<QAStructureSurfaceForm>>()
+        //                                                  .addAll(hitlParser.getPronounCoreArgQueriesForSentence(sentenceId))
+        //                                                  .addAll(hitlParser.getCleftedQuestionsForSentence(sentenceId))
+        //                                                  .build(),
+        //                                                  annotations),
+        //                 "gold annotated Qs,core arg signal",
+        //                 csvStringBuilder);
 
-        System.out.println();
-        System.out.println("=======================================================");
-        System.out.println("== REPARSED: JUST CLEFTED  Qs W/GOLD SIGNAL ON ANNO. ==");
-        System.out.println("=======================================================");
-        runFullAnalysis(reparsedFromAnnotationSignalGold(hitlParser,
-                                                         sentenceId -> new ImmutableList.Builder<ScoredQuery<QAStructureSurfaceForm>>()
-                                                         .addAll(hitlParser.getCleftedQuestionsForSentence(sentenceId))
-                                                         .build(),
-                                                         annotations),
-                        "gold annotated Qs,adjunct signal",
-                        csvStringBuilder);
+        // System.out.println();
+        // System.out.println("=======================================================");
+        // System.out.println("== REPARSED: JUST CLEFTED  Qs W/GOLD SIGNAL ON ANNO. ==");
+        // System.out.println("=======================================================");
+        // runFullAnalysis(reparsedFromAnnotationSignalGold(hitlParser,
+        //                                                  sentenceId -> new ImmutableList.Builder<ScoredQuery<QAStructureSurfaceForm>>()
+        //                                                  .addAll(hitlParser.getCleftedQuestionsForSentence(sentenceId))
+        //                                                  .build(),
+        //                                                  annotations),
+        //                 "gold annotated Qs,adjunct signal",
+        //                 csvStringBuilder);
 
-        System.out.println();
-        System.out.println("=======================================================");
-        System.out.println("== REPARSED: CORE ARG/CLEFTED W/GOLD SIGNAL ON ANNO. ==");
-        System.out.println("=======================================================");
-        runFullAnalysis(reparsedFromAnnotationSignalGold(hitlParser,
-                                                         sentenceId -> new ImmutableList.Builder<ScoredQuery<QAStructureSurfaceForm>>()
-                                                         .addAll(hitlParser.getPronounCoreArgQueriesForSentence(sentenceId))
-                                                         .addAll(hitlParser.getCleftedQuestionsForSentence(sentenceId))
-                                                         .build(),
-                                                         annotations),
-                        "gold annotated Qs,core arg + adjunct signal",
-                        csvStringBuilder);
+        // System.out.println();
+        // System.out.println("=======================================================");
+        // System.out.println("== REPARSED: CORE ARG/CLEFTED W/GOLD SIGNAL ON ANNO. ==");
+        // System.out.println("=======================================================");
+        // runFullAnalysis(reparsedFromAnnotationSignalGold(hitlParser,
+        //                                                  sentenceId -> new ImmutableList.Builder<ScoredQuery<QAStructureSurfaceForm>>()
+        //                                                  .addAll(hitlParser.getPronounCoreArgQueriesForSentence(sentenceId))
+        //                                                  .addAll(hitlParser.getCleftedQuestionsForSentence(sentenceId))
+        //                                                  .build(),
+        //                                                  annotations),
+        //                 "gold annotated Qs,core arg + adjunct signal",
+        //                 csvStringBuilder);
 
         System.err.println("Number of filtered core arg queries: " +
                            annotations.keySet().stream().mapToInt(sentenceId -> hitlParser.getPronounCoreArgQueriesForSentence(sentenceId).size()).sum());
@@ -862,15 +1421,47 @@ public class DependencyErrorAnalysis {
                         "gold all filtered Qs,core arg + adjunct signal",
                         csvStringBuilder);
 
-        // hooray for messing with the fields of this structure, which is already inside the HITLParser...
-        queryPruningParameters.minPromptConfidence = 0.0;
-        queryPruningParameters.minOptionConfidence = 0.0;
-        queryPruningParameters.minOptionEntropy = 0.0;
-        queryPruningParameters.maxNumOptionsPerQuery = 50;
-        queryPruningParameters.skipBinaryQueries = false;
-        queryPruningParameters.skipSAdjQuestions = false;
-        queryPruningParameters.skipPPQuestions = false;
-        queryPruningParameters.skipQueriesWithPronounOptions = false;
+        // reparsedFromGoldQueryResponsesOnlyWithCorrectConstraints
+
+        System.out.println();
+        System.out.println("=======================================================");
+        System.out.println("== REPARSED: JUST CORE ARG Qs W/GOLD CORRECT SIGNAL FILTERED ==");
+        System.out.println("=======================================================");
+        runFullAnalysis(reparsedFromGoldQueryResponsesOnlyWithCorrectConstraints(hitlParser,
+                                                       sentenceId -> new ImmutableList.Builder<ScoredQuery<QAStructureSurfaceForm>>()
+                                                       .addAll(hitlParser.getPronounCoreArgQueriesForSentence(sentenceId))
+                                                       .build(),
+                                                       annotations),
+                        "gold all filtered Qs correct,core arg signal",
+                        csvStringBuilder);
+
+        System.out.println();
+        System.out.println("=======================================================");
+        System.out.println("== REPARSED: JUST CLEFTED Qs  W/GOLD CORRECT SIGNAL FILTERED ==");
+        System.out.println("=======================================================");
+        runFullAnalysis(reparsedFromGoldQueryResponsesOnlyWithCorrectConstraints(hitlParser,
+                                                       sentenceId -> new ImmutableList.Builder<ScoredQuery<QAStructureSurfaceForm>>()
+                                                       .addAll(hitlParser.getCleftedQuestionsForSentence(sentenceId))
+                                                       .build(),
+                                                       annotations),
+                        "gold all filtered Qs correct,adjunct signal",
+                        csvStringBuilder);
+
+        System.out.println();
+        System.out.println("=======================================================");
+        System.out.println("===== REPARSED: ALL QUERIES W/GOLD CORRECT SIGNAL FILTERED ====");
+        System.out.println("=======================================================");
+        runFullAnalysis(reparsedFromGoldQueryResponsesOnlyWithCorrectConstraints(hitlParser,
+                                                       sentenceId -> new ImmutableList.Builder<ScoredQuery<QAStructureSurfaceForm>>()
+                                                       .addAll(hitlParser.getCleftedQuestionsForSentence(sentenceId))
+                                                       .addAll(hitlParser.getPronounCoreArgQueriesForSentence(sentenceId))
+                                                       .build(),
+                                                       annotations),
+                        "gold all filtered Qs correct,core arg + adjunct signal",
+                        csvStringBuilder);
+
+
+        hitlParser.setQueryPruningParameters(noFilterQueryPruningParameters);
 
         System.err.println("Number of unfiltered core arg queries: " +
                            annotations.keySet().stream().mapToInt(sentenceId -> hitlParser.getPronounCoreArgQueriesForSentence(sentenceId).size()).sum() + "; " +
@@ -905,43 +1496,38 @@ public class DependencyErrorAnalysis {
         System.out.println("=======================================================");
         System.out.println("= REPARSED: JUST CORE ARG Qs W/GOLD SIGNAL UNFILTERED =");
         System.out.println("=======================================================");
-        runFullAnalysis(reparsedFromGoldQueryResponses(hitlParser,
+        runFullAnalysis(reparsedFromGoldQueryResponsesOnlyWithCorrectConstraints(hitlParser,
                                                        sentenceId -> new ImmutableList.Builder<ScoredQuery<QAStructureSurfaceForm>>()
                                                        .addAll(hitlParser.getPronounCoreArgQueriesForSentence(sentenceId))
                                                        .build(),
                                                        annotations),
-                        "gold all unfiltered Qs,core arg signal",
+                        "gold all unfiltered Qs correct,core arg signal",
                         csvStringBuilder);
 
         System.out.println();
         System.out.println("=======================================================");
         System.out.println("= REPARSED: JUST CLEFTED Qs  W/GOLD SIGNAL UNFILTERED =");
         System.out.println("=======================================================");
-        runFullAnalysis(reparsedFromGoldQueryResponses(hitlParser,
+        runFullAnalysis(reparsedFromGoldQueryResponsesOnlyWithCorrectConstraints(hitlParser,
                                                        sentenceId -> new ImmutableList.Builder<ScoredQuery<QAStructureSurfaceForm>>()
                                                        .addAll(hitlParser.getCleftedQuestionsForSentence(sentenceId))
                                                        .build(),
                                                        annotations),
-                        "gold all unfiltered Qs,adjunct signal",
+                        "gold all unfiltered Qs correct,adjunct signal",
                         csvStringBuilder);
 
         System.out.println();
         System.out.println("=======================================================");
         System.out.println("==== REPARSED: ALL QUERIES W/GOLD SIGNAL UNFILTERED ===");
         System.out.println("=======================================================");
-        runFullAnalysis(reparsedFromGoldQueryResponses(hitlParser,
+        runFullAnalysis(reparsedFromGoldQueryResponsesOnlyWithCorrectConstraints(hitlParser,
                                                        sentenceId -> new ImmutableList.Builder<ScoredQuery<QAStructureSurfaceForm>>()
                                                        .addAll(hitlParser.getCleftedQuestionsForSentence(sentenceId))
                                                        .addAll(hitlParser.getPronounCoreArgQueriesForSentence(sentenceId))
                                                        .build(),
                                                        annotations),
-                        "gold all unfiltered Qs,core arg + adjunct signal",
+                        "gold all unfiltered Qs correct,core arg + adjunct signal",
                         csvStringBuilder);
-
-        final DependencyProfiler dependencyProfiler =
-            new DependencyProfiler(hitlParser.getParseData(),
-                                   hitlParser.getAllSentenceIds().stream()
-                                   .collect(toMap(Function.identity(), hitlParser::getNBestList)));
 
         System.out.println();
         System.out.println("=======================================================");
@@ -984,11 +1570,9 @@ public class DependencyErrorAnalysis {
         System.out.println(csvStringBuilder.toString());
     }
 
-    public static void runDifferentialAnalyses() {
-
-    }
-
     public static void main(String[] args) {
         runIndependentAnalyses();
+        // runCoreArgQueryWiseConstraintAnalysis();
+        // runCleftedQuestionQueryWiseConstraintAnalysis();
     }
 }
