@@ -1,5 +1,6 @@
 package edu.uw.easysrl.qasrl.classification;
 
+import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
@@ -9,17 +10,23 @@ import edu.uw.easysrl.qasrl.query.ScoredQuery;
  */
 public class DependencyInstanceHelper {
 
-    static boolean containsDependency(QAStructureSurfaceForm qa, int headId, int argId) {
+    static boolean containsDependency(final ImmutableList<String> sentence, final QAStructureSurfaceForm qa,
+                                      int headId, int argId) {
         for (QuestionStructure qstr : qa.getQuestionStructures()) {
             // Verb-PP argument (undirected).
             /*
             if ((qstr.predicateIndex == headId && qstr.targetPrepositionIndex == argId) ||
                 (qstr.predicateIndex == argId && qstr.targetPrepositionIndex == headId)) {
                 return true;
-            }*/
+            }
+            */
             // Core/PP-NP dependencies.
             if ((qstr.predicateIndex == headId || qstr.targetPrepositionIndex == headId) &&
                     qa.getAnswerStructures().stream().anyMatch(astr -> astr.argumentIndices.contains(argId))) {
+                // Hack to get around answer span error.
+                if (qstr.predicateIndex == headId && qstr.targetPrepositionIndex == argId) {
+                    return false;
+                }
                 return true;
             }
             // NP adjunct dependencies.
@@ -35,15 +42,16 @@ public class DependencyInstanceHelper {
     static String getDependencyContainsType(ScoredQuery<QAStructureSurfaceForm> query, int headId, int argId) {
         for (QAStructureSurfaceForm qa : query.getQAPairSurfaceForms()) {
             for (QuestionStructure qstr : qa.getQuestionStructures()) {
+                // Verb-PP argument (undirected).
+                /*
+                if ((qstr.predicateIndex == headId && qstr.targetPrepositionIndex == argId) ||
+                        (qstr.predicateIndex == argId && qstr.targetPrepositionIndex == headId)) {
+                    return "pp_arg_in_question";
+                }*/
                 // Core/PP-NP dependencies.
                 if ((qstr.predicateIndex == headId || qstr.targetPrepositionIndex == headId) &&
                         qa.getAnswerStructures().stream().anyMatch(astr -> astr.argumentIndices.contains(argId))) {
                     return "in_qa";
-                }
-                // Verb-PP argument (undirected).
-                if ((qstr.predicateIndex == headId && qstr.targetPrepositionIndex == argId) ||
-                        (qstr.predicateIndex == argId && qstr.targetPrepositionIndex == headId)) {
-                    return "pp_arg_in_question";
                 }
                 // NP adjunct dependencies.
                 if (qa.getAnswerStructures().stream()

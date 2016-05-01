@@ -12,7 +12,6 @@ import edu.uw.easysrl.qasrl.experiments.ReparsingHistory;
 import edu.uw.easysrl.qasrl.model.Constraint;
 import edu.uw.easysrl.qasrl.model.HITLParser;
 import edu.uw.easysrl.qasrl.model.HITLParsingParameters;
-import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
@@ -24,10 +23,8 @@ import ml.dmlc.xgboost4j.java.XGBoost;
 import ml.dmlc.xgboost4j.java.XGBoostError;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 
 /**
@@ -107,7 +104,8 @@ public class ClassificationExperiment {
         System.out.println(devSents);
         System.out.println(testSents);
 
-        trainingInstances = getInstances(trainSents);
+        trainingInstances = ClassificationUtils.getInstances(trainSents, myParser, featureExtractor, annotations,
+                alignedQueries, alignedAnnotations, alignedOldAnnotations);
         final int numPositive = (int) trainingInstances.stream().filter(inst -> inst.inGold).count();
         System.out.println(String.format("Extracted %d training samples and %d features, %d positive and %d negative.",
                 trainingInstances.size(), featureExtractor.featureMap.size(),
@@ -115,8 +113,10 @@ public class ClassificationExperiment {
 
         featureExtractor.freeze();
 
-        devInstances = getInstances(devSents);
-        testInstances = getInstances(testSents);
+        devInstances = ClassificationUtils.getInstances(devSents, myParser, featureExtractor, annotations,
+                alignedQueries, alignedAnnotations, alignedOldAnnotations);
+        testInstances = ClassificationUtils.getInstances(testSents, myParser, featureExtractor, annotations,
+                alignedQueries, alignedAnnotations, alignedOldAnnotations);
 
         final int numPositiveDev = (int) devInstances.stream().filter(inst -> inst.inGold).count();
         System.out.println(String.format("Extracted %d dev samples and %d features, %d positive and %d negative.",
@@ -128,117 +128,6 @@ public class ClassificationExperiment {
         } catch (XGBoostError e) {
             e.printStackTrace();
         }
-    }
-
-    private static void getQueriesAndAnnotationsForSentence(int sentenceId, final List<AlignedAnnotation> annotations) {
-        boolean isCheckboxStyle = !annotations.stream()
-                .anyMatch(annot -> annot.answerOptions.stream()
-                        .anyMatch(op -> op.contains(QAPairAggregatorUtils.answerDelimiter)));
-
-        List<ScoredQuery<QAStructureSurfaceForm>> queryList = new ArrayList<>();
-        List<ImmutableList<ImmutableList<Integer>>> annotationList = new ArrayList<>();
-        List<AlignedAnnotation> oldAnnotations = new ArrayList<>();
-
-        List<ScoredQuery<QAStructureSurfaceForm>> allQueries = new ArrayList<>();
-        allQueries.addAll(myParser.getCoreArgumentQueriesForSentence(sentenceId, isCheckboxStyle));
-        myParser.getPronounCoreArgQueriesForSentence(sentenceId).stream()
-                .filter(query -> !allQueries.stream().anyMatch(q -> query.getPrompt().equals(q.getPrompt()) &&
-                        q.getPredicateId().getAsInt() == query.getPredicateId().getAsInt()))
-                .forEach(allQueries::add);
-        //allQueries.addAll(myParser.getPronounCoreArgQueriesForSentence(sentenceId));
-        allQueries.addAll(myParser.getCleftedQuestionsForSentence(sentenceId));
-
-        allQueries.stream()
-                .forEach(query -> {
-                    AlignedAnnotation annotation = ExperimentUtils.getAlignedAnnotation(query, annotations);
-                    if (annotation != null) {
-                        ImmutableList<ImmutableList<Integer>> allResponses =
-                                AnnotationUtils.getAllUserResponses(query, annotation);
-                        if (allResponses.size() == 5) {
-                            query.setQueryId(queryList.size());
-                            queryList.add(query);
-                            annotationList.add(allResponses);
-                            oldAnnotations.add(annotation);
-                        }
-                    }
-                });
-
-        alignedQueries.put(sentenceId, queryList);
-        alignedAnnotations.put(sentenceId, annotationList);
-        alignedOldAnnotations.put(sentenceId, oldAnnotations);
-    }
-
-    private static ImmutableList<int[]> getAllAttachments(final ImmutableList<String> sentence,
-                                                          final ScoredQuery<QAStructureSurfaceForm> query) {
-        return IntStream.range(0, sentence.size())
-                .boxed()
-                .flatMap(headId -> IntStream.range(0, sentence.size())
-                        .boxed()
-                        .filter(argId -> query.getQAPairSurfaceForms().stream()
-                                .anyMatch(qa -> DependencyInstanceHelper.containsDependency(qa, headId, argId)))
-                        .map(argId -> new int[] { headId, argId }))
-                .collect(GuavaCollectors.toImmutableList());
-    }
-
-    private static ImmutableList<DependencyInstance> getInstances(final List<Integer> sentIds) {
-        return sentIds.stream()
-                .flatMap(sid -> {
-                    final Parse gold = myParser.getGoldParse(sid);
-                    final NBestList nbestList = myParser.getNBestList(sid);
-                    final ImmutableList<String> sentence = myParser.getSentence(sid);
-                    getQueriesAndAnnotationsForSentence(sid, annotations.get(sid));
-                    return IntStream.range(0, alignedQueries.get(sid).size())
-                            .boxed()
-                            .flatMap(qid -> {
-                                final ScoredQuery<QAStructureSurfaceForm> query = alignedQueries.get(sid).get(qid);
-                                final ImmutableList<ImmutableList<Integer>> annotation = alignedAnnotations.get(sid).get(qid);
-                                final int naOptionId = query.getBadQuestionOptionId().getAsInt();
-                                final int numNAVotes = (int) annotation.stream()
-                                        .filter(ops -> ops.contains(naOptionId))
-                                        .count();
-                                /*
-                                if (numNAVotes > 2) {
-                                    return Stream.empty();
-                                }*/
-                                return getAllAttachments(sentence, query).stream().map(attachment -> {
-                                    final int headId = attachment[0];
-                                    final int argId = attachment[1];
-                                    final boolean inGold = gold.dependencies.stream().anyMatch(
-                                            dep -> dep.getHead() == headId && dep.getArgument() == argId);
-                                    return new DependencyInstance(
-                                            sid, qid, headId, argId, inGold,
-                                            featureExtractor.getDependencyInstanceFeatures(
-                                                    headId, argId, query, annotation, sentence, nbestList));
-                                });
-                            });
-                })
-                .collect(GuavaCollectors.toImmutableList());
-    }
-
-    private static DMatrix getDMatrix(ImmutableList<DependencyInstance> instances) throws XGBoostError {
-        final int numInstances = instances.size();
-        final float[] labels = new float[numInstances];
-        final long[] rowHeaders = new long[numInstances + 1];
-        rowHeaders[0] = 0;
-        for (int i = 0; i < numInstances; i++) {
-            rowHeaders[i + 1] = rowHeaders[i] + instances.get(i).features.size();
-        }
-        final int numValues = (int) rowHeaders[numInstances];
-        final int[] colIndices = new int[numValues];
-        final float[] data = new float[numValues];
-        AtomicInteger ptr = new AtomicInteger(0);
-        for (int i = 0; i < numInstances; i++) {
-            final DependencyInstance instance = instances.get(i);
-            labels[i] = instance.inGold ? 1 : 0;
-            instance.features.keySet().stream().sorted()
-                    .forEach(fid -> {
-                        colIndices[ptr.get()] = fid;
-                        data[ptr.getAndIncrement()] = instance.features.get(fid).floatValue();
-                    });
-        }
-        DMatrix dmat = new DMatrix(rowHeaders, colIndices, data, DMatrix.SparseType.CSR);
-        dmat.setLabel(labels);
-        return dmat;
     }
 
     private static void reparse(final Booster booster, final ImmutableList<DependencyInstance> instances,
@@ -267,7 +156,8 @@ public class ClassificationExperiment {
                 baselinePrediction = userDist[query.getBadQuestionOptionId().getAsInt()] < 4;
             } else {
                 final ImmutableList<Integer> options = IntStream.range(0, qaList.size()).boxed()
-                        .filter(op -> DependencyInstanceHelper.containsDependency(qaList.get(op), instance.headId, instance.argId))
+                        .filter(op -> DependencyInstanceHelper.containsDependency(sentence, qaList.get(op),
+                                                                                  instance.headId, instance.argId))
                         .collect(GuavaCollectors.toImmutableList());
                 baselinePrediction = options.stream().mapToInt(op -> userDist[op]).max().orElse(0) >= 3;
             }
@@ -292,11 +182,11 @@ public class ClassificationExperiment {
             }
             if (pred[i][0] > 0.5) {
                 constraints.get(sentenceId).add(
-                        new Constraint.AttachmentConstraint(instance.headId, instance.argId, true, 1.0));
+                        new Constraint.AttachmentConstraint(instance.headId, instance.argId, true, 1.0)); //1.0 * (pred[i][0] - 0.5)));
             }
             if (pred[i][0] < 0.5) {
                 constraints.get(sentenceId).add(
-                        new Constraint.AttachmentConstraint(instance.headId, instance.argId, false, 1.0));
+                        new Constraint.AttachmentConstraint(instance.headId, instance.argId, false, 1.0)); // * (0.5 - pred[i][0])));
             }
             IntStream.range(0, alignedQueries.get(sentenceId).size()).boxed()
                     .forEach(qid -> heursticConstraints.get(sentenceId).addAll(
@@ -372,6 +262,8 @@ public class ClassificationExperiment {
                                 instance.inGold, pred[instId][0]));
                     }
                 }
+                constraints.get(sentenceId).stream()
+                        .forEach(c -> System.out.println(c.toString(sentence)));
                 System.out.println("----- old constraints -----");
                 myParser.getConstraints(query, annotation)
                         .forEach(c -> System.out.println(c.toString(sentence)));
@@ -403,13 +295,13 @@ public class ClassificationExperiment {
     private static void runExperiment() throws XGBoostError {
         // TODO: print out training samples.
         // TODO: compute precision/recall and tune by threshold.
-        DMatrix trainData = getDMatrix(trainingInstances);
-        DMatrix devData = getDMatrix(devInstances);
-        DMatrix testData = getDMatrix(testInstances);
+        DMatrix trainData = ClassificationUtils.getDMatrix(trainingInstances);
+        DMatrix devData = ClassificationUtils.getDMatrix(devInstances);
+        DMatrix testData = ClassificationUtils.getDMatrix(testInstances);
         final Map<String, Object> paramsMap = ImmutableMap.of(
-                "eta", 0.3,
-                "min_child_weight", 5.0,
-                "max_depth", 15,
+                "eta", 0.1,
+                "min_child_weight", 1.0,
+                "max_depth", 5,
                 "objective", "binary:logistic"
         );
         final Map<String, DMatrix> watches = ImmutableMap.of(
@@ -419,17 +311,12 @@ public class ClassificationExperiment {
         final int round = 50, nfold = 5;
         Booster booster = XGBoost.train(trainData, paramsMap, round, watches, null, null);
 
-        GridSearch.runGridSearch(trainData, nfold);
-
-        //reparse(booster, devInstances, devData);
+        //GridSearch.runGridSearch(trainData, nfold);
+        reparse(booster, devInstances, devData);
         //reparse(booster, testInstances, testData);
 
-        /*
-        booster.saveModel("model.txt");
+        booster.saveModel("model.bin");
         //booster,("modelInfo.txt", "featureMap.txt", false)
-        System.out.println(booster.getFeatureScore("").entrySet().stream()
-                    .map(e -> String.format("%s:\t%d", e.getKey(), e.getValue()))
-                    .collect(Collectors.joining("\n")));
-            */
+        ClassificationUtils.printXGBoostFeatures(featureExtractor.featureMap, booster.getFeatureScore(""));
     }
 }

@@ -9,6 +9,7 @@ import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
 import edu.uw.easysrl.qasrl.qg.util.PronounList;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
+import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.HashMap;
@@ -58,7 +59,7 @@ public class FeatureExtractor {
                 .collect(GuavaCollectors.toImmutableList());
 
         // Query Type
-        // addFeature(features, "QueryType=" + query.getQueryType(), 1);
+        addFeature(features, "QueryType=" + query.getQueryType(), 1);
 
         // Argument category.
         questionStructures.stream()
@@ -73,13 +74,13 @@ public class FeatureExtractor {
                 .forEach(argType -> addFeature(features, "ArgumentType=" + argType, 1));
 
         // Predicate type
-        //if (questionStructures.stream().anyMatch(qstr -> qstr.category.isFunctionInto(Category.valueOf("S[pss]")))) {
-        //    addFeature(features, "PredicateIsPassive", 1);
-        //}
+        if (questionStructures.stream().anyMatch(qstr -> qstr.category.isFunctionInto(Category.valueOf("S[pss]")))) {
+            addFeature(features, "PredicateIsPassive", 1);
+        }
 
         // Dependency contain type
-        // final String depQATApe = DependencyInstanceHelper.getDependencyContainsType(query, headId, argId);
-        // addFeature(features, "DepContainedType=" + depQATApe, 1);
+        final String depQATApe = DependencyInstanceHelper.getDependencyContainsType(query, headId, argId);
+        addFeature(features, "DepContainedType=" + depQATApe, 1);
 
         // 1best score
         final boolean oneBestContains = nBestList.getParse(0).dependencies.stream()
@@ -93,25 +94,22 @@ public class FeatureExtractor {
         final int numQAOptions = query.getQAPairSurfaceForms().size();
         final ImmutableList<Integer> options = IntStream.range(0, numQAOptions)
                 .boxed()
-                .filter(i -> DependencyInstanceHelper.containsDependency(query.getQAPairSurfaceForms().get(i),
-                        headId, argId))
+                .filter(i -> DependencyInstanceHelper.containsDependency(sentence, query.getQAPairSurfaceForms().get(i),
+                                                                         headId, argId))
                 .collect(GuavaCollectors.toImmutableList());
 
-
-        // NBest score.
         /*
-        final double nBestScoreNorm = nBestList.getParses().stream().mapToDouble(p -> p.score).sum();
-        final double nBestScore = nBestList.getParses().stream()
-                .filter(p -> p.dependencies.stream()
-                        .anyMatch(dep -> (dep.getHead() == headId && dep.getArgument() == argId) ||
-                                         (dep.getHead() == argId && dep.getArgument() == headId)))
-                .mapToDouble(p -> p.score)
-                .sum();
-                */
         final double nBestScore = options.stream()
                 .mapToDouble(i -> query.getOptionScores().get(i))
-                .sum() / query.getPromptScore();
-        addFeature(features, "NBestScore", nBestScore);
+                .sum() / query.getPromptScore();*/
+        final double nBestScoreNorm = nBestList.getParses().stream()
+                .mapToDouble(parse -> parse.score)
+                .sum();
+        final double nBestScore = nBestList.getParses().stream()
+                .filter(parse -> parse.dependencies.stream().anyMatch(d -> d.getHead() == headId && d.getArgument() == argId))
+                .mapToDouble(parse -> parse.score)
+                .sum();
+        addFeature(features, "NBestScore", nBestScore / nBestScoreNorm);
 
         final int firstEncounterInNBest = IntStream.range(0, nBestList.getN())
                 .filter(k -> nBestList.getParse(k).dependencies.stream()
@@ -121,54 +119,62 @@ public class FeatureExtractor {
         addFeature(features, "firstEncounterInNBest", 1.0 - firstEncounterInNBest / nBestList.getN());
 
         // User votes.
-        int minVotes = options.stream()
-                .mapToInt(i -> (int) annotation.stream().filter(ops -> ops.contains(i)).count())
-                .min().orElse(0);
-        addFeature(features, "MinReceivedVotes", 1.0 * minVotes / numAnnotators);
-
-        int maxVotes = options.stream()
+        int numVotes = options.stream()
                 .mapToInt(i -> (int) annotation.stream().filter(ops -> ops.contains(i)).count())
                 .max().orElse(0);
-        addFeature(features, "MaxReceivedVotes", 1.0 * maxVotes / numAnnotators);
+        addFeature(features, "NumReceivedVotes", 1.0 * numVotes / numAnnotators);
 
+        int numSingleVotes = options.stream()
+                .mapToInt(i -> (int) annotation.stream().filter(ops -> ops.contains(i) && ops.size() == 1).count())
+                .max().orElse(0);
+        addFeature(features, "NumReceivedSingleVotes", 1.0 * numSingleVotes / numAnnotators);
+
+        int numSkipped = options.stream()
+                .mapToInt(i -> (int) annotation.stream().filter(ops -> !ops.contains(i)).count())
+                .max().orElse(0);
+        addFeature(features, "NumSkippedVotes", 1.0 * numSkipped / numAnnotators);
+
+        /*
         int otherVotes = IntStream.range(0, numQAOptions)
                 .boxed()
                 .filter(i -> !options.contains(i))
                 .mapToInt(i -> (int) annotation.stream().filter(ops -> ops.contains(i)).count())
                 .max().orElse(0);
         addFeature(features, "OtherReceivedVotes", 1.0 * otherVotes / numAnnotators);
+        */
 
         ImmutableList<Integer> superSpanOptions = IntStream.range(0, numQAOptions)
                 .boxed()
                 .filter(i -> options.stream().map(query.getOptions()::get)
                         .anyMatch(op -> query.getOptions().get(i).toLowerCase().contains(op.toLowerCase()) &&
-                               // !op.equals(query.getOptions().get(i)) &&
+                                !op.equals(query.getOptions().get(i)) &&
                                 !query.getOptions().get(i).contains("_AND_") ))
                 .collect(GuavaCollectors.toImmutableList());
         ImmutableList<Integer> subSpanOptions = IntStream.range(0, numQAOptions)
                 .boxed()
                 .filter(i -> options.stream().map(query.getOptions()::get)
                         .anyMatch(op -> op.toLowerCase().contains(query.getOptions().get(i).toLowerCase()) &&
-                              //  !op.equals(query.getOptions().get(i)) &&
+                                !op.equals(query.getOptions().get(i)) &&
                                 !op.contains("_AND_") ))
                 .collect(GuavaCollectors.toImmutableList());
 
-        addFeature(features, "SuperSpanScores", superSpanOptions.stream()
+        /*addFeature(features, "SuperSpanScores", superSpanOptions.stream()
                 .mapToDouble(query.getOptionScores()::get)
-                .sum());
+                .sum());*/
         addFeature(features, "SuperSpanReceivedVotes", 1.0 / numAnnotators * superSpanOptions.stream()
                 .mapToInt(i -> (int) annotation.stream().filter(ops -> ops.contains(i)).count())
                 .max().orElse(0));
 
+        /*
         addFeature(features, "SubSpanScores", subSpanOptions.stream()
                 .mapToDouble(query.getOptionScores()::get)
-                .sum());
+                .sum());*/
         addFeature(features, "SubSpanReceivedVotes", 1.0 / numAnnotators * subSpanOptions.stream()
                 .mapToInt(i -> (int) annotation.stream().filter(ops -> ops.contains(i)).count())
                 .max().orElse(0));
 
 
-        addFeature(features, "QueryConfidence", query.getPromptScore());
+        //addFeature(features, "QueryConfidence", query.getPromptScore());
         addFeature(features, "NAOptionReceivedVotes", 1.0 * annotation.stream()
                 .filter(ops -> ops.contains(naOptionId)).count() / numAnnotators);
 
@@ -199,6 +205,7 @@ public class FeatureExtractor {
         }
 
         // Preceding comma.
+        /*
         for (int i = argId - 1; i >= 0; i--) {
             if (sentence.get(i).equals(",")) {
                 addFeature(features, "PrecedingComma", 1.0 - 1.0 * (argId - i - 1) / sentence.size());
@@ -213,8 +220,9 @@ public class FeatureExtractor {
                 break;
             }
         }
+        */
 
-        addFeature(features, argId < headId ? "ArgOnLeft" : "ArgOnRight", 1);
+        //addFeature(features, argId < headId ? "ArgOnLeft" : "ArgOnRight", 1);
 
         return ImmutableMap.copyOf(features);
     }
