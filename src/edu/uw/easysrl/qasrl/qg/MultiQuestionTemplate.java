@@ -288,6 +288,7 @@ public class MultiQuestionTemplate {
         int argIndex = argIndexOpt.get();
         Category observedArgCategory = categories.get(argIndex);
         boolean cantAsk = type == QuestionType.INVALID ||
+            (type == QuestionType.VERB && Prepositions.prepositionWords.contains(words.get(predicateIndex))) ||
             (words.get(argIndex).matches("[0-9]+")) ||
             (badPredicates.contains(words.get(predicateIndex))) ||
             (auxiliaries.matches(observedArgCategory) ||
