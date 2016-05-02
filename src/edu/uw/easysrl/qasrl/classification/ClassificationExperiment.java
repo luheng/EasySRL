@@ -130,13 +130,29 @@ public class ClassificationExperiment {
         }
     }
 
-    private static void reparse(final Booster booster, final ImmutableList<DependencyInstance> instances,
+    private static void reparse(final Booster booster, final ImmutableList<Integer> sentenceIds,
+                                final ImmutableList<DependencyInstance> instances,
                                 final DMatrix data) throws XGBoostError {
 
         Map<Integer, Set<Constraint>> constraints = new HashMap<>();
         Map<Integer, Set<Constraint>> heursticConstraints = new HashMap<>();
         final float[][] pred = booster.predict(data);
-        int baselineAcc = 0;
+        int baselineAcc = 0, classifierAcc = 0, numInstances = 0;
+
+        for (int sentenceId : sentenceIds) {
+            constraints.put(sentenceId, new HashSet<>());
+            heursticConstraints.put(sentenceId, new HashSet<>());
+            for (int qid = 0; qid < alignedQueries.get(sentenceId).size(); qid++) {
+                final ScoredQuery<QAStructureSurfaceForm> query = alignedQueries.get(sentenceId).get(qid);
+                final ImmutableList<ImmutableList<Integer>> annotation = alignedAnnotations.get(sentenceId).get(qid);
+                final int naOptionId = query.getBadQuestionOptionId().getAsInt();
+                final int numNAVotes = (int) annotation.stream().filter(ops -> ops.contains(naOptionId)).count();
+                if (numNAVotes > reparsingParameters.negativeConstraintMaxAgreement) {
+                    constraints.get(sentenceId).add(new Constraint.SupertagConstraint(query.getPredicateId().getAsInt(),
+                            query.getPredicateCategory().get(), false, reparsingParameters.supertagPenaltyWeight));
+                }
+            }
+        }
 
         for (int i = 0; i < instances.size(); i++) {
             final DependencyInstance instance = instances.get(i);
@@ -147,21 +163,32 @@ public class ClassificationExperiment {
             final ScoredQuery<QAStructureSurfaceForm> query = alignedQueries.get(sentenceId).get(instance.queryId);
             final ImmutableList<QAStructureSurfaceForm> qaList = query.getQAPairSurfaceForms();
             final AlignedAnnotation annotation = alignedOldAnnotations.get(sentenceId).get(instance.queryId);
+            final int[] userDist = AnnotationUtils.getUserResponseDistribution(query, annotation);
+
+            IntStream.range(0, alignedQueries.get(sentenceId).size()).boxed()
+                    .forEach(qid -> heursticConstraints.get(sentenceId).addAll(
+                            myParser.getConstraints(alignedQueries.get(sentenceId).get(qid),
+                                    alignedOldAnnotations.get(sentenceId).get(qid))));
+
+            if (pred[i][0] > 0.6) {
+                constraints.get(sentenceId).add(
+                        new Constraint.AttachmentConstraint(instance.headId, instance.argId, true, 1.0));
+            }
+            if (pred[i][0] < 0.4) {
+                constraints.get(sentenceId).add(
+                        new Constraint.AttachmentConstraint(instance.headId, instance.argId, false, 1.0));
+            }
 
             /************** Get baseline accuracy *************************/
-            final int[] userDist = AnnotationUtils.getUserResponseDistribution(query, annotation);
-            boolean baselinePrediction;
-            if (DependencyInstanceHelper.getDependencyContainsType(query, instance.headId, instance.argId)
-                    .equals("pp_arg_in_question")) {
-                baselinePrediction = userDist[query.getBadQuestionOptionId().getAsInt()] < 4;
-            } else {
-                final ImmutableList<Integer> options = IntStream.range(0, qaList.size()).boxed()
-                        .filter(op -> DependencyInstanceHelper.containsDependency(sentence, qaList.get(op),
-                                                                                  instance.headId, instance.argId))
-                        .collect(GuavaCollectors.toImmutableList());
-                baselinePrediction = options.stream().mapToInt(op -> userDist[op]).max().orElse(0) >= 3;
-            }
+            final ImmutableList<Integer> options = IntStream.range(0, qaList.size()).boxed()
+                    .filter(op -> DependencyInstanceHelper.containsDependency(sentence, qaList.get(op),
+                            instance.headId, instance.argId))
+                    .collect(GuavaCollectors.toImmutableList());
+            boolean baselinePrediction = options.stream().mapToInt(op -> userDist[op]).max().orElse(0) >= 3;
+
             baselineAcc += (baselinePrediction == instance.inGold) ? 1 : 0;
+            classifierAcc += (p == instance.inGold) ? 1 : 0;
+            numInstances++;
 
             if (p != instance.inGold) {
                 System.out.println();
@@ -174,28 +201,10 @@ public class ClassificationExperiment {
 
                 featureExtractor.printFeature(instance.features);
             }
-            if (!constraints.containsKey(sentenceId)) {
-                constraints.put(sentenceId, new HashSet<>());
-            }
-            if (!heursticConstraints.containsKey(sentenceId)) {
-                heursticConstraints.put(sentenceId, new HashSet<>());
-            }
-            if (pred[i][0] > 0.5) {
-                constraints.get(sentenceId).add(
-                        new Constraint.AttachmentConstraint(instance.headId, instance.argId, true, 1.0)); //1.0 * (pred[i][0] - 0.5)));
-            }
-            if (pred[i][0] < 0.5) {
-                constraints.get(sentenceId).add(
-                        new Constraint.AttachmentConstraint(instance.headId, instance.argId, false, 1.0)); // * (0.5 - pred[i][0])));
-            }
-            IntStream.range(0, alignedQueries.get(sentenceId).size()).boxed()
-                    .forEach(qid -> heursticConstraints.get(sentenceId).addAll(
-                            myParser.getConstraints(alignedQueries.get(sentenceId).get(qid),
-                                    alignedOldAnnotations.get(sentenceId).get(qid))));
         }
 
-        System.out.println("Baseline accuracy:\t" + 100.0 * baselineAcc / instances.size());
-
+        System.out.println("Baseline accuracy:\t" + 100.0 * baselineAcc / numInstances);
+        System.out.println("Classifier accuracy:\t" + 100.0 * classifierAcc / numInstances);
         Results avgBaseline = new Results(),
                 avgReparsed = new Results(),
                 avgHeuristicReparsed = new Results(),
@@ -205,10 +214,7 @@ public class ClassificationExperiment {
         int numImproved = 0, numWorsened = 0;
 
         // Re-parsing ...
-        ImmutableList<Integer> sentIds = instances.stream().map(inst -> inst.sentenceId)
-                .distinct().sorted()
-                .collect(GuavaCollectors.toImmutableList());
-        for (int sentenceId : sentIds) {
+        for (int sentenceId : sentenceIds) {
             final ImmutableList<String> sentence = myParser.getSentence(sentenceId);
             final Parse gold = myParser.getGoldParse(sentenceId);
             final Parse reparsed = myParser.getReparsed(sentenceId, constraints.get(sentenceId));
@@ -237,7 +243,6 @@ public class ClassificationExperiment {
             if (baselineF1.getF1() > reparsedF1.getF1() + 1e-6) {
                 numWorsened ++;
             }
-
             if (baselineF1.getF1() <= reparsedF1.getF1()) {
                 continue;
             }
@@ -287,7 +292,7 @@ public class ClassificationExperiment {
         System.out.println(avgUnlabeledHeuristicReparsed);
         System.out.println(avgUnlabeledReparsed);
 
-        System.out.println("Num processed sentences:\t" + sentIds.size());
+        System.out.println("Num processed sentences:\t" + sentenceIds.size());
         System.out.println("Num improved:\t" + numImproved);
         System.out.println("Num worsened:\t" + numWorsened);
     }
@@ -300,19 +305,19 @@ public class ClassificationExperiment {
         DMatrix testData = ClassificationUtils.getDMatrix(testInstances);
         final Map<String, Object> paramsMap = ImmutableMap.of(
                 "eta", 0.1,
-                "min_child_weight", 1.0,
-                "max_depth", 5,
+                "min_child_weight", 0.1,
+                "max_depth", 3,
                 "objective", "binary:logistic"
         );
         final Map<String, DMatrix> watches = ImmutableMap.of(
                 "train", trainData,
                 "dev", devData
         );
-        final int round = 50, nfold = 5;
+        final int round = 100, nfold = 5;
         Booster booster = XGBoost.train(trainData, paramsMap, round, watches, null, null);
 
-        //GridSearch.runGridSearch(trainData, nfold);
-        reparse(booster, devInstances, devData);
+        GridSearch.runGridSearch(trainData, nfold);
+        //reparse(booster, devSents, devInstances, devData);
         //reparse(booster, testInstances, testData);
 
         booster.saveModel("model.bin");

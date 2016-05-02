@@ -8,6 +8,7 @@ import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
 import edu.uw.easysrl.qasrl.model.HITLParser;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.util.Prepositions;
+import edu.uw.easysrl.qasrl.qg.util.PronounList;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.util.GuavaCollectors;
@@ -81,6 +82,15 @@ public class TemplateHelper {
             }
             if (commaBetweenPredArg1 == 1) {
                 return "[pred] , [op1] , [op2]";
+            }
+        }
+        // Pronoun template.
+        if (PronounList.englishPronounSet.contains(op2)) {
+            if (argId1 < argId2 && argId2 < predicateId) {
+                return "[op1] [pron] [pred]";
+            }
+            if (predicateId < argId2 && argId2 < argId1) {
+                return "[pred] [pron] [op1]";
             }
         }
         return "";

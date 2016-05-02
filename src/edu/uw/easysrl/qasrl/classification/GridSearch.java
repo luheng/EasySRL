@@ -15,17 +15,18 @@ import java.util.stream.Collectors;
  */
 public class GridSearch {
 
-    /*
-    final static ImmutableList<Double> etaValues = ImmutableList.of(0.01, 0.05, 0.1, 0.2, 0.3);
-    final static ImmutableList<Integer> treeDepthValues = ImmutableList.of(3, 4, 5, 7, 10, 12, 15, 20);
-    final static ImmutableList<Double> minChildWeightValues = ImmutableList.of(0.1, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0);
-    */
-    final static ImmutableList<Double> etaValues = ImmutableList.of(0.01, 0.1, 0.3);
-    final static ImmutableList<Integer> treeDepthValues = ImmutableList.of(3, 5, 10, 20);
-    final static ImmutableList<Double> minChildWeightValues = ImmutableList.of(0.1, 1.0, 5.0);
-    final static int numRounds = 50;
+    final static ImmutableList<Double> etaValues = ImmutableList.of(0.1);
+    final static ImmutableList<Integer> treeDepthValues = ImmutableList.of(3, 5, 10, 15);
+    final static ImmutableList<Double> minChildWeightValues = ImmutableList.of(0.1, 1.0);
 
-    public static void runGridSearch(final DMatrix trainData, final int numFolds) {
+    /*
+    final static ImmutableList<Double> etaValues = ImmutableList.of(0.05, 0.1, 0.3);
+    final static ImmutableList<Integer> treeDepthValues = ImmutableList.of(3, 5, 10, 15, 20, 25, 30, 40);
+    final static ImmutableList<Double> minChildWeightValues = ImmutableList.of(0.1, 1.0, 3.0, 5.0);
+    */
+    final static int numRounds = 100;
+
+    public static double runGridSearch(final DMatrix trainData, final int numFolds) {
         final List<String> results = new ArrayList<>();
         etaValues.forEach(eta ->
                 treeDepthValues.forEach(treeDepth ->
@@ -47,5 +48,11 @@ public class GridSearch {
                 )
         );
         System.out.println("\n" + ImmutableList.copyOf(results).stream().collect(Collectors.joining("\n")));
+        return results.stream()
+                .mapToDouble(r -> {
+                    String[] info = r.split("\\t");
+                    return Double.parseDouble(info[2].split(":")[1]);
+                })
+                .average().getAsDouble();
     }
 }

@@ -19,11 +19,14 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 /**
  * Created by luheng on 4/21/16.
  */
 public class ClassificationUtils {
+
+    static int maxAllowedNAVotes = 1;
 
     /**
      * Split a list of objects into n parts.
@@ -87,8 +90,7 @@ public class ClassificationUtils {
                 .forEach(query -> {
                     AlignedAnnotation annotation = ExperimentUtils.getAlignedAnnotation(query, annotations);
                     if (annotation != null) {
-                        ImmutableList<ImmutableList<Integer>> allResponses =
-                                AnnotationUtils.getAllUserResponses(query, annotation);
+                        ImmutableList<ImmutableList<Integer>> allResponses = AnnotationUtils.getAllUserResponses(query, annotation);
                         if (allResponses.size() == 5) {
                             query.setQueryId(queryList.size());
                             queryList.add(query);
@@ -134,11 +136,16 @@ public class ClassificationUtils {
                             .flatMap(qid -> {
                                 final ScoredQuery<QAStructureSurfaceForm> query = alignedQueries.get(sid).get(qid);
                                 final ImmutableList<ImmutableList<Integer>> annotation = alignedAnnotations.get(sid).get(qid);
+                                final int naOptionId = query.getBadQuestionOptionId().getAsInt();
+                                final int numNAVotes = (int) annotation.stream().filter(ops -> ops.contains(naOptionId)).count();
+                                if (numNAVotes > maxAllowedNAVotes) {
+                                    return Stream.empty();
+                                }
                                 return getAllAttachments(sentence, query).stream().map(attachment -> {
                                     final int headId = attachment[0];
                                     final int argId = attachment[1];
-                                    final boolean inGold = gold.dependencies.stream().anyMatch(
-                                            dep -> dep.getHead() == headId && dep.getArgument() == argId);
+                                    final boolean inGold = gold.dependencies.stream()
+                                            .anyMatch(dep -> dep.getHead() == headId && dep.getArgument() == argId);
                                     return new DependencyInstance(
                                             sid, qid, headId, argId, inGold,
                                             featureExtractor.getDependencyInstanceFeatures(

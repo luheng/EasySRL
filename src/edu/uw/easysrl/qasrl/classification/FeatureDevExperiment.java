@@ -134,8 +134,8 @@ public class FeatureDevExperiment {
                 System.out.println(String.format("======================= FOLD%d =========================", i + 1));
                 final Map<String, Object> paramsMap = ImmutableMap.of(
                         "eta", 0.1,
-                        "min_child_weight", 1.0,
-                        "max_depth", 5,
+                        "min_child_weight", 0.1,
+                        "max_depth", 3,
                         "objective", "binary:logistic",
                         "silent", 1
                 );
@@ -143,7 +143,7 @@ public class FeatureDevExperiment {
                         "train", trainMat,
                         "dev", devMat
                 );
-                final int round = 50;
+                final int round = 100;
                 Booster booster = XGBoost.train(trainMat, paramsMap, round, watches, null, null);
 
                 runAnalysis(booster, devInsts, devMat);
@@ -156,30 +156,29 @@ public class FeatureDevExperiment {
     private static void runAnalysis(final Booster booster, final ImmutableList<DependencyInstance> instances,
                                     final DMatrix data) throws XGBoostError {
         final float[][] pred = booster.predict(data);
-        int baselineAcc = 0, accuracy = 0, errorCount = 0;
+        int baselineAcc = 0, accuracy = 0, errorCount = 0, numInstances = 0;
         for (int i = 0; i < instances.size(); i++) {
             final DependencyInstance instance = instances.get(i);
             final boolean p = (pred[i][0] > 0.5);
+
             final int sentenceId = instance.sentenceId;
             final ImmutableList<String> sentence = myParser.getSentence(sentenceId);
             final ScoredQuery<QAStructureSurfaceForm> query = alignedQueries.get(sentenceId).get(instance.queryId);
             final ImmutableList<QAStructureSurfaceForm> qaList = query.getQAPairSurfaceForms();
             final AlignedAnnotation annotation = alignedOldAnnotations.get(sentenceId).get(instance.queryId);
-            /************** Get baseline accuracy *************************/
             final int[] userDist = AnnotationUtils.getUserResponseDistribution(query, annotation);
-            boolean baselinePrediction;
-            if (DependencyInstanceHelper.getDependencyContainsType(query, instance.headId, instance.argId)
-                    .equals("pp_arg_in_question")) {
-                baselinePrediction = userDist[query.getBadQuestionOptionId().getAsInt()] < 3;
-            } else {
-                final ImmutableList<Integer> options = IntStream.range(0, qaList.size()).boxed()
-                        .filter(op -> DependencyInstanceHelper.containsDependency(sentence, qaList.get(op),
-                                                                                  instance.headId, instance.argId))
-                        .collect(GuavaCollectors.toImmutableList());
-                baselinePrediction = options.stream().mapToInt(op -> userDist[op]).max().orElse(0) >= 3;
-            }
+
+            /************** Get baseline accuracy *************************/
+            final ImmutableList<Integer> options = IntStream.range(0, qaList.size()).boxed()
+                    .filter(op -> DependencyInstanceHelper.containsDependency(sentence, qaList.get(op),
+                            instance.headId, instance.argId))
+                    .collect(GuavaCollectors.toImmutableList());
+            boolean baselinePrediction = options.stream().mapToInt(op -> userDist[op]).max().orElse(0) >= 3;
+
             baselineAcc += (baselinePrediction == instance.inGold) ? 1 : 0;
             accuracy += (p == instance.inGold) ? 1 : 0;
+            numInstances++;
+
             if (p != instance.inGold) {
                 System.out.println();
                 System.out.println(errorCount + "\t" + query.toString(sentence,
@@ -192,8 +191,8 @@ public class FeatureDevExperiment {
                 errorCount ++;
             }
         }
-        System.out.println("Accuracy:\t" + 100.0 * accuracy / instances.size());
-        System.out.println("Baseline accuracy:\t" + 100.0 * baselineAcc / instances.size());
+        System.out.println("Accuracy:\t" + 100.0 * accuracy / numInstances);
+        System.out.println("Baseline accuracy:\t" + 100.0 * baselineAcc / numInstances);
         System.out.println("==================== Feature Weights ====================");
         ClassificationUtils.printXGBoostFeatures(featureExtractor.featureMap, booster.getFeatureScore(""));
     }

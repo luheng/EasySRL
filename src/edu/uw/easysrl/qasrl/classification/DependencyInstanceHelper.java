@@ -21,7 +21,11 @@ public class DependencyInstanceHelper {
             }
             */
             // Core/PP-NP dependencies.
-            if ((qstr.predicateIndex == headId || qstr.targetPrepositionIndex == headId) &&
+            if (qstr.predicateIndex == headId && qstr.targetPrepositionIndex < 0 &&
+                    qa.getAnswerStructures().stream().anyMatch(astr -> astr.argumentIndices.contains(argId))) {
+                return true;
+            }
+            if (qstr.targetPrepositionIndex == headId &&
                     qa.getAnswerStructures().stream().anyMatch(astr -> astr.argumentIndices.contains(argId))) {
                 // Hack to get around answer span error.
                 if (qstr.predicateIndex == headId && qstr.targetPrepositionIndex == argId) {
