@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.Optional;
 
 import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.qasrl.Parse;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -17,6 +18,10 @@ import com.google.common.collect.ImmutableSet;
  */
 public abstract class Predication {
 
+    public static Predication getFromParse(int index, Category category, PredicateCache preds, Parse parse) {
+        return null; // TODO TODO TODO
+    }
+
 
     /* public API */
 
@@ -28,9 +33,9 @@ public abstract class Predication {
         return predicateCategory;
     }
 
-    public final Gap elide() {
-        return new Gap(predicateCategory);
-    }
+    // public final Gap elide() {
+    //     return new Gap(predicateCategory);
+    // }
 
     /* abstract methods */
 
@@ -48,10 +53,10 @@ public abstract class Predication {
 
     /**
      * This phrase will include all of the arguments, including external ones,
-     * and will include determiners and such for nouns.
+     * and will include determiners and such for nouns. maybe?
      * actually... consider passing in a desired category?
      */
-    public abstract ImmutableList<String> getCompletePhrase();
+    public abstract ImmutableList<String> getPhrase();
 
     // consider
     // public abstract ImmutableList<String> getPhrase(Category desiredCategory);
@@ -60,21 +65,21 @@ public abstract class Predication {
 
     /* protected methods and fields */
 
-    protected ImmutableMap<Integer, ImmutableList<Predication>> getArgPreds() {
-        return argPreds;
+    protected ImmutableMap<Integer, ImmutableList<Argument>> getArgs() {
+        return args;
     }
 
     protected Predication(String predicate,
                           Category predicateCategory,
-                          ImmutableMap<Integer, Predication> argPreds) {
+                          ImmutableMap<Integer, ImmutableList<Argument>> args) {
         this.predicate = predicate;
         this.predicateCategory = predicateCategory;
-        this.argPreds = argPreds;
+        this.args = args;
     }
 
     /* private fields */
 
     private final String predicate;
     private final Category predicateCategory;
-    private final ImmutableMap<Integer, ImmutableList<Predication>> argPreds;
+    private final ImmutableMap<Integer, ImmutableList<Argument>> args;
 }

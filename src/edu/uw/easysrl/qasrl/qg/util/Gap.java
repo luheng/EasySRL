@@ -9,7 +9,7 @@ public final class Gap extends Predication {
     public static final String PRED = "'e'";
 
     @Override
-    public ImmutableList<String> getCompletePhrase() {
+    public ImmutableList<String> getPhrase() {
         return ImmutableList.of();
     }
 

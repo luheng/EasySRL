@@ -119,23 +119,23 @@ public class VerbHelper {
             // System.err.println("Can't find inflections for: " + words.get(index) + " " + categories.get(index));
             return Optional.empty();
         }
-        // build
+        // eat
         if (verbStr.equals(infl[0])) {
             return Optional.of(new String[] {"would", infl[0]});
         }
-        // builds
+        // eats
         if (verbStr.equals(infl[1])) {
             return Optional.of(new String[] {"does", infl[0]});
         }
-        // building
+        // eating
         if (verbStr.equals(infl[2])) {
             return Optional.of(new String[] {"would", "be " + infl[2]});
         }
-        // built
+        // ate
         if (verbStr.equals(infl[3])) {
             return Optional.of(new String[] {"did", infl[0]});
         }
-        // built (pt)
+        // eaten
         return Optional.of(new String[] {"have", infl[4]});
     }
 
@@ -157,20 +157,57 @@ public class VerbHelper {
         return infl != null && verbStr.equals(infl[0]);
     }
 
+    public static boolean isModal(String verb) {
+        return modalVerbs.contains(verb.toLowerCase());
+    }
+
+    public static String getNormalizedModal(String word) {
+        if(word.equalsIgnoreCase("ca")) {
+            return "can";
+        } else {
+            return word;
+        }
+    }
+
+    public static boolean isFutureTense(String verb) {
+        return willVerbs.contains(verb.toLowerCase());
+    }
+
+    public static boolean isPastTense(String verb) {
+        return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
+            .map(infl -> verb.equalsIgnoreCase(infl[3]))
+            .orElse(false);
+    }
+
     public static String getPastTense(String verb) {
         return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
             .map(infl -> infl[3])
             .orElse(verb + "[DBG]");
     }
 
+    // if the number of the subject is not known, allows for the "do" form (as opposed to "does" form) long as subj is third person
+    public static boolean isPresentTense(String verb, Noun subject) {
+        return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
+            .map(infl -> verb.equalsIgnoreCase(infl[1]) ||
+                 (!(subject.getNumber().map(num -> num == Noun.Number.SINGULAR).orElse(true) && subject.getPerson() == Noun.Person.THIRD) &&
+                  verb.equalsIgnoreCase(infl[0])))
+            .orElse(false);
+    }
+
     public static String getPresentTense(String verb, Noun subject) {
         return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
             .map(infl -> ((subject.getNumber().map(num -> num == Noun.Number.SINGULAR).orElse(true)) &&
-                          subject.getPerson() == Noun.Person.THIRD) ? infl[3] : infl[0])
+                          subject.getPerson() == Noun.Person.THIRD) ? infl[1] : infl[0])
             .orElse(verb + "[DBG]");
     }
 
     // aka progressive form
+    public static boolean isPresentParticiple(String verb) {
+        return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
+            .map(infl -> verb.equalsIgnoreCase(infl[2]))
+            .orElse(false);
+    }
+
     public static String getPresentParticiple(String verb) {
         return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
             .map(infl -> infl[2])
@@ -178,10 +215,22 @@ public class VerbHelper {
     }
 
     // aka participle
+    public static boolean isPastParticiple(String verb) {
+        return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
+            .map(infl -> verb.equalsIgnoreCase(infl[4]))
+            .orElse(false);
+    }
+
     public static String getPastParticiple(String verb) {
         return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
             .map(infl -> infl[4])
             .orElse(verb + "[DBG]");
+    }
+
+    public static boolean isStem(String verb) {
+        return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
+            .map(infl -> verb.equalsIgnoreCase(infl[0]))
+            .orElse(true); // assume it's the stem if we don't know
     }
 
     public static String getStem(String verb) {

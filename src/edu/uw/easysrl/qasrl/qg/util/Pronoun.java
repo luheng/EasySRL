@@ -53,7 +53,7 @@ public final class Pronoun extends Noun {
     }
 
     @Override
-    public ImmutableList<String> getCompletePhrase() {
+    public ImmutableList<String> getPhrase() {
         return ImmutableList.of(this.toString());
     }
 

@@ -17,7 +17,7 @@ public class BasicNoun extends Noun {
     // overrides
 
     @Override
-    public ImmutableList<String> getCompletePhrase() {
+    public ImmutableList<String> getPhrase() {
         return words;
     }
 
@@ -30,7 +30,7 @@ public class BasicNoun extends Noun {
 
     @Override
     public BasicNoun withCase(Optional<Case> caseMarking) {
-        return new BasicNoun(getPredicate(), getPredicateCategory(), getArgPreds(),
+        return new BasicNoun(getPredicate(), getPredicateCategory(), getArgs(),
                              getCase(), getNumber(), getGender(), getPerson(), getDefiniteness(), words);
     }
 
@@ -41,7 +41,7 @@ public class BasicNoun extends Noun {
 
     @Override
     public BasicNoun withNumber(Optional<Number> number) {
-        return new BasicNoun(getPredicate(), getPredicateCategory(), getArgPreds(),
+        return new BasicNoun(getPredicate(), getPredicateCategory(), getArgs(),
                              getCase(), getNumber(), getGender(), getPerson(), getDefiniteness(), words);
     }
 
@@ -52,19 +52,19 @@ public class BasicNoun extends Noun {
 
     @Override
     public BasicNoun withGender(Optional<Gender> gender) {
-        return new BasicNoun(getPredicate(), getPredicateCategory(), getArgPreds(),
+        return new BasicNoun(getPredicate(), getPredicateCategory(), getArgs(),
                              getCase(), getNumber(), getGender(), getPerson(), getDefiniteness(), words);
     }
 
     @Override
     public BasicNoun withPerson(Person person) {
-        return new BasicNoun(getPredicate(), getPredicateCategory(), getArgPreds(),
+        return new BasicNoun(getPredicate(), getPredicateCategory(), getArgs(),
                              getCase(), getNumber(), getGender(), getPerson(), getDefiniteness(), words);
     }
 
     @Override
     public BasicNoun withDefiniteness(Definiteness definiteness) {
-        return new BasicNoun(getPredicate(), getPredicateCategory(), getArgPreds(),
+        return new BasicNoun(getPredicate(), getPredicateCategory(), getArgs(),
                              getCase(), getNumber(), getGender(), getPerson(), getDefiniteness(), words);
     }
 
@@ -72,14 +72,14 @@ public class BasicNoun extends Noun {
 
     protected BasicNoun(String predicate,
                         Category predicateCategory,
-                        ImmutableMap<Integer, Predication> argPreds,
+                        ImmutableMap<Integer, ImmutableList<Argument>> args,
                         Optional<Case> caseMarking,
                         Optional<Number> number,
                         Optional<Gender> gender,
                         Person person,
                         Definiteness definiteness,
                         ImmutableList<String> words) {
-        super(predicate, predicateCategory, argPreds, caseMarking, number, gender, person, definiteness);
+        super(predicate, predicateCategory, args, caseMarking, number, gender, person, definiteness);
         this.words = words;
     }
 

@@ -67,7 +67,7 @@ public abstract class Noun extends Predication {
 
         /* extract grammatical features. */
         // this is fine because none of our nouns take arguments, right?
-        final ImmutableMap<Integer, Predication> argPreds = ImmutableMap.of();
+        final ImmutableMap<Integer, ImmutableList<Argument>> args = ImmutableMap.of();
 
         // only pronouns are case marked
         final Optional<Case> caseMarking = Optional.empty();
@@ -89,9 +89,8 @@ public abstract class Noun extends Predication {
         // only pronouns can be non-third person
         final Person person = Person.THIRD;
 
-        final Definiteness definiteness;
-        npNode.getLeaves().stream()
-            .filter(leaf -> leaf.getPos().equals("DT") || leaf.getPos("WDT"))
+        final Definiteness definiteness = npNode.getLeaves().stream()
+            .filter(leaf -> leaf.getPos().equals("DT") || leaf.getPos().equals("WDT"))
             .findFirst()
             .flatMap(leaf -> {
                     if(leaf.getWord().equalsIgnoreCase("the")) {
@@ -100,6 +99,8 @@ public abstract class Noun extends Predication {
                         return Optional.of(Definiteness.INDEFINITE);
                     } else if(leaf.getPos().equals("WDT")) {
                         return Optional.of(Definiteness.FOCAL);
+                    } else {
+                        return Optional.empty();
                     }
                 })
             .orElse(null);
@@ -135,13 +136,13 @@ public abstract class Noun extends Predication {
     public QuestionData getQuestionData() {
         ImmutableList<String> wh = this.getFocalPronoun()
             .withCase(Case.NOMINATIVE)
-            .getCompletePhrase();
-        Predication placeholder = this.elide();
+            .getPhrase();
+        Predication placeholder = new Gap(Category.NP);
         Predication answer = this;
         return new QuestionData(wh, placeholder, answer);
     }
 
-    // getCompletePhrase is left abstract
+    // getPhrase is left abstract
 
     // getters
 
@@ -212,13 +213,13 @@ public abstract class Noun extends Predication {
 
     protected Noun(String predicate,
                    Category predicateCategory,
-                   ImmutableMap<Integer, Predication> argPreds,
+                   ImmutableMap<Integer, ImmutableList<Argument>> args,
                    Optional<Case> caseMarking,
                    Optional<Number> number,
                    Optional<Gender> gender,
                    Person person,
                    Definiteness definiteness) {
-        super(predicate, predicateCategory, argPreds);
+        super(predicate, predicateCategory, args);
         this.caseMarking = caseMarking;
         this.number = number;
         this.gender = gender;
