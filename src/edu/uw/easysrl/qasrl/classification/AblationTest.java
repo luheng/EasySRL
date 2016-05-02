@@ -1,21 +1,13 @@
 package edu.uw.easysrl.qasrl.classification;
 
 import com.google.common.collect.*;
-import edu.uw.easysrl.qasrl.NBestList;
-import edu.uw.easysrl.qasrl.Parse;
-import edu.uw.easysrl.qasrl.TextGenerationHelper;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
-import edu.uw.easysrl.qasrl.annotation.AnnotationUtils;
-import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
-import edu.uw.easysrl.qasrl.experiments.ReparsingHistory;
-import edu.uw.easysrl.qasrl.model.Constraint;
 import edu.uw.easysrl.qasrl.model.HITLParser;
 import edu.uw.easysrl.qasrl.model.HITLParsingParameters;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
-import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.util.GuavaCollectors;
 import ml.dmlc.xgboost4j.java.Booster;
 import ml.dmlc.xgboost4j.java.DMatrix;
@@ -24,7 +16,6 @@ import ml.dmlc.xgboost4j.java.XGBoostError;
 
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 
 /**
@@ -41,7 +32,6 @@ public class AblationTest {
     private static Map<Integer, List<ImmutableList<ImmutableList<Integer>>>> alignedAnnotations;
     private static Map<Integer, List<AlignedAnnotation>> alignedOldAnnotations;
     private static ImmutableList<Integer> trainSents;
-    private static ImmutableList<DependencyInstance> trainingInstances, devInstances, testInstances;
 
     private static final String[] annotationFiles = {
             "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
@@ -91,38 +81,65 @@ public class AblationTest {
 
         FeatureExtractor featureExtractor;
 
+        System.out.println("All Features");
+        featureExtractor = new FeatureExtractor();
+        runExperiment(featureExtractor, "All Features");
+
+        featureExtractor = new FeatureExtractor();
+        featureExtractor.addCategoryFeatures = false;
+        featureExtractor.addNAOptionFeature = false;
+        featureExtractor.addAnswerLexicalFeatures = false;
+        featureExtractor.addArgumentPositionFeatures = false;
+        featureExtractor.addTemplateBasedFeatures = false;
+        runExperiment(featureExtractor, "Base Features");
+
+        featureExtractor = new FeatureExtractor();
+        featureExtractor.addCategoryFeatures = false;
+        featureExtractor.addNAOptionFeature = false;
+        featureExtractor.addAnswerLexicalFeatures = false;
+        featureExtractor.addArgumentPositionFeatures = false;
+        featureExtractor.addTemplateBasedFeatures = true;
+        runExperiment(featureExtractor, "Add template features");
+
+        /*
         System.out.println("-Prior Features");
         featureExtractor = new FeatureExtractor();
         featureExtractor.addNBestPriorFeatures = false;
-        runExperiment(featureExtractor);
+        runExperiment(featureExtractor, "-Prior Features");
 
         System.out.println("-Category Features");
         featureExtractor = new FeatureExtractor();
         featureExtractor.addCategoryFeatures = false;
-        runExperiment(featureExtractor);
+        runExperiment(featureExtractor, "-Category Features");
 
         System.out.println("-Argument position features");
         featureExtractor = new FeatureExtractor();
         featureExtractor.addArgumentPositionFeatures = false;
-        runExperiment(featureExtractor);
+        runExperiment(featureExtractor, "-Argument position features");
+
+        System.out.println("-Answer lexical features");
+        featureExtractor = new FeatureExtractor();
+        featureExtractor.addAnswerLexicalFeatures = false;
+        runExperiment(featureExtractor, "-Answer lexical features");
 
         System.out.println("-NA option features");
         featureExtractor = new FeatureExtractor();
         featureExtractor.addNAOptionFeature = false;
-        runExperiment(featureExtractor);
+        runExperiment(featureExtractor, "-NA option features");
 
         System.out.println("-Annotation features");
         featureExtractor = new FeatureExtractor();
         featureExtractor.addAnnotationFeatures = false;
-        runExperiment(featureExtractor);
+        runExperiment(featureExtractor, "-Annotation features");
 
         System.out.println("-Template Features");
         featureExtractor = new FeatureExtractor();
         featureExtractor.addTemplateBasedFeatures = false;
-        runExperiment(featureExtractor);
+        runExperiment(featureExtractor, "-Template features");
+        */
     }
 
-    private static void runExperiment(FeatureExtractor featureExtractor) {
+    private static void runExperiment(final FeatureExtractor featureExtractor, final String message) {
         ImmutableList<DependencyInstance> trainingInstances =
                 ClassificationUtils.getInstances(trainSents, myParser, featureExtractor, annotations, alignedQueries,
                         alignedAnnotations, alignedOldAnnotations);
@@ -135,7 +152,7 @@ public class AblationTest {
             DMatrix trainData = ClassificationUtils.getDMatrix(trainingInstances);
             final int nfold = 5;
             double result = GridSearch.runGridSearch(trainData, nfold);
-            System.out.println(result);
+            System.out.println("[avg]\t" + message + "\t" + result);
 
             final Map<String, Object> paramsMap = ImmutableMap.of(
                     "eta", 0.1,

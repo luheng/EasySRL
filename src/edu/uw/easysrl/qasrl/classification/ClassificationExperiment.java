@@ -1,7 +1,6 @@
 package edu.uw.easysrl.qasrl.classification;
 
 import com.google.common.collect.*;
-import edu.uw.easysrl.qasrl.NBestList;
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.TextGenerationHelper;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
@@ -32,7 +31,7 @@ import java.util.stream.IntStream;
  */
 public class ClassificationExperiment {
     private static final int nBest = 100;
-    private static final ImmutableList<Double> split = ImmutableList.of(0.6, 0.4, 0.0);
+    private static final ImmutableList<Double> split = ImmutableList.of(0.8, 0.2, 0.0);
     private static final int randomSeed = 12345;
     private static HITLParser myParser;
     private static ReparsingHistory myHistory;
@@ -85,6 +84,12 @@ public class ClassificationExperiment {
         alignedAnnotations = new HashMap<>();
         alignedOldAnnotations = new HashMap<>();
         featureExtractor = new FeatureExtractor();
+        featureExtractor.addArgumentPositionFeatures = false;
+        featureExtractor.addCategoryFeatures = false;
+        featureExtractor.addAnswerLexicalFeatures = false;
+        featureExtractor.addNAOptionFeature = false;
+        //featureExtractor.addTemplateBasedFeatures = false;
+        //featureExtractor.addNBestPriorFeatures = false;
         assert annotations != null;
 
         /**************** Prepare data ********************/
@@ -170,11 +175,11 @@ public class ClassificationExperiment {
                             myParser.getConstraints(alignedQueries.get(sentenceId).get(qid),
                                     alignedOldAnnotations.get(sentenceId).get(qid))));
 
-            if (pred[i][0] > 0.6) {
+            if (pred[i][0] > 0.5) {
                 constraints.get(sentenceId).add(
                         new Constraint.AttachmentConstraint(instance.headId, instance.argId, true, 1.0));
             }
-            if (pred[i][0] < 0.4) {
+            if (pred[i][0] < 0.5) {
                 constraints.get(sentenceId).add(
                         new Constraint.AttachmentConstraint(instance.headId, instance.argId, false, 1.0));
             }
@@ -305,7 +310,7 @@ public class ClassificationExperiment {
         DMatrix testData = ClassificationUtils.getDMatrix(testInstances);
         final Map<String, Object> paramsMap = ImmutableMap.of(
                 "eta", 0.1,
-                "min_child_weight", 0.1,
+                "min_child_weight", 1.0,
                 "max_depth", 3,
                 "objective", "binary:logistic"
         );
@@ -316,8 +321,9 @@ public class ClassificationExperiment {
         final int round = 100, nfold = 5;
         Booster booster = XGBoost.train(trainData, paramsMap, round, watches, null, null);
 
-        GridSearch.runGridSearch(trainData, nfold);
-        //reparse(booster, devSents, devInstances, devData);
+        double avg = GridSearch.runGridSearch(trainData, nfold);
+        System.out.println("avg:\t" + avg);
+        reparse(booster, devSents, devInstances, devData);
         //reparse(booster, testInstances, testData);
 
         booster.saveModel("model.bin");

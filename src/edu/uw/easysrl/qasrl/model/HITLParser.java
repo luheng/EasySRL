@@ -34,10 +34,16 @@ public class HITLParser {
     public void setQueryPruningParameters(QueryPruningParameters queryPruningParameters) {
         this.queryPruningParameters = queryPruningParameters;
     }
+    public QueryPruningParameters getQueryPruningParameters() {
+        return queryPruningParameters;
+    }
 
     private HITLParsingParameters reparsingParameters = new HITLParsingParameters();
     public void setReparsingParameters(HITLParsingParameters reparsingParameters) {
         this.reparsingParameters = reparsingParameters;
+    }
+    public HITLParsingParameters getReparsingParameters() {
+        return reparsingParameters;
     }
 
     private BaseCcgParser.ConstrainedCcgParser2 reparser;

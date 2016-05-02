@@ -2,13 +2,11 @@ package edu.uw.easysrl.qasrl.classification;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import edu.uw.easysrl.qasrl.NBestList;
 import edu.uw.easysrl.qasrl.corpora.CountDictionary;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.syntax.AnswerStructure;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
-import edu.uw.easysrl.qasrl.qg.util.PronounList;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.GuavaCollectors;
@@ -27,10 +25,10 @@ public class FeatureExtractor {
 
     boolean addCategoryFeatures = true;
     boolean addNBestPriorFeatures = true;
-    boolean addTemplateBasedFeatures = false;
+    boolean addTemplateBasedFeatures = true;
     boolean addAnnotationFeatures = true;
     boolean addNAOptionFeature = true;
-    boolean addAnswerLexicalFeautures = true;
+    boolean addAnswerLexicalFeatures = true;
     boolean addArgumentPositionFeatures = true;
 
     FeatureExtractor() {
@@ -98,8 +96,7 @@ public class FeatureExtractor {
                         .mapToDouble(parse -> parse.score)
                         .sum()
                 ));
-
-        ImmutableList<Integer> votes = IntStream.range(0, numQAOptions).boxed()
+        final ImmutableList<Integer> allVotes = IntStream.range(0, numQAOptions).boxed()
                 .map(i -> (int) annotation.stream().filter(ops -> ops.contains(i)).count())
                 .collect(GuavaCollectors.toImmutableList());
 
@@ -118,22 +115,25 @@ public class FeatureExtractor {
                     .forEach(argType -> addFeature(features, "ArgumentType=" + argType, 1));
         }
 
+        final double prior = nBestPriors.get(argId) / nBestPriorNorm;
         if (addNBestPriorFeatures) {
-            addFeature(features, "NBestPrior", nBestPriors.get(argId) / nBestPriorNorm);
+            addFeature(features, "NBestPrior", prior);
         }
 
+        final double votes = 1.0 * options.stream().mapToInt(allVotes::get).max().orElse(0);
         if (addAnnotationFeatures) {
-            addFeature(features, "NumReceivedVotes", 1.0 * options.stream().mapToInt(votes::get).max().orElse(0) / numAnnotators);
-
+            addFeature(features, "NumReceivedVotes", votes); // / numAnnotators);
+            /*
             int numSingleVotes = options.stream()
                     .mapToInt(i -> (int) annotation.stream().filter(ops -> ops.contains(i) && ops.size() == 1).count())
                     .max().orElse(0);
-            addFeature(features, "NumReceivedSingleVotes", 1.0 * numSingleVotes / numAnnotators);
+            addFeature(features, "NumReceivedSingleVotes", 1.0 * numSingleVotes); // / numAnnotators);
 
             int numSkipped = options.stream()
                     .mapToInt(i -> (int) annotation.stream().filter(ops -> !ops.contains(i)).count())
                     .max().orElse(0);
-            addFeature(features, "NumSkippedVotes", 1.0 * numSkipped / numAnnotators);
+            addFeature(features, "NumSkippedVotes", 1.0 * numSkipped);// / numAnnotators);
+            */
         }
 
         if (addNAOptionFeature) {
@@ -142,7 +142,7 @@ public class FeatureExtractor {
                     .filter(ops -> ops.contains(naOptionId)).count() / numAnnotators);
         }
 
-        if (addAnswerLexicalFeautures) {
+        if (addAnswerLexicalFeatures) {
             if (options.stream().map(query.getOptions()::get)
                     .anyMatch(op -> op.toLowerCase().startsWith("a "))) {
                 addFeature(features, "StartsWith=a", 1);
@@ -167,12 +167,18 @@ public class FeatureExtractor {
                     }
                     if (options.contains(i)) {
                         final int otherHead = query.getQAPairSurfaceForms().get(j).getAnswerStructures().get(0).argumentIndices.get(0);
-                        addFeature(features, template + ".1." + "votes", 1.0 * votes.get(j) / numAnnotators);
-                        addFeature(features, template + ".1." + "prior", nBestPriors.get(otherHead) / nBestPriorNorm);
+                        final double otherVotes = 1.0 * allVotes.get(j);
+                        final double otherPrior = nBestPriors.get(otherHead) / nBestPriorNorm;
+                        addFeature(features, template + ".1." + "votes", otherVotes);
+                        addFeature(features, template + ".1." + "prior", otherPrior);
+                        //addFeature(features, template + ".1." + "votes+", Math.min(votes + otherVotes, numAnnotators));
                     } else if (options.contains(j)) {
                         final int otherHead = query.getQAPairSurfaceForms().get(i).getAnswerStructures().get(0).argumentIndices.get(0);
-                        addFeature(features, template + ".2." + "votes", 1.0 * votes.get(i) / numAnnotators);
-                        addFeature(features, template + ".2." + "prior", nBestPriors.get(otherHead) / nBestPriorNorm);
+                        final double otherVotes = 1.0 * allVotes.get(i);
+                        final double otherPrior = nBestPriors.get(otherHead) / nBestPriorNorm;
+                        addFeature(features, template + ".2." + "votes", otherVotes);
+                        addFeature(features, template + ".2." + "prior", otherPrior);
+                        //addFeature(features, template + ".2." + "votes+", Math.min(votes + otherVotes, numAnnotators));
                     }
                 }
             }
