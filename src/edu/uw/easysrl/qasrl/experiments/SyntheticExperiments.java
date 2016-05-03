@@ -21,7 +21,7 @@ import java.util.stream.Stream;
 public class SyntheticExperiments {
     // Parameters.
     private static int nBest = 100;
-    private static int maxNumSentences = 1000;
+    private static int maxNumSentences = 2000;
 
     // Shared data: nBestList, sentences, etc.
     private static HITLParser myHITLParser;
@@ -31,7 +31,7 @@ public class SyntheticExperiments {
     static {
         queryPruningParameters = new QueryPruningParameters();
         queryPruningParameters.minPromptConfidence = 0.1;
-        queryPruningParameters.minOptionConfidence = 0.05;
+        queryPruningParameters.minOptionConfidence = 0.00;
         queryPruningParameters.minOptionEntropy = 0.05;
         queryPruningParameters.skipBinaryQueries = true;
         queryPruningParameters.skipPPQuestions = false;
