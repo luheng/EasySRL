@@ -44,14 +44,14 @@ public class CrowdFlowerDataWriterNPClefted {
         queryPruningParameters.skipSAdjQuestions = true;
         queryPruningParameters.minOptionConfidence = 0.05;
         queryPruningParameters.minOptionEntropy = 0.1;
-        queryPruningParameters.minPromptConfidence = 0.1;
+        queryPruningParameters.minPromptConfidence = 0.3;
         //queryPruningParameters.minPromptConfidence = 0.3;
     }
     static HITLParsingParameters reparsingParamters;
     static {
         reparsingParamters = new HITLParsingParameters();
-        reparsingParamters.attachmentPenaltyWeight = 10.0;
-        reparsingParamters.supertagPenaltyWeight = 10.0;
+        reparsingParamters.attachmentPenaltyWeight = 5.0;
+        reparsingParamters.supertagPenaltyWeight = 5.0;
     }
 
     private static void printTestQuestions() throws IOException {

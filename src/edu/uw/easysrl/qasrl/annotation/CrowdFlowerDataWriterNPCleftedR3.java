@@ -40,7 +40,7 @@ public class CrowdFlowerDataWriterNPCleftedR3 {
             "./Crowdflower_unannotated/test_questions/test_questions_np_clefting_r01.tsv",
     };
 
-    private static final String csvOutputFilePrefix = "./Crowdflower_unannotated/np_clefting_100best";
+    private static final String csvOutputFilePrefix = "./Crowdflower_temp/np_clefting_100best";
 
     static QueryPruningParameters queryPruningParameters;
     static {
@@ -163,7 +163,7 @@ public class CrowdFlowerDataWriterNPCleftedR3 {
 
     public static void main(String[] args) throws IOException {
         //final ImmutableList<Integer> testSentenceIds = CrowdFlowerDataUtils.getTestSentenceIds();
-        printTestQuestions();
-        //printQuestionsToAnnotate();
+        //printTestQuestions();
+        printQuestionsToAnnotate();
     }
 }
