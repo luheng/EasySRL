@@ -58,7 +58,7 @@ public class OracleExperiment {
 
     private static ImmutableList<Integer> skipSentenceIds = ImmutableList.of(449, 604, 662, 705, 1523, 1730);
 
-    private static Set<Constraint> getAttachmentConstraints(final Stream <ProfiledDependency> dependencyStream) {
+    public static Set<Constraint> getAttachmentConstraints(final Stream <ProfiledDependency> dependencyStream) {
         return dependencyStream
                 .map(dep -> dep.dependency)
                 .map(dep -> new Constraint.AttachmentConstraint(dep.getHead(), dep.getArgument(), true,
