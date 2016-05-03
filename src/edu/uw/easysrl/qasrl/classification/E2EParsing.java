@@ -27,7 +27,7 @@ import java.util.stream.IntStream;
  * Created by luheng on 5/2/16.
  */
 public class E2EParsing {
-    private static ImmutableMap<String, Double> reparse(final ImmutableList<Integer> trainSents,
+    static ImmutableMap<String, Double> reparse(final ImmutableList<Integer> trainSents,
                                                         final ImmutableList<Integer> devSents,
                                                         final Map<Integer, List<AlignedAnnotation>> annotations,
                                                         final HITLParser myParser,
