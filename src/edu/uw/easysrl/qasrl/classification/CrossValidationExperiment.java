@@ -33,8 +33,7 @@ import java.util.stream.IntStream;
 public class CrossValidationExperiment {
     private static final int nBest = 100;
     private static final int randomSeed = 12345;
-    private static  annotations;
-
+    
     private static ImmutableList<Integer> trainSents, devSents;
 
     private static final String[] annotationFiles = {
@@ -100,252 +99,36 @@ public class CrossValidationExperiment {
                 "objective", "binary:logistic"
         );
         final int numRounds = 100;
-        Map<String, Double> aggregatedResults = new HashMap<>();
+        Map<String, Map<String, Double>> aggregatedResults = new HashMap<>();
         for (double trainPortion : ImmutableList.of(0.2, 0.4, 0.6, 0.8)) {
-        for (int i = 0; i < numRandomRuns; i++) {
-            ImmutableList<ImmutableList<Integer>> splitSents = ClassificationUtils.jackknife(sentenceIds,
-                    ImmutableList.of(trainPortion, 1.0 - trainPortion), randomSeed);
-            trainSents = splitSents.get(0);
-            devSents = splitSents.get(1);
-            try {
-                ImmutableMap<String, Double> results = E2EParsing.reparse(trainSents, devSents, annotations, myParser,
-                        featureExtractor, paramsMap, numRounds);
-                for (String k : results.keySet()) {
-                    double r = aggregatedResults.containsKey(k) ? aggregatedResults.get(k) : 0.0;
-                    
-                    if (!aggregatedResults.containsKey(k)) {
-                        aggregatedResults.
+            final String setupKey = "trainPortion=" + trainPortion;
+            aggregatedResults.put(setupKey, new HashMap<>());
+            for (int i = 0; i < numRandomRuns; i++) {
+                ImmutableList<ImmutableList<Integer>> splitSents = ClassificationUtils.jackknife(sentenceIds,
+                        ImmutableList.of(trainPortion, 1.0 - trainPortion), randomSeed);
+                trainSents = splitSents.get(0);
+                devSents = splitSents.get(1);
+                try {
+                    ImmutableMap<String, Double> results = E2EParsing.reparse(trainSents, devSents, annotations, myParser,
+                            featureExtractor, paramsMap, numRounds);
+                    for (String k : results.keySet()) {
+                        double r = aggregatedResults.get(setupKey).containsKey(k) ?
+                                aggregatedResults.get(setupKey).get(k) : 0.0;
+                        aggregatedResults.get(setupKey).put(k, r + results.get(k));
                     }
-                }
-            } catch (XGBoostError e) {
-                e.printStackTrace();
-            }
-
-        testSents = splitSents.get(2);
-        System.out.println(trainSents.size() + "\t" + devSents.size() + "\t" + testSents.size());
-        System.out.println(trainSents);
-        System.out.println(devSents);
-        System.out.println(testSents);
-
-        trainingInstances = ClassificationUtils.getInstances(trainSents, myParser, featureExtractor, annotations,
-                alignedQueries, alignedAnnotations, alignedOldAnnotations);
-        final int numPositive = (int) trainingInstances.stream().filter(inst -> inst.inGold).count();
-        System.out.println(String.format("Extracted %d training samples and %d features, %d positive and %d negative.",
-                trainingInstances.size(), featureExtractor.featureMap.size(),
-                numPositive, trainingInstances.size() - numPositive));
-
-        featureExtractor.freeze();
-
-        devInstances = ClassificationUtils.getInstances(devSents, myParser, featureExtractor, annotations,
-                alignedQueries, alignedAnnotations, alignedOldAnnotations);
-        testInstances = ClassificationUtils.getInstances(testSents, myParser, featureExtractor, annotations,
-                alignedQueries, alignedAnnotations, alignedOldAnnotations);
-
-        final int numPositiveDev = (int) devInstances.stream().filter(inst -> inst.inGold).count();
-        System.out.println(String.format("Extracted %d dev samples and %d features, %d positive and %d negative.",
-                devInstances.size(), featureExtractor.featureMap.size(),
-                numPositiveDev, devInstances.size() - numPositiveDev));
-
-        try {
-            runExperiment();
-        } catch (XGBoostError e) {
-            e.printStackTrace();
-        }
-    }
-
-    private static void reparse(final Booster booster, final ImmutableList<Integer> sentenceIds,
-                                final ImmutableList<DependencyInstance> instances,
-                                final DMatrix data) throws XGBoostError {
-
-        Map<Integer, Set<Constraint>> constraints = new HashMap<>();
-        Map<Integer, Set<Constraint>> heursticConstraints = new HashMap<>();
-        final float[][] pred = booster.predict(data);
-        int baselineAcc = 0, classifierAcc = 0, numInstances = 0;
-
-        for (int sentenceId : sentenceIds) {
-            constraints.put(sentenceId, new HashSet<>());
-            heursticConstraints.put(sentenceId, new HashSet<>());
-            for (int qid = 0; qid < alignedQueries.get(sentenceId).size(); qid++) {
-                final ScoredQuery<QAStructureSurfaceForm> query = alignedQueries.get(sentenceId).get(qid);
-                final ImmutableList<ImmutableList<Integer>> annotation = alignedAnnotations.get(sentenceId).get(qid);
-                final int naOptionId = query.getBadQuestionOptionId().getAsInt();
-                final int numNAVotes = (int) annotation.stream().filter(ops -> ops.contains(naOptionId)).count();
-                if (numNAVotes > reparsingParameters.negativeConstraintMaxAgreement) {
-                    constraints.get(sentenceId).add(new Constraint.SupertagConstraint(query.getPredicateId().getAsInt(),
-                            query.getPredicateCategory().get(), false, reparsingParameters.supertagPenaltyWeight));
+                } catch (XGBoostError e) {
+                    e.printStackTrace();
                 }
             }
         }
 
-        for (int i = 0; i < instances.size(); i++) {
-            final DependencyInstance instance = instances.get(i);
-            final boolean p = (pred[i][0] > 0.5);
-
-            final int sentenceId = instance.sentenceId;
-            final ImmutableList<String> sentence = myParser.getSentence(sentenceId);
-            final ScoredQuery<QAStructureSurfaceForm> query = alignedQueries.get(sentenceId).get(instance.queryId);
-            final ImmutableList<QAStructureSurfaceForm> qaList = query.getQAPairSurfaceForms();
-            final AlignedAnnotation annotation = alignedOldAnnotations.get(sentenceId).get(instance.queryId);
-            final int[] userDist = AnnotationUtils.getUserResponseDistribution(query, annotation);
-
-            IntStream.range(0, alignedQueries.get(sentenceId).size()).boxed()
-                    .forEach(qid -> heursticConstraints.get(sentenceId).addAll(
-                            myParser.getConstraints(alignedQueries.get(sentenceId).get(qid),
-                                    alignedOldAnnotations.get(sentenceId).get(qid))));
-
-            if (pred[i][0] > 0.5) {
-                constraints.get(sentenceId).add(
-                        new Constraint.AttachmentConstraint(instance.headId, instance.argId, true, 1.0));
+        System.out.println();
+        for (String setupKey : aggregatedResults.keySet()) {
+            System.out.print(setupKey);
+            for (String k : aggregatedResults.get(setupKey).keySet()) {
+                System.out.println(k + "\t" + aggregatedResults.get(setupKey).get(k) / numRandomRuns);
             }
-            if (pred[i][0] < 0.5) {
-                constraints.get(sentenceId).add(
-                        new Constraint.AttachmentConstraint(instance.headId, instance.argId, false, 1.0));
-            }
-
-            /************** Get baseline accuracy *************************/
-            final ImmutableList<Integer> options = IntStream.range(0, qaList.size()).boxed()
-                    .filter(op -> DependencyInstanceHelper.containsDependency(sentence, qaList.get(op),
-                            instance.headId, instance.argId))
-                    .collect(GuavaCollectors.toImmutableList());
-            boolean baselinePrediction = options.stream().mapToInt(op -> userDist[op]).max().orElse(0) >= 3;
-
-            baselineAcc += (baselinePrediction == instance.inGold) ? 1 : 0;
-            classifierAcc += (p == instance.inGold) ? 1 : 0;
-            numInstances++;
-
-            if (p != instance.inGold) {
-                System.out.println();
-                System.out.println(query.toString(sentence,
-                        'G', myParser.getGoldOptions(query),
-                        '*', userDist));
-                System.out.println(String.format("%d:%s ---> %d:%s", instance.headId, sentence.get(instance.headId),
-                        instance.argId, sentence.get(instance.argId)));
-                System.out.println(String.format("%b\t%.2f\t%b", instance.inGold, pred[i][0], baselinePrediction));
-
-                featureExtractor.printFeature(instance.features);
-            }
-        }
-
-        System.out.println("Baseline accuracy:\t" + 100.0 * baselineAcc / numInstances);
-        System.out.println("Classifier accuracy:\t" + 100.0 * classifierAcc / numInstances);
-        Results avgBaseline = new Results(),
-                avgReparsed = new Results(),
-                avgHeuristicReparsed = new Results(),
-                avgUnlabeledBaseline = new Results(),
-                avgUnlabeledReparsed = new Results(),
-                avgUnlabeledHeuristicReparsed = new Results();
-        int numImproved = 0, numWorsened = 0;
-
-        // Re-parsing ...
-        for (int sentenceId : sentenceIds) {
-            final ImmutableList<String> sentence = myParser.getSentence(sentenceId);
-            final Parse gold = myParser.getGoldParse(sentenceId);
-            final Parse reparsed = myParser.getReparsed(sentenceId, constraints.get(sentenceId));
-            final Parse heuristicReparsed = myParser.getReparsed(sentenceId, heursticConstraints.get(sentenceId));
-            final Results baselineF1 = myParser.getNBestList(sentenceId).getResults(0);
-            final Results reparsedF1 = CcgEvaluation.evaluate(reparsed.dependencies, gold.dependencies);
-            final Results heuristicReparsedF1 = CcgEvaluation.evaluate(heuristicReparsed.dependencies,
-                    gold.dependencies);
-            final Results unlabeledBaselineF1 = CcgEvaluation.evaluateUnlabeled(
-                    myParser.getNBestList(sentenceId).getParse(0).dependencies, gold.dependencies);
-            final Results unlabeledReparsedF1 = CcgEvaluation.evaluateUnlabeled(reparsed.dependencies,
-                    gold.dependencies);
-            final Results unlabeledHeuristicReparsedF1 = CcgEvaluation.evaluateUnlabeled(heuristicReparsed.dependencies,
-                    gold.dependencies);
-
-            avgBaseline.add(baselineF1);
-            avgReparsed.add(reparsedF1);
-            avgHeuristicReparsed.add(heuristicReparsedF1);
-            avgUnlabeledBaseline.add(unlabeledBaselineF1);
-            avgUnlabeledReparsed.add(unlabeledReparsedF1);
-            avgUnlabeledHeuristicReparsed.add(unlabeledHeuristicReparsedF1);
-
-            if (baselineF1.getF1() + 1e-6 < reparsedF1.getF1()) {
-                numImproved ++;
-            }
-            if (baselineF1.getF1() > reparsedF1.getF1() + 1e-6) {
-                numWorsened ++;
-            }
-            if (baselineF1.getF1() <= reparsedF1.getF1()) {
-                continue;
-            }
-
-            /**************************** Debugging ! ************************/
-            System.out.println(sentenceId + "\t" + TextGenerationHelper.renderString(sentence));
-            for (int qid = 0; qid < alignedQueries.get(sentenceId).size(); qid++) {
-                final ScoredQuery<QAStructureSurfaceForm> query = alignedQueries.get(sentenceId).get(qid);
-                final AlignedAnnotation annotation = alignedOldAnnotations.get(sentenceId).get(qid);
-                System.out.println(query.toString(sentence,
-                        'G', myParser.getGoldOptions(query),
-                        'U', myParser.getUserOptions(query, annotation),
-                        '*', AnnotationUtils.getUserResponseDistribution(query, annotation)));
-                // System.out.println(annotation);
-                System.out.println("----- classifier predictions -----");
-                for (int instId = 0; instId < instances.size(); instId++) {
-                    final DependencyInstance instance = instances.get(instId);
-                    if (instance.sentenceId == sentenceId && instance.queryId == qid) {
-                        System.out.println(String.format("%d:%s ---> %d:%s:\t%b\t%.2f",
-                                instance.headId, sentence.get(instance.headId),
-                                instance.argId, sentence.get(instance.argId),
-                                instance.inGold, pred[instId][0]));
-                    }
-                }
-                constraints.get(sentenceId).stream()
-                        .forEach(c -> System.out.println(c.toString(sentence)));
-                System.out.println("----- old constraints -----");
-                myParser.getConstraints(query, annotation)
-                        .forEach(c -> System.out.println(c.toString(sentence)));
-                System.out.println();
-            }
-
-            System.out.println(baselineF1);
-            System.out.println(heuristicReparsedF1);
-            System.out.println(reparsedF1);
-            System.out.println("---");
-            System.out.println(unlabeledBaselineF1);
-            System.out.println(unlabeledHeuristicReparsedF1);
-            System.out.println(unlabeledReparsedF1);
             System.out.println();
-
         }
-        System.out.println(avgBaseline);
-        System.out.println(avgHeuristicReparsed);
-        System.out.println(avgReparsed);
-        System.out.println(avgUnlabeledBaseline);
-        System.out.println(avgUnlabeledHeuristicReparsed);
-        System.out.println(avgUnlabeledReparsed);
-
-        System.out.println("Num processed sentences:\t" + sentenceIds.size());
-        System.out.println("Num improved:\t" + numImproved);
-        System.out.println("Num worsened:\t" + numWorsened);
-    }
-
-    private static void runExperiment() throws XGBoostError {
-        // TODO: print out training samples.
-        // TODO: compute precision/recall and tune by threshold.
-        DMatrix trainData = ClassificationUtils.getDMatrix(trainingInstances);
-        DMatrix devData = ClassificationUtils.getDMatrix(devInstances);
-        DMatrix testData = ClassificationUtils.getDMatrix(testInstances);
-        final Map<String, Object> paramsMap = ImmutableMap.of(
-                "eta", 0.1,
-                "min_child_weight", 1.0,
-                "max_depth", 3,
-                "objective", "binary:logistic"
-        );
-        final Map<String, DMatrix> watches = ImmutableMap.of(
-                "train", trainData,
-                "dev", devData
-        );
-        final int round = 100, nfold = 5;
-        Booster booster = XGBoost.train(trainData, paramsMap, round, watches, null, null);
-
-        double avg = GridSearch.runGridSearch(trainData, nfold);
-        System.out.println("avg:\t" + avg);
-        reparse(booster, devSents, devInstances, devData);
-        //reparse(booster, testInstances, testData);
-
-        booster.saveModel("model.bin");
-        //booster,("modelInfo.txt", "featureMap.txt", false)
-        ClassificationUtils.printXGBoostFeatures(featureExtractor.featureMap, booster.getFeatureScore(""));
     }
 }
