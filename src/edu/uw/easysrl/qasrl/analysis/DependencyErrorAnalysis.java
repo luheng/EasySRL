@@ -380,10 +380,10 @@ public class DependencyErrorAnalysis {
 
     private static final ParseData parseData = ParseData.loadFromDevPool().get();
     private static final ImmutableList<Parse> goldParses = parseData.getGoldParses();
-    private static final String[] coreArgAnnotationFiles = {
+    private static final String[] round3CoreArgAnnotationFiles = {
         "./Crowdflower_data/f893900.csv"                 // Round3-pronouns: checkbox, core only, pronouns.
     };
-    private static final String[] cleftedQuestionAnnotationFiles = {
+    private static final String[] round2To3CleftedQuestionAnnotationFiles = {
         "./Crowdflower_data/f897179.csv"                 // Round2-3: NP clefting questions.
     };
     private static final String[] round2To3AnnotationFiles = {
@@ -391,7 +391,8 @@ public class DependencyErrorAnalysis {
         "./Crowdflower_data/f897179.csv"                 // Round2-3: NP clefting questions.
     };
     private static final String[] round4AnnotationFiles = {
-        "./Crowdflower_data/f902142.csv"
+        "./Crowdflower_data/f902142.csv",
+        "./Crowdflower_data/f903842.csv"
     };
     private static final QueryPruningParameters queryPruningParameters = new QueryPruningParameters();
     static {
@@ -550,9 +551,9 @@ public class DependencyErrorAnalysis {
 
     private static void runQueryMatchingAnalysis() {
         final ImmutableMap<Integer, List<AlignedAnnotation>> coreArgAnnotations = ImmutableMap
-            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(coreArgAnnotationFiles));
+            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(round3CoreArgAnnotationFiles));
         final ImmutableMap<Integer, List<AlignedAnnotation>> cleftedQuestionAnnotations = ImmutableMap
-            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(cleftedQuestionAnnotationFiles));
+            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(round2To3CleftedQuestionAnnotationFiles));
         final ImmutableMap<Integer, List<AlignedAnnotation>> annotations = ImmutableMap
             .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(round2To3AnnotationFiles));
 
@@ -599,9 +600,9 @@ public class DependencyErrorAnalysis {
 
     private static void runGlobalConstraintAnalysis() {
         final ImmutableMap<Integer, List<AlignedAnnotation>> coreArgAnnotations = ImmutableMap
-            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(coreArgAnnotationFiles));
+            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(round3CoreArgAnnotationFiles));
         final ImmutableMap<Integer, List<AlignedAnnotation>> cleftedQuestionAnnotations = ImmutableMap
-            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(cleftedQuestionAnnotationFiles));
+            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(round2To3CleftedQuestionAnnotationFiles));
         final ImmutableMap<Integer, List<AlignedAnnotation>> annotations = ImmutableMap
             .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(round2To3AnnotationFiles));
 
@@ -757,9 +758,9 @@ public class DependencyErrorAnalysis {
 
     private static void runCoreArgQueryWiseConstraintAnalysis() {
         final ImmutableMap<Integer, List<AlignedAnnotation>> coreArgAnnotations = ImmutableMap
-            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(coreArgAnnotationFiles));
+            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(round3CoreArgAnnotationFiles));
         final ImmutableMap<Integer, List<AlignedAnnotation>> cleftedQuestionAnnotations = ImmutableMap
-            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(cleftedQuestionAnnotationFiles));
+            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(round2To3CleftedQuestionAnnotationFiles));
         final ImmutableMap<Integer, List<AlignedAnnotation>> annotations = ImmutableMap
             .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(round2To3AnnotationFiles));
 
@@ -930,7 +931,7 @@ public class DependencyErrorAnalysis {
 
     private static void runCleftedQuestionQueryWiseConstraintAnalysis() {
         final ImmutableMap<Integer, List<AlignedAnnotation>> cleftedQuestionAnnotations = ImmutableMap
-            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(cleftedQuestionAnnotationFiles));
+            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(round2To3CleftedQuestionAnnotationFiles));
         final ImmutableMap<Integer, List<AlignedAnnotation>> annotations = ImmutableMap
             .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(round2To3AnnotationFiles));
 
@@ -1095,6 +1096,35 @@ public class DependencyErrorAnalysis {
             }
 
 
+        }
+    }
+
+    private static void runCleftedQuestionQueryPrinting() {
+        final HITLParser hitlParser = new HITLParser(100);
+        hitlParser.setQueryPruningParameters(queryPruningParameters);
+        hitlParser.setReparsingParameters(reparsingParameters);
+
+        final ImmutableMap<Integer, List<AlignedAnnotation>> cleftedQuestionAnnotations = ImmutableMap
+            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(round2To3CleftedQuestionAnnotationFiles));
+
+        for(int sentenceId : cleftedQuestionAnnotations.keySet()) {
+            final ImmutableList<String> words = parseData.getSentences().get(sentenceId);
+            // System.out.println("\nSID: " + sentenceId);
+            final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries = hitlParser.getCleftedQuestionsForSentence(sentenceId);
+            for(ScoredQuery<QAStructureSurfaceForm> query : queries) {
+                AlignedAnnotation annotation = ExperimentUtils.getAlignedAnnotation(query, cleftedQuestionAnnotations.get(sentenceId));
+                if(annotation != null) {
+                    final ImmutableList<Integer> goldOptions = hitlParser.getGoldOptions(query);
+                    final List<AlignedAnnotation> alignedAnnotations = cleftedQuestionAnnotations.get(sentenceId);
+                    final ImmutableList<Integer> userOptions = hitlParser.getUserOptions(query, annotation);
+                    final int[] optionDist = AnnotationUtils.getUserResponseDistribution(query, annotation);
+                    System.out.println();
+                    System.out.println(query.toString(words,
+                                                      'G', goldOptions,
+                                                      'U', userOptions,
+                                                      '*', optionDist));
+                }
+            }
         }
     }
 
@@ -1574,5 +1604,6 @@ public class DependencyErrorAnalysis {
         runIndependentAnalyses();
         // runCoreArgQueryWiseConstraintAnalysis();
         // runCleftedQuestionQueryWiseConstraintAnalysis();
+        // runCleftedQuestionQueryPrinting();
     }
 }
