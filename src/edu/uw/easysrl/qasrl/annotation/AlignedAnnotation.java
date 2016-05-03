@@ -85,11 +85,11 @@ public class AlignedAnnotation extends RecordedAnnotation {
 
     public static List<AlignedAnnotation> getAlignedAnnotations(List<RecordedAnnotation> annotations) {
         Map<String, AlignedAnnotation> alignedAnnotations = new HashMap<>();
-
         annotations.forEach(annotation -> {
             String queryKey = "SID=" + annotation.sentenceId
                     + "_PRED=" + annotation.predicateId
-                    + "_Q=" + annotation.queryPrompt;
+                    + "_Q=" + annotation.queryPrompt
+                    + "_QID=" + annotation.queryId;
             if (!alignedAnnotations.containsKey(queryKey)) {
                 alignedAnnotations.put(queryKey, new AlignedAnnotation(annotation));
             }
