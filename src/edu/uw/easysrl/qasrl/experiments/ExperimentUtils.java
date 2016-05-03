@@ -121,7 +121,7 @@ public class ExperimentUtils {
                 nBestList, queryPruningParameters);
     }
 
-    static Map<Integer, List<AlignedAnnotation>> loadCrowdflowerAnnotation(String[] fileNames) {
+    public static Map<Integer, List<AlignedAnnotation>> loadCrowdflowerAnnotation(String[] fileNames) {
         Map<Integer, List<AlignedAnnotation>> sentenceToAnnotations;
         List<AlignedAnnotation> annotationList = new ArrayList<>();
         try {
@@ -143,7 +143,7 @@ public class ExperimentUtils {
         return sentenceToAnnotations;
     }
 
-    static AlignedAnnotation getAlignedAnnotation(ScoredQuery<QAStructureSurfaceForm> query,
+    public static AlignedAnnotation getAlignedAnnotation(ScoredQuery<QAStructureSurfaceForm> query,
                                                   List<AlignedAnnotation> annotations) {
         AlignedAnnotation bestAligned = null;
         int maxNumOverlappingOptions = 1;

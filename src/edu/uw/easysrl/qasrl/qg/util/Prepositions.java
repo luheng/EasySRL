@@ -21,7 +21,7 @@ public class Prepositions {
             "below", "beneath", "beside", "besides", "between", "beyond", "by", "despite", "down", "during", "except",
             "for", "from", "given", "in", "inside", "into", "near", "next", "of", "off", "on", "onto", "opposite",
             "out", "outside", "over", "pace", "per", "round", "since", "than", "through", "throughout", "till", "times",
-            "to", "toward", "towards", "under", "underneath", "until", "unto", "up", "upon", "versus", "via", "with ",
+            "to", "toward", "towards", "under", "underneath", "until", "unto", "up", "upon", "versus", "via", "with",
             "within", "without"
     );
 }
