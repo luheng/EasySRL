@@ -18,15 +18,6 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
-/**
- * Create Crowdflower data for pronoun-style core questions.
- *
- * 1. Sample sentences (or reuse previous sentences)
- * 2. Sample test sentences or (reuse previous sentences)
- * 3. Write candidate questions to csv.
- * 4. Write candidate test questions to csv.
- * Created by luheng on 3/25/16.
- */
 public class CrowdFlowerDataWriterNPClefted {
 
     static final int nBest = 100;
@@ -37,25 +28,30 @@ public class CrowdFlowerDataWriterNPClefted {
     private static ReparsingHistory history = null;
 
     private static final String[] reviewedTestQuestionFiles = new String[] {
-            "./Crowdflower_unannotated/test_questions/test_questions_np_clefting_r01.tsv",
+            "./Crowdflower_unannotated/test_questions/test_questions_np_clefting_r0123.tsv",
     };
 
-    private static final String csvOutputFilePrefix = "./Crowdflower_unannotated/np_clefting_100best";
+    private static final String inputSentenceIdsFile =
+            "./Crowdflower_unannotated/pronoun_core_r4_100best.sent_ids.txt";
+
+    private static final String csvOutputFilePrefix =
+            "./Crowdflower_unannotated/np_clefting_r4_100best";
 
     static QueryPruningParameters queryPruningParameters;
     static {
         queryPruningParameters = new QueryPruningParameters();
         queryPruningParameters.skipPPQuestions = false;
         queryPruningParameters.skipSAdjQuestions = true;
-        queryPruningParameters.minOptionConfidence = 0.1;
+        queryPruningParameters.minOptionConfidence = 0.05;
         queryPruningParameters.minOptionEntropy = 0.1;
-        queryPruningParameters.minPromptConfidence = 0.3;
+        queryPruningParameters.minPromptConfidence = 0.1;
+        //queryPruningParameters.minPromptConfidence = 0.3;
     }
     static HITLParsingParameters reparsingParamters;
     static {
         reparsingParamters = new HITLParsingParameters();
-        reparsingParamters.attachmentPenaltyWeight = 5.0;
-        reparsingParamters.supertagPenaltyWeight = 5.0;
+        reparsingParamters.attachmentPenaltyWeight = 10.0;
+        reparsingParamters.supertagPenaltyWeight = 10.0;
     }
 
     private static void printTestQuestions() throws IOException {
@@ -78,7 +74,6 @@ public class CrowdFlowerDataWriterNPClefted {
 
         AtomicInteger lineCounter = new AtomicInteger(0);
         for (int sid : annotations.keySet()) {
-            //if (sid > 2000) {
             annotations.get(sid).stream().forEach(annot -> {
                 try {
                     System.out.println(annot);
@@ -97,9 +92,10 @@ public class CrowdFlowerDataWriterNPClefted {
     }
 
     private static void printQuestionsToAnnotate() throws IOException {
-        final ImmutableList<Integer> sentenceIds = CrowdFlowerDataUtils.getRound2And3SentenceIds();
+        final ImmutableList<Integer> sentenceIds = CrowdFlowerDataUtils.loadSentenceIdsFromFile(inputSentenceIdsFile);
+        System.out.println(String.format("Processing %d sentences ...", sentenceIds.size()));
         AtomicInteger lineCounter = new AtomicInteger(0),
-                fileCounter = new AtomicInteger(0);
+                      fileCounter = new AtomicInteger(0);
 
         hitlParser = new HITLParser(nBest);
         history = new ReparsingHistory(hitlParser);
@@ -120,7 +116,6 @@ public class CrowdFlowerDataWriterNPClefted {
                 if (query.getQAPairSurfaceForms().get(0).getAnswerStructures().get(0).headIsVP) {
                     continue;
                 }
-
                 final ImmutableList<String> sentence = hitlParser.getSentence(sid);
                 final ImmutableList<Integer> goldOptionIds = hitlParser.getGoldOptions(query);
                 CrowdFlowerDataUtils.printQueryToCSVFileNew(
@@ -147,7 +142,6 @@ public class CrowdFlowerDataWriterNPClefted {
                     );
                 });
                 System.out.println();
-
                 if (lineCounter.get() % maxNumQueriesPerFile == 0) {
                     csvPrinter.close();
                     csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter(
@@ -164,6 +158,6 @@ public class CrowdFlowerDataWriterNPClefted {
     public static void main(String[] args) throws IOException {
         //final ImmutableList<Integer> testSentenceIds = CrowdFlowerDataUtils.getTestSentenceIds();
         printTestQuestions();
-        //printQuestionsToAnnotate();
+        printQuestionsToAnnotate();
     }
 }

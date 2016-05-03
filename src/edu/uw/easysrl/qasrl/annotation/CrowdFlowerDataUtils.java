@@ -15,9 +15,7 @@ import edu.uw.easysrl.util.GuavaCollectors;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 
-import java.io.BufferedWriter;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -137,6 +135,19 @@ public class CrowdFlowerDataUtils {
         return sentIds.stream().limit(numSentences)
                 .sorted()
                 .collect(GuavaCollectors.toImmutableList());
+    }
+
+    public static ImmutableList<Integer> loadSentenceIdsFromFile(final String filePath) throws IOException {
+        final BufferedReader reader = new BufferedReader(new FileReader(new File(filePath)));
+        String line;
+        final List<Integer> sentenceIds = new ArrayList<>();
+        while ((line = reader.readLine()) != null) {
+            if (!line.trim().isEmpty()) {
+                sentenceIds.add(Integer.parseInt(line.trim()));
+            }
+        }
+        reader.close();
+        return sentenceIds.stream().distinct().sorted().collect(GuavaCollectors.toImmutableList());
     }
 
     public static void printQueryToCSVFile(final ScoredQuery<QAStructureSurfaceForm> query,

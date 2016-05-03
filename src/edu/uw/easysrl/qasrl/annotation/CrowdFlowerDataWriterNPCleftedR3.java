@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
  * 4. Write candidate test questions to csv.
  * Created by luheng on 3/25/16.
  */
-public class CrowdFlowerDataWriterVPClefted {
+public class CrowdFlowerDataWriterNPCleftedR3 {
 
     static final int nBest = 100;
     static final boolean usePronouns = false;
@@ -37,10 +37,10 @@ public class CrowdFlowerDataWriterVPClefted {
     private static ReparsingHistory history = null;
 
     private static final String[] reviewedTestQuestionFiles = new String[] {
-            "./Crowdflower_unannotated/test_questions/test_questions_vp_clefting_r01.tsv",
+            "./Crowdflower_unannotated/test_questions/test_questions_np_clefting_r01.tsv",
     };
 
-    private static final String csvOutputFilePrefix = "./Crowdflower_unannotated/vp_clefting_100best";
+    private static final String csvOutputFilePrefix = "./Crowdflower_unannotated/np_clefting_100best";
 
     static QueryPruningParameters queryPruningParameters;
     static {
@@ -117,7 +117,7 @@ public class CrowdFlowerDataWriterVPClefted {
             history.addSentence(sid);
             for (ScoredQuery<QAStructureSurfaceForm> query : queries) {
                 // Skip certain type of questions.
-                if (!query.getQAPairSurfaceForms().get(0).getAnswerStructures().get(0).headIsVP) {
+                if (query.getQAPairSurfaceForms().get(0).getAnswerStructures().get(0).headIsVP) {
                     continue;
                 }
 
@@ -163,7 +163,7 @@ public class CrowdFlowerDataWriterVPClefted {
 
     public static void main(String[] args) throws IOException {
         //final ImmutableList<Integer> testSentenceIds = CrowdFlowerDataUtils.getTestSentenceIds();
-        //printTestQuestions();
-        printQuestionsToAnnotate();
+        printTestQuestions();
+        //printQuestionsToAnnotate();
     }
 }

@@ -37,9 +37,11 @@ public class CrowdFlowerDataWriterCorePronouns {
     private final static HITLParser hitlParser = new HITLParser(nBest);
     private final static ReparsingHistory history = new ReparsingHistory(hitlParser);
 
-    private static final String csvOutputFilePrefix = "./Crowdflower_unannotated/pronoun_core_r4_100best";
-    //"./Crowdflower_unannotated/pronoun_core_r3_100best";
-    private static final String sentenceIdsFile = "./Crowdflower_unannotated/pronoun_core_r4_100best.sent_ids.txt";
+    private static final String csvOutputFilePrefix =
+            "./Crowdflower_unannotated/pronoun_core_r4_100best";
+
+    private static final String outputSentenceIdsFile =
+            "./Crowdflower_unannotated/pronoun_core_r4_100best.sent_ids.txt";
 
     private static final String[] reviewedTestQuestionFiles = new String[] {
             "./Crowdflower_unannotated/test_questions/test_question_core_pronoun_r0123.tsv",
@@ -76,15 +78,7 @@ public class CrowdFlowerDataWriterCorePronouns {
                     });
         }
 
-        QueryPruningParameters queryPruningParams = new QueryPruningParameters();
-        queryPruningParams.skipSAdjQuestions = true;
-        queryPruningParams.minOptionConfidence = 0;
-        queryPruningParams.minOptionEntropy = -1;
-        queryPruningParams.minPromptConfidence = -1;
-        //hitlParser.setQueryPruningParameters(queryPruningParams);
-
         testSentenceIds = annotations.keySet().stream().sorted().collect(GuavaCollectors.toImmutableList());
-
         final String testQuestionsFile = String.format("%s_test.csv", csvOutputFilePrefix);
         CSVPrinter csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter(testQuestionsFile)),
                 CSVFormat.EXCEL.withRecordSeparator("\n"));
@@ -121,7 +115,7 @@ public class CrowdFlowerDataWriterCorePronouns {
                 fileCounter = new AtomicInteger(0);
 
         System.out.println("Num. sentences:\t" + sentenceIds.size());
-        BufferedWriter writer = new BufferedWriter(new FileWriter(new File(sentenceIdsFile)));
+        BufferedWriter writer = new BufferedWriter(new FileWriter(new File(outputSentenceIdsFile)));
         for (int id : sentenceIds) {
             writer.write(id + "\n");
         }
