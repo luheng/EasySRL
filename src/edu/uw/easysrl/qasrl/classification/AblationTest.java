@@ -75,6 +75,8 @@ public class AblationTest {
         System.out.println(sentenceIds.stream().map(String::valueOf).collect(Collectors.joining(", ")));
         System.out.println("Queried " + sentenceIds.size() + " sentences. Total number of questions:\t" +
                 annotations.entrySet().stream().mapToInt(e -> e.getValue().size()).sum());
+        sentenceIds.forEach(sid -> ClassificationUtils.getQueriesAndAnnotationsForSentence(sid, annotations.get(sid),
+                myParser, alignedQueries, alignedAnnotations, alignedOldAnnotations));
 
         ImmutableList<ImmutableList<Integer>> splitSents = ClassificationUtils.jackknife(sentenceIds, split, randomSeed);
         trainSents = splitSents.get(0);
@@ -140,9 +142,9 @@ public class AblationTest {
     }
 
     private static void runExperiment(final FeatureExtractor featureExtractor, final String message) {
-        ImmutableList<DependencyInstance> trainingInstances =
-                ClassificationUtils.getInstances(trainSents, myParser, featureExtractor, annotations, alignedQueries,
-                        alignedAnnotations, alignedOldAnnotations);
+        ImmutableList<DependencyInstance> trainingInstances = ClassificationUtils
+                .getInstances(trainSents, myParser, featureExtractor, alignedQueries, alignedAnnotations);
+
         final int numPositive = (int) trainingInstances.stream().filter(inst -> inst.inGold).count();
         System.out.println(String.format("Extracted %d training samples and %d features, %d positive and %d negative.",
                 trainingInstances.size(), featureExtractor.featureMap.size(),

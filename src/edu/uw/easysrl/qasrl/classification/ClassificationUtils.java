@@ -65,11 +65,11 @@ public class ClassificationUtils {
         }
     }
 
-    private static void getQueriesAndAnnotationsForSentence(int sentenceId, final List<AlignedAnnotation> annotations,
-                                                            final HITLParser myParser,
-                                                            final Map<Integer, List<ScoredQuery<QAStructureSurfaceForm>>> alignedQueries,
-                                                            final Map<Integer, List<ImmutableList<ImmutableList<Integer>>>> alignedAnnotations,
-                                                            final Map<Integer, List<AlignedAnnotation>> alignedOldAnnotations) {
+    static void getQueriesAndAnnotationsForSentence(int sentenceId, final List<AlignedAnnotation> annotations,
+                                                    final HITLParser myParser,
+                                                    final Map<Integer, List<ScoredQuery<QAStructureSurfaceForm>>> alignedQueries,
+                                                    final Map<Integer, List<ImmutableList<ImmutableList<Integer>>>> alignedAnnotations,
+                                                    final Map<Integer, List<AlignedAnnotation>> alignedOldAnnotations) {
         boolean isCheckboxStyle = !annotations.stream()
                 .anyMatch(annot -> annot.answerOptions.stream()
                         .anyMatch(op -> op.contains(QAPairAggregatorUtils.answerDelimiter)));
@@ -120,17 +120,13 @@ public class ClassificationUtils {
     static ImmutableList<DependencyInstance> getInstances(final List<Integer> sentIds,
                                                           final HITLParser myParser,
                                                           final FeatureExtractor featureExtractor,
-                                                          final Map<Integer, List<AlignedAnnotation>> annotations,
                                                           final Map<Integer, List<ScoredQuery<QAStructureSurfaceForm>>> alignedQueries,
-                                                          final Map<Integer, List<ImmutableList<ImmutableList<Integer>>>> alignedAnnotations,
-                                                          final Map<Integer, List<AlignedAnnotation>> alignedOldAnnotations) {
+                                                          final Map<Integer, List<ImmutableList<ImmutableList<Integer>>>> alignedAnnotations) {
         return sentIds.stream()
                 .flatMap(sid -> {
                     final Parse gold = myParser.getGoldParse(sid);
                     final NBestList nbestList = myParser.getNBestList(sid);
                     final ImmutableList<String> sentence = myParser.getSentence(sid);
-                    getQueriesAndAnnotationsForSentence(sid, annotations.get(sid), myParser, alignedQueries,
-                                                        alignedAnnotations, alignedOldAnnotations);
                     return IntStream.range(0, alignedQueries.get(sid).size())
                             .boxed()
                             .flatMap(qid -> {
@@ -147,9 +143,9 @@ public class ClassificationUtils {
                                     final boolean inGold = gold.dependencies.stream()
                                             .anyMatch(dep -> dep.getHead() == headId && dep.getArgument() == argId);
                                     return new DependencyInstance(
-                                            sid, qid, headId, argId, inGold,
-                                            featureExtractor.getDependencyInstanceFeatures(
-                                                    headId, argId, query, annotation, sentence, nbestList));
+                                            sid, qid, headId, argId, DependencyInstanceType.CoreArg, inGold,
+                                            featureExtractor.getDependencyInstanceFeatures(headId, argId, query,
+                                                    annotation, sentence, nbestList));
                                 });
                             });
                 })

@@ -28,25 +28,40 @@ import java.util.stream.IntStream;
  */
 public class E2EParsing {
     static ImmutableMap<String, Double> reparse(final ImmutableList<Integer> trainSents,
-                                                        final ImmutableList<Integer> devSents,
-                                                        final Map<Integer, List<AlignedAnnotation>> annotations,
-                                                        final HITLParser myParser,
-                                                        final FeatureExtractor featureExtractor,
-                                                        final Map<String, Object> paramsMap,
-                                                        final int numRounds) throws XGBoostError {
+                                                final ImmutableList<Integer> devSents,
+                                                final Map<Integer, List<ScoredQuery<QAStructureSurfaceForm>>> alignedQueries,
+                                                final Map<Integer, List<ImmutableList<ImmutableList<Integer>>>> alignedAnnotations,
+                                                final Map<Integer, List<AlignedAnnotation>> alignedOldAnnotations,
+                                                final HITLParser myParser,
+                                                final FeatureExtractor featureExtractor,
+                                                final Map<String, Object> paramsMap,
+                                                final int numRounds) throws XGBoostError {
+        return reparse(trainSents, devSents, alignedQueries, alignedAnnotations, alignedOldAnnotations, myParser,
+                featureExtractor, paramsMap, numRounds, 0.499, 0.501, 1.0, 1.0);
+    }
 
-        Map<Integer, List<ScoredQuery<QAStructureSurfaceForm>>> alignedQueries = new HashMap<>();
-        Map<Integer, List<ImmutableList<ImmutableList<Integer>>>> alignedAnnotations = new HashMap<>();
-        Map<Integer, List<AlignedAnnotation>> alignedOldAnnotations = new HashMap<>();
+    static ImmutableMap<String, Double> reparse(final ImmutableList<Integer> trainSents,
+                                                final ImmutableList<Integer> devSents,
+                                                final Map<Integer, List<ScoredQuery<QAStructureSurfaceForm>>> alignedQueries,
+                                                final Map<Integer, List<ImmutableList<ImmutableList<Integer>>>> alignedAnnotations,
+                                                final Map<Integer, List<AlignedAnnotation>> alignedOldAnnotations,
+                                                final HITLParser myParser,
+                                                final FeatureExtractor featureExtractor,
+                                                final Map<String, Object> paramsMap,
+                                                final int numRounds,
+                                                final double negativeConstraintThreshold,
+                                                final double positiveConstraintThreshold,
+                                                final double negativePenaltyWeight,
+                                                final double positivePenaltyWeight) throws XGBoostError {
         final ImmutableList<DependencyInstance> trainInstances = ClassificationUtils.getInstances(trainSents, myParser,
-                featureExtractor, annotations, alignedQueries, alignedAnnotations, alignedOldAnnotations);
+                featureExtractor, alignedQueries, alignedAnnotations);
         final int numPositive = (int) trainInstances.stream().filter(inst -> inst.inGold).count();
         System.out.println(String.format("Extracted %d training samples and %d features, %d positive and %d negative.",
                 trainInstances.size(), featureExtractor.featureMap.size(),
                 numPositive, trainInstances.size() - numPositive));
         featureExtractor.freeze();
         final ImmutableList<DependencyInstance> devInstances = ClassificationUtils.getInstances(devSents, myParser,
-                featureExtractor, annotations, alignedQueries, alignedAnnotations, alignedOldAnnotations);
+                featureExtractor, alignedQueries, alignedAnnotations);
 
         DMatrix trainData = ClassificationUtils.getDMatrix(trainInstances);
         DMatrix devData = ClassificationUtils.getDMatrix(devInstances);
@@ -93,13 +108,13 @@ public class E2EParsing {
             final ImmutableList<QAStructureSurfaceForm> qaList = query.getQAPairSurfaceForms();
             final AlignedAnnotation annotation = alignedOldAnnotations.get(sentenceId).get(instance.queryId);
             final int[] userDist = AnnotationUtils.getUserResponseDistribution(query, annotation);
-            if (pred[i][0] > 0.5) {
+            if (pred[i][0] > positiveConstraintThreshold) {
                 constraints.get(sentenceId).add(
-                        new Constraint.AttachmentConstraint(instance.headId, instance.argId, true, 1.0));
+                        new Constraint.AttachmentConstraint(instance.headId, instance.argId, true, positivePenaltyWeight));
             }
-            if (pred[i][0] < 0.5) {
+            if (pred[i][0] < negativeConstraintThreshold) {
                 constraints.get(sentenceId).add(
-                        new Constraint.AttachmentConstraint(instance.headId, instance.argId, false, 1.0));
+                        new Constraint.AttachmentConstraint(instance.headId, instance.argId, false, negativePenaltyWeight));
             }
             /************** Get baseline accuracy *************************/
             final ImmutableList<Integer> options = IntStream.range(0, qaList.size()).boxed()

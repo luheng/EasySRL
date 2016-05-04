@@ -15,11 +15,13 @@ public class DependencyInstance {
     final boolean inGold;
     final int sentenceId, queryId, headId, argId;
     final ImmutableMap<Integer, Double> features;
+    final DependencyInstanceType instanceType;
 
-    DependencyInstance(int sentenceId, int queryId, int headId, int argId, boolean inGold,
-                       ImmutableMap<Integer, Double> features) {
+    DependencyInstance(int sentenceId, int queryId, int headId, int argId, DependencyInstanceType instanceType,
+                       boolean inGold, ImmutableMap<Integer, Double> features) {
         this.sentenceId = sentenceId;
         this.queryId = queryId;
+        this.instanceType = instanceType;
         this.headId = headId;
         this.argId = argId;
         this.inGold = inGold;

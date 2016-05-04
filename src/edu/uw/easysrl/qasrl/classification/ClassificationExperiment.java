@@ -31,7 +31,7 @@ import java.util.stream.IntStream;
  */
 public class ClassificationExperiment {
     private static final int nBest = 100;
-    private static final ImmutableList<Double> split = ImmutableList.of(0.8, 0.2, 0.0);
+    private static final ImmutableList<Double> split = ImmutableList.of(0.6, 0.4, 0.0);
     private static final int randomSeed = 12345;
     private static HITLParser myParser;
     private static ReparsingHistory myHistory;
@@ -68,7 +68,7 @@ public class ClassificationExperiment {
         reparsingParameters.jeopardyQuestionMinAgreement = 1;
         reparsingParameters.positiveConstraintMinAgreement = 5;
         reparsingParameters.negativeConstraintMaxAgreement = 1;
-        reparsingParameters.skipPronounEvidence = true;
+        reparsingParameters.skipPronounEvidence = false;
         reparsingParameters.jeopardyQuestionWeight = 1.0;
         reparsingParameters.attachmentPenaltyWeight = 1.0;
         reparsingParameters.supertagPenaltyWeight = 1.0;
@@ -84,10 +84,10 @@ public class ClassificationExperiment {
         alignedAnnotations = new HashMap<>();
         alignedOldAnnotations = new HashMap<>();
         featureExtractor = new FeatureExtractor();
-        featureExtractor.addArgumentPositionFeatures = false;
-        featureExtractor.addCategoryFeatures = false;
-        featureExtractor.addAnswerLexicalFeatures = false;
-        featureExtractor.addNAOptionFeature = false;
+        //featureExtractor.addArgumentPositionFeatures = false;
+        //featureExtractor.addCategoryFeatures = false;
+        //featureExtractor.addAnswerLexicalFeatures = false;
+        //featureExtractor.addNAOptionFeature = false;
         //featureExtractor.addTemplateBasedFeatures = false;
         //featureExtractor.addNBestPriorFeatures = false;
         assert annotations != null;
@@ -109,8 +109,11 @@ public class ClassificationExperiment {
         System.out.println(devSents);
         System.out.println(testSents);
 
-        trainingInstances = ClassificationUtils.getInstances(trainSents, myParser, featureExtractor, annotations,
-                alignedQueries, alignedAnnotations, alignedOldAnnotations);
+        sentenceIds.forEach(sid -> ClassificationUtils.getQueriesAndAnnotationsForSentence(sid, annotations.get(sid),
+                myParser, alignedQueries, alignedAnnotations, alignedOldAnnotations));
+
+        trainingInstances = ClassificationUtils.getInstances(trainSents, myParser, featureExtractor, alignedQueries, alignedAnnotations);
+
         final int numPositive = (int) trainingInstances.stream().filter(inst -> inst.inGold).count();
         System.out.println(String.format("Extracted %d training samples and %d features, %d positive and %d negative.",
                 trainingInstances.size(), featureExtractor.featureMap.size(),
@@ -118,10 +121,8 @@ public class ClassificationExperiment {
 
         featureExtractor.freeze();
 
-        devInstances = ClassificationUtils.getInstances(devSents, myParser, featureExtractor, annotations,
-                alignedQueries, alignedAnnotations, alignedOldAnnotations);
-        testInstances = ClassificationUtils.getInstances(testSents, myParser, featureExtractor, annotations,
-                alignedQueries, alignedAnnotations, alignedOldAnnotations);
+        devInstances = ClassificationUtils.getInstances(devSents, myParser, featureExtractor, alignedQueries, alignedAnnotations);
+        testInstances = ClassificationUtils.getInstances(testSents, myParser, featureExtractor, alignedQueries, alignedAnnotations);
 
         final int numPositiveDev = (int) devInstances.stream().filter(inst -> inst.inGold).count();
         System.out.println(String.format("Extracted %d dev samples and %d features, %d positive and %d negative.",
@@ -195,17 +196,18 @@ public class ClassificationExperiment {
             classifierAcc += (p == instance.inGold) ? 1 : 0;
             numInstances++;
 
-            if (p != instance.inGold) {
+            //if (p != instance.inGold) {
                 System.out.println();
                 System.out.println(query.toString(sentence,
                         'G', myParser.getGoldOptions(query),
+                        'B', myParser.getOneBestOptions(query),
                         '*', userDist));
                 System.out.println(String.format("%d:%s ---> %d:%s", instance.headId, sentence.get(instance.headId),
                         instance.argId, sentence.get(instance.argId)));
                 System.out.println(String.format("%b\t%.2f\t%b", instance.inGold, pred[i][0], baselinePrediction));
 
                 featureExtractor.printFeature(instance.features);
-            }
+            //}
         }
 
         System.out.println("Baseline accuracy:\t" + 100.0 * baselineAcc / numInstances);

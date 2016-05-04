@@ -87,8 +87,7 @@ public class FeatureDevExperiment {
                 annotations.entrySet().stream().mapToInt(e -> e.getValue().size()).sum());
         ImmutableList<ImmutableList<Integer>> splitSents = ClassificationUtils.jackknife(sentenceIds, split, randomSeed);
         trainSents = splitSents.get(0);
-        trainingInstances = ClassificationUtils.getInstances(trainSents, myParser, featureExtractor, annotations,
-                alignedQueries, alignedAnnotations, alignedOldAnnotations);
+        trainingInstances = ClassificationUtils.getInstances(trainSents, myParser, featureExtractor, alignedQueries, alignedAnnotations);
         final int numPositive = (int) trainingInstances.stream().filter(inst -> inst.inGold).count();
         System.out.println(String.format("Extracted %d training samples and %d features, %d positive and %d negative.",
                 trainingInstances.size(), featureExtractor.featureMap.size(),
@@ -123,11 +122,9 @@ public class FeatureDevExperiment {
     private static void runExperiments() {
         for (int i = 0; i < cvTrainSents.size(); i++) {
             final ImmutableList<DependencyInstance> trainInsts =
-                    ClassificationUtils.getInstances(cvTrainSents.get(i), myParser, featureExtractor, annotations,
-                            alignedQueries, alignedAnnotations, alignedOldAnnotations);
+                    ClassificationUtils.getInstances(cvTrainSents.get(i), myParser, featureExtractor, alignedQueries, alignedAnnotations);
             final ImmutableList<DependencyInstance> devInsts =
-                    ClassificationUtils.getInstances(cvDevSents.get(i), myParser, featureExtractor, annotations,
-                            alignedQueries, alignedAnnotations, alignedOldAnnotations);
+                    ClassificationUtils.getInstances(cvDevSents.get(i), myParser, featureExtractor, alignedQueries, alignedAnnotations);
             try {
                 final DMatrix trainMat = ClassificationUtils.getDMatrix(trainInsts);
                 final DMatrix devMat = ClassificationUtils.getDMatrix(devInsts);

@@ -1,40 +1,30 @@
 package edu.uw.easysrl.qasrl.classification;
 
-import com.google.common.collect.*;
-import edu.uw.easysrl.qasrl.Parse;
-import edu.uw.easysrl.qasrl.TextGenerationHelper;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
-import edu.uw.easysrl.qasrl.annotation.AnnotationUtils;
-import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
+import edu.uw.easysrl.qasrl.annotation.Annotation;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
-import edu.uw.easysrl.qasrl.experiments.ReparsingHistory;
-import edu.uw.easysrl.qasrl.model.Constraint;
 import edu.uw.easysrl.qasrl.model.HITLParser;
 import edu.uw.easysrl.qasrl.model.HITLParsingParameters;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
-import edu.uw.easysrl.syntax.evaluation.Results;
-import edu.uw.easysrl.syntax.model.feature.Feature;
 import edu.uw.easysrl.util.GuavaCollectors;
-import ml.dmlc.xgboost4j.java.Booster;
-import ml.dmlc.xgboost4j.java.DMatrix;
-import ml.dmlc.xgboost4j.java.XGBoost;
 import ml.dmlc.xgboost4j.java.XGBoostError;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-
 /**
- * Created by luheng on 4/21/16.
+ * Created by luheng on 5/3/16.
  */
-public class CrossValidationExperiment {
+public class TuningPenaltyThresholdsAndWeights {
     private static final int nBest = 100;
     private static final int randomSeed = 12345;
-    
-    private static ImmutableList<Integer> trainSents, devSents;
 
     private static final String[] annotationFiles = {
             "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
@@ -83,23 +73,13 @@ public class CrossValidationExperiment {
         System.out.println("Queried " + sentenceIds.size() + " sentences. Total number of questions:\t" +
                 annotations.entrySet().stream().mapToInt(e -> e.getValue().size()).sum());
 
-
         final Map<Integer, List<ScoredQuery<QAStructureSurfaceForm>>> alignedQueries = new HashMap<>();
         final Map<Integer, List<ImmutableList<ImmutableList<Integer>>>> alignedAnnotations = new HashMap<>();
         final Map<Integer, List<AlignedAnnotation>> alignedOldAnnotations = new HashMap<>();
         sentenceIds.forEach(sid -> ClassificationUtils.getQueriesAndAnnotationsForSentence(sid, annotations.get(sid),
                 myParser, alignedQueries, alignedAnnotations, alignedOldAnnotations));
 
-
         /*************** cross validation ****************/
-        final int numRandomRuns = 10;
-        Random random = new Random(randomSeed);
-        ImmutableList<Integer> randomSeeds = IntStream.range(0, numRandomRuns)
-                .boxed().map(r -> random.nextInt())
-                .collect(GuavaCollectors.toImmutableList());
-        System.out.println("random seeds:\t" + randomSeeds);
-
-
         final Map<String, Object> paramsMap = ImmutableMap.of(
                 "eta", 0.1,
                 "min_child_weight", 1.0,
@@ -107,25 +87,38 @@ public class CrossValidationExperiment {
                 "objective", "binary:logistic"
         );
         final int numRounds = 100;
+        final ImmutableList<Double> split = ImmutableList.of(0.15, 0.15, 0.15, 0.15, 0.15, 0.25);
+        ImmutableList<ImmutableList<Integer>> splitSents = ClassificationUtils.jackknife(sentenceIds, split, randomSeed);
+
         Map<String, Map<String, Double>> aggregatedResults = new HashMap<>();
-        for (double trainPortion : ImmutableList.of(0.2, 0.4, 0.6, 0.8)) {
-            final String setupKey = "trainPortion=" + trainPortion;
-            aggregatedResults.put(setupKey, new HashMap<>());
-            for (int i = 0; i < numRandomRuns; i++) {
-                ImmutableList<ImmutableList<Integer>> splitSents = ClassificationUtils.jackknife(sentenceIds,
-                        ImmutableList.of(trainPortion, 1.0 - trainPortion), randomSeeds.get(i));
-                trainSents = splitSents.get(0);
-                devSents = splitSents.get(1);
-                try {
-                    ImmutableMap<String, Double> results = E2EParsing.reparse(trainSents, devSents, alignedQueries,
-                            alignedAnnotations, alignedOldAnnotations, myParser, featureExtractor, paramsMap, numRounds);
-                    for (String k : results.keySet()) {
-                        double r = aggregatedResults.get(setupKey).containsKey(k) ?
-                                aggregatedResults.get(setupKey).get(k) : 0.0;
-                        aggregatedResults.get(setupKey).put(k, r + results.get(k));
+
+        for (double negativeThreshold : ImmutableList.of(0.1, 0.3, 0.499)) {
+            for (double positiveThreshold : ImmutableList.of(0.501, 0.7, 0.9)) {
+                for (double weight : ImmutableList.of(1.0, 2.0, 5.0)) {
+                    final String setupKey = String.format("NegThreshold=%.2f\tPosThreshold=%.2f\tWeight=%.2f",
+                            negativeThreshold, positiveThreshold, weight);
+                    aggregatedResults.put(setupKey, new HashMap<>());
+                    for (int i : ImmutableList.of(0, 1, 2, 3, 4)) {
+                        ImmutableList<Integer> devSents = splitSents.get(i);
+                        ImmutableList<Integer> trainSents = IntStream.range(0, 5).boxed()
+                                .filter(j -> j != i)
+                                .flatMap(j -> splitSents.get(j).stream())
+                                .distinct().sorted()
+                                .collect(GuavaCollectors.toImmutableList());
+                        try {
+                            ImmutableMap<String, Double> results = E2EParsing.reparse(trainSents, devSents,
+                                    alignedQueries, alignedAnnotations, alignedOldAnnotations,
+                                    myParser, featureExtractor, paramsMap, numRounds,
+                                    negativeThreshold, positiveThreshold, weight, weight);
+                            for (String k : results.keySet()) {
+                                double r = aggregatedResults.get(setupKey).containsKey(k) ?
+                                        aggregatedResults.get(setupKey).get(k) : 0.0;
+                                aggregatedResults.get(setupKey).put(k, r + results.get(k));
+                            }
+                        } catch (XGBoostError e) {
+                            e.printStackTrace();
+                        }
                     }
-                } catch (XGBoostError e) {
-                    e.printStackTrace();
                 }
             }
         }
@@ -134,7 +127,7 @@ public class CrossValidationExperiment {
         for (String setupKey : aggregatedResults.keySet()) {
             System.out.println(setupKey);
             for (String k : aggregatedResults.get(setupKey).keySet()) {
-                System.out.println(k + "\t" + aggregatedResults.get(setupKey).get(k) / numRandomRuns);
+                System.out.println(k + "\t" + aggregatedResults.get(setupKey).get(k) / 5);
             }
             System.out.println();
         }
