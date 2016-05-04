@@ -1,6 +1,7 @@
 package edu.uw.easysrl.qasrl.classification;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import edu.uw.easysrl.qasrl.NBestList;
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
@@ -10,6 +11,7 @@ import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
 import edu.uw.easysrl.qasrl.model.HITLParser;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
+import edu.uw.easysrl.qasrl.query.QueryType;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.util.GuavaCollectors;
 import ml.dmlc.xgboost4j.java.DMatrix;
@@ -104,18 +106,6 @@ public class ClassificationUtils {
         alignedOldAnnotations.put(sentenceId, oldAnnotations);
     }
 
-    private static ImmutableList<int[]> getAllAttachments(final ImmutableList<String> sentence,
-                                                          final ScoredQuery<QAStructureSurfaceForm> query) {
-        return IntStream.range(0, sentence.size())
-                .boxed()
-                .flatMap(headId -> IntStream.range(0, sentence.size())
-                        .boxed()
-                        .filter(argId -> argId != headId)
-                        .filter(argId -> query.getQAPairSurfaceForms().stream()
-                                .anyMatch(qa -> DependencyInstanceHelper.containsDependency(sentence, qa, headId, argId)))
-                        .map(argId -> new int[] { headId, argId }))
-                .collect(GuavaCollectors.toImmutableList());
-    }
 
     static ImmutableList<DependencyInstance> getInstances(final List<Integer> sentIds,
                                                           final HITLParser myParser,
@@ -137,16 +127,23 @@ public class ClassificationUtils {
                                 if (numNAVotes > maxAllowedNAVotes) {
                                     return Stream.empty();
                                 }
-                                return getAllAttachments(sentence, query).stream().map(attachment -> {
-                                    final int headId = attachment[0];
-                                    final int argId = attachment[1];
-                                    final boolean inGold = gold.dependencies.stream()
-                                            .anyMatch(dep -> dep.getHead() == headId && dep.getArgument() == argId);
-                                    return new DependencyInstance(
-                                            sid, qid, headId, argId, DependencyInstanceType.CoreArg, inGold,
-                                            featureExtractor.getDependencyInstanceFeatures(headId, argId, query,
-                                                    annotation, sentence, nbestList));
-                                });
+                                return IntStream.range(0, sentence.size())
+                                        .boxed()
+                                        .flatMap(headId -> IntStream.range(0, sentence.size())
+                                                .boxed()
+                                                .filter(argId -> argId.intValue() != headId.intValue())
+                                                .filter(argId -> DependencyInstanceHelper.getDependencyType(query, headId, argId)
+                                                        != DependencyInstanceType.NONE)
+                                                .map(argId -> {
+                                                    final DependencyInstanceType dtype =
+                                                            DependencyInstanceHelper.getDependencyType(query, headId, argId);
+                                                    final boolean inGold = gold.dependencies.stream()
+                                                            .anyMatch(dep -> dep.getHead() == headId && dep.getArgument() == argId);
+                                                    final ImmutableMap<Integer, Double> features = query.getQueryType() == QueryType.Forward ?
+                                                            featureExtractor.getCoreArgFeatures(headId, argId, dtype, query, annotation, sentence, nbestList) :
+                                                            featureExtractor.getNPCleftingFeatures(headId, argId, dtype, query, annotation, sentence, nbestList);
+                                                    return new DependencyInstance(sid, qid, headId, argId,dtype, inGold, features);
+                                                }));
                             });
                 })
                 .collect(GuavaCollectors.toImmutableList());

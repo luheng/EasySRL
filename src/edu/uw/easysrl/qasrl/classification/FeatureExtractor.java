@@ -50,11 +50,12 @@ public class FeatureExtractor {
      * @param nBestList
      * @return
      */
-    ImmutableMap<Integer, Double> getDependencyInstanceFeatures(final int headId, final int argId,
-                                                                final ScoredQuery<QAStructureSurfaceForm> query,
-                                                                final ImmutableList<ImmutableList<Integer>> annotation,
-                                                                final ImmutableList<String> sentence,
-                                                                final NBestList nBestList) {
+    ImmutableMap<Integer, Double> getCoreArgFeatures(final int headId, final int argId,
+                                                     final DependencyInstanceType instanceType,
+                                                     final ScoredQuery<QAStructureSurfaceForm> query,
+                                                     final ImmutableList<ImmutableList<Integer>> annotation,
+                                                     final ImmutableList<String> sentence,
+                                                     final NBestList nBestList) {
         Map<Integer, Double> features = new HashMap<>();
 
         final ImmutableList<QuestionStructure> questionStructures = query.getQAPairSurfaceForms().stream()
@@ -99,6 +100,9 @@ public class FeatureExtractor {
         final ImmutableList<Integer> allVotes = IntStream.range(0, numQAOptions).boxed()
                 .map(i -> (int) annotation.stream().filter(ops -> ops.contains(i)).count())
                 .collect(GuavaCollectors.toImmutableList());
+
+
+        addFeature(features, "DependencyType=" + instanceType, 1.0);
 
         if (addCategoryFeatures) {
             questionStructures.stream()
@@ -186,6 +190,97 @@ public class FeatureExtractor {
 
         return ImmutableMap.copyOf(features);
     }
+
+    ImmutableMap<Integer, Double> getNPCleftingFeatures(final int headId, final int argId,
+                                                        final DependencyInstanceType instanceType,
+                                                        final ScoredQuery<QAStructureSurfaceForm> query,
+                                                        final ImmutableList<ImmutableList<Integer>> annotation,
+                                                        final ImmutableList<String> sentence,
+                                                        final NBestList nBestList) {
+        Map<Integer, Double> features = new HashMap<>();
+
+        final ImmutableList<QuestionStructure> questionStructures = query.getQAPairSurfaceForms().stream()
+                .flatMap(qa -> qa.getQuestionStructures().stream())
+                .distinct()
+                .collect(GuavaCollectors.toImmutableList());
+        final ImmutableList<AnswerStructure> answerStructures = query.getQAPairSurfaceForms().stream()
+                .flatMap(qa -> qa.getAnswerStructures().stream())
+                .distinct()
+                .collect(GuavaCollectors.toImmutableList());
+        final ImmutableList<Integer> candidateHeads = Stream.concat(
+                Stream.of(argId),
+                answerStructures.stream().flatMap(astr -> astr.argumentIndices.stream()))
+                .distinct()
+                .sorted()
+                .collect(GuavaCollectors.toImmutableList());
+
+        final int numAnnotators = annotation.size();
+        final int naOptionId = query.getBadQuestionOptionId().getAsInt();
+        final int numQAOptions = query.getQAPairSurfaceForms().size();
+        final ImmutableList<Integer> options = IntStream.range(0, numQAOptions)
+                .boxed()
+                .filter(i -> DependencyInstanceHelper.containsDependency(sentence, query.getQAPairSurfaceForms().get(i),
+                        headId, argId))
+                .collect(GuavaCollectors.toImmutableList());
+
+        final double nBestPriorNorm = nBestList.getParses().stream()
+                .filter(parse -> candidateHeads.stream()
+                        .anyMatch(a -> parse.dependencies.stream()
+                                .anyMatch(d -> d.getHead() == headId && d.getArgument() == a)))
+                .mapToDouble(parse -> parse.score)
+                .sum();
+        // TODO: fix this.
+        final ImmutableMap<Integer, Double> nBestPriors = candidateHeads.stream()
+                .collect(GuavaCollectors.toImmutableMap(
+                        a -> a,
+                        a -> nBestList.getParses().stream()
+                                .filter(parse -> parse.dependencies.stream()
+                                        .anyMatch(d -> d.getHead() == headId && d.getArgument() == a))
+                                .mapToDouble(parse -> parse.score)
+                                .sum()
+                ));
+        final ImmutableList<Integer> allVotes = IntStream.range(0, numQAOptions).boxed()
+                .map(i -> (int) annotation.stream().filter(ops -> ops.contains(i)).count())
+                .collect(GuavaCollectors.toImmutableList());
+
+
+        addFeature(features, "DependencyType=" + instanceType, 1.0);
+
+        if (questionStructures.get(0).targetPrepositionIndex >= 0) {
+            addFeature(features, "Preposition=" + sentence.get(questionStructures.get(0).targetPrepositionIndex).toLowerCase(), 1.0);
+        }
+        // TODO: preposition to object distance.
+
+        final double prior = nBestPriors.get(argId) / nBestPriorNorm;
+        if (addNBestPriorFeatures) {
+            addFeature(features, "NBestPrior", prior);
+        }
+
+        final double maxVotes = 1.0 * options.stream().mapToInt(allVotes::get).max().orElse(0);
+        final double minVotes = 1.0 * options.stream().mapToInt(allVotes::get).min().orElse(0);
+        if (addAnnotationFeatures) {
+            addFeature(features, "MaxReceivedVotes", maxVotes); // / numAnnotators);
+            // addFeature(features, "MinReceivedVotes", minVotes); // / numAnnotators);
+            /*
+            int numSingleVotes = options.stream()
+                    .mapToInt(i -> (int) annotation.stream().filter(ops -> ops.contains(i) && ops.size() == 1).count())
+                    .max().orElse(0);
+            addFeature(features, "NumReceivedSingleVotes", 1.0 * numSingleVotes); // / numAnnotators);
+
+            int numSkipped = options.stream()
+                    .mapToInt(i -> (int) annotation.stream().filter(ops -> !ops.contains(i)).count())
+                    .max().orElse(0);
+            addFeature(features, "NumSkippedVotes", 1.0 * numSkipped);// / numAnnotators);
+            */
+        }
+        if (addNAOptionFeature) {
+            addFeature(features, "QueryConfidence", query.getPromptScore());
+            addFeature(features, "NAOptionReceivedVotes", 1.0 * annotation.stream()
+                    .filter(ops -> ops.contains(naOptionId)).count() / numAnnotators);
+        }
+        return ImmutableMap.copyOf(features);
+    }
+
 
     private boolean addFeature(final Map<Integer, Double> features, String featureName, double featureValue) {
         int featureId = featureMap.addString(featureName, acceptNewFeatures);

@@ -3,6 +3,7 @@ package edu.uw.easysrl.qasrl.classification;
 import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
+import edu.uw.easysrl.qasrl.query.QueryType;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 
 /**
@@ -10,8 +11,8 @@ import edu.uw.easysrl.qasrl.query.ScoredQuery;
  */
 public class DependencyInstanceHelper {
 
-    static boolean containsDependency(final ImmutableList<String> sentence, final QAStructureSurfaceForm qa,
-                                      int headId, int argId) {
+    static boolean containsDependency(final ImmutableList<String> sentence,
+                                      final QAStructureSurfaceForm qa, int headId, int argId) {
         for (QuestionStructure qstr : qa.getQuestionStructures()) {
             // Verb-PP argument (undirected).
             /*
@@ -43,7 +44,7 @@ public class DependencyInstanceHelper {
         return false;
     }
 
-    static String getDependencyContainsType(ScoredQuery<QAStructureSurfaceForm> query, int headId, int argId) {
+    static DependencyInstanceType getDependencyType(ScoredQuery<QAStructureSurfaceForm> query, int headId, int argId) {
         for (QAStructureSurfaceForm qa : query.getQAPairSurfaceForms()) {
             for (QuestionStructure qstr : qa.getQuestionStructures()) {
                 // Verb-PP argument (undirected).
@@ -53,19 +54,27 @@ public class DependencyInstanceHelper {
                     return "pp_arg_in_question";
                 }*/
                 // Core/PP-NP dependencies.
-                if ((qstr.predicateIndex == headId || qstr.targetPrepositionIndex == headId) &&
+                if (qstr.predicateIndex == headId && qstr.targetPrepositionIndex < 0 &&
                         qa.getAnswerStructures().stream().anyMatch(astr -> astr.argumentIndices.contains(argId))) {
-                    return "in_qa";
+                    return DependencyInstanceType.VerbArgument;
+                }
+                if (qstr.targetPrepositionIndex == headId &&
+                        qa.getAnswerStructures().stream().anyMatch(astr -> astr.argumentIndices.contains(argId))) {
+                    // Hack to get around answer span error.
+                    if (qstr.predicateIndex == headId && qstr.targetPrepositionIndex == argId) {
+                        return DependencyInstanceType.NONE;
+                    }
+                    return DependencyInstanceType.VerbArgument;
                 }
                 // NP adjunct dependencies.
                 if (qa.getAnswerStructures().stream()
                         .flatMap(astr -> astr.adjunctDependencies.stream())
                         .anyMatch(d -> d.getHead() == headId && d.getArgument() == argId)) {
-                    return "in_answer";
+                    return (argId < headId) ? DependencyInstanceType.PPGovernor : DependencyInstanceType.PPObject;
                 }
             }
         }
-        return "";
+        return DependencyInstanceType.NONE;
     }
 
 }

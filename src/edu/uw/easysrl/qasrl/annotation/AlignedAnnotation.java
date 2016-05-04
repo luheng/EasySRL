@@ -89,7 +89,8 @@ public class AlignedAnnotation extends RecordedAnnotation {
         annotations.forEach(annotation -> {
             String queryKey = "SID=" + annotation.sentenceId
                     + "_PRED=" + annotation.predicateId
-                    + "_Q=" + annotation.queryPrompt;
+                    + "_QID=" + annotation.queryPrompt
+                    + "_Q=" + annotation.queryId;
             if (!alignedAnnotations.containsKey(queryKey)) {
                 alignedAnnotations.put(queryKey, new AlignedAnnotation(annotation));
             }

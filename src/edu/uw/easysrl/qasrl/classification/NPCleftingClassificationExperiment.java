@@ -29,12 +29,11 @@ import java.util.stream.IntStream;
 /**
  * Created by luheng on 4/21/16.
  */
-public class ClassificationExperiment {
+public class NPCleftingClassificationExperiment {
     private static final int nBest = 100;
     private static final ImmutableList<Double> split = ImmutableList.of(0.6, 0.4, 0.0);
     private static final int randomSeed = 12345;
     private static HITLParser myParser;
-    private static ReparsingHistory myHistory;
     private static Map<Integer, List<AlignedAnnotation>> annotations;
     private static FeatureExtractor featureExtractor;
 
@@ -46,13 +45,8 @@ public class ClassificationExperiment {
     private static ImmutableList<DependencyInstance> trainingInstances, devInstances, testInstances;
 
     private static final String[] annotationFiles = {
-            //"./Crowdflower_data/f878213.csv",                // Round1: radio-button, core + pp
-            //"./Crowdflower_data/f882410.csv",                // Round2: radio-button, core only
-            //  "./Crowdflower_data/all-checkbox-responses.csv", // Round3: checkbox, core + pp
-            //  "./Crowdflower_data/f891522.csv",                // Round4: jeopardy checkbox, pp only
-             "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
-            // "./Crowdflower_data/f897179.csv"                 // Round2-3: NP clefting questions.
-            "./Crowdflower_data/f902142.csv"                   // Round4: checkbox, pronouns, core only, 300 sentences.
+            "./Crowdflower_data/f897179.csv",                 // Round2-3: NP clefting questions.
+            "./Crowdflower_data/f903842.csv"              // Round4: clefting.
     };
 
     private static QueryPruningParameters queryPruningParameters;
@@ -78,7 +72,6 @@ public class ClassificationExperiment {
         myParser = new HITLParser(nBest);
         myParser.setQueryPruningParameters(queryPruningParameters);
         myParser.setReparsingParameters(reparsingParameters);
-        myHistory = new ReparsingHistory(myParser);
         annotations = ExperimentUtils.loadCrowdflowerAnnotation(annotationFiles);
         alignedQueries = new HashMap<>();
         alignedAnnotations = new HashMap<>();
@@ -111,8 +104,8 @@ public class ClassificationExperiment {
 
         sentenceIds.forEach(sid -> ClassificationUtils.getQueriesAndAnnotationsForSentence(sid, annotations.get(sid),
                 myParser, alignedQueries, alignedAnnotations, alignedOldAnnotations));
-
-        trainingInstances = ClassificationUtils.getInstances(trainSents, myParser, featureExtractor, alignedQueries, alignedAnnotations);
+        trainingInstances = ClassificationUtils.getInstances(trainSents, myParser, featureExtractor, alignedQueries,
+                alignedAnnotations);
 
         final int numPositive = (int) trainingInstances.stream().filter(inst -> inst.inGold).count();
         System.out.println(String.format("Extracted %d training samples and %d features, %d positive and %d negative.",
@@ -197,16 +190,16 @@ public class ClassificationExperiment {
             numInstances++;
 
             //if (p != instance.inGold) {
-                System.out.println();
-                System.out.println(query.toString(sentence,
-                        'G', myParser.getGoldOptions(query),
-                        'B', myParser.getOneBestOptions(query),
-                        '*', userDist));
-                System.out.println(String.format("%d:%s ---> %d:%s", instance.headId, sentence.get(instance.headId),
-                        instance.argId, sentence.get(instance.argId)));
-                System.out.println(String.format("%b\t%.2f\t%b", instance.inGold, pred[i][0], baselinePrediction));
+            System.out.println();
+            System.out.println(query.toString(sentence,
+                    'G', myParser.getGoldOptions(query),
+                    'B', myParser.getOneBestOptions(query),
+                    '*', userDist));
+            System.out.println(String.format("%d:%s ---> %d:%s", instance.headId, sentence.get(instance.headId),
+                    instance.argId, sentence.get(instance.argId)));
+            System.out.println(String.format("%b\t%.2f\t%b", instance.inGold, pred[i][0], baselinePrediction));
 
-                featureExtractor.printFeature(instance.features);
+            featureExtractor.printFeature(instance.features);
             //}
         }
 
@@ -322,8 +315,9 @@ public class ClassificationExperiment {
         );
         final int round = 100, nfold = 5;
         Booster booster = XGBoost.train(trainData, paramsMap, round, watches, null, null);
-        //double avg = GridSearch.runGridSearch(trainData, nfold);
-        //System.out.println("avg:\t" + avg);
+
+        double avg = GridSearch.runGridSearch(trainData, nfold);
+        System.out.println("avg:\t" + avg);
         reparse(booster, devSents, devInstances, devData);
         //reparse(booster, testInstances, testData);
 
