@@ -390,6 +390,9 @@ public class DependencyErrorAnalysis {
         "./Crowdflower_data/f893900.csv",                // Round3-pronouns: checkbox, core only, pronouns.
         "./Crowdflower_data/f897179.csv"                 // Round2-3: NP clefting questions.
     };
+    private static final String[] round4CleftedQuestionAnnotationFiles = {
+        "./Crowdflower_data/f903842.csv"
+    };
     private static final String[] round4AnnotationFiles = {
         "./Crowdflower_data/f902142.csv",
         "./Crowdflower_data/f903842.csv"
@@ -431,15 +434,18 @@ public class DependencyErrorAnalysis {
         System.out.println(supertagMistakes.log());
 
         final Table<Category, Category, Integer> supertagMistakeCounts = HashBasedTable.create();
+        final Table<Category, Category, Set<String>> supertagMistakeWords = HashBasedTable.create();
         for(SupertagMistake mistake : supertagMistakes.getAllMistakes()) {
             final Category goldTag = mistake.getGoldSupertag();
             final Category predictedTag = mistake.getPredictedSupertag();
             if(!supertagMistakeCounts.contains(goldTag, predictedTag)) {
                 supertagMistakeCounts.put(goldTag, predictedTag, 1);
+                supertagMistakeWords.put(goldTag, predictedTag, new HashSet<String>());
             } else {
                 int currentCount = supertagMistakeCounts.get(goldTag, predictedTag);
                 supertagMistakeCounts.put(goldTag, predictedTag, currentCount + 1);
             }
+            supertagMistakeWords.get(goldTag, predictedTag).add(mistake.getWord());
         }
 
         final ImmutableSet<Category> mistakenSupertags = supertagMistakes.getAllMistakes().stream()
@@ -467,7 +473,10 @@ public class DependencyErrorAnalysis {
         System.out.println();
         System.out.println(nMostCommonSupertaggingErrors + " most common supertagging errors (gold --> predicted):");
         for(Table.Cell<Category, Category, Integer> cell : sortedSupertagCells.subList(0, nMostCommonSupertaggingErrors)) {
-            System.out.println(cell.getRowKey() + " --> " + cell.getColumnKey() + ": " + cell.getValue());
+            ImmutableList<String> exampleWords = supertagMistakeWords.get(cell.getRowKey(), cell.getColumnKey()).stream()
+                .limit(5)
+                .collect(toImmutableList());
+            System.out.println(cell.getRowKey() + " --> " + cell.getColumnKey() + ": " + cell.getValue() + " " + exampleWords);
         }
     }
 
@@ -931,9 +940,9 @@ public class DependencyErrorAnalysis {
 
     private static void runCleftedQuestionQueryWiseConstraintAnalysis() {
         final ImmutableMap<Integer, List<AlignedAnnotation>> cleftedQuestionAnnotations = ImmutableMap
-            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(round2To3CleftedQuestionAnnotationFiles));
+            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(round4CleftedQuestionAnnotationFiles));
         final ImmutableMap<Integer, List<AlignedAnnotation>> annotations = ImmutableMap
-            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(round2To3AnnotationFiles));
+            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(round4AnnotationFiles));
 
         final ImmutableMap<Integer, NBestList> originalOneBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 1).get();
         final ImmutableMap<Integer, Parse> parsesOriginal = originalOneBestLists.entrySet().stream()
