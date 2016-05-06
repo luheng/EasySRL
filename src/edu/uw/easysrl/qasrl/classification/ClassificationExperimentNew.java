@@ -52,7 +52,9 @@ public class ClassificationExperimentNew {
 
     private static final String[] annotationFiles = {
             "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
-            "./Crowdflower_data/f902142.csv"                   // Round4: checkbox, pronouns, core only, 300 sentences.
+            "./Crowdflower_data/f902142.csv",                   // Round4: checkbox, pronouns, core only, 300 sentences.
+            "./Crowdflower_data/f897179.csv",                 // Round2-3: NP clefting questions.
+            "./Crowdflower_data/f903842.csv"              // Round4: clefting.
     };
 
     private static QueryPruningParameters queryPruningParameters;
@@ -136,8 +138,8 @@ public class ClassificationExperimentNew {
                 "max_depth", 3,
                 "objective", "binary:logistic"
         );
-        coreArgClassifier = Classifier.trainClassifier(coreArgTrainInstances, paramsMap, 50);
-        cleftingClassifier = Classifier.trainClassifier(cleftingTrainInstances, paramsMap, 50);
+        coreArgClassifier = Classifier.trainClassifier(coreArgTrainInstances, paramsMap, 30);
+        cleftingClassifier = Classifier.trainClassifier(cleftingTrainInstances, paramsMap, 30);
     }
 
     private static void reparse() {
@@ -168,21 +170,39 @@ public class ClassificationExperimentNew {
             }
         }
 
+
         for (int i = 0; i < coreArgDevInstances.size(); i++) {
             final DependencyInstance instance = coreArgDevInstances.get(i);
-            final int sentenceId = instance.sentenceId;
             final boolean p = (coreArgsPred.get(i) > 0.5);
-            if (p) {
-                constraints.get(sentenceId).add(
-                        new Constraint.AttachmentConstraint(instance.headId, instance.argId, true, 1.0));
-            } else {
-                constraints.get(sentenceId).add(
-                        new Constraint.AttachmentConstraint(instance.headId, instance.argId, false, 1.0));
+            constraints.get(instance.sentenceId).add(p ?
+                    new Constraint.AttachmentConstraint(instance.headId, instance.argId, true, 1.0) :
+                    new Constraint.AttachmentConstraint(instance.headId, instance.argId, false, 1.0));
+            final String depType = instance.instanceType.toString();
+            if (!coreArgsPredAcc.containsKey(depType)) {
+                coreArgsPredAcc.put(depType, new Accuracy());
             }
+            coreArgsPredAcc.get(depType).add(p == instance.inGold);
         }
-      
-        System.out.println("Baseline accuracy:\t" + 100.0 * baselineAcc / numInstances);
-        System.out.println("Classifier accuracy:\t" + 100.0 * classifierAcc / numInstances);
+
+
+        for (int i = 0; i < cleftingDevInstances.size(); i++) {
+            final DependencyInstance instance = cleftingDevInstances.get(i);
+            final boolean p = (cleftingPred.get(i) > 0.5);
+            constraints.get(instance.sentenceId).add(p ?
+                    new Constraint.AttachmentConstraint(instance.headId, instance.argId, true, 1.0) :
+                    new Constraint.AttachmentConstraint(instance.headId, instance.argId, false, 1.0));
+            final String depType = instance.instanceType.toString();
+            if (!cleftingPredAcc.containsKey(depType)) {
+                cleftingPredAcc.put(depType, new Accuracy());
+            }
+            cleftingPredAcc.get(depType).add(p == instance.inGold);
+        }
+
+        System.out.println("Core arg acc:\t");
+        coreArgsPredAcc.keySet().forEach(depType -> System.out.println(depType + '\t' + coreArgsPredAcc.get(depType)));
+        System.out.println("Clefting acc:\t");
+        cleftingPredAcc.keySet().forEach(depType -> System.out.println(depType + '\t' + cleftingPredAcc.get(depType)));
+
         Results avgBaseline = new Results(),
                 avgReparsed = new Results(),
                 avgHeuristicReparsed = new Results(),
@@ -192,7 +212,7 @@ public class ClassificationExperimentNew {
         int numImproved = 0, numWorsened = 0;
 
         // Re-parsing ...
-        for (int sentenceId : sentenceIds) {
+        for (int sentenceId : devSents) {
             final ImmutableList<String> sentence = myParser.getSentence(sentenceId);
             final Parse gold = myParser.getGoldParse(sentenceId);
             final Parse reparsed = myParser.getReparsed(sentenceId, constraints.get(sentenceId));
@@ -233,18 +253,10 @@ public class ClassificationExperimentNew {
                 System.out.println(query.toString(sentence,
                         'G', myParser.getGoldOptions(query),
                         'U', myParser.getUserOptions(query, annotation),
+                        'B', myParser.getOneBestOptions(query),
                         '*', AnnotationUtils.getUserResponseDistribution(query, annotation)));
-                // System.out.println(annotation);
-                System.out.println("----- classifier predictions -----");
-                for (int instId = 0; instId < instances.size(); instId++) {
-                    final DependencyInstance instance = instances.get(instId);
-                    if (instance.sentenceId == sentenceId && instance.queryId == qid) {
-                        System.out.println(String.format("%d:%s ---> %d:%s:\t%b\t%.2f",
-                                instance.headId, sentence.get(instance.headId),
-                                instance.argId, sentence.get(instance.argId),
-                                instance.inGold, pred[instId][0]));
-                    }
-                }
+
+                System.out.println("----- classifier constraints -----");
                 constraints.get(sentenceId).stream()
                         .forEach(c -> System.out.println(c.toString(sentence)));
                 System.out.println("----- old constraints -----");
@@ -270,36 +282,13 @@ public class ClassificationExperimentNew {
         System.out.println(avgUnlabeledHeuristicReparsed);
         System.out.println(avgUnlabeledReparsed);
 
-        System.out.println("Num processed sentences:\t" + sentenceIds.size());
+        System.out.println("Num processed sentences:\t" + devSents.size());
         System.out.println("Num improved:\t" + numImproved);
         System.out.println("Num worsened:\t" + numWorsened);
     }
 
-    private static void runExperiment() throws XGBoostError {
-        // TODO: print out training samples.
-        // TODO: compute precision/recall and tune by threshold.
-        DMatrix trainData = ClassificationUtils.getDMatrix(trainingInstances);
-        DMatrix devData = ClassificationUtils.getDMatrix(devInstances);
-        DMatrix testData = ClassificationUtils.getDMatrix(testInstances);
-        final Map<String, Object> paramsMap = ImmutableMap.of(
-                "eta", 0.1,
-                "min_child_weight", 1.0,
-                "max_depth", 3,
-                "objective", "binary:logistic"
-        );
-        final Map<String, DMatrix> watches = ImmutableMap.of(
-                "train", trainData,
-                "dev", devData
-        );
-        final int round = 100, nfold = 5;
-        Booster booster = XGBoost.train(trainData, paramsMap, round, watches, null, null);
-        //double avg = GridSearch.runGridSearch(trainData, nfold);
-        //System.out.println("avg:\t" + avg);
-        reparse(booster, devSents, devInstances, devData);
-        //reparse(booster, testInstances, testData);
-
-        booster.saveModel("model.bin");
-        //booster,("modelInfo.txt", "featureMap.txt", false)
-        ClassificationUtils.printXGBoostFeatures(featureExtractor.featureMap, booster.getFeatureScore(""));
+    public static void main(String[] args) {
+        initializeData();
+        reparse();
     }
 }
