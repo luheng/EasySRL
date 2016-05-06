@@ -7,6 +7,7 @@ import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
 import edu.uw.easysrl.qasrl.annotation.AnnotationUtils;
 import edu.uw.easysrl.qasrl.evaluation.Accuracy;
 import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
+import edu.uw.easysrl.qasrl.experiments.DebugPrinter;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
 import edu.uw.easysrl.qasrl.experiments.ReparsingHistory;
 import edu.uw.easysrl.qasrl.model.Constraint;
@@ -143,40 +144,14 @@ public class ClassificationExperimentNew {
     }
 
     private static void reparse() {
-
-        Map<Integer, Set<Constraint>> constraints = new HashMap<>();
-        Map<Integer, Set<Constraint>> heursticConstraints = new HashMap<>();
         final ImmutableList<Double> coreArgsPred = coreArgClassifier.predict(coreArgDevInstances),
                                     cleftingPred = cleftingClassifier.predict(cleftingDevInstances);
-
         Map<String, Accuracy> coreArgsPredAcc = new HashMap<>(),
                               cleftingPredAcc = new HashMap<>();
-
-        for (int sentenceId : devSents) {
-            constraints.put(sentenceId, new HashSet<>());
-            heursticConstraints.put(sentenceId, new HashSet<>());
-            for (int qid = 0; qid < alignedQueries.get(sentenceId).size(); qid++) {
-                final ScoredQuery<QAStructureSurfaceForm> query = alignedQueries.get(sentenceId).get(qid);
-                final ImmutableList<ImmutableList<Integer>> annotation = alignedAnnotations.get(sentenceId).get(qid);
-                final int naOptionId = query.getBadQuestionOptionId().getAsInt();
-                final int numNAVotes = (int) annotation.stream().filter(ops -> ops.contains(naOptionId)).count();
-                if (numNAVotes > reparsingParameters.negativeConstraintMaxAgreement) {
-                    constraints.get(sentenceId).add(new Constraint.SupertagConstraint(query.getPredicateId().getAsInt(),
-                            query.getPredicateCategory().get(), false, reparsingParameters.supertagPenaltyWeight));
-                }
-                heursticConstraints.get(sentenceId).addAll(
-                        myParser.getConstraints(alignedQueries.get(sentenceId).get(qid),
-                                alignedOldAnnotations.get(sentenceId).get(qid)));
-            }
-        }
-
 
         for (int i = 0; i < coreArgDevInstances.size(); i++) {
             final DependencyInstance instance = coreArgDevInstances.get(i);
             final boolean p = (coreArgsPred.get(i) > 0.5);
-            constraints.get(instance.sentenceId).add(p ?
-                    new Constraint.AttachmentConstraint(instance.headId, instance.argId, true, 1.0) :
-                    new Constraint.AttachmentConstraint(instance.headId, instance.argId, false, 1.0));
             final String depType = instance.instanceType.toString();
             if (!coreArgsPredAcc.containsKey(depType)) {
                 coreArgsPredAcc.put(depType, new Accuracy());
@@ -184,13 +159,9 @@ public class ClassificationExperimentNew {
             coreArgsPredAcc.get(depType).add(p == instance.inGold);
         }
 
-
         for (int i = 0; i < cleftingDevInstances.size(); i++) {
             final DependencyInstance instance = cleftingDevInstances.get(i);
             final boolean p = (cleftingPred.get(i) > 0.5);
-            constraints.get(instance.sentenceId).add(p ?
-                    new Constraint.AttachmentConstraint(instance.headId, instance.argId, true, 1.0) :
-                    new Constraint.AttachmentConstraint(instance.headId, instance.argId, false, 1.0));
             final String depType = instance.instanceType.toString();
             if (!cleftingPredAcc.containsKey(depType)) {
                 cleftingPredAcc.put(depType, new Accuracy());
@@ -198,56 +169,41 @@ public class ClassificationExperimentNew {
             cleftingPredAcc.get(depType).add(p == instance.inGold);
         }
 
-        System.out.println("Core arg acc:\t");
+        System.out.println("CoreArgs accuracy:\t");
         coreArgsPredAcc.keySet().forEach(depType -> System.out.println(depType + '\t' + coreArgsPredAcc.get(depType)));
-        System.out.println("Clefting acc:\t");
+        System.out.println("Clefting accuracy:\t");
         cleftingPredAcc.keySet().forEach(depType -> System.out.println(depType + '\t' + cleftingPredAcc.get(depType)));
+
+        System.out.println();
 
         Results avgBaseline = new Results(),
                 avgReparsed = new Results(),
                 avgHeuristicReparsed = new Results(),
+                avgOracleReparsed = new Results(),
                 avgUnlabeledBaseline = new Results(),
                 avgUnlabeledReparsed = new Results(),
-                avgUnlabeledHeuristicReparsed = new Results();
-        int numImproved = 0, numWorsened = 0;
+                avgUnlabeledHeuristicReparsed = new Results(),
+                avgUnlabeledOracleReparsed = new Results();
+        int numImproved = 0, numWorsened = 0, numUnlabeledImproved = 0, numUnlabeledWorsened = 0;
 
-        // Re-parsing ...
         for (int sentenceId : devSents) {
+            Set<Constraint> allConstraints = new HashSet<>(),
+                            allHeuristicConstraints = new HashSet<>(),
+                            allOracleConstraints = new HashSet<>();
+
             final ImmutableList<String> sentence = myParser.getSentence(sentenceId);
             final Parse gold = myParser.getGoldParse(sentenceId);
-            final Parse reparsed = myParser.getReparsed(sentenceId, constraints.get(sentenceId));
-            final Parse heuristicReparsed = myParser.getReparsed(sentenceId, heursticConstraints.get(sentenceId));
             final Results baselineF1 = myParser.getNBestList(sentenceId).getResults(0);
-            final Results reparsedF1 = CcgEvaluation.evaluate(reparsed.dependencies, gold.dependencies);
-            final Results heuristicReparsedF1 = CcgEvaluation.evaluate(heuristicReparsed.dependencies,
-                    gold.dependencies);
             final Results unlabeledBaselineF1 = CcgEvaluation.evaluateUnlabeled(
                     myParser.getNBestList(sentenceId).getParse(0).dependencies, gold.dependencies);
-            final Results unlabeledReparsedF1 = CcgEvaluation.evaluateUnlabeled(reparsed.dependencies,
-                    gold.dependencies);
-            final Results unlabeledHeuristicReparsedF1 = CcgEvaluation.evaluateUnlabeled(heuristicReparsed.dependencies,
-                    gold.dependencies);
-
-            avgBaseline.add(baselineF1);
-            avgReparsed.add(reparsedF1);
-            avgHeuristicReparsed.add(heuristicReparsedF1);
-            avgUnlabeledBaseline.add(unlabeledBaselineF1);
-            avgUnlabeledReparsed.add(unlabeledReparsedF1);
-            avgUnlabeledHeuristicReparsed.add(unlabeledHeuristicReparsedF1);
-
-            if (baselineF1.getF1() + 1e-6 < reparsedF1.getF1()) {
-                numImproved ++;
-            }
-            if (baselineF1.getF1() > reparsedF1.getF1() + 1e-6) {
-                numWorsened ++;
-            }
-            if (baselineF1.getF1() <= reparsedF1.getF1()) {
-                continue;
-            }
+            Results reparsedF1 = baselineF1, heuristicReparsedF1 = baselineF1, oracleReparsedF1 = baselineF1,
+                    unlabeledReparsedF1 = unlabeledBaselineF1, unlabeledHeuristicReparsedF1 = unlabeledBaselineF1,
+                    unlabeledOracleReparsedF1 = unlabeledReparsedF1;
 
             /**************************** Debugging ! ************************/
             System.out.println(sentenceId + "\t" + TextGenerationHelper.renderString(sentence));
-            for (int qid = 0; qid < alignedQueries.get(sentenceId).size(); qid++) {
+            for (int r = 0; r < alignedQueries.get(sentenceId).size(); r++) {
+                final int qid = r;
                 final ScoredQuery<QAStructureSurfaceForm> query = alignedQueries.get(sentenceId).get(qid);
                 final AlignedAnnotation annotation = alignedOldAnnotations.get(sentenceId).get(qid);
                 System.out.println(query.toString(sentence,
@@ -256,35 +212,106 @@ public class ClassificationExperimentNew {
                         'B', myParser.getOneBestOptions(query),
                         '*', AnnotationUtils.getUserResponseDistribution(query, annotation)));
 
+                Set<Constraint> constraints = new HashSet<>(),
+                                heuristicConstraints = myParser.getConstraints(query, annotation),
+                                oracleConstraints = myParser.getOracleConstraints(query, myParser.getGoldOptions(query));
+                Set<String> predictions = new HashSet<>();
+                IntStream.range(0, coreArgsPred.size()).boxed()
+                        .forEach(i -> {
+                            final DependencyInstance inst = coreArgDevInstances.get(i);
+                            if (inst.sentenceId == sentenceId && inst.queryId == qid) {
+                                final boolean pred = coreArgsPred.get(i) > 0.5;
+                                constraints.add(pred ?
+                                        new Constraint.AttachmentConstraint(inst.headId, inst.argId, true, 1.0) :
+                                        new Constraint.AttachmentConstraint(inst.headId, inst.argId, false, 1.0));
+                                predictions.add(String.format("%s\tGold=%b\tPred=%.2f\t%d:%s-->%d:%s", inst.inGold,
+                                        pred == inst.inGold ? "[Y]" : "[N]", coreArgsPred.get(i),
+                                        inst.headId, sentence.get(inst.headId), inst.argId, sentence.get(inst.argId)));
+                            }
+                        });
+                IntStream.range(0, cleftingPred.size()).boxed()
+                        .forEach(i -> {
+                            final DependencyInstance inst = cleftingDevInstances.get(i);
+                            if (inst.sentenceId == sentenceId && inst.queryId == qid) {
+                                final boolean pred = cleftingPred.get(i) > 0.5;
+                                constraints.add(pred ?
+                                        new Constraint.AttachmentConstraint(inst.headId, inst.argId, true, 1.0) :
+                                        new Constraint.AttachmentConstraint(inst.headId, inst.argId, false, 1.0));
+                                predictions.add(String.format("%s\tGold=%b\tPred=%.2f\t%d:%s-->%d:%s", inst.inGold,
+                                        pred == inst.inGold ? "[Y]" : "[N]", cleftingPred.get(i),
+                                        inst.headId, sentence.get(inst.headId), inst.argId, sentence.get(inst.argId)));
+                            }
+                        });
+
+                allConstraints.addAll(constraints);
+                allHeuristicConstraints.addAll(heuristicConstraints);
+                allOracleConstraints.addAll(oracleConstraints);
+
+                final Parse reparsed = myParser.getReparsed(sentenceId, allConstraints);
+                final Parse heuristicReparsed = myParser.getReparsed(sentenceId, allHeuristicConstraints);
+                final Parse oracleReparsed = myParser.getReparsed(sentenceId, allOracleConstraints);
+                reparsedF1 = CcgEvaluation.evaluate(reparsed.dependencies, gold.dependencies);
+                heuristicReparsedF1 = CcgEvaluation.evaluate(heuristicReparsed.dependencies, gold.dependencies);
+                oracleReparsedF1 = CcgEvaluation.evaluate(oracleReparsed.dependencies, gold.dependencies);
+                unlabeledReparsedF1 = CcgEvaluation.evaluateUnlabeled(reparsed.dependencies, gold.dependencies);
+                unlabeledHeuristicReparsedF1 = CcgEvaluation.evaluateUnlabeled(heuristicReparsed.dependencies, gold.dependencies);
+                unlabeledOracleReparsedF1 = CcgEvaluation.evaluateUnlabeled(oracleReparsed.dependencies, gold.dependencies);
+
+                System.out.println(String.format("Baseline  :\t%.2f%%\tunlabeled:\t%.2f%%", 100.0 * baselineF1.getF1(), 100.0 * unlabeledBaselineF1.getF1()));
+                System.out.println(String.format("Heuristic :\t%.2f%%\tunlabeled:\t%.2f%%", 100.0 * heuristicReparsedF1.getF1(), 100.0 * unlabeledHeuristicReparsedF1.getF1()));
+                System.out.println(String.format("Classifier:\t%.2f%%\tunlabeled:\t%.2f%%", 100.0 * reparsedF1.getF1(), 100.0 * unlabeledReparsedF1.getF1()));
+                System.out.println(String.format("Oracle    :\t%.2f%%\tunlabeled:\t%.2f%%", 100.0 * oracleReparsedF1.getF1(), 100.0 * unlabeledOracleReparsedF1.getF1()));
+
+                System.out.println("----- prediction -----");
+                predictions.forEach(System.out::println);
                 System.out.println("----- classifier constraints -----");
-                constraints.get(sentenceId).stream()
-                        .forEach(c -> System.out.println(c.toString(sentence)));
-                System.out.println("----- old constraints -----");
-                myParser.getConstraints(query, annotation)
-                        .forEach(c -> System.out.println(c.toString(sentence)));
+                constraints.forEach(c -> System.out.println(c.toString(sentence)));
+                System.out.println("----- heuristic constraints -----");
+                heuristicConstraints.forEach(c -> System.out.println(c.toString(sentence)));
+                System.out.println("----- oracle constraints -----");
+                oracleConstraints.forEach(c -> System.out.println(c.toString(sentence)));
                 System.out.println();
             }
 
-            System.out.println(baselineF1);
-            System.out.println(heuristicReparsedF1);
-            System.out.println(reparsedF1);
-            System.out.println("---");
-            System.out.println(unlabeledBaselineF1);
-            System.out.println(unlabeledHeuristicReparsedF1);
-            System.out.println(unlabeledReparsedF1);
+            avgBaseline.add(baselineF1);
+            avgReparsed.add(reparsedF1);
+            avgOracleReparsed.add(oracleReparsedF1);
+            avgHeuristicReparsed.add(heuristicReparsedF1);
+            avgUnlabeledBaseline.add(unlabeledBaselineF1);
+            avgUnlabeledReparsed.add(unlabeledReparsedF1);
+            avgUnlabeledOracleReparsed.add(unlabeledOracleReparsedF1);
+            avgUnlabeledHeuristicReparsed.add(unlabeledHeuristicReparsedF1);
+
+            System.out.print(String.format("%SID=%d\t%.2f%% --> %.2f%%\t\t", sentenceId,
+                    100.0 * baselineF1.getF1(), 100.0 * reparsedF1.getF1()));
+            if (baselineF1.getF1() + 1e-6 < reparsedF1.getF1()) {
+                numImproved ++;
+                System.out.println("[improved]");
+            } else if (baselineF1.getF1() > reparsedF1.getF1() + 1e-6) {
+                numWorsened ++;
+                System.out.println("[worsened]");
+            } else {
+                System.out.println("[unchanged]");
+            }
+            if (unlabeledBaselineF1.getF1() + 1e-6 < unlabeledReparsedF1.getF1()) {
+                numUnlabeledImproved ++;
+            } else if (unlabeledBaselineF1.getF1() > unlabeledReparsedF1.getF1() + 1e-6) {
+                numUnlabeledWorsened ++;
+            }
             System.out.println();
-
         }
-        System.out.println(avgBaseline);
-        System.out.println(avgHeuristicReparsed);
-        System.out.println(avgReparsed);
-        System.out.println(avgUnlabeledBaseline);
-        System.out.println(avgUnlabeledHeuristicReparsed);
-        System.out.println(avgUnlabeledReparsed);
 
+        System.out.println();
+        System.out.println(String.format("Avg. Baseline  :\t%.2f%%\tunlabeled:\t%.2f%%", 100.0 * avgBaseline.getF1(), 100.0 * avgUnlabeledBaseline.getF1()));
+        System.out.println(String.format("Avg. Heuristic :\t%.2f%%\tunlabeled:\t%.2f%%", 100.0 * avgHeuristicReparsed.getF1(), 100.0 * avgUnlabeledHeuristicReparsed.getF1()));
+        System.out.println(String.format("Avg. Classifier:\t%.2f%%\tunlabeled:\t%.2f%%", 100.0 * avgReparsed.getF1(), 100.0 * avgUnlabeledReparsed.getF1()));
+        System.out.println(String.format("Avg. Oracle    :\t%.2f%%\tunlabeled:\t%.2f%%", 100.0 * avgOracleReparsed.getF1(), 100.0 * avgUnlabeledOracleReparsed.getF1()));
+        System.out.println();
         System.out.println("Num processed sentences:\t" + devSents.size());
         System.out.println("Num improved:\t" + numImproved);
         System.out.println("Num worsened:\t" + numWorsened);
+        System.out.println("Num unlabeled improved:\t" + numUnlabeledImproved);
+        System.out.println("Num unlabeled worsened:\t" + numUnlabeledWorsened);
     }
 
     public static void main(String[] args) {

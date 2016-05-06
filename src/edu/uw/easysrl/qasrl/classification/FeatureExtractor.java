@@ -199,16 +199,6 @@ public class FeatureExtractor {
                                                         final ImmutableList<String> sentence,
                                                         final NBestList nBestList) {
         Map<Integer, Double> features = new HashMap<>();
-
-        final ImmutableList<QuestionStructure> questionStructures = query.getQAPairSurfaceForms().stream()
-                .flatMap(qa -> qa.getQuestionStructures().stream())
-                .distinct()
-                .collect(GuavaCollectors.toImmutableList());
-        final ImmutableList<AnswerStructure> answerStructures = query.getQAPairSurfaceForms().stream()
-                .flatMap(qa -> qa.getAnswerStructures().stream())
-                .distinct()
-                .collect(GuavaCollectors.toImmutableList());
-
         final int numAnnotators = annotation.size();
         final int naOptionId = query.getBadQuestionOptionId().getAsInt();
         final int numQAOptions = query.getQAPairSurfaceForms().size();
@@ -229,6 +219,12 @@ public class FeatureExtractor {
         addFeature(features, "DependencyType=" + instanceType, 1.0);
         if (instanceType == DependencyInstanceType.PPGovernor || instanceType == DependencyInstanceType.PPObject) {
             addFeature(features, "Preposition=" + sentence.get(headId), 1.0);
+        }
+
+        if (addNAOptionFeature) {
+            addFeature(features, "QueryConfidence", query.getPromptScore());
+            addFeature(features, "NAOptionReceivedVotes", 1.0 * annotation.stream()
+                    .filter(ops -> ops.contains(naOptionId)).count() / numAnnotators);
         }
 
         // TODO: preposition to object distance.

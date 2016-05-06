@@ -136,16 +136,17 @@ public class ClassificationUtils {
                                 final ImmutableList<ImmutableList<Integer>> annotation = alignedAnnotations.get(sid).get(qid);
                                 final int naOptionId = query.getBadQuestionOptionId().getAsInt();
                                 final int numNAVotes = (int) annotation.stream().filter(ops -> ops.contains(naOptionId)).count();
-                                if (numNAVotes > maxAllowedNAVotes) {
+                               /* if (numNAVotes > maxAllowedNAVotes) {
                                     return Stream.empty();
-                                }
+                                } */
                                 return IntStream.range(0, sentence.size())
                                         .boxed()
                                         .flatMap(headId -> IntStream.range(0, sentence.size())
                                                 .boxed()
                                                 .filter(argId -> argId.intValue() != headId.intValue())
-                                                .filter(argId -> DependencyInstanceHelper.getDependencyType(query, headId, argId)
-                                                        != DependencyInstanceType.NONE)
+                                                .filter(argId -> DependencyInstanceHelper.getDependencyType(query, headId, argId) != DependencyInstanceType.NONE)
+                                                //.filter(argId -> !(query.getQueryType() == QueryType.Clefted &&
+                                                //        DependencyInstanceHelper.getDependencyType(query, headId, argId) != DependencyInstanceType.PPGovernor))
                                                 .map(argId -> {
                                                     final DependencyInstanceType dtype =
                                                             DependencyInstanceHelper.getDependencyType(query, headId, argId);

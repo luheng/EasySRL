@@ -326,8 +326,6 @@ public class NPCleftingClassificationExperiment {
     }
 
     private static void runExperiment() throws XGBoostError {
-        // TODO: print out training samples.
-        // TODO: compute precision/recall and tune by threshold.
         DMatrix trainData = ClassificationUtils.getDMatrix(trainingInstances);
         DMatrix devData = ClassificationUtils.getDMatrix(devInstances);
         DMatrix testData = ClassificationUtils.getDMatrix(testInstances);
@@ -343,8 +341,8 @@ public class NPCleftingClassificationExperiment {
         );
         final int round = 30, nfold = 5;
 
-        double avg = GridSearch.runGridSearch(trainData, nfold);
-        System.out.println("avg:\t" + avg);
+        //double avg = GridSearch.runGridSearch(trainData, nfold);
+        //System.out.println("avg:\t" + avg);
         Booster booster = XGBoost.train(trainData, paramsMap, round, watches, null, null);
         reparse(booster, devSents, devInstances, devData);
         //reparse(booster, testInstances, testData);
