@@ -15,17 +15,19 @@ import java.util.stream.Collectors;
  */
 public class GridSearch {
 
+
+    /*
     final static ImmutableList<Double> etaValues = ImmutableList.of(0.1);
     final static ImmutableList<Integer> treeDepthValues = ImmutableList.of(3, 5, 10, 15);
     final static ImmutableList<Double> minChildWeightValues = ImmutableList.of(0.1, 1.0);
+     */
 
-    /*
     final static ImmutableList<Double> etaValues = ImmutableList.of(0.05, 0.1, 0.3);
     final static ImmutableList<Integer> treeDepthValues = ImmutableList.of(3, 5, 10, 15, 20, 25, 30, 40);
     final static ImmutableList<Double> minChildWeightValues = ImmutableList.of(0.1, 1.0, 3.0, 5.0);
-    */
 
-    final static int numRounds = 100;
+
+    final static int numRounds = 30;
 
     public static double runGridSearch(final DMatrix trainData, final int numFolds) {
         final List<String> results = new ArrayList<>();

@@ -64,7 +64,7 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
         constraints.stream()
                 .filter(c -> !c.isPositive())
                 .filter(Constraint.SupertagConstraint.class::isInstance)
-                .map(c -> (Constraint.SupertagConstraint) c)
+                 .map(c -> (Constraint.SupertagConstraint) c)
                 .filter(c -> !mustSupertags.contains(c.getPredId(), c.getCategory()))
                 .forEach(c -> cannotSupertags.put(c.getPredId(), c.getCategory(), c.getStrength()));
 

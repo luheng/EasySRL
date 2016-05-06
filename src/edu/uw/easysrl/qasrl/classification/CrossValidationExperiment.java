@@ -37,8 +37,10 @@ public class CrossValidationExperiment {
     private static ImmutableList<Integer> trainSents, devSents;
 
     private static final String[] annotationFiles = {
-            "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
-            "./Crowdflower_data/f902142.csv"                   // Round4: checkbox, pronouns, core only, 300 sentences.
+          //  "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
+          //  "./Crowdflower_data/f902142.csv"                    // Round4: checkbox, pronouns, core only, 300 sentences.
+            "./Crowdflower_data/f897179.csv",                   // Round2-3: NP clefting questions.
+            "./Crowdflower_data/f903842.csv"              // Round4: clefting.
     };
 
     private static QueryPruningParameters queryPruningParameters;

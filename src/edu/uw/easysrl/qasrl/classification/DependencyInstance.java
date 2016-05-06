@@ -2,6 +2,7 @@ package edu.uw.easysrl.qasrl.classification;
 
 import com.google.common.collect.ImmutableMap;
 import edu.uw.easysrl.dependencies.Dependency;
+import edu.uw.easysrl.qasrl.query.QueryType;
 
 import java.util.Map;
 
@@ -16,11 +17,13 @@ public class DependencyInstance {
     final int sentenceId, queryId, headId, argId;
     final ImmutableMap<Integer, Double> features;
     final DependencyInstanceType instanceType;
+    final QueryType queryType;
 
-    DependencyInstance(int sentenceId, int queryId, int headId, int argId, DependencyInstanceType instanceType,
-                       boolean inGold, ImmutableMap<Integer, Double> features) {
+    DependencyInstance(int sentenceId, int queryId, int headId, int argId, QueryType queryType,
+                       DependencyInstanceType instanceType, boolean inGold, ImmutableMap<Integer, Double> features) {
         this.sentenceId = sentenceId;
         this.queryId = queryId;
+        this.queryType = queryType;
         this.instanceType = instanceType;
         this.headId = headId;
         this.argId = argId;

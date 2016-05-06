@@ -7,6 +7,7 @@ import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
 import edu.uw.easysrl.qasrl.model.HITLParser;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
+import edu.uw.easysrl.qasrl.qg.util.Partitive;
 import edu.uw.easysrl.qasrl.qg.util.Prepositions;
 import edu.uw.easysrl.qasrl.qg.util.PronounList;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
@@ -36,8 +37,10 @@ public class TemplateHelper {
         final int argId2 = query.getQAPairSurfaceForms().get(opId2).getAnswerStructures().get(0).argumentIndices.get(0);
 
         // op1 is superspan of op2
-        if (op1.equals("some of " + op2) || op1.equals("many of " + op2)) {
-            return "[op1] := some/many of [op2]";
+        for (String tok : Partitive.tokens) {
+            if (op1.equals(tok + " of " + op2)) {
+                return "[op1] : [partitive] of [op2]";
+            }
         }
         if (op1.contains(" of " + op2)) {
             return "[op1] := X of [op2]";

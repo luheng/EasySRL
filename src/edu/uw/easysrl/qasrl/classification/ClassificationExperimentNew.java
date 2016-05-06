@@ -14,6 +14,7 @@ import edu.uw.easysrl.qasrl.model.HITLParser;
 import edu.uw.easysrl.qasrl.model.HITLParsingParameters;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
+import edu.uw.easysrl.qasrl.query.QueryType;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.util.GuavaCollectors;
@@ -28,26 +29,30 @@ import java.util.stream.IntStream;
 
 
 /**
+ * Putting things together ...
  * Created by luheng on 4/21/16.
  */
-public class NPCleftingClassificationExperiment {
+public class ClassificationExperimentNew {
     private static final int nBest = 100;
     private static final ImmutableList<Double> split = ImmutableList.of(0.6, 0.4, 0.0);
     private static final int randomSeed = 12345;
     private static HITLParser myParser;
     private static Map<Integer, List<AlignedAnnotation>> annotations;
-    private static FeatureExtractor featureExtractor;
+    private static FeatureExtractor coreArgsFeatureExtractor, cleftingFeatureExtractor;
 
     private static Map<Integer, List<ScoredQuery<QAStructureSurfaceForm>>> alignedQueries;
     private static Map<Integer, List<ImmutableList<ImmutableList<Integer>>>> alignedAnnotations;
     private static Map<Integer, List<AlignedAnnotation>> alignedOldAnnotations;
 
     private static ImmutableList<Integer> trainSents, devSents, testSents;
-    private static ImmutableList<DependencyInstance> trainingInstances, devInstances, testInstances;
+    private static ImmutableList<DependencyInstance> coreArgTrainInstances, coreArgDevInstances, coreArgTestInstances,
+                                                     cleftingTrainInstances, cleftingDevInstances, cleftingTestInstances;
+
+    private static Classifier coreArgClassifier, cleftingClassifier;
 
     private static final String[] annotationFiles = {
-            "./Crowdflower_data/f897179.csv",                 // Round2-3: NP clefting questions.
-            "./Crowdflower_data/f903842.csv"              // Round4: clefting.
+            "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
+            "./Crowdflower_data/f902142.csv"                   // Round4: checkbox, pronouns, core only, 300 sentences.
     };
 
     private static QueryPruningParameters queryPruningParameters;
@@ -69,7 +74,7 @@ public class NPCleftingClassificationExperiment {
         reparsingParameters.supertagPenaltyWeight = 1.0;
     }
 
-    public static void main(String[] args) {
+    private static void initializeData() {
         myParser = new HITLParser(nBest);
         myParser.setQueryPruningParameters(queryPruningParameters);
         myParser.setReparsingParameters(reparsingParameters);
@@ -77,16 +82,8 @@ public class NPCleftingClassificationExperiment {
         alignedQueries = new HashMap<>();
         alignedAnnotations = new HashMap<>();
         alignedOldAnnotations = new HashMap<>();
-        featureExtractor = new FeatureExtractor();
-        //featureExtractor.addArgumentPositionFeatures = false;
-        //featureExtractor.addCategoryFeatures = false;
-        //featureExtractor.addAnswerLexicalFeatures = false;
-        //featureExtractor.addNAOptionFeature = false;
-        //featureExtractor.addTemplateBasedFeatures = false;
-        //featureExtractor.addNBestPriorFeatures = false;
         assert annotations != null;
 
-        /**************** Prepare data ********************/
         ImmutableList<Integer> sentenceIds = annotations.keySet().stream()
                 .sorted()
                 .collect(GuavaCollectors.toImmutableList());
@@ -105,50 +102,55 @@ public class NPCleftingClassificationExperiment {
 
         sentenceIds.forEach(sid -> ClassificationUtils.getQueriesAndAnnotationsForSentence(sid, annotations.get(sid),
                 myParser, alignedQueries, alignedAnnotations, alignedOldAnnotations));
-        trainingInstances = ClassificationUtils.getInstances(trainSents, myParser, featureExtractor, alignedQueries, alignedAnnotations)
-                .stream()
-              //  .filter(inst -> inst.instanceType == DependencyInstanceType.PPGovernor)
-                .collect(GuavaCollectors.toImmutableList());
 
-        final int numPositive = (int) trainingInstances.stream().filter(inst -> inst.inGold).count();
+        coreArgsFeatureExtractor = new FeatureExtractor();
+        cleftingFeatureExtractor = new FeatureExtractor();
+
+        coreArgTrainInstances = ClassificationUtils.getInstances(trainSents, myParser,
+                ImmutableSet.of(QueryType.Forward), coreArgsFeatureExtractor, alignedQueries, alignedAnnotations);
+        cleftingTrainInstances = ClassificationUtils.getInstances(trainSents, myParser,
+                ImmutableSet.of(QueryType.Clefted), cleftingFeatureExtractor, alignedQueries, alignedAnnotations);
+
+        coreArgsFeatureExtractor.freeze();
+        cleftingFeatureExtractor.freeze();
+
+        final int numPositiveCoreArgs = (int) coreArgTrainInstances.stream().filter(inst -> inst.inGold).count();
         System.out.println(String.format("Extracted %d training samples and %d features, %d positive and %d negative.",
-                trainingInstances.size(), featureExtractor.featureMap.size(),
-                numPositive, trainingInstances.size() - numPositive));
+                coreArgTrainInstances.size(), coreArgsFeatureExtractor.featureMap.size(),
+                numPositiveCoreArgs, coreArgTrainInstances.size() - numPositiveCoreArgs));
 
-        featureExtractor.freeze();
+        final int numPositiveClefting = (int) cleftingTrainInstances.stream().filter(inst -> inst.inGold).count();
+        System.out.println(String.format("Extracted %d training samples and %d features, %d positive and %d negative.",
+                cleftingTrainInstances.size(), cleftingFeatureExtractor.featureMap.size(),
+                numPositiveClefting, cleftingTrainInstances.size() - numPositiveClefting));
 
-        devInstances = ClassificationUtils.getInstances(devSents, myParser, featureExtractor, alignedQueries, alignedAnnotations)
-                .stream()
-               // .filter(inst -> inst.instanceType == DependencyInstanceType.PPGovernor)
-                .collect(GuavaCollectors.toImmutableList());
-        testInstances = ClassificationUtils.getInstances(testSents, myParser, featureExtractor, alignedQueries, alignedAnnotations)
-                .stream()
-              //  .filter(inst -> inst.instanceType == DependencyInstanceType.PPGovernor)
-                .collect(GuavaCollectors.toImmutableList());
 
-        final int numPositiveDev = (int) devInstances.stream().filter(inst -> inst.inGold).count();
-        System.out.println(String.format("Extracted %d dev samples and %d features, %d positive and %d negative.",
-                devInstances.size(), featureExtractor.featureMap.size(),
-                numPositiveDev, devInstances.size() - numPositiveDev));
+        coreArgDevInstances = ClassificationUtils.getInstances(devSents, myParser, ImmutableSet.of(QueryType.Forward),
+                coreArgsFeatureExtractor, alignedQueries, alignedAnnotations);
+        cleftingDevInstances = ClassificationUtils.getInstances(devSents, myParser, ImmutableSet.of(QueryType.Clefted),
+                cleftingFeatureExtractor, alignedQueries, alignedAnnotations);
 
-        try {
-            runExperiment();
-        } catch (XGBoostError e) {
-            e.printStackTrace();
-        }
+        final Map<String, Object> paramsMap = ImmutableMap.of(
+                "eta", 0.1,
+                "min_child_weight", 1.0,
+                "max_depth", 3,
+                "objective", "binary:logistic"
+        );
+        coreArgClassifier = Classifier.trainClassifier(coreArgTrainInstances, paramsMap, 50);
+        cleftingClassifier = Classifier.trainClassifier(cleftingTrainInstances, paramsMap, 50);
     }
 
-    private static void reparse(final Booster booster, final ImmutableList<Integer> sentenceIds,
-                                final ImmutableList<DependencyInstance> instances,
-                                final DMatrix data) throws XGBoostError {
+    private static void reparse() {
 
         Map<Integer, Set<Constraint>> constraints = new HashMap<>();
         Map<Integer, Set<Constraint>> heursticConstraints = new HashMap<>();
-        final float[][] pred = booster.predict(data);
-        int baselineAcc = 0, classifierAcc = 0, numInstances = 0;
-        Map<String, Accuracy> accuracyMap = new HashMap<>();
+        final ImmutableList<Double> coreArgsPred = coreArgClassifier.predict(coreArgDevInstances),
+                                    cleftingPred = cleftingClassifier.predict(cleftingDevInstances);
 
-        for (int sentenceId : sentenceIds) {
+        Map<String, Accuracy> coreArgsPredAcc = new HashMap<>(),
+                              cleftingPredAcc = new HashMap<>();
+
+        for (int sentenceId : devSents) {
             constraints.put(sentenceId, new HashSet<>());
             heursticConstraints.put(sentenceId, new HashSet<>());
             for (int qid = 0; qid < alignedQueries.get(sentenceId).size(); qid++) {
@@ -160,77 +162,34 @@ public class NPCleftingClassificationExperiment {
                     constraints.get(sentenceId).add(new Constraint.SupertagConstraint(query.getPredicateId().getAsInt(),
                             query.getPredicateCategory().get(), false, reparsingParameters.supertagPenaltyWeight));
                 }
+                heursticConstraints.get(sentenceId).addAll(
+                        myParser.getConstraints(alignedQueries.get(sentenceId).get(qid),
+                                alignedOldAnnotations.get(sentenceId).get(qid)));
             }
         }
 
-        for (int i = 0; i < instances.size(); i++) {
-            final DependencyInstance instance = instances.get(i);
-            final boolean p = (pred[i][0] > 0.5);
-
+        for (int i = 0; i < coreArgDevInstances.size(); i++) {
+            final DependencyInstance instance = coreArgDevInstances.get(i);
             final int sentenceId = instance.sentenceId;
-            final ImmutableList<String> sentence = myParser.getSentence(sentenceId);
-            final ScoredQuery<QAStructureSurfaceForm> query = alignedQueries.get(sentenceId).get(instance.queryId);
-            final ImmutableList<QAStructureSurfaceForm> qaList = query.getQAPairSurfaceForms();
-            final AlignedAnnotation annotation = alignedOldAnnotations.get(sentenceId).get(instance.queryId);
-            final int[] userDist = AnnotationUtils.getUserResponseDistribution(query, annotation);
-
-            IntStream.range(0, alignedQueries.get(sentenceId).size()).boxed()
-                    .forEach(qid -> heursticConstraints.get(sentenceId).addAll(
-                            myParser.getConstraints(alignedQueries.get(sentenceId).get(qid),
-                                    alignedOldAnnotations.get(sentenceId).get(qid))));
-
-            if (pred[i][0] > 0.5) {
+            final boolean p = (coreArgsPred.get(i) > 0.5);
+            if (p) {
                 constraints.get(sentenceId).add(
                         new Constraint.AttachmentConstraint(instance.headId, instance.argId, true, 1.0));
-            }
-            if (pred[i][0] < 0.5) {
+            } else {
                 constraints.get(sentenceId).add(
                         new Constraint.AttachmentConstraint(instance.headId, instance.argId, false, 1.0));
             }
-
-            /************** Get baseline accuracy *************************/
-            final ImmutableList<Integer> options = IntStream.range(0, qaList.size()).boxed()
-                    .filter(op -> DependencyInstanceHelper.containsDependency(sentence, qaList.get(op),
-                            instance.headId, instance.argId))
-                    .collect(GuavaCollectors.toImmutableList());
-            boolean baselinePrediction = options.stream().mapToInt(op -> userDist[op]).max().orElse(0) >= 3;
-
-            baselineAcc += (baselinePrediction == instance.inGold) ? 1 : 0;
-            classifierAcc += (p == instance.inGold) ? 1 : 0;
-            numInstances++;
-
-            if (!accuracyMap.containsKey(instance.instanceType.toString())) {
-                accuracyMap.put(instance.instanceType.toString(), new Accuracy());
-            }
-            accuracyMap.get(instance.instanceType.toString()).add(p == instance.inGold);
-
-            if (p != instance.inGold) {
-                System.out.println();
-                System.out.println(query.toString(sentence,
-                        'G', myParser.getGoldOptions(query),
-                        'B', myParser.getOneBestOptions(query),
-                        '*', userDist));
-                System.out.println(String.format("%d:%s ---> %d:%s", instance.headId, sentence.get(instance.headId),
-                        instance.argId, sentence.get(instance.argId)));
-                System.out.println(String.format("%b\t%.2f\t%b", instance.inGold, pred[i][0], baselinePrediction));
-
-                featureExtractor.printFeature(instance.features);
-            }
         }
-
+      
         System.out.println("Baseline accuracy:\t" + 100.0 * baselineAcc / numInstances);
         System.out.println("Classifier accuracy:\t" + 100.0 * classifierAcc / numInstances);
-        for (String accType : accuracyMap.keySet()) {
-            System.out.println(accType + "\t" + accuracyMap.get(accType));
-        }
-
         Results avgBaseline = new Results(),
                 avgReparsed = new Results(),
                 avgHeuristicReparsed = new Results(),
                 avgUnlabeledBaseline = new Results(),
                 avgUnlabeledReparsed = new Results(),
                 avgUnlabeledHeuristicReparsed = new Results();
-        int numImproved = 0, numWorsened = 0, numImprovedUnlabeled = 0, numWorsenedUnlabeled = 0;
+        int numImproved = 0, numWorsened = 0;
 
         // Re-parsing ...
         for (int sentenceId : sentenceIds) {
@@ -262,13 +221,6 @@ public class NPCleftingClassificationExperiment {
             if (baselineF1.getF1() > reparsedF1.getF1() + 1e-6) {
                 numWorsened ++;
             }
-            if (unlabeledBaselineF1.getF1() + 1e-6 < unlabeledReparsedF1.getF1()) {
-                numImprovedUnlabeled ++;
-            }
-            if (unlabeledBaselineF1.getF1() > unlabeledReparsedF1.getF1() + 1e-6) {
-                numWorsenedUnlabeled ++;
-            }
-
             if (baselineF1.getF1() <= reparsedF1.getF1()) {
                 continue;
             }
@@ -321,8 +273,6 @@ public class NPCleftingClassificationExperiment {
         System.out.println("Num processed sentences:\t" + sentenceIds.size());
         System.out.println("Num improved:\t" + numImproved);
         System.out.println("Num worsened:\t" + numWorsened);
-        System.out.println("Num improved unlabeled:\t" + numImprovedUnlabeled);
-        System.out.println("Num worsened unlabeled:\t" + numWorsenedUnlabeled);
     }
 
     private static void runExperiment() throws XGBoostError {
@@ -341,14 +291,14 @@ public class NPCleftingClassificationExperiment {
                 "train", trainData,
                 "dev", devData
         );
-        final int round = 30, nfold = 5;
-
-        double avg = GridSearch.runGridSearch(trainData, nfold);
-        System.out.println("avg:\t" + avg);
+        final int round = 100, nfold = 5;
         Booster booster = XGBoost.train(trainData, paramsMap, round, watches, null, null);
+        //double avg = GridSearch.runGridSearch(trainData, nfold);
+        //System.out.println("avg:\t" + avg);
         reparse(booster, devSents, devInstances, devData);
         //reparse(booster, testInstances, testData);
-        // booster.saveModel("model.bin");
+
+        booster.saveModel("model.bin");
         //booster,("modelInfo.txt", "featureMap.txt", false)
         ClassificationUtils.printXGBoostFeatures(featureExtractor.featureMap, booster.getFeatureScore(""));
     }

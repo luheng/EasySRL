@@ -2,6 +2,7 @@ package edu.uw.easysrl.qasrl.classification;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import edu.uw.easysrl.qasrl.NBestList;
 import edu.uw.easysrl.qasrl.corpora.CountDictionary;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
@@ -207,12 +208,6 @@ public class FeatureExtractor {
                 .flatMap(qa -> qa.getAnswerStructures().stream())
                 .distinct()
                 .collect(GuavaCollectors.toImmutableList());
-        final ImmutableList<Integer> candidateHeads = Stream.concat(
-                Stream.of(argId),
-                answerStructures.stream().flatMap(astr -> astr.argumentIndices.stream()))
-                .distinct()
-                .sorted()
-                .collect(GuavaCollectors.toImmutableList());
 
         final int numAnnotators = annotation.size();
         final int naOptionId = query.getBadQuestionOptionId().getAsInt();
@@ -224,34 +219,26 @@ public class FeatureExtractor {
                 .collect(GuavaCollectors.toImmutableList());
 
         final double nBestPriorNorm = nBestList.getParses().stream()
-                .filter(parse -> candidateHeads.stream()
-                        .anyMatch(a -> parse.dependencies.stream()
-                                .anyMatch(d -> d.getHead() == headId && d.getArgument() == a)))
                 .mapToDouble(parse -> parse.score)
                 .sum();
-        // TODO: fix this.
-        final ImmutableMap<Integer, Double> nBestPriors = candidateHeads.stream()
-                .collect(GuavaCollectors.toImmutableMap(
-                        a -> a,
-                        a -> nBestList.getParses().stream()
-                                .filter(parse -> parse.dependencies.stream()
-                                        .anyMatch(d -> d.getHead() == headId && d.getArgument() == a))
-                                .mapToDouble(parse -> parse.score)
-                                .sum()
-                ));
+
         final ImmutableList<Integer> allVotes = IntStream.range(0, numQAOptions).boxed()
                 .map(i -> (int) annotation.stream().filter(ops -> ops.contains(i)).count())
                 .collect(GuavaCollectors.toImmutableList());
 
-
         addFeature(features, "DependencyType=" + instanceType, 1.0);
-
-        if (questionStructures.get(0).targetPrepositionIndex >= 0) {
-            addFeature(features, "Preposition=" + sentence.get(questionStructures.get(0).targetPrepositionIndex).toLowerCase(), 1.0);
+        if (instanceType == DependencyInstanceType.PPGovernor || instanceType == DependencyInstanceType.PPObject) {
+            addFeature(features, "Preposition=" + sentence.get(headId), 1.0);
         }
+
         // TODO: preposition to object distance.
 
-        final double prior = nBestPriors.get(argId) / nBestPriorNorm;
+        final double nBestPrior = nBestList.getParses().stream()
+                .filter(parse -> parse.dependencies.stream()
+                        .anyMatch(d -> d.getHead() == headId && d.getArgument() == argId))
+                .mapToDouble(parse -> parse.score)
+                .sum();
+        final double prior = nBestPrior / nBestPriorNorm;
         if (addNBestPriorFeatures) {
             addFeature(features, "NBestPrior", prior);
         }
@@ -260,24 +247,19 @@ public class FeatureExtractor {
         final double minVotes = 1.0 * options.stream().mapToInt(allVotes::get).min().orElse(0);
         if (addAnnotationFeatures) {
             addFeature(features, "MaxReceivedVotes", maxVotes); // / numAnnotators);
-            // addFeature(features, "MinReceivedVotes", minVotes); // / numAnnotators);
-            /*
-            int numSingleVotes = options.stream()
-                    .mapToInt(i -> (int) annotation.stream().filter(ops -> ops.contains(i) && ops.size() == 1).count())
-                    .max().orElse(0);
-            addFeature(features, "NumReceivedSingleVotes", 1.0 * numSingleVotes); // / numAnnotators);
+        }
 
-            int numSkipped = options.stream()
-                    .mapToInt(i -> (int) annotation.stream().filter(ops -> !ops.contains(i)).count())
-                    .max().orElse(0);
-            addFeature(features, "NumSkippedVotes", 1.0 * numSkipped);// / numAnnotators);
-            */
+        // Head arg distance.
+        addFeature(features, "HeadArgDist", Math.abs(headId - argId));
+
+        // Comma and other stuff in between.
+        for (int i = Math.min(headId, argId) + 1; i < Math.max(headId, argId); i++) {
+            final String token = sentence.get(i).toLowerCase();
+            if (ImmutableSet.of(",", "and", "of").contains(token)) {
+                addFeature(features, "TokenBetweenHeadAndArg=" + token, 1.0);
+            }
         }
-        if (addNAOptionFeature) {
-            addFeature(features, "QueryConfidence", query.getPromptScore());
-            addFeature(features, "NAOptionReceivedVotes", 1.0 * annotation.stream()
-                    .filter(ops -> ops.contains(naOptionId)).count() / numAnnotators);
-        }
+
         return ImmutableMap.copyOf(features);
     }
 

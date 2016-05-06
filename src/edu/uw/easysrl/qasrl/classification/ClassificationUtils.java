@@ -2,6 +2,7 @@ package edu.uw.easysrl.qasrl.classification;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import edu.uw.easysrl.qasrl.NBestList;
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
@@ -112,6 +113,16 @@ public class ClassificationUtils {
                                                           final FeatureExtractor featureExtractor,
                                                           final Map<Integer, List<ScoredQuery<QAStructureSurfaceForm>>> alignedQueries,
                                                           final Map<Integer, List<ImmutableList<ImmutableList<Integer>>>> alignedAnnotations) {
+        return getInstances(sentIds, myParser, ImmutableSet.of(QueryType.Forward, QueryType.Clefted), featureExtractor,
+                alignedQueries, alignedAnnotations);
+    }
+
+    static ImmutableList<DependencyInstance> getInstances(final List<Integer> sentIds,
+                                                          final HITLParser myParser,
+                                                          final ImmutableSet<QueryType> allowedQueryTypes,
+                                                          final FeatureExtractor featureExtractor,
+                                                          final Map<Integer, List<ScoredQuery<QAStructureSurfaceForm>>> alignedQueries,
+                                                          final Map<Integer, List<ImmutableList<ImmutableList<Integer>>>> alignedAnnotations) {
         return sentIds.stream()
                 .flatMap(sid -> {
                     final Parse gold = myParser.getGoldParse(sid);
@@ -119,6 +130,7 @@ public class ClassificationUtils {
                     final ImmutableList<String> sentence = myParser.getSentence(sid);
                     return IntStream.range(0, alignedQueries.get(sid).size())
                             .boxed()
+                            .filter(qid -> allowedQueryTypes.contains(alignedQueries.get(sid).get(qid).getQueryType()))
                             .flatMap(qid -> {
                                 final ScoredQuery<QAStructureSurfaceForm> query = alignedQueries.get(sid).get(qid);
                                 final ImmutableList<ImmutableList<Integer>> annotation = alignedAnnotations.get(sid).get(qid);
@@ -142,7 +154,7 @@ public class ClassificationUtils {
                                                     final ImmutableMap<Integer, Double> features = query.getQueryType() == QueryType.Forward ?
                                                             featureExtractor.getCoreArgFeatures(headId, argId, dtype, query, annotation, sentence, nbestList) :
                                                             featureExtractor.getNPCleftingFeatures(headId, argId, dtype, query, annotation, sentence, nbestList);
-                                                    return new DependencyInstance(sid, qid, headId, argId,dtype, inGold, features);
+                                                    return new DependencyInstance(sid, qid, headId, argId, query.getQueryType(), dtype, inGold, features);
                                                 }));
                             });
                 })

@@ -196,7 +196,7 @@ public class ClassificationExperiment {
             classifierAcc += (p == instance.inGold) ? 1 : 0;
             numInstances++;
 
-            //if (p != instance.inGold) {
+           // if (p != instance.inGold) {
                 System.out.println();
                 System.out.println(query.toString(sentence,
                         'G', myParser.getGoldOptions(query),
@@ -207,7 +207,7 @@ public class ClassificationExperiment {
                 System.out.println(String.format("%b\t%.2f\t%b", instance.inGold, pred[i][0], baselinePrediction));
 
                 featureExtractor.printFeature(instance.features);
-            //}
+          //  }
         }
 
         System.out.println("Baseline accuracy:\t" + 100.0 * baselineAcc / numInstances);
