@@ -89,7 +89,7 @@ public abstract class Noun extends Predication {
         // only pronouns can be non-third person
         final Person person = Person.THIRD;
 
-        final Definiteness definiteness = npNode.getLeaves().stream()
+        final Optional<Definiteness> definitenessOpt = npNode.getLeaves().stream()
             .filter(leaf -> leaf.getPos().equals("DT") || leaf.getPos().equals("WDT"))
             .findFirst()
             .flatMap(leaf -> {
@@ -102,8 +102,19 @@ public abstract class Noun extends Predication {
                     } else {
                         return Optional.empty();
                     }
-                })
-            .orElse(null);
+                });
+        final Definiteness definiteness;
+        // heuristics: if it's proper, assume definite. otherwise if it's plural, assume indefinite.
+        if(definitenessOpt.isPresent()) {
+            definiteness = definitenessOpt.get();
+        } else if(headLeaf.getPos().equals("NNP") || headLeaf.getPos().equals("NNPS")) {
+            definiteness = Definiteness.DEFINITE;
+        } else if(headLeaf.getPos().equals("NNS")) {
+            definiteness = Definiteness.INDEFINITE;
+        } else {
+            definiteness = null;
+        }
+
         if(definiteness == null) {
             System.err.println("couldn't establish definiteness for [" + npNode.getWord() + "]");
         }
@@ -134,12 +145,13 @@ public abstract class Noun extends Predication {
 
     @Override
     public QuestionData getQuestionData() {
-        ImmutableList<String> wh = this.getFocalPronoun()
-            .withCase(Case.NOMINATIVE)
-            .getPhrase();
-        Predication placeholder = new Gap(Category.NP);
-        Predication answer = this;
-        return new QuestionData(wh, placeholder, answer);
+        // ImmutableList<String> wh = this.getFocalPronoun()
+        //     .withCase(Case.NOMINATIVE)
+        //     .getPhrase();
+        // Predication placeholder = new Gap(Category.NP);
+        // Predication answer = this;
+        // return new QuestionData(wh, placeholder, answer);
+        return null;
     }
 
     // getPhrase is left abstract
@@ -178,20 +190,6 @@ public abstract class Noun extends Predication {
 
     public final Pronoun getPronoun() {
         return new Pronoun(caseMarking, number, gender, person, definiteness);
-    }
-
-    public final Pronoun getIndefinitePronoun() {
-        return this.getPronoun()
-            .withNumber(Number.SINGULAR)
-            .withPerson(Person.THIRD)
-            .withDefiniteness(Definiteness.INDEFINITE);
-    }
-
-    public final Pronoun getFocalPronoun() {
-        return this.getPronoun()
-            .withNumber(Number.SINGULAR)
-            .withPerson(Person.THIRD)
-            .withDefiniteness(Definiteness.FOCAL);
     }
 
     // transformers -- subclasses need to override

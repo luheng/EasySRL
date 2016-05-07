@@ -14,4 +14,8 @@ public final class Argument {
         this.depOpt = depOpt;
         this.pred = pred;
     }
+
+    public static Argument withNoDependency(Predication pred) {
+        return new Argument(Optional.empty(), pred);
+    }
 }

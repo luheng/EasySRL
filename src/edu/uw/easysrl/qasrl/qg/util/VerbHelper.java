@@ -89,6 +89,11 @@ public class VerbHelper {
                 categories.get(index).isFunctionInto(Category.valueOf("(S\\NP)|(S\\NP)"));
     }
 
+    public static boolean isAuxiliaryVerb(String word, Category category) {
+        return auxiliaryVerbs.contains(word.toLowerCase()) &&
+            category.isFunctionInto(Category.valueOf("(S\\NP)|(S\\NP)"));
+    }
+
     public boolean isNegationWord(List<String> words, List<Category> categories, int index) {
         if(index < words.size()) {
             String word = words.get(index);

@@ -18,10 +18,9 @@ import com.google.common.collect.ImmutableSet;
  */
 public abstract class Predication {
 
-    public static Predication getFromParse(int index, Category category, PredicateCache preds, Parse parse) {
-        return null; // TODO TODO TODO
+    public static enum Type {
+        VERB, NOUN
     }
-
 
     /* public API */
 
@@ -31,6 +30,14 @@ public abstract class Predication {
 
     public final Category getPredicateCategory() {
         return predicateCategory;
+    }
+
+    public ImmutableMap<Integer, ImmutableList<Argument>> getArgs() {
+        if(args == null) {
+            assert false; // this shouldn't happen anyway. if it does we have a convenient fallback.
+            resolveArguments();
+        }
+        return args;
     }
 
     // public final Gap elide() {
@@ -65,21 +72,23 @@ public abstract class Predication {
 
     /* protected methods and fields */
 
-    protected ImmutableMap<Integer, ImmutableList<Argument>> getArgs() {
-        return args;
+    protected void resolveArguments() {
+        this.args = argSuppliers.entrySet().stream()
+            .collect(toImmutableMap(e -> e.getKey(), e -> e.getValue().get()));
     }
 
     protected Predication(String predicate,
                           Category predicateCategory,
-                          ImmutableMap<Integer, ImmutableList<Argument>> args) {
+                          ImmutableMap<Integer, Supplier<ImmutableList<Argument>>> argSuppliers) {
         this.predicate = predicate;
         this.predicateCategory = predicateCategory;
-        this.args = args;
+        this.args = null;
     }
 
     /* private fields */
 
     private final String predicate;
     private final Category predicateCategory;
-    private final ImmutableMap<Integer, ImmutableList<Argument>> args;
+    // final for all intents and purposes, but has to be set after all arguments are created
+    private ImmutableMap<Integer, ImmutableList<Argument>> args;
 }

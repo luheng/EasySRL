@@ -4,6 +4,7 @@ import edu.uw.easysrl.qasrl.*;
 
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.qasrl.qg.util.*;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -66,6 +67,55 @@ public class QuestionGenerator {
                                                                       ));
     }
 
+    public static ImmutableList<ImmutableList<String>[]> simpleVerbNPArgNewQAPairs(Parse parse) {
+        final PredicateCache preds = new PredicateCache(parse);
+        ImmutableList.Builder<Verb> verbsBuilder = new ImmutableList.Builder<>();
+        for(int index = 0; index < parse.categories.size(); index++) {
+            if(parse.categories.get(index).isFunctionInto(Category.valueOf("S\\NP"))
+               && !parse.categories.get(index).isFunctionInto(Category.valueOf("(S\\NP)|(S\\NP)"))) {
+                verbsBuilder = verbsBuilder.add(Verb.getFromParse(index, preds, parse));
+            }
+        }
+        final ImmutableList<Verb> verbs = verbsBuilder.build();
+        final ImmutableList<ImmutableList<String>[]> qaPairStrings = verbs.stream()
+            .flatMap(verb -> IntStream.range(1, verb.getPredicateCategory().getNumberOfArguments() + 1)
+            .boxed()
+            .filter(argNum -> Category.NP.matches(verb.getPredicateCategory().getArgument(argNum)))
+            .flatMap(askingArgNum -> {
+                    Verb questionPredication = verb.transformArgs((argNum, args) -> {
+                            if(argNum == askingArgNum) {
+                                if(args.isEmpty()) {
+                                    return ImmutableList.of(Argument.withNoDependency(Pronoun.fromString("what").get()));
+                                } else {
+                                    return ImmutableList.of(Argument.withNoDependency(((Noun) args.get(0).getPredication())
+                                                                                      .getPronoun().withDefiniteness(Noun.Definiteness.FOCAL)));
+                                }
+                            } else {
+                                if(args.isEmpty()) {
+                                    return ImmutableList.of(Argument.withNoDependency(Pronoun.fromString("something").get()));
+                                } else {
+                                    return ImmutableList.of(Argument.withNoDependency(((Noun) args.get(0).getPredication())
+                                                                                      .getPronoun().withDefiniteness(Noun.Definiteness.INDEFINITE)));
+                                }
+                            }
+                        }).withModal("would");
+                    ImmutableList<String> question = questionPredication.getQuestionWords();
+                    ImmutableList<ImmutableList<String>> answers = verb.getArgs().get(askingArgNum).stream()
+                    .map(Argument::getPredication)
+                    .map(Predication::getPhrase)
+                    .collect(toImmutableList());
+                    return answers.stream()
+                    .map(ans -> {
+                            ImmutableList<String>[] qaStrings = new ImmutableList[2];
+                            qaStrings[0] = question;
+                            qaStrings[1] = ans;
+                            return qaStrings;
+                        });
+                }))
+            .collect(toImmutableList());
+        return qaPairStrings;
+    }
+
     /**
      * Run this to print all the generated QA pairs to stdout.
      */
@@ -76,21 +126,11 @@ public class QuestionGenerator {
             Parse goldParse = devData.getGoldParses().get(sentenceId);
             System.out.println("==========");
             System.out.println(TextGenerationHelper.renderString(words));
-            for(QuestionAnswerPair qaPair : generateAllQAPairs(sentenceId, words, -1, goldParse)) {
-                System.out.println(qaPair.getQuestion());
-                System.out.println("\t" + qaPair.getAnswer());
+            for(ImmutableList<String>[] qaPairStrings : simpleVerbNPArgNewQAPairs(goldParse)) {
+                System.out.println(TextGenerationHelper.renderString(qaPairStrings[0]));
+                System.out.println("\t" + TextGenerationHelper.renderString(qaPairStrings[1]));
             }
         }
-        // ImmutableMap<Integer, NBestList> nBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 100).get();
-        // System.err.println("loaded n-best lists");
-        // for(int sentenceId : nBestLists.keySet()) {
-        //     ImmutableList<String> words = devData.getSentences().get(sentenceId);
-        //     NBestList nBestList = nBestLists.get(sentenceId);
-        //     for(QuestionAnswerPair qaPair : generateAllQAPairs(sentenceId, words, nBestList)) {
-        //         System.out.println(qaPair.getQuestion());
-        //         System.out.println("\t" + qaPair.getAnswer());
-        //     }
-        // }
     }
 }
 

@@ -31,9 +31,9 @@ public final class Pronoun extends Noun {
      * Ideally it will be completely specified, but if not we'll just choose the first that comes.
      */
     public String toString() {
-        return pronounsByString.keySet()
+        return pronounsByStringForMatching.keySet()
             .stream()
-            .filter(str -> this.matches(pronounsByString.get(str)))
+            .filter(str -> this.matches(pronounsByStringForMatching.get(str)))
             .findFirst()
             .get();
     }
@@ -111,28 +111,27 @@ public final class Pronoun extends Noun {
     private static final Map<String, Pronoun> pronounsByString = new ImmutableMap.Builder<String, Pronoun>()
         .put("I", new Pronoun(Optional.of(Case.NOMINATIVE),
                               Optional.of(Number.SINGULAR),
-                              Optional.empty(),
+                              Optional.of(Gender.ANIMATE),
                               Person.FIRST,
                               Definiteness.DEFINITE))
         .put("me", new Pronoun(Optional.of(Case.ACCUSATIVE),
                                Optional.of(Number.SINGULAR),
-                               Optional.empty(),
+                               Optional.of(Gender.ANIMATE),
                                Person.FIRST,
                                Definiteness.DEFINITE))
         .put("we", new Pronoun(Optional.of(Case.NOMINATIVE),
                                Optional.of(Number.PLURAL),
-                               Optional.empty(),
+                               Optional.of(Gender.ANIMATE),
                                Person.FIRST,
                                Definiteness.DEFINITE))
         .put("us", new Pronoun(Optional.of(Case.ACCUSATIVE),
                                Optional.of(Number.PLURAL),
-                               Optional.empty(),
+                               Optional.of(Gender.ANIMATE),
                                Person.FIRST,
                                Definiteness.DEFINITE))
-        // can be semantically singular, but is grammatically plural
         .put("you", new Pronoun(Optional.empty(),
                                 Optional.of(Number.PLURAL),
-                                Optional.empty(),
+                                Optional.of(Gender.ANIMATE),
                                 Person.SECOND,
                                 Definiteness.DEFINITE))
         .put("he", new Pronoun(Optional.of(Case.NOMINATIVE),
@@ -160,8 +159,6 @@ public final class Pronoun extends Noun {
                                Optional.of(Gender.INANIMATE),
                                Person.THIRD,
                                Definiteness.DEFINITE))
-        // yes, there's also a semantically animate, singular, genderless "they",
-        // but it's still grammatically plural.
         .put("they", new Pronoun(Optional.of(Case.NOMINATIVE),
                                  Optional.of(Number.PLURAL),
                                  Optional.empty(),
@@ -202,5 +199,100 @@ public final class Pronoun extends Noun {
         .entrySet()
         .stream()
         .collect(toImmutableMap(e -> e.getKey().toLowerCase(), ImmutableMap.Entry::getValue));
+
+    private static final Map<String, Pronoun> pronounsByStringForMatching = new ImmutableMap.Builder<String, Pronoun>()
+        .put("I", new Pronoun(Optional.of(Case.NOMINATIVE),
+                              Optional.of(Number.SINGULAR),
+                              Optional.of(Gender.ANIMATE),
+                              Person.FIRST,
+                              Definiteness.DEFINITE))
+        .put("me", new Pronoun(Optional.of(Case.ACCUSATIVE),
+                               Optional.of(Number.SINGULAR),
+                               Optional.of(Gender.ANIMATE),
+                               Person.FIRST,
+                               Definiteness.DEFINITE))
+        .put("we", new Pronoun(Optional.of(Case.NOMINATIVE),
+                               Optional.of(Number.PLURAL),
+                               Optional.of(Gender.ANIMATE),
+                               Person.FIRST,
+                               Definiteness.DEFINITE))
+        .put("us", new Pronoun(Optional.of(Case.ACCUSATIVE),
+                               Optional.of(Number.PLURAL),
+                               Optional.of(Gender.ANIMATE),
+                               Person.FIRST,
+                               Definiteness.DEFINITE))
+        // can be matched by singular things
+        .put("you", new Pronoun(Optional.empty(),
+                                Optional.empty(),
+                                Optional.of(Gender.ANIMATE),
+                                Person.SECOND,
+                                Definiteness.DEFINITE))
+        .put("he", new Pronoun(Optional.of(Case.NOMINATIVE),
+                               Optional.of(Number.SINGULAR),
+                               Optional.of(Gender.MALE),
+                               Person.THIRD,
+                               Definiteness.DEFINITE))
+        .put("she", new Pronoun(Optional.of(Case.NOMINATIVE),
+                                Optional.of(Number.SINGULAR),
+                                Optional.of(Gender.FEMALE),
+                                Person.THIRD,
+                                Definiteness.DEFINITE))
+        .put("him", new Pronoun(Optional.of(Case.ACCUSATIVE),
+                                Optional.of(Number.SINGULAR),
+                                Optional.of(Gender.MALE),
+                                Person.THIRD,
+                                Definiteness.DEFINITE))
+        .put("her", new Pronoun(Optional.of(Case.ACCUSATIVE),
+                                Optional.of(Number.SINGULAR),
+                                Optional.of(Gender.FEMALE),
+                                Person.THIRD,
+                                Definiteness.DEFINITE))
+        .put("it", new Pronoun(Optional.empty(),
+                               Optional.of(Number.SINGULAR),
+                               Optional.of(Gender.INANIMATE),
+                               Person.THIRD,
+                               Definiteness.DEFINITE))
+        // to allow for a semantically animate, singular, genderless "they" and "them"
+        .put("them", new Pronoun(Optional.of(Case.ACCUSATIVE),
+                                 Optional.empty(),
+                                 Optional.empty(),
+                                 Person.THIRD,
+                                 Definiteness.DEFINITE))
+        // can match against case unknown
+        .put("they", new Pronoun(Optional.empty(),
+                                 Optional.empty(),
+                                 Optional.empty(),
+                                 Person.THIRD,
+                                 Definiteness.DEFINITE))
+        // we also probably want plural things to match to "something" and "someone"
+        .put("someone", new Pronoun(Optional.empty(),
+                                    Optional.empty(),
+                                    Optional.of(Gender.ANIMATE),
+                                    Person.THIRD,
+                                    Definiteness.INDEFINITE))
+        // can match against animateness unknown
+        .put("something", new Pronoun(Optional.empty(),
+                                      Optional.empty(),
+                                      Optional.empty(),
+                                      Person.THIRD,
+                                      Definiteness.INDEFINITE))
+        .put("whom", new Pronoun(Optional.of(Case.ACCUSATIVE),
+                                 Optional.empty(),
+                                 Optional.of(Gender.ANIMATE),
+                                 Person.THIRD,
+                                 Definiteness.FOCAL))
+        // can match when don't know case
+        .put("who", new Pronoun(Optional.empty(),
+                                Optional.empty(),
+                                Optional.of(Gender.ANIMATE),
+                                Person.THIRD,
+                                Definiteness.FOCAL))
+        // can match against animateness unknown
+        .put("what", new Pronoun(Optional.empty(),
+                                 Optional.empty(),
+                                 Optional.empty(),
+                                 Person.THIRD,
+                                 Definiteness.FOCAL))
+        .build();
 
 }
