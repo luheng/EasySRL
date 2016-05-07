@@ -47,6 +47,23 @@ public abstract class Noun extends Predication {
     public static Noun getFromParse(Integer headIndex, Parse parse) {
         final SyntaxTreeNode tree = parse.syntaxTree;
         final SyntaxTreeNodeLeaf headLeaf = tree.getLeaves().get(headIndex);
+
+        /* recover the whole noun phrase. */
+        final Optional<SyntaxTreeNode> npNodeOpt = TextGenerationHelper.getLowestAncestorFunctionIntoCategory(headLeaf, Category.NP, tree);
+        assert npNodeOpt.isPresent()
+            : "the head of an NP can always be traced up to a function into an NP";
+        final SyntaxTreeNode npNode = npNodeOpt.get();
+        final Category npNodeCategory = npNode.getCategory();
+        if(Category.valueOf("NP[thr]").matches(npNodeCategory)) {
+            return ExpletiveNoun.there;
+        } else if(Category.valueOf("NP[expl]").matches(npNodeCategory)) {
+            return ExpletiveNoun.it;
+        } else if(!npNode.getCategory().matches(Category.valueOf("NP"))) {
+            System.err.println("error category: " + npNodeCategory);
+            assert false
+                : "climbing up to function into NP should always yield NP, since we don't have NPs that take arguments";
+        }
+
         final String predicate = TextGenerationHelper.renderString(TextGenerationHelper.getNodeWords(headLeaf, Optional.empty(), Optional.empty()));
 
         // if it's a pronoun, we're done
@@ -54,16 +71,7 @@ public abstract class Noun extends Predication {
         if(pronounOpt.isPresent()) {
             return pronounOpt.get();
         }
-
         // otherwise, we have a lot more work to do.
-
-        /* recover the whole noun phrase. */
-        final Optional<SyntaxTreeNode> npNodeOpt = TextGenerationHelper.getLowestAncestorFunctionIntoCategory(headLeaf, Category.NP, tree);
-        assert npNodeOpt.isPresent()
-            : "the head of an NP can always be traced up to a function into an NP";
-        final SyntaxTreeNode npNode = npNodeOpt.get();
-        assert npNode.getCategory().matches(Category.valueOf("NP"))
-            : "climbing up to function into NP should always yield NP, since we don't have NPs that take arguments";
 
         /* extract grammatical features. */
         // this is fine because none of our nouns take arguments, right?
@@ -143,17 +151,6 @@ public abstract class Noun extends Predication {
 
     // overrides
 
-    @Override
-    public QuestionData getQuestionData() {
-        // ImmutableList<String> wh = this.getFocalPronoun()
-        //     .withCase(Case.NOMINATIVE)
-        //     .getPhrase();
-        // Predication placeholder = new Gap(Category.NP);
-        // Predication answer = this;
-        // return new QuestionData(wh, placeholder, answer);
-        return null;
-    }
-
     // getPhrase is left abstract
 
     // getters
@@ -180,7 +177,11 @@ public abstract class Noun extends Predication {
 
     // convenience methods
 
-    public final Boolean isAnimate() {
+    public final boolean isExpletive() {
+        return getPredicate().equals(ExpletiveNoun.PRED);
+    }
+
+    public final boolean isAnimate() {
         return gender.map(Gender::isAnimate).orElse(false);
     }
 

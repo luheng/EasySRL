@@ -13,11 +13,6 @@ public final class Gap extends Predication {
         return ImmutableList.of();
     }
 
-    @Override
-    public QuestionData getQuestionData() {
-        throw new UnsupportedOperationException("cannot ask about a gap");
-    }
-
     public Gap(Category predicateCategory) {
         super(PRED, predicateCategory, ImmutableMap.of());
     }

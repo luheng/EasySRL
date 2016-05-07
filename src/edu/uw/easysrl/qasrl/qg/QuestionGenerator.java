@@ -88,10 +88,15 @@ public class QuestionGenerator {
                                     return ImmutableList.of(Argument.withNoDependency(Pronoun.fromString("what").get()));
                                 } else {
                                     return ImmutableList.of(Argument.withNoDependency(((Noun) args.get(0).getPredication())
-                                                                                      .getPronoun().withDefiniteness(Noun.Definiteness.FOCAL)));
+                                                                                      .getPronoun()
+                                                                                      .withPerson(Noun.Person.THIRD)
+                                                                                      .withDefiniteness(Noun.Definiteness.FOCAL)));
                                 }
                             } else {
-                                if(args.isEmpty()) {
+                                Category argCat = verb.getPredicateCategory().getArgument(argNum);
+                                if(!Category.NP.matches(argCat)) {
+                                    return ImmutableList.of(Argument.withNoDependency(new Gap(argCat)));
+                                } else if(args.isEmpty()) {
                                     return ImmutableList.of(Argument.withNoDependency(Pronoun.fromString("something").get()));
                                 } else {
                                     return ImmutableList.of(Argument.withNoDependency(((Noun) args.get(0).getPredication())

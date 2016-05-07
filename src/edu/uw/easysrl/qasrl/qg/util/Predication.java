@@ -3,6 +3,7 @@ package edu.uw.easysrl.qasrl.qg.util;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.qasrl.Parse;
@@ -19,7 +20,17 @@ import com.google.common.collect.ImmutableSet;
 public abstract class Predication {
 
     public static enum Type {
-        VERB, NOUN
+        VERB, NOUN;
+
+        public static Optional<Type> getTypeForArgCategory(Category category) {
+            if(Category.valueOf("S\\NP").matches(category)) {
+                return Optional.of(VERB);
+            } else if(Category.NP.matches(category)) {
+                return Optional.of(NOUN);
+            } else {
+                return Optional.empty();
+            }
+        }
     }
 
     /* public API */
@@ -34,8 +45,7 @@ public abstract class Predication {
 
     public ImmutableMap<Integer, ImmutableList<Argument>> getArgs() {
         if(args == null) {
-            assert false; // this shouldn't happen anyway. if it does we have a convenient fallback.
-            resolveArguments();
+            args = argSupplier.get();
         }
         return args;
     }
@@ -46,49 +56,35 @@ public abstract class Predication {
 
     /* abstract methods */
 
-    /**
-     * Gets the phrase representation of the predication, together with its "internal arguments",
-     * i.e., for verbs, not including the subject, for modifiers, not including the thing being modified.
-     * Indeed, perhaps we can think of all of these things as "subjects" yes?
-     * (For a clause, I have in mind that this would be the whole clause.)
-     * It seems that working directly with linguistically-motivated text generation is affecting my linguistic sensibilities...
-     * Aha, and for nouns, the place of "subject" is with the determiner. Just look at "Elwood's flouting of the law"!
-     *   internal is N/N'/NP as opposed to DP.
-     *   internal is VP/I' as opposed to IP. hmm..
-     */
-    // public abstract ImmutableList<String> getInternalPhrase();
-
-    /**
-     * This phrase will include all of the arguments, including external ones,
-     * and will include determiners and such for nouns. maybe?
-     * actually... consider passing in a desired category?
-     */
     public abstract ImmutableList<String> getPhrase();
-
     // consider
     // public abstract ImmutableList<String> getPhrase(Category desiredCategory);
 
-    public abstract QuestionData getQuestionData();
-
     /* protected methods and fields */
 
-    protected void resolveArguments() {
-        this.args = argSuppliers.entrySet().stream()
-            .collect(toImmutableMap(e -> e.getKey(), e -> e.getValue().get()));
+    protected Predication(String predicate,
+                          Category predicateCategory,
+                          Supplier<ImmutableMap<Integer, ImmutableList<Argument>>> argSupplier) {
+        this.predicate = predicate;
+        this.predicateCategory = predicateCategory;
+        this.argSupplier = argSupplier;
+        this.args = null;
     }
 
     protected Predication(String predicate,
                           Category predicateCategory,
-                          ImmutableMap<Integer, Supplier<ImmutableList<Argument>>> argSuppliers) {
+                          ImmutableMap<Integer, ImmutableList<Argument>> args) {
         this.predicate = predicate;
         this.predicateCategory = predicateCategory;
-        this.args = null;
+        this.argSupplier = null;
+        this.args = args;
     }
 
     /* private fields */
 
     private final String predicate;
     private final Category predicateCategory;
+    private final Supplier<ImmutableMap<Integer, ImmutableList<Argument>>> argSupplier;
     // final for all intents and purposes, but has to be set after all arguments are created
     private ImmutableMap<Integer, ImmutableList<Argument>> args;
 }

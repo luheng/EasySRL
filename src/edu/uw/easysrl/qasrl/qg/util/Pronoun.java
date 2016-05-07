@@ -31,11 +31,26 @@ public final class Pronoun extends Noun {
      * Ideally it will be completely specified, but if not we'll just choose the first that comes.
      */
     public String toString() {
-        return pronounsByStringForMatching.keySet()
+        Optional<String> result = pronounsByStringForMatching.keySet()
             .stream()
             .filter(str -> this.matches(pronounsByStringForMatching.get(str)))
-            .findFirst()
-            .get();
+            .findFirst();
+        if(result.isPresent()) {
+            return result.get();
+        } else {
+            System.err.println(toStringDetail());
+            assert false;
+            return null;
+        }
+    }
+
+    public String toStringDetail() {
+        return String.format("case: %s\nnum: %s\ngen: %s\npers: %s\n def: %s",
+                             getCase().map(x -> x.name()),
+                             getNumber().map(x -> x.name()),
+                             getGender().map(x -> x.name()),
+                             getPerson().name(),
+                             getDefiniteness().name());
     }
 
     /**
@@ -281,7 +296,7 @@ public final class Pronoun extends Noun {
                                  Optional.of(Gender.ANIMATE),
                                  Person.THIRD,
                                  Definiteness.FOCAL))
-        // can match when don't know case
+        // can match when don't know case or person
         .put("who", new Pronoun(Optional.empty(),
                                 Optional.empty(),
                                 Optional.of(Gender.ANIMATE),

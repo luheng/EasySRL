@@ -199,6 +199,13 @@ public class VerbHelper {
             .orElse(false);
     }
 
+    // relaxed present tense test that looks for either case
+    public static boolean isPresentTense(String verb) {
+        return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
+            .map(infl -> verb.equalsIgnoreCase(infl[1]) || verb.equalsIgnoreCase(infl[0]))
+            .orElse(false);
+    }
+
     public static String getPresentTense(String verb, Noun subject) {
         return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
             .map(infl -> ((subject.getNumber().map(num -> num == Noun.Number.SINGULAR).orElse(true)) &&
