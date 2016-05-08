@@ -5,8 +5,10 @@ import java.util.HashMap;
 import java.util.Optional;
 
 import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.dependencies.ResolvedDependency;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableMap;
 
 import static edu.uw.easysrl.util.GuavaCollectors.*;
@@ -70,6 +72,11 @@ public final class Pronoun extends Noun {
     @Override
     public ImmutableList<String> getPhrase() {
         return ImmutableList.of(this.toString());
+    }
+
+    @Override
+    public ImmutableSet<ResolvedDependency> getLocalDependencies() {
+        return ImmutableSet.of();
     }
 
     // transformers

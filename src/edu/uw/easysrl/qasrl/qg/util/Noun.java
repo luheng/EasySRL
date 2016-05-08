@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.Optional;
 
+import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeLeaf;
@@ -65,12 +66,12 @@ public abstract class Noun extends Predication {
             } else {
                 phraseNode = candidatePhraseNode;
             }
-            System.err.println("new category: " + phraseNode.getCategory());
-            System.err.println("new phrase: " + phraseNode.getWord());
-            System.err.println("actual head: " + headLeaf.getWord());
-            if(npNodeOpt.isPresent()) {
-                System.err.println("(mistaken phrase: " + npNodeOpt.get().getWord() + ")");
-            }
+            // System.err.println("new category: " + phraseNode.getCategory());
+            // System.err.println("new phrase: " + phraseNode.getWord());
+            // System.err.println("actual head: " + headLeaf.getWord());
+            // if(npNodeOpt.isPresent()) {
+            //     System.err.println("(mistaken phrase: " + npNodeOpt.get().getWord() + ")");
+            // }
         } else {
             final SyntaxTreeNode npNode = npNodeOpt.get();
             final Category npNodeCategory = npNode.getCategory();
@@ -101,12 +102,19 @@ public abstract class Noun extends Predication {
 
         final String nounPOS = headLeaf.getPos();
         final Optional<Number> number;
-        if(nounPOS.equals("NN") || nounPOS.equals("NNP")) {
+        if(nounPOS.equals("NN") || nounPOS.equals("NNP") || nounPOS.equals("VBG")) {
             number = Optional.of(Number.SINGULAR);
         } else if(nounPOS.equals("NNS") || nounPOS.equals("NNPS")) {
             number = Optional.of(Number.PLURAL);
+        } else if(nounPOS.equals("CD")) {
+            if(predicate.equalsIgnoreCase("one") || predicate.equalsIgnoreCase("1")) {
+                number = Optional.of(Number.SINGULAR);
+            } else {
+                number = Optional.of(Number.PLURAL);
+            }
         } else {
-            System.err.println(String.format("noun %s has mysterious POS %s", headLeaf.getWord(), nounPOS));
+            // TODO take care of more cases, perhaps by adding more pronouns
+            // System.err.println(String.format("noun %s has mysterious POS %s", headLeaf.getWord(), nounPOS));
             number = Optional.empty();
         }
 
@@ -145,22 +153,26 @@ public abstract class Noun extends Predication {
 
         /* include an of-phrase if necessary. */
         final ImmutableList<String> words;
+        final ImmutableSet<ResolvedDependency> deps;
         if(phraseNode.getEndIndex() < tree.getEndIndex() &&
            tree.getLeaves().get(phraseNode.getEndIndex()).getWord().equals("of")) {
             final SyntaxTreeNode ofNode = tree.getLeaves().get(phraseNode.getEndIndex());
             final Optional<SyntaxTreeNode> phraseNodeWithOfOpt = TextGenerationHelper.getLowestAncestorOfNodes(phraseNode, ofNode, tree);
             if(phraseNodeWithOfOpt.isPresent()) {
                 words = ImmutableList.copyOf(TextGenerationHelper.getNodeWords(phraseNodeWithOfOpt.get(), Optional.empty(), Optional.empty()));
+                deps = TextGenerationHelper.getContainedDependencies(phraseNodeWithOfOpt.get(), parse);
             } else {
                 words = ImmutableList.copyOf(TextGenerationHelper.getNodeWords(phraseNode, Optional.empty(), Optional.empty()));
+                deps = TextGenerationHelper.getContainedDependencies(phraseNode, parse);
             }
         } else {
             words = ImmutableList.copyOf(TextGenerationHelper.getNodeWords(phraseNode, Optional.empty(), Optional.empty()));
+            deps = TextGenerationHelper.getContainedDependencies(phraseNode, parse);
         }
         return new BasicNoun(predicate, Category.NP,
                              ImmutableMap.of(),
                              caseMarking, number, gender, person, definiteness,
-                             words);
+                             words, deps);
     }
 
     /* public API */

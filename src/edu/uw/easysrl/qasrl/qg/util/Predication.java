@@ -5,8 +5,10 @@ import java.util.HashMap;
 import java.util.Optional;
 import java.util.function.Supplier;
 
+import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.qasrl.Parse;
+import static edu.uw.easysrl.util.GuavaCollectors.*;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -50,11 +52,28 @@ public abstract class Predication {
         return args;
     }
 
+    public ImmutableSet<ResolvedDependency> getAllDependencies() {
+        return new ImmutableSet.Builder<ResolvedDependency>()
+            .addAll(this.getLocalDependencies())
+            .addAll(getArgs().entrySet().stream()
+                    .flatMap(e -> e.getValue().stream()
+                    .map(arg -> arg.getDependency()))
+                    .filter(Optional::isPresent).map(Optional::get)
+                    .collect(toImmutableSet()))
+            .addAll(getArgs().entrySet().stream()
+                    .flatMap(e -> e.getValue().stream()
+                    .flatMap(arg -> arg.getPredication().getAllDependencies().stream()))
+                    .collect(toImmutableSet()))
+            .build();
+    }
+
     // public final Gap elide() {
     //     return new Gap(predicateCategory);
     // }
 
     /* abstract methods */
+
+    public abstract ImmutableSet<ResolvedDependency> getLocalDependencies();
 
     public abstract ImmutableList<String> getPhrase();
     // consider

@@ -8,10 +8,13 @@ import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeLeaf;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.function.Predicate;
+
+import static edu.uw.easysrl.util.GuavaCollectors.*;
 
 /**
  * Tools for generating text from trees, dependencies, and lists of tokens.
@@ -554,17 +557,13 @@ public class TextGenerationHelper {
     /**
      * Gets all of the dependencies that start and end inside the syntax tree rooted at the given node
      */
-    private static Set<ResolvedDependency> getContainedDependencies(SyntaxTreeNode node, Parse parse) {
-        final Set<ResolvedDependency> deps = new HashSet<>();
+    public static ImmutableSet<ResolvedDependency> getContainedDependencies(SyntaxTreeNode node, Parse parse) {
         final int minIndex = node.getStartIndex();
         final int maxIndex = node.getEndIndex();
-        for (ResolvedDependency dep : parse.dependencies) {
-            if (dep.getHead() >= minIndex && dep.getHead() < maxIndex &&
-                dep.getArgument() >= minIndex && dep.getArgument() <= maxIndex) {
-                deps.add(dep);
-            }
-        }
-        return deps;
+        return parse.dependencies.stream()
+            .filter(dep -> dep.getHead() >= minIndex && dep.getHead() < maxIndex &&
+                    dep.getArgument() >= minIndex && dep.getArgument() <= maxIndex)
+            .collect(toImmutableSet());
     }
 
     public static List<Map<Integer, Optional<ResolvedDependency>>>

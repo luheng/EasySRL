@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.Optional;
 
 import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.dependencies.ResolvedDependency; 
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -21,6 +22,11 @@ public class BasicNoun extends Noun {
         return words;
     }
 
+    @Override
+    public ImmutableSet<ResolvedDependency> getLocalDependencies() {
+        return deps;
+    }
+
     // transformers -- subclasses should override
 
     @Override
@@ -31,7 +37,7 @@ public class BasicNoun extends Noun {
     @Override
     public BasicNoun withCase(Optional<Case> caseMarking) {
         return new BasicNoun(getPredicate(), getPredicateCategory(), getArgs(),
-                             getCase(), getNumber(), getGender(), getPerson(), getDefiniteness(), words);
+                             getCase(), getNumber(), getGender(), getPerson(), getDefiniteness(), words, deps);
     }
 
     @Override
@@ -42,7 +48,7 @@ public class BasicNoun extends Noun {
     @Override
     public BasicNoun withNumber(Optional<Number> number) {
         return new BasicNoun(getPredicate(), getPredicateCategory(), getArgs(),
-                             getCase(), getNumber(), getGender(), getPerson(), getDefiniteness(), words);
+                             getCase(), getNumber(), getGender(), getPerson(), getDefiniteness(), words, deps);
     }
 
     @Override
@@ -53,19 +59,19 @@ public class BasicNoun extends Noun {
     @Override
     public BasicNoun withGender(Optional<Gender> gender) {
         return new BasicNoun(getPredicate(), getPredicateCategory(), getArgs(),
-                             getCase(), getNumber(), getGender(), getPerson(), getDefiniteness(), words);
+                             getCase(), getNumber(), getGender(), getPerson(), getDefiniteness(), words, deps);
     }
 
     @Override
     public BasicNoun withPerson(Person person) {
         return new BasicNoun(getPredicate(), getPredicateCategory(), getArgs(),
-                             getCase(), getNumber(), getGender(), getPerson(), getDefiniteness(), words);
+                             getCase(), getNumber(), getGender(), getPerson(), getDefiniteness(), words, deps);
     }
 
     @Override
     public BasicNoun withDefiniteness(Definiteness definiteness) {
         return new BasicNoun(getPredicate(), getPredicateCategory(), getArgs(),
-                             getCase(), getNumber(), getGender(), getPerson(), getDefiniteness(), words);
+                             getCase(), getNumber(), getGender(), getPerson(), getDefiniteness(), words, deps);
     }
 
     /* protected methods and fields */
@@ -78,12 +84,15 @@ public class BasicNoun extends Noun {
                         Optional<Gender> gender,
                         Person person,
                         Definiteness definiteness,
-                        ImmutableList<String> words) {
+                        ImmutableList<String> words,
+                        ImmutableSet<ResolvedDependency> deps) {
         super(predicate, predicateCategory, args, caseMarking, number, gender, person, definiteness);
         this.words = words;
+        this.deps = deps;
     }
 
     /* private fields */
 
     private final ImmutableList<String> words;
+    private final ImmutableSet<ResolvedDependency> deps;
 }

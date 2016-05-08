@@ -9,9 +9,11 @@ import edu.uw.easysrl.qasrl.qg.util.*;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import static edu.uw.easysrl.util.GuavaCollectors.*;
+import static edu.uw.easysrl.qasrl.TextGenerationHelper.TextWithDependencies;
 
 import java.util.*;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 /**
  * Created by luheng on 12/8/15.
@@ -67,22 +69,20 @@ public class QuestionGenerator {
                                                                       ));
     }
 
-    public static ImmutableList<ImmutableList<String>[]> simpleVerbNPArgNewQAPairs(Parse parse) {
+    public static ImmutableList<QuestionAnswerPair> newCoreNPArgPronounQuestions(int sentenceId, int parseId, Parse parse) {
         final PredicateCache preds = new PredicateCache(parse);
-        ImmutableList.Builder<Verb> verbsBuilder = new ImmutableList.Builder<>();
-        for(int index = 0; index < parse.categories.size(); index++) {
-            if(parse.categories.get(index).isFunctionInto(Category.valueOf("S\\NP"))
-               && !parse.categories.get(index).isFunctionInto(Category.valueOf("(S\\NP)|(S\\NP)"))) {
-                verbsBuilder = verbsBuilder.add(Verb.getFromParse(index, preds, parse));
-            }
-        }
-        final ImmutableList<Verb> verbs = verbsBuilder.build();
-        final ImmutableList<ImmutableList<String>[]> qaPairStrings = verbs.stream()
+        final ImmutableList<QuestionAnswerPair> qaPairs = IntStream
+            .range(0, parse.categories.size())
+            .boxed()
+            .filter(index -> parse.categories.get(index).isFunctionInto(Category.valueOf("S\\NP"))
+                    && !parse.categories.get(index).isFunctionInto(Category.valueOf("(S\\NP)|(S\\NP)")))
+            .flatMap(predicateIndex -> Stream.of(Verb.getFromParse(predicateIndex, preds, parse))
+            .filter(verb -> !verb.isCopular())
             .flatMap(verb -> IntStream.range(1, verb.getPredicateCategory().getNumberOfArguments() + 1)
             .boxed()
             .filter(argNum -> Category.NP.matches(verb.getPredicateCategory().getArgument(argNum)))
             .flatMap(askingArgNum -> {
-                    Verb questionPredication = verb.transformArgs((argNum, args) -> {
+                    Verb questionPred = verb.transformArgs((argNum, args) -> {
                             if(argNum == askingArgNum) {
                                 if(args.isEmpty()) {
                                     return ImmutableList.of(Argument.withNoDependency(Pronoun.fromString("what").get()));
@@ -104,21 +104,22 @@ public class QuestionGenerator {
                                 }
                             }
                         }).withModal("would");
-                    ImmutableList<String> question = questionPredication.getQuestionWords();
-                    ImmutableList<ImmutableList<String>> answers = verb.getArgs().get(askingArgNum).stream()
-                    .map(Argument::getPredication)
-                    .map(Predication::getPhrase)
-                    .collect(toImmutableList());
-                    return answers.stream()
-                    .map(ans -> {
-                            ImmutableList<String>[] qaStrings = new ImmutableList[2];
-                            qaStrings[0] = question;
-                            qaStrings[1] = ans;
-                            return qaStrings;
-                        });
-                }))
+                    // ImmutableList<String> question = questionPredication.getQuestionWords();
+                    return verb.getArgs().get(askingArgNum).stream()
+                        .filter(answerArg -> answerArg.getDependency().isPresent())
+                        .map(answerArg -> {
+                                QuestionAnswerPair qaPair = new BasicQuestionAnswerPair(sentenceId, parseId, parse,
+                                                                                        predicateIndex, verb.getPredicateCategory(), askingArgNum,
+                                                                                        predicateIndex, null,
+                                                                                        questionPred.getAllDependencies(), questionPred.getQuestionWords(),
+                                                                                        answerArg.getDependency().get(),
+                                                                                        new TextWithDependencies(answerArg.getPredication().getPhrase(),
+                                                                                                                 answerArg.getPredication().getAllDependencies()));
+                                return qaPair;
+                            });
+                })))
             .collect(toImmutableList());
-        return qaPairStrings;
+        return qaPairs;
     }
 
     /**
@@ -131,9 +132,9 @@ public class QuestionGenerator {
             Parse goldParse = devData.getGoldParses().get(sentenceId);
             System.out.println("==========");
             System.out.println(TextGenerationHelper.renderString(words));
-            for(ImmutableList<String>[] qaPairStrings : simpleVerbNPArgNewQAPairs(goldParse)) {
-                System.out.println(TextGenerationHelper.renderString(qaPairStrings[0]));
-                System.out.println("\t" + TextGenerationHelper.renderString(qaPairStrings[1]));
+            for(QuestionAnswerPair qaPair : newCoreNPArgPronounQuestions(sentenceId, -1, goldParse)) {
+                System.out.println(qaPair.getQuestion());
+                System.out.println("\t" + qaPair.getAnswer());
             }
         }
     }

@@ -224,6 +224,7 @@ public class VerbHelper {
             verb.equalsIgnoreCase("'re") ||
             verb.equalsIgnoreCase("'m") ||
             verb.equalsIgnoreCase("'ve") ||
+            verb.equalsIgnoreCase("ai") ||
             Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
             .map(infl -> verb.equalsIgnoreCase(infl[1]) || verb.equalsIgnoreCase(infl[0]))
             .orElse(false);

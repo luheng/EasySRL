@@ -164,6 +164,11 @@ public final class Verb extends Predication {
         return null;
     }
 
+    @Override
+    public ImmutableSet<ResolvedDependency> getLocalDependencies() {
+        return ImmutableSet.of();
+    }
+
     public Noun getSubject() {
         return (Noun) getArgs().get(1).get(0).getPredication(); // TODO
     }
