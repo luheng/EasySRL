@@ -14,6 +14,7 @@ import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -148,13 +149,17 @@ public class FeatureExtractor {
         }
 
         if (addAnswerLexicalFeatures) {
-            if (options.stream().map(query.getOptions()::get)
-                    .anyMatch(op -> op.toLowerCase().startsWith("a "))) {
-                addFeature(features, "StartsWith=a", 1);
+            if (options.stream()
+                    .map(op -> query.getOptions().get(op).toLowerCase())
+                    .anyMatch(op -> Stream.of("a ", "an ", "the ").anyMatch(op::startsWith))) {
+                addFeature(features, "StartsWith=a/an/the", 1);
             }
-            if (options.stream().map(query.getOptions()::get)
-                    .anyMatch(op -> op.toLowerCase().startsWith("the "))) {
-                addFeature(features, "StartsWith=the", 1);
+            final String sentenceStr = sentence.stream().collect(Collectors.joining(" "));
+            if (options.stream()
+                    .map(op -> query.getOptions().get(op).toLowerCase())
+                    .anyMatch(op -> Stream.of(" who ", " that ", " which ")
+                            .anyMatch(tok -> sentenceStr.contains(op + tok)))) {
+                addFeature(features, "FollowedBy=who/that/which", 1);
             }
         }
 
@@ -218,7 +223,11 @@ public class FeatureExtractor {
 
         addFeature(features, "DependencyType=" + instanceType, 1.0);
         if (instanceType == DependencyInstanceType.PPGovernor || instanceType == DependencyInstanceType.PPObject) {
-            addFeature(features, "Preposition=" + sentence.get(headId), 1.0);
+            if (headId > 0 && sentence.get(headId - 1).equalsIgnoreCase("such") && sentence.get(headId).equals("as")) {
+                addFeature(features, "Preposition=" + "such as", 1.0);
+            } else {
+                addFeature(features, "Preposition=" + sentence.get(headId).toLowerCase(), 1.0);
+            }
         }
 
         if (addNAOptionFeature) {
@@ -226,8 +235,6 @@ public class FeatureExtractor {
             addFeature(features, "NAOptionReceivedVotes", 1.0 * annotation.stream()
                     .filter(ops -> ops.contains(naOptionId)).count() / numAnnotators);
         }
-
-        // TODO: preposition to object distance.
 
         final double nBestPrior = nBestList.getParses().stream()
                 .filter(parse -> parse.dependencies.stream()
@@ -242,7 +249,7 @@ public class FeatureExtractor {
         final double maxVotes = 1.0 * options.stream().mapToInt(allVotes::get).max().orElse(0);
         final double minVotes = 1.0 * options.stream().mapToInt(allVotes::get).min().orElse(0);
         if (addAnnotationFeatures) {
-            addFeature(features, "MaxReceivedVotes", maxVotes); // / numAnnotators);
+            addFeature(features, "MaxReceivedVotes", maxVotes);
         }
 
         // Head arg distance.

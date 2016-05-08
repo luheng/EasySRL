@@ -320,15 +320,16 @@ public class ClassificationExperiment {
                 "train", trainData,
                 "dev", devData
         );
-        final int round = 100, nfold = 5;
-        Booster booster = XGBoost.train(trainData, paramsMap, round, watches, null, null);
-        //double avg = GridSearch.runGridSearch(trainData, nfold);
-        //System.out.println("avg:\t" + avg);
-        reparse(booster, devSents, devInstances, devData);
+        final int round = 20, nfold = 5;
+
+        double avg = GridSearch.runGridSearch(trainData, nfold);
+        System.out.println("avg:\t" + avg);
+        //reparse(booster, devSents, devInstances, devData);
         //reparse(booster, testInstances, testData);
 
-        booster.saveModel("model.bin");
+        //booster.saveModel("model.bin");
         //booster,("modelInfo.txt", "featureMap.txt", false)
+        Booster booster = XGBoost.train(trainData, paramsMap, round, watches, null, null);
         ClassificationUtils.printXGBoostFeatures(featureExtractor.featureMap, booster.getFeatureScore(""));
     }
 }

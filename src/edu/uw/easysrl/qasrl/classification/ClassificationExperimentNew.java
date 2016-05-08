@@ -63,6 +63,7 @@ public class ClassificationExperimentNew {
         queryPruningParameters = new QueryPruningParameters();
         queryPruningParameters.skipPPQuestions = false;
         queryPruningParameters.skipSAdjQuestions = true;
+        queryPruningParameters.skipQueriesWithPronounOptions = false;
     }
 
     private static HITLParsingParameters reparsingParameters;
@@ -133,14 +134,20 @@ public class ClassificationExperimentNew {
         cleftingDevInstances = ClassificationUtils.getInstances(devSents, myParser, ImmutableSet.of(QueryType.Clefted),
                 cleftingFeatureExtractor, alignedQueries, alignedAnnotations);
 
-        final Map<String, Object> paramsMap = ImmutableMap.of(
-                "eta", 0.1,
-                "min_child_weight", 1.0,
+        final Map<String, Object> params1 = ImmutableMap.of(
+                "eta", 0.05,
+                "min_child_weight", 0.1,
                 "max_depth", 3,
                 "objective", "binary:logistic"
         );
-        coreArgClassifier = Classifier.trainClassifier(coreArgTrainInstances, paramsMap, 30);
-        cleftingClassifier = Classifier.trainClassifier(cleftingTrainInstances, paramsMap, 30);
+        final Map<String, Object> params2 = ImmutableMap.of(
+                "eta", 0.05,
+                "min_child_weight", 5.0,
+                "max_depth", 20,
+                "objective", "binary:logistic"
+        );
+        coreArgClassifier = Classifier.trainClassifier(coreArgTrainInstances, params1, 100);
+        cleftingClassifier = Classifier.trainClassifier(cleftingTrainInstances, params2, 20);
     }
 
     private static void reparse() {
@@ -159,6 +166,7 @@ public class ClassificationExperimentNew {
             coreArgsPredAcc.get(depType).add(p == instance.inGold);
         }
 
+        /*
         for (int i = 0; i < cleftingDevInstances.size(); i++) {
             final DependencyInstance instance = cleftingDevInstances.get(i);
             final boolean p = (cleftingPred.get(i) > 0.5);
@@ -167,7 +175,7 @@ public class ClassificationExperimentNew {
                 cleftingPredAcc.put(depType, new Accuracy());
             }
             cleftingPredAcc.get(depType).add(p == instance.inGold);
-        }
+        }*/
 
         System.out.println("CoreArgs accuracy:\t");
         coreArgsPredAcc.keySet().forEach(depType -> System.out.println(depType + '\t' + coreArgsPredAcc.get(depType)));
@@ -200,8 +208,6 @@ public class ClassificationExperimentNew {
                     unlabeledReparsedF1 = unlabeledBaselineF1, unlabeledHeuristicReparsedF1 = unlabeledBaselineF1,
                     unlabeledOracleReparsedF1 = unlabeledReparsedF1;
 
-            /**************************** Debugging ! ************************/
-            System.out.println(sentenceId + "\t" + TextGenerationHelper.renderString(sentence));
             for (int r = 0; r < alignedQueries.get(sentenceId).size(); r++) {
                 final int qid = r;
                 final ScoredQuery<QAStructureSurfaceForm> query = alignedQueries.get(sentenceId).get(qid);
@@ -224,11 +230,12 @@ public class ClassificationExperimentNew {
                                 constraints.add(pred ?
                                         new Constraint.AttachmentConstraint(inst.headId, inst.argId, true, 1.0) :
                                         new Constraint.AttachmentConstraint(inst.headId, inst.argId, false, 1.0));
-                                predictions.add(String.format("%s\tGold=%b\tPred=%.2f\t%d:%s-->%d:%s", inst.inGold,
-                                        pred == inst.inGold ? "[Y]" : "[N]", coreArgsPred.get(i),
+                                predictions.add(String.format("%s\tGold=%b\tPred=%.2f\t%d:%s-->%d:%s",
+                                        pred == inst.inGold ? "[Y]" : "[N]", inst.inGold, coreArgsPred.get(i),
                                         inst.headId, sentence.get(inst.headId), inst.argId, sentence.get(inst.argId)));
                             }
                         });
+
                 IntStream.range(0, cleftingPred.size()).boxed()
                         .forEach(i -> {
                             final DependencyInstance inst = cleftingDevInstances.get(i);
@@ -237,8 +244,8 @@ public class ClassificationExperimentNew {
                                 constraints.add(pred ?
                                         new Constraint.AttachmentConstraint(inst.headId, inst.argId, true, 1.0) :
                                         new Constraint.AttachmentConstraint(inst.headId, inst.argId, false, 1.0));
-                                predictions.add(String.format("%s\tGold=%b\tPred=%.2f\t%d:%s-->%d:%s", inst.inGold,
-                                        pred == inst.inGold ? "[Y]" : "[N]", cleftingPred.get(i),
+                                predictions.add(String.format("%s\tGold=%b\tPred=%.2f\t%d:%s-->%d:%s",
+                                        pred == inst.inGold ? "[Y]" : "[N]", inst.inGold, cleftingPred.get(i),
                                         inst.headId, sentence.get(inst.headId), inst.argId, sentence.get(inst.argId)));
                             }
                         });
@@ -282,7 +289,7 @@ public class ClassificationExperimentNew {
             avgUnlabeledOracleReparsed.add(unlabeledOracleReparsedF1);
             avgUnlabeledHeuristicReparsed.add(unlabeledHeuristicReparsedF1);
 
-            System.out.print(String.format("%SID=%d\t%.2f%% --> %.2f%%\t\t", sentenceId,
+            System.out.print(String.format("SID=%d\t%.2f%% --> %.2f%%\t\t", sentenceId,
                     100.0 * baselineF1.getF1(), 100.0 * reparsedF1.getF1()));
             if (baselineF1.getF1() + 1e-6 < reparsedF1.getF1()) {
                 numImproved ++;
@@ -312,6 +319,8 @@ public class ClassificationExperimentNew {
         System.out.println("Num worsened:\t" + numWorsened);
         System.out.println("Num unlabeled improved:\t" + numUnlabeledImproved);
         System.out.println("Num unlabeled worsened:\t" + numUnlabeledWorsened);
+
+        // TODO: print features.
     }
 
     public static void main(String[] args) {

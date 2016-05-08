@@ -29,7 +29,7 @@ import java.util.stream.Stream;
  */
 public class ClassificationUtils {
 
-    static int maxAllowedNAVotes = 1;
+    static int maxAllowedNAVotes = 2;
 
     /**
      * Split a list of objects into n parts.
@@ -136,9 +136,9 @@ public class ClassificationUtils {
                                 final ImmutableList<ImmutableList<Integer>> annotation = alignedAnnotations.get(sid).get(qid);
                                 final int naOptionId = query.getBadQuestionOptionId().getAsInt();
                                 final int numNAVotes = (int) annotation.stream().filter(ops -> ops.contains(naOptionId)).count();
-                               /* if (numNAVotes > maxAllowedNAVotes) {
+                                if (numNAVotes > maxAllowedNAVotes) {
                                     return Stream.empty();
-                                } */
+                                }
                                 return IntStream.range(0, sentence.size())
                                         .boxed()
                                         .flatMap(headId -> IntStream.range(0, sentence.size())

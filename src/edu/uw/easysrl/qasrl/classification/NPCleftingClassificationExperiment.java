@@ -341,10 +341,10 @@ public class NPCleftingClassificationExperiment {
         );
         final int round = 30, nfold = 5;
 
-        //double avg = GridSearch.runGridSearch(trainData, nfold);
-        //System.out.println("avg:\t" + avg);
+        double avg = GridSearch.runGridSearch(trainData, nfold);
+        System.out.println("avg:\t" + avg);
         Booster booster = XGBoost.train(trainData, paramsMap, round, watches, null, null);
-        reparse(booster, devSents, devInstances, devData);
+        //reparse(booster, devSents, devInstances, devData);
         //reparse(booster, testInstances, testData);
         // booster.saveModel("model.bin");
         //booster,("modelInfo.txt", "featureMap.txt", false)

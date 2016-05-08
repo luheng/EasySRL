@@ -45,6 +45,9 @@ public class TemplateHelper {
         if (op1.contains(" of " + op2)) {
             return "[op1] := X of [op2]";
         }
+        if (op1.endsWith(op2)) {
+            return "[op1] := X [op2]";
+        }
         // op1 is subspan of op2
         for (String pp : ImmutableList.copyOf(Prepositions.prepositionWords)) {
             if (!pp.equals("of") && op2.startsWith(op1 + " " + pp + " ")) {
@@ -73,18 +76,24 @@ public class TemplateHelper {
         }
         if (argId1 < argId2 && argId2 < predicateId && commaBetweenArgs == 1) {
             if (commaBetweenArg2Pred == 0) {
-                return "[op1] , [op2] [pred]";
+                //return "[op1] , [op2] [pred]";
+                return "[appositive-restrictive]";
             }
-            if (commaBetweenArg2Pred == 1) {
-                return "[op1] , [op2] , [pred]";
+            // One or more comma
+            if (commaBetweenArg2Pred >= 1) {
+                //return "[op1] , [op2] , [pred]";
+                return "[appositive]";
             }
         }
         if (predicateId < argId1 && argId1 < argId2 && commaBetweenArgs == 1) {
             if (commaBetweenPredArg1 == 0) {
-                return "[pred] [op1] , [op2]";
+                //return "[pred] [op1] , [op2]";
+                return "[appositive]";
             }
-            if (commaBetweenPredArg1 == 1) {
-                return "[pred] , [op1] , [op2]";
+            // One or more comma
+            if (commaBetweenPredArg1 >= 1) {
+                //return "[pred] , [op1] , [op2]";
+                return "[appositive]";
             }
         }
         // Pronoun template.

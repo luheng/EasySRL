@@ -26,8 +26,7 @@ public class GridSearch {
     final static ImmutableList<Integer> treeDepthValues = ImmutableList.of(3, 5, 10, 15, 20, 25, 30, 40);
     final static ImmutableList<Double> minChildWeightValues = ImmutableList.of(0.1, 1.0, 3.0, 5.0);
 
-
-    final static int numRounds = 30;
+    final static int numRounds = 20;
 
     public static double runGridSearch(final DMatrix trainData, final int numFolds) {
         final List<String> results = new ArrayList<>();
