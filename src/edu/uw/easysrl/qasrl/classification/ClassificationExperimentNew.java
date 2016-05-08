@@ -28,6 +28,8 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static com.google.common.collect.ImmutableMap.builder;
+
 
 /**
  * Putting things together ...
@@ -35,21 +37,20 @@ import java.util.stream.IntStream;
  */
 public class ClassificationExperimentNew {
     private static final int nBest = 100;
-    private static final ImmutableList<Double> split = ImmutableList.of(0.6, 0.4, 0.0);
-    private static final int randomSeed = 12345;
-    private static HITLParser myParser;
-    private static Map<Integer, List<AlignedAnnotation>> annotations;
-    private static FeatureExtractor coreArgsFeatureExtractor, cleftingFeatureExtractor;
 
-    private static Map<Integer, List<ScoredQuery<QAStructureSurfaceForm>>> alignedQueries;
-    private static Map<Integer, List<ImmutableList<ImmutableList<Integer>>>> alignedAnnotations;
-    private static Map<Integer, List<AlignedAnnotation>> alignedOldAnnotations;
+    private HITLParser myParser;
+    private Map<Integer, List<AlignedAnnotation>> annotations;
+    private FeatureExtractor coreArgsFeatureExtractor, cleftingFeatureExtractor;
 
-    private static ImmutableList<Integer> trainSents, devSents, testSents;
-    private static ImmutableList<DependencyInstance> coreArgTrainInstances, coreArgDevInstances, coreArgTestInstances,
-                                                     cleftingTrainInstances, cleftingDevInstances, cleftingTestInstances;
+    private Map<Integer, List<ScoredQuery<QAStructureSurfaceForm>>> alignedQueries;
+    private Map<Integer, List<ImmutableList<ImmutableList<Integer>>>> alignedAnnotations;
+    private Map<Integer, List<AlignedAnnotation>> alignedOldAnnotations;
 
-    private static Classifier coreArgClassifier, cleftingClassifier;
+    private ImmutableList<Integer> trainSents, devSents, testSents;
+    private ImmutableList<DependencyInstance> coreArgTrainInstances, coreArgDevInstances, coreArgTestInstances,
+            cleftingTrainInstances, cleftingDevInstances, cleftingTestInstances;
+
+    private Classifier coreArgClassifier, cleftingClassifier;
 
     private static final String[] annotationFiles = {
             "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
@@ -58,16 +59,15 @@ public class ClassificationExperimentNew {
             "./Crowdflower_data/f903842.csv"              // Round4: clefting.
     };
 
-    private static QueryPruningParameters queryPruningParameters;
-    static {
+    private QueryPruningParameters queryPruningParameters;
+    private HITLParsingParameters reparsingParameters;
+
+    ClassificationExperimentNew(final ImmutableList<Double> split, final int randomSeed) {
         queryPruningParameters = new QueryPruningParameters();
         queryPruningParameters.skipPPQuestions = false;
         queryPruningParameters.skipSAdjQuestions = true;
         queryPruningParameters.skipQueriesWithPronounOptions = false;
-    }
 
-    private static HITLParsingParameters reparsingParameters;
-    static {
         reparsingParameters = new HITLParsingParameters();
         reparsingParameters.jeopardyQuestionMinAgreement = 1;
         reparsingParameters.positiveConstraintMinAgreement = 5;
@@ -76,12 +76,15 @@ public class ClassificationExperimentNew {
         reparsingParameters.jeopardyQuestionWeight = 1.0;
         reparsingParameters.attachmentPenaltyWeight = 1.0;
         reparsingParameters.supertagPenaltyWeight = 1.0;
-    }
 
-    private static void initializeData() {
         myParser = new HITLParser(nBest);
         myParser.setQueryPruningParameters(queryPruningParameters);
         myParser.setReparsingParameters(reparsingParameters);
+
+        initializeData(split, randomSeed);
+    }
+
+    private void initializeData(final ImmutableList<Double> split, final int randomSeed) {
         annotations = ExperimentUtils.loadCrowdflowerAnnotation(annotationFiles);
         alignedQueries = new HashMap<>();
         alignedAnnotations = new HashMap<>();
@@ -150,7 +153,7 @@ public class ClassificationExperimentNew {
         cleftingClassifier = Classifier.trainClassifier(cleftingTrainInstances, params2, 20);
     }
 
-    private static void reparse() {
+    private ImmutableMap<String, Double> reparse(boolean skipCleftingQueries) {
         final ImmutableList<Double> coreArgsPred = coreArgClassifier.predict(coreArgDevInstances),
                                     cleftingPred = cleftingClassifier.predict(cleftingDevInstances);
         Map<String, Accuracy> coreArgsPredAcc = new HashMap<>(),
@@ -166,7 +169,6 @@ public class ClassificationExperimentNew {
             coreArgsPredAcc.get(depType).add(p == instance.inGold);
         }
 
-        /*
         for (int i = 0; i < cleftingDevInstances.size(); i++) {
             final DependencyInstance instance = cleftingDevInstances.get(i);
             final boolean p = (cleftingPred.get(i) > 0.5);
@@ -175,7 +177,7 @@ public class ClassificationExperimentNew {
                 cleftingPredAcc.put(depType, new Accuracy());
             }
             cleftingPredAcc.get(depType).add(p == instance.inGold);
-        }*/
+        }
 
         System.out.println("CoreArgs accuracy:\t");
         coreArgsPredAcc.keySet().forEach(depType -> System.out.println(depType + '\t' + coreArgsPredAcc.get(depType)));
@@ -193,6 +195,7 @@ public class ClassificationExperimentNew {
                 avgUnlabeledHeuristicReparsed = new Results(),
                 avgUnlabeledOracleReparsed = new Results();
         int numImproved = 0, numWorsened = 0, numUnlabeledImproved = 0, numUnlabeledWorsened = 0;
+        int numHeuristicConstraints = 0;
 
         for (int sentenceId : devSents) {
             Set<Constraint> allConstraints = new HashSet<>(),
@@ -212,6 +215,11 @@ public class ClassificationExperimentNew {
                 final int qid = r;
                 final ScoredQuery<QAStructureSurfaceForm> query = alignedQueries.get(sentenceId).get(qid);
                 final AlignedAnnotation annotation = alignedOldAnnotations.get(sentenceId).get(qid);
+
+                if (skipCleftingQueries && query.getQueryType() == QueryType.Clefted) {
+                    continue;
+                }
+
                 System.out.println(query.toString(sentence,
                         'G', myParser.getGoldOptions(query),
                         'U', myParser.getUserOptions(query, annotation),
@@ -221,6 +229,7 @@ public class ClassificationExperimentNew {
                 Set<Constraint> constraints = new HashSet<>(),
                                 heuristicConstraints = myParser.getConstraints(query, annotation),
                                 oracleConstraints = myParser.getOracleConstraints(query, myParser.getGoldOptions(query));
+
                 Set<String> predictions = new HashSet<>();
                 IntStream.range(0, coreArgsPred.size()).boxed()
                         .forEach(i -> {
@@ -280,6 +289,8 @@ public class ClassificationExperimentNew {
                 System.out.println();
             }
 
+            numHeuristicConstraints += allHeuristicConstraints.size();
+
             avgBaseline.add(baselineF1);
             avgReparsed.add(reparsedF1);
             avgOracleReparsed.add(oracleReparsedF1);
@@ -320,11 +331,82 @@ public class ClassificationExperimentNew {
         System.out.println("Num unlabeled improved:\t" + numUnlabeledImproved);
         System.out.println("Num unlabeled worsened:\t" + numUnlabeledWorsened);
 
-        // TODO: print features.
+
+        System.out.println("Heuristic constraints:\t" + numHeuristicConstraints);
+
+        return ImmutableMap.<String, Double>builder()
+                .put("avg_baseline", 100.0 * avgBaseline.getF1())
+                .put("avg_unlabeled_baseline", 100.0 * avgUnlabeledBaseline.getF1())
+                .put("avg_heuristic", 100.0 * avgHeuristicReparsed.getF1())
+                .put("avg_unlabeled_heuristic", 100.0 * avgUnlabeledHeuristicReparsed.getF1())
+                .put("avg_classifier", 100.0 * avgReparsed.getF1())
+                .put("avg_unlabeled_classifier", 100.0 * avgUnlabeledReparsed.getF1())
+                .put("avg_oracle", 100.0 * avgOracleReparsed.getF1())
+                .put("avg_unlabeled_oracle", 100.0 * avgUnlabeledOracleReparsed.getF1())
+                .put("num_processed_sents", 1.0 * devSents.size())
+                .put("num_improved_sents", 1.0 * numImproved)
+                .put("num_worsened_sents", 1.0 * numWorsened)
+                .put("num_unlabeled_improved", 1.0 * numUnlabeledImproved)
+                .put("num_unlabeled_worsened", 1.0 * numUnlabeledWorsened)
+                .build();
     }
 
+    static ImmutableList<String> resultKeys = ImmutableList.of(
+            "avg_baseline",
+            "avg_unlabeled_baseline",
+            "avg_heuristic",
+            "avg_unlabeled_heuristic",
+            "avg_classifier",
+            "avg_unlabeled_classifier",
+            "avg_oracle",
+            "avg_unlabeled_oracle",
+            "num_processed_sents",
+            "num_improved_sents",
+            "num_worsened_sents",
+            "num_unlabeled_improved",
+            "num_unlabeled_worsened"
+    );
+
     public static void main(String[] args) {
-        initializeData();
-        reparse();
+        final int initialRandomSeed = 12345;
+        final int numRandomRuns = 1;
+        Random random = new Random(initialRandomSeed);
+        ImmutableList<Integer> randomSeeds = IntStream.range(0, numRandomRuns)
+                .boxed().map(r -> random.nextInt())
+                .collect(GuavaCollectors.toImmutableList());
+        System.out.println("random seeds:\t" + randomSeeds);
+
+        Map<String, List<Double>> aggregatedResults = new HashMap<>();
+        Map<String, List<Double>> aggregatedResultsNoClefting = new HashMap<>();
+        for (int i = 0; i < numRandomRuns; i++) {
+            ClassificationExperimentNew experiment = new ClassificationExperimentNew(ImmutableList.of(0.6, 0.4, 0.0), randomSeeds.get(i)); //12345);
+            ImmutableMap<String, Double> results1 = experiment.reparse(false /* no clefting */);
+            ImmutableMap<String, Double> results2 = experiment.reparse(true /* no clefting */);
+            results1.keySet().forEach(k -> {
+                if (!aggregatedResults.containsKey(k)) {
+                    aggregatedResults.put(k, new ArrayList<>());
+                }
+                aggregatedResults.get(k).add(results1.get(k));
+            });
+            results2.keySet().forEach(k -> {
+                if (!aggregatedResultsNoClefting.containsKey(k)) {
+                    aggregatedResultsNoClefting.put(k, new ArrayList<>());
+                }
+                aggregatedResultsNoClefting.get(k).add(results2.get(k));
+            });
+        }
+
+        // Print aggregated results.
+        resultKeys.forEach(k -> {
+            final List<Double> results = aggregatedResults.get(k);
+            System.out.println(String.format("%s\t%.3f\t%.3f", k, ClassificationUtils.getAverage(results),
+                    ClassificationUtils.getStd(results)));
+        });
+        System.out.println("No clefting");
+        resultKeys.forEach(k -> {
+            final List<Double> results = aggregatedResultsNoClefting.get(k);
+            System.out.println(String.format("%s\t%.3f\t%.3f", k, ClassificationUtils.getAverage(results),
+                    ClassificationUtils.getStd(results)));
+        });
     }
 }

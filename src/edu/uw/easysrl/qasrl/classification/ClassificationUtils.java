@@ -61,6 +61,15 @@ public class ClassificationUtils {
                 .collect(GuavaCollectors.toImmutableList());
     }
 
+    static double getAverage(Collection<Double> results) {
+        return results.stream().mapToDouble(Double::valueOf).average().orElse(0.0);
+    }
+
+    static double getStd(Collection<Double> results) {
+        final double mean = getAverage(results);
+        return Math.sqrt(results.stream().mapToDouble(r -> (r - mean) * (r - mean)).sum() / results.size());
+    }
+
     static void printXGBoostFeatures(final CountDictionary featureMap, final Map<String, Integer> featureScores) {
         for (String feat : featureScores.keySet()) {
             final int featId = Integer.parseInt(feat.substring(1));
