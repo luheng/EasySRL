@@ -49,19 +49,38 @@ public abstract class Noun extends Predication {
         final SyntaxTreeNodeLeaf headLeaf = tree.getLeaves().get(headIndex);
 
         /* recover the whole noun phrase. */
-        final Optional<SyntaxTreeNode> npNodeOpt = TextGenerationHelper.getLowestAncestorFunctionIntoCategory(headLeaf, Category.NP, tree);
-        assert npNodeOpt.isPresent()
-            : "the head of an NP can always be traced up to a function into an NP";
-        final SyntaxTreeNode npNode = npNodeOpt.get();
-        final Category npNodeCategory = npNode.getCategory();
-        if(Category.valueOf("NP[thr]").matches(npNodeCategory)) {
-            return ExpletiveNoun.there;
-        } else if(Category.valueOf("NP[expl]").matches(npNodeCategory)) {
-            return ExpletiveNoun.it;
-        } else if(!npNode.getCategory().matches(Category.valueOf("NP"))) {
-            System.err.println("error category: " + npNodeCategory);
-            assert false
-                : "climbing up to function into NP should always yield NP, since we don't have NPs that take arguments";
+        final Optional<SyntaxTreeNode> npNodeOpt = TextGenerationHelper
+            .getLowestAncestorSatisfyingPredicate(headLeaf, node -> Category.NP.matches(node.getCategory()), tree);
+        final SyntaxTreeNode phraseNode;
+        if(!npNodeOpt.isPresent() || npNodeOpt.get().getHeadIndex() != headIndex) {
+            // should always be present because leaf's head index is its own
+            final SyntaxTreeNode candidatePhraseNode = TextGenerationHelper
+                .getHighestAncestorStillSatisfyingPredicate(headLeaf, node -> node.getHeadIndex() == headIndex, tree).get();
+            // this is a hack to get around the fact that when "and" combines with a "that"-CP, it leaves the right guy as the head,
+            // so we pick up the undesired "and". now we wish to shed it.
+            if(candidatePhraseNode instanceof SyntaxTreeNode.SyntaxTreeNodeBinary &&
+               candidatePhraseNode.getChild(0) instanceof SyntaxTreeNode.SyntaxTreeNodeLeaf &&
+               ((SyntaxTreeNode.SyntaxTreeNodeLeaf) candidatePhraseNode.getChild(0)).getPos().equals("CC")) {
+                phraseNode = candidatePhraseNode.getChild(1);
+            } else {
+                phraseNode = candidatePhraseNode;
+            }
+            System.err.println("new category: " + phraseNode.getCategory());
+            System.err.println("new phrase: " + phraseNode.getWord());
+            System.err.println("actual head: " + headLeaf.getWord());
+            if(npNodeOpt.isPresent()) {
+                System.err.println("(mistaken phrase: " + npNodeOpt.get().getWord() + ")");
+            }
+        } else {
+            final SyntaxTreeNode npNode = npNodeOpt.get();
+            final Category npNodeCategory = npNode.getCategory();
+            if(Category.valueOf("NP[thr]").matches(npNodeCategory)) {
+                return ExpletiveNoun.there;
+            } else if(Category.valueOf("NP[expl]").matches(npNodeCategory)) {
+                return ExpletiveNoun.it;
+            } else {
+                phraseNode = npNode;
+            }
         }
 
         final String predicate = TextGenerationHelper.renderString(TextGenerationHelper.getNodeWords(headLeaf, Optional.empty(), Optional.empty()));
@@ -97,7 +116,7 @@ public abstract class Noun extends Predication {
         // only pronouns can be non-third person
         final Person person = Person.THIRD;
 
-        final Optional<Definiteness> definitenessOpt = npNode.getLeaves().stream()
+        final Optional<Definiteness> definitenessOpt = phraseNode.getLeaves().stream()
             .filter(leaf -> leaf.getPos().equals("DT") || leaf.getPos().equals("WDT"))
             .findFirst()
             .flatMap(leaf -> {
@@ -120,26 +139,23 @@ public abstract class Noun extends Predication {
         } else if(headLeaf.getPos().equals("NNS")) {
             definiteness = Definiteness.INDEFINITE;
         } else {
-            definiteness = null;
-        }
-
-        if(definiteness == null) {
-            System.err.println("couldn't establish definiteness for [" + npNode.getWord() + "]");
+            // System.err.println("couldn't establish definiteness for [" + phraseNode.getWord() + "]");
+            definiteness = Definiteness.INDEFINITE;
         }
 
         /* include an of-phrase if necessary. */
         final ImmutableList<String> words;
-        if(npNode.getEndIndex() < tree.getEndIndex() &&
-           tree.getLeaves().get(npNode.getEndIndex()).getWord().equals("of")) {
-            final SyntaxTreeNode ofNode = tree.getLeaves().get(npNode.getEndIndex());
-            final Optional<SyntaxTreeNode> npNodeWithOfOpt = TextGenerationHelper.getLowestAncestorOfNodes(npNode, ofNode, tree);
-            if(npNodeWithOfOpt.isPresent()) {
-                words = ImmutableList.copyOf(TextGenerationHelper.getNodeWords(npNodeWithOfOpt.get(), Optional.empty(), Optional.empty()));
+        if(phraseNode.getEndIndex() < tree.getEndIndex() &&
+           tree.getLeaves().get(phraseNode.getEndIndex()).getWord().equals("of")) {
+            final SyntaxTreeNode ofNode = tree.getLeaves().get(phraseNode.getEndIndex());
+            final Optional<SyntaxTreeNode> phraseNodeWithOfOpt = TextGenerationHelper.getLowestAncestorOfNodes(phraseNode, ofNode, tree);
+            if(phraseNodeWithOfOpt.isPresent()) {
+                words = ImmutableList.copyOf(TextGenerationHelper.getNodeWords(phraseNodeWithOfOpt.get(), Optional.empty(), Optional.empty()));
             } else {
-                words = ImmutableList.copyOf(TextGenerationHelper.getNodeWords(npNode, Optional.empty(), Optional.empty()));
+                words = ImmutableList.copyOf(TextGenerationHelper.getNodeWords(phraseNode, Optional.empty(), Optional.empty()));
             }
         } else {
-            words = ImmutableList.copyOf(TextGenerationHelper.getNodeWords(npNode, Optional.empty(), Optional.empty()));
+            words = ImmutableList.copyOf(TextGenerationHelper.getNodeWords(phraseNode, Optional.empty(), Optional.empty()));
         }
         return new BasicNoun(predicate, Category.NP,
                              ImmutableMap.of(),

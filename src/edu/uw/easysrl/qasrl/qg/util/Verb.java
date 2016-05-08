@@ -65,8 +65,6 @@ public final class Verb extends Predication {
         assert predicateCategory.isFunctionInto(Category.valueOf("S\\NP"))
             : "verb predication must arise from verb category";
 
-        System.err.println("constructing pred for " + predicate + ": " + predicateCategory);
-
         final ImmutableMap<Integer, ImmutableList<Argument>> args = IntStream
             .range(1, predicateCategory.getNumberOfArguments() + 1)
             .boxed()
@@ -95,15 +93,25 @@ public final class Verb extends Predication {
         // Optional<String> negationWord = Optional.empty();
         Voice voice = Voice.ACTIVE;
 
+        final Optional<String> particle;
+        if(headIndex + 1 < parse.categories.size() && Category.valueOf("(S\\NP)\\(S\\NP)").matches(parse.categories.get(headIndex + 1))) {
+            particle = Optional.of(words.get(headIndex + 1));
+        } else {
+            particle = Optional.empty();
+        }
+
         int curAuxIndex = headIndex;
         boolean done = false;
         while(!done) {
             String aux = words.get(curAuxIndex).toLowerCase();
             Category cat = parse.categories.get(curAuxIndex);
+            curAuxIndex--;
+            if(curAuxIndex < 0) {
+                done = true;
+            }
             // adverbs might be between auxiliaries. including (S\NP)/(S\NP) maybe.
-            if(curAuxIndex != 0 && !VerbHelper.isAuxiliaryVerb(aux, cat) && !VerbHelper.isNegationWord(aux) &&
+            if(!VerbHelper.isAuxiliaryVerb(aux, cat) && !VerbHelper.isNegationWord(aux) &&
                cat.isFunctionInto(Category.valueOf("(S\\NP)|(S\\NP)"))) {
-                curAuxIndex--;
                 continue;
             } else if(VerbHelper.isNegationWord(aux)) {
                 isNegated = true;
@@ -140,12 +148,12 @@ public final class Verb extends Predication {
             } else {
                 done = true;
             }
-            curAuxIndex--;
         }
 
         return new Verb(predicate, predicateCategory, args,
                         tense, modal, voice,
-                        isPerfect, isProgressive, isNegated);
+                        isPerfect, isProgressive, isNegated,
+                        particle);
     }
 
     // overrides
@@ -208,29 +216,52 @@ public final class Verb extends Predication {
         ImmutableList<String> questionPrefix;
         ImmutableList<String> verbWords;
         if(focalArgNumOpt.isPresent() && focalArgNumOpt.get() == 1) { // if we're asking about the subject
+            ImmutableList<String> allVerbWords = getVerbWithoutSplit();
+            ImmutableList<String> auxChain;
+            if(particle.isPresent()) {
+                auxChain = allVerbWords.subList(0, allVerbWords.size() - 2);
+                verbWords = allVerbWords.subList(allVerbWords.size() - 2, allVerbWords.size());
+            } else {
+                auxChain = allVerbWords.subList(0, allVerbWords.size() - 1);
+                verbWords = allVerbWords.subList(allVerbWords.size() - 1, allVerbWords.size());
+            }
             questionPrefix = new ImmutableList.Builder<String>()
                 .addAll(subjWords) // wh-subject
-                .build();
-            verbWords = new ImmutableList.Builder<String>()
-                .addAll(getVerbWithoutSplit())
+                .addAll(auxChain)
                 .build();
         } else if(focalArgNumOpt.isPresent()) { // if we're asking about a non-subject
             ImmutableList<String> wordsForFlip = getVerbWithSplit();
             ImmutableList<String> flippedAux = wordsForFlip.subList(0, 1);
+            ImmutableList<String> remainingAuxChain;
+            if(particle.isPresent()) {
+                remainingAuxChain = wordsForFlip.subList(1, wordsForFlip.size() - 2);
+                verbWords = wordsForFlip.subList(wordsForFlip.size() - 2, wordsForFlip.size());
+            } else {
+                remainingAuxChain = wordsForFlip.subList(1, wordsForFlip.size() - 1);
+                verbWords = wordsForFlip.subList(wordsForFlip.size() - 1, wordsForFlip.size());
+            }
             questionPrefix = new ImmutableList.Builder<String>()
                 .addAll(args.get(focalArgNumOpt.get()).getPredication().getPhrase())
                 .addAll(flippedAux)
                 .addAll(subjWords)
+                .addAll(remainingAuxChain)
                 .build();
-            verbWords = wordsForFlip.subList(1, wordsForFlip.size());
         } else { // it's a yes/no question; no focal arg
             ImmutableList<String> wordsForFlip = getVerbWithSplit();
             ImmutableList<String> flippedAux = wordsForFlip.subList(0, 1);
+            ImmutableList<String> remainingAuxChain;
+            if(particle.isPresent()) {
+                remainingAuxChain = wordsForFlip.subList(1, wordsForFlip.size() - 2);
+                verbWords = wordsForFlip.subList(wordsForFlip.size() - 2, wordsForFlip.size());
+            } else {
+                remainingAuxChain = wordsForFlip.subList(1, wordsForFlip.size() - 1);
+                verbWords = wordsForFlip.subList(wordsForFlip.size() - 1, wordsForFlip.size());
+            }
             questionPrefix = new ImmutableList.Builder<String>()
                 .addAll(flippedAux)
                 .addAll(subjWords)
+                .addAll(remainingAuxChain)
                 .build();
-            verbWords = wordsForFlip.subList(1, wordsForFlip.size());
         }
 
         return new ImmutableList.Builder<String>()
@@ -241,19 +272,23 @@ public final class Verb extends Predication {
             .build();
     }
 
+    public boolean isCopular() {
+        return getPredicate().equals("be");
+    }
+
     public Verb transformArgs(BiFunction<Integer, ImmutableList<Argument>, ImmutableList<Argument>> transform) {
         ImmutableMap<Integer, ImmutableList<Argument>> newArgs = getArgs()
             .entrySet()
             .stream()
             .collect(toImmutableMap(e -> e.getKey(), e -> (transform.apply(e.getKey(), e.getValue()))));
         return new Verb(getPredicate(), getPredicateCategory(), newArgs,
-                        tense, modal, voice, isPerfect, isProgressive, isNegated);
+                        tense, modal, voice, isPerfect, isProgressive, isNegated, particle);
     }
 
     public Verb withModal(String modal) {
         return new Verb(getPredicate(), getPredicateCategory(), getArgs(),
                         Tense.MODAL, Optional.of(modal),
-                        voice, isPerfect, isProgressive, isNegated);
+                        voice, isPerfect, isProgressive, isNegated, particle);
     }
 
     /* protected methods */
@@ -266,7 +301,8 @@ public final class Verb extends Predication {
                    Voice voice,
                    boolean isPerfect,
                    boolean isProgressive,
-                   boolean isNegated) {
+                   boolean isNegated,
+                   Optional<String> particle) {
         super(predicate, predicateCategory, args);
         this.tense = tense;
         this.modal = modal;
@@ -274,6 +310,7 @@ public final class Verb extends Predication {
         this.isPerfect = isPerfect;
         this.isProgressive = isProgressive;
         this.isNegated = isNegated;
+        this.particle = particle;
         validate();
     }
 
@@ -285,7 +322,8 @@ public final class Verb extends Predication {
                    Voice voice,
                    boolean isPerfect,
                    boolean isProgressive,
-                   boolean isNegated) {
+                   boolean isNegated,
+                   Optional<String> particle) {
         super(predicate, predicateCategory, argSupplier);
         this.tense = tense;
         this.modal = modal;
@@ -293,6 +331,7 @@ public final class Verb extends Predication {
         this.isPerfect = isPerfect;
         this.isProgressive = isProgressive;
         this.isNegated = isNegated;
+        this.particle = particle;
         validate();
     }
 
@@ -304,6 +343,7 @@ public final class Verb extends Predication {
     private final boolean isPerfect;
     private final boolean isProgressive;
     private final boolean isNegated;
+    private final Optional<String> particle; // read in as an adverb that directly follows the verb
 
     private void validate() {
         boolean isVerb = getPredicateCategory().isFunctionInto(Category.valueOf("S\\NP")) &&
@@ -345,8 +385,11 @@ public final class Verb extends Predication {
 
     private Deque<String> getVerbWordStack() {
         Deque<String> verbStack = new LinkedList<>();
-        // special case for NO tense rather than BARE tense: we want participles not to have their auxes
-        // (but passives should).
+
+        if(particle.isPresent()) {
+            verbStack.addFirst(particle.get());
+        }
+
         if(tense == Tense.BARE_VERB) {
             if(isPerfect || voice == Voice.PASSIVE) {
                 verbStack.addFirst(VerbHelper.getPastParticiple(getPredicate()));
@@ -390,7 +433,7 @@ public final class Verb extends Predication {
             case BARE_COPULA: break;
             case TO: verbStack.addFirst("to");
             case MODAL: verbStack.addFirst(modal.get()); break;
-            case PAST: verbStack.addFirst(VerbHelper.getPastTense(verbStack.removeFirst())); break;
+            case PAST: verbStack.addFirst(VerbHelper.getPastTense(verbStack.removeFirst(), getSubject())); break;
             case PRESENT: verbStack.addFirst(VerbHelper.getPresentTense(verbStack.removeFirst(), getSubject())); break;
             case FUTURE: verbStack.addFirst("will"); break;
             }
@@ -416,7 +459,7 @@ public final class Verb extends Predication {
         //     : "verb should only be split in very specific circumstances";
         verbStack.addFirst(VerbHelper.getStem(verbStack.removeFirst()));
         switch(tense) {
-        case PAST: verbStack.addFirst(VerbHelper.getPastTense("do")); break;
+        case PAST: verbStack.addFirst(VerbHelper.getPastTense("do", getSubject())); break;
         case PRESENT: verbStack.addFirst(VerbHelper.getPresentTense("do", getSubject())); break;
         default: assert false;
         }

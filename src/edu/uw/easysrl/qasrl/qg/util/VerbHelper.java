@@ -179,76 +179,125 @@ public class VerbHelper {
     }
 
     public static boolean isPastTense(String verb) {
-        return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
+        return verb.equalsIgnoreCase("was") ||
+            verb.equalsIgnoreCase("were") ||
+            Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
             .map(infl -> verb.equalsIgnoreCase(infl[3]))
             .orElse(false);
     }
 
-    public static String getPastTense(String verb) {
-        return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
-            .map(infl -> infl[3])
-            .orElse(verb + "[DBG]");
+    public static String getPastTense(String verb, Noun subject) {
+        if(isCopulaVerb(verb)) {
+            Noun.Number num = subject.getNumber().orElse(Noun.Number.SINGULAR);
+            switch(num) {
+            case PLURAL: return "were";
+            case SINGULAR: switch(subject.getPerson()) {
+                case FIRST: return "was";
+                case SECOND: return "were";
+                case THIRD: return "was";
+                default: assert false; return null;
+                }
+            default: assert false; return null;
+            }
+        } else {
+            return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
+                .map(infl -> infl[3])
+                .orElse(verb);
+        }
     }
 
     // if the number of the subject is not known, allows for the "do" form (as opposed to "does" form) long as subj is third person
-    public static boolean isPresentTense(String verb, Noun subject) {
-        return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
-            .map(infl -> verb.equalsIgnoreCase(infl[1]) ||
-                 (!(subject.getNumber().map(num -> num == Noun.Number.SINGULAR).orElse(true) && subject.getPerson() == Noun.Person.THIRD) &&
-                  verb.equalsIgnoreCase(infl[0])))
-            .orElse(false);
-    }
+    // public static boolean isPresentTense(String verb, Noun subject) {
+    //     return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
+    //         .map(infl -> verb.equalsIgnoreCase(infl[1]) ||
+    //              (!(subject.getNumber().map(num -> num == Noun.Number.SINGULAR).orElse(true) && subject.getPerson() == Noun.Person.THIRD) &&
+    //               verb.equalsIgnoreCase(infl[0])))
+    //         .orElse(false);
+    // }
 
     // relaxed present tense test that looks for either case
     public static boolean isPresentTense(String verb) {
-        return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
+        return verb.equalsIgnoreCase("am") ||
+            verb.equalsIgnoreCase("are") ||
+            verb.equalsIgnoreCase("is") ||
+            verb.equalsIgnoreCase("'s") ||
+            verb.equalsIgnoreCase("'re") ||
+            verb.equalsIgnoreCase("'m") ||
+            verb.equalsIgnoreCase("'ve") ||
+            Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
             .map(infl -> verb.equalsIgnoreCase(infl[1]) || verb.equalsIgnoreCase(infl[0]))
             .orElse(false);
     }
 
     public static String getPresentTense(String verb, Noun subject) {
-        return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
-            .map(infl -> ((subject.getNumber().map(num -> num == Noun.Number.SINGULAR).orElse(true)) &&
-                          subject.getPerson() == Noun.Person.THIRD) ? infl[1] : infl[0])
-            .orElse(verb + "[DBG]");
+        if(isCopulaVerb(verb)) {
+            Noun.Number num = subject.getNumber().orElse(Noun.Number.SINGULAR);
+            switch(num) {
+            case PLURAL: return "are";
+            case SINGULAR: switch(subject.getPerson()) {
+                case FIRST: return "am";
+                case SECOND: return "are";
+                case THIRD: return "is";
+                default: assert false; return null;
+                }
+            default: assert false; return null;
+            }
+        } else {
+            return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
+                .map(infl -> ((subject.getNumber().map(num -> num == Noun.Number.SINGULAR).orElse(true)) &&
+                              subject.getPerson() == Noun.Person.THIRD) ? infl[1] : infl[0])
+                .orElse(verb);
+        }
     }
 
     // aka progressive form
     public static boolean isPresentParticiple(String verb) {
-        return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
+        return verb.equalsIgnoreCase("being") || Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
             .map(infl -> verb.equalsIgnoreCase(infl[2]))
             .orElse(false);
     }
 
     public static String getPresentParticiple(String verb) {
-        return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
-            .map(infl -> infl[2])
-            .orElse(verb + "[DBG]");
+        if(isCopulaVerb(verb)) {
+            return "being";
+        } else {
+            return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
+                .map(infl -> infl[2])
+                .orElse(verb);
+        }
     }
 
     // aka participle
     public static boolean isPastParticiple(String verb) {
-        return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
+        return verb.equalsIgnoreCase("been") || Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
             .map(infl -> verb.equalsIgnoreCase(infl[4]))
             .orElse(false);
     }
 
     public static String getPastParticiple(String verb) {
-        return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
-            .map(infl -> infl[4])
-            .orElse(verb + "[DBG]");
+        if(isCopulaVerb(verb)) {
+            return "been";
+        } else {
+            return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
+                .map(infl -> infl[4])
+                .orElse(verb);
+        }
     }
 
     public static boolean isStem(String verb) {
-        return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
+        return verb.equalsIgnoreCase("be") || Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
             .map(infl -> verb.equalsIgnoreCase(infl[0]))
             .orElse(true); // assume it's the stem if we don't know
     }
 
     public static String getStem(String verb) {
-        return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
-            .map(infl -> infl[0])
-            .orElse(verb + "[DBG]");
+        if(isCopulaVerb(verb)) {
+            return "be";
+        } else {
+            return Optional.ofNullable(s_inflectionDictionary.getBestInflections(verb.toLowerCase()))
+                .map(infl -> infl[0])
+                .orElse(verb);
+        }
     }
 
     /**

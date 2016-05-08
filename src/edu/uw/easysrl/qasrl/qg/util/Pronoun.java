@@ -62,7 +62,7 @@ public final class Pronoun extends Noun {
         boolean caseMatch = pron.getCase().map(x -> this.getCase().map(y -> x == y).orElse(false)).orElse(true);
         boolean numMatch = pron.getNumber().map(x -> this.getNumber().map(y -> x == y).orElse(false)).orElse(true);
         boolean genMatch = pron.getGender().map(x -> this.getGender().map(y -> x == y).orElse(false)).orElse(true);
-        boolean persMatch = pron.getPerson() == this.getPerson();
+        boolean persMatch = pron.getPerson() == null || pron.getPerson() == this.getPerson();
         boolean defMatch = pron.getDefiniteness() == this.getDefiniteness();
         return caseMatch && numMatch && genMatch && persMatch && defMatch;
     }
@@ -283,7 +283,7 @@ public final class Pronoun extends Noun {
         .put("someone", new Pronoun(Optional.empty(),
                                     Optional.empty(),
                                     Optional.of(Gender.ANIMATE),
-                                    Person.THIRD,
+                                    null,
                                     Definiteness.INDEFINITE))
         // can match against animateness unknown
         .put("something", new Pronoun(Optional.empty(),
@@ -300,7 +300,7 @@ public final class Pronoun extends Noun {
         .put("who", new Pronoun(Optional.empty(),
                                 Optional.empty(),
                                 Optional.of(Gender.ANIMATE),
-                                Person.THIRD,
+                                null,
                                 Definiteness.FOCAL))
         // can match against animateness unknown
         .put("what", new Pronoun(Optional.empty(),

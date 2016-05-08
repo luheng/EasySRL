@@ -11,6 +11,7 @@ import com.google.common.collect.ImmutableMap;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.function.Predicate;
 
 /**
  * Tools for generating text from trees, dependencies, and lists of tokens.
@@ -247,12 +248,35 @@ public class TextGenerationHelper {
      * until we reach a node whose category is a function into (i.e., ends on the left with)
      * the given category. If none is found before getting to the root, returns empty.
      */
+    // XXX replace body with call to utility method below
     public static Optional<SyntaxTreeNode> getLowestAncestorFunctionIntoCategory(SyntaxTreeNode node, Category category, SyntaxTreeNode wholeTree) {
         Optional<SyntaxTreeNode> curNode = Optional.of(node);
         Optional<Category> curCat = curNode.map(SyntaxTreeNode::getCategory);
         while(curNode.isPresent() && !curCat.get().isFunctionInto(category)) {
             curNode = getParent(curNode.get(), wholeTree);
             curCat = curNode.map(SyntaxTreeNode::getCategory);
+        }
+        return curNode;
+    }
+
+    public static Optional<SyntaxTreeNode> getHighestAncestorStillSatisfyingPredicate(SyntaxTreeNode node, Predicate<SyntaxTreeNode> pred, SyntaxTreeNode wholeTree) {
+        if(!pred.test(node)) {
+            return Optional.empty();
+        } else {
+            SyntaxTreeNode curNode = node;
+            Optional<SyntaxTreeNode> nextNode = getParent(curNode, wholeTree);
+            while(nextNode.isPresent() && pred.test(nextNode.get())) {
+                curNode = nextNode.get();
+                nextNode = getParent(curNode, wholeTree);
+            }
+            return Optional.of(curNode);
+        }
+    }
+
+    public static Optional<SyntaxTreeNode> getLowestAncestorSatisfyingPredicate(SyntaxTreeNode node, Predicate<SyntaxTreeNode> pred, SyntaxTreeNode wholeTree) {
+        Optional<SyntaxTreeNode> curNode = Optional.of(node);
+        while(curNode.isPresent() && !pred.test(curNode.get())) {
+            curNode = getParent(curNode.get(), wholeTree);
         }
         return curNode;
     }
