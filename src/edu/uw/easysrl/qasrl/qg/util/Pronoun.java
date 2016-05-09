@@ -3,6 +3,7 @@ package edu.uw.easysrl.qasrl.qg.util;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Optional;
+import java.util.function.BiFunction;
 
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
@@ -63,7 +64,10 @@ public final class Pronoun extends Noun {
     public boolean matches(Pronoun pron) {
         boolean caseMatch = pron.getCase().map(x -> this.getCase().map(y -> x == y).orElse(false)).orElse(true);
         boolean numMatch = pron.getNumber().map(x -> this.getNumber().map(y -> x == y).orElse(false)).orElse(true);
-        boolean genMatch = pron.getGender().map(x -> this.getGender().map(y -> x == y).orElse(false)).orElse(true);
+        boolean genMatch = pron.getGender()
+            .map(x -> this.getGender()
+            .map(y -> x == Gender.ANIMATE ? y != Gender.INANIMATE : x == y)
+            .orElse(false)).orElse(true);
         boolean persMatch = pron.getPerson() == null || pron.getPerson() == this.getPerson();
         boolean defMatch = pron.getDefiniteness() == this.getDefiniteness();
         return caseMatch && numMatch && genMatch && persMatch && defMatch;
@@ -77,6 +81,11 @@ public final class Pronoun extends Noun {
     @Override
     public ImmutableSet<ResolvedDependency> getLocalDependencies() {
         return ImmutableSet.of();
+    }
+
+    @Override
+    public Pronoun transformArgs(BiFunction<Integer, ImmutableList<Argument>, ImmutableList<Argument>> transform) {
+        return this;
     }
 
     // transformers

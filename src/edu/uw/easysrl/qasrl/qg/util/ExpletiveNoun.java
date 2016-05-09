@@ -3,6 +3,7 @@ package edu.uw.easysrl.qasrl.qg.util;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Optional;
+import java.util.function.BiFunction;
 
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
@@ -35,6 +36,11 @@ public class ExpletiveNoun extends Noun {
                                                              "it");
 
     // overrides
+
+    @Override
+    public ExpletiveNoun transformArgs(BiFunction<Integer, ImmutableList<Argument>, ImmutableList<Argument>> transform) {
+        return this;
+    }
 
     @Override
     public ImmutableList<String> getPhrase() {

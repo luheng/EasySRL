@@ -160,14 +160,76 @@ public final class Verb extends Predication {
 
     @Override
     public ImmutableList<String> getPhrase() {
-        assert false;
-        return null;
+        // assert getArgs().entrySet().stream().allMatch(e -> e.getValue().size() == 1)
+        //     : "can only get phrase for predication with exactly one arg in each slot"; // do i want this?
+        // assert getArgs().entrySet().stream().allMatch(e -> e.getValue().size() > 0) 
+        //     : "can only get phrase for predication with at least one arg in each slot"; // do i want this?
+        ImmutableMap<Integer, Argument> args = getArgs().entrySet().stream()
+            .collect(toImmutableMap(e -> e.getKey(), e -> e.getValue().size() > 0 ? e.getValue().get(0)
+                                    : Argument.withNoDependency(Pronoun.fromString("something").get())));
+
+        ImmutableList<String> leftInternalArgs = ImmutableList.of();
+        ImmutableList<String> rightInternalArgs = ImmutableList.of();
+        Category done = Category.valueOf("(S\\NP)");
+        Category curCat = getPredicateCategory();
+        while(!done.matches(curCat)) { // we're not including the subject
+            Predication curArg = args.get(curCat.getNumberOfArguments()).getPredication();
+            Slash slash = curCat.getSlash();
+            switch(slash) {
+            case BWD: leftInternalArgs = new ImmutableList.Builder<String>()
+                    .addAll(curArg.getPhrase())
+                    .addAll(leftInternalArgs)
+                    .build();
+                break;
+            case FWD: rightInternalArgs = new ImmutableList.Builder<String>()
+                    .addAll(rightInternalArgs)
+                    .addAll(curArg.getPhrase())
+                    .build();
+                break;
+            default: assert false;
+            }
+            curCat = curCat.getLeft();
+        }
+
+        final Noun subject = (Noun) args.get(1).getPredication();
+        final ImmutableList<String> allVerbWords = getVerbWithoutSplit();
+
+        final ImmutableList<String> subjWords = subject.getPhrase();
+        final ImmutableList<String> auxChain;
+        final ImmutableList<String> verbWords;
+        if(particle.isPresent()) {
+            auxChain = allVerbWords.subList(0, allVerbWords.size() - 2);
+            verbWords = allVerbWords.subList(allVerbWords.size() - 2, allVerbWords.size());
+        } else {
+            auxChain = allVerbWords.subList(0, allVerbWords.size() - 1);
+            verbWords = allVerbWords.subList(allVerbWords.size() - 1, allVerbWords.size());
+        }
+
+        return new ImmutableList.Builder<String>()
+            .addAll(subjWords)
+            .addAll(auxChain)
+            .addAll(leftInternalArgs)
+            .addAll(verbWords)
+            .addAll(rightInternalArgs)
+            .build();
     }
 
     @Override
     public ImmutableSet<ResolvedDependency> getLocalDependencies() {
         return ImmutableSet.of();
     }
+
+    @Override
+    public Verb transformArgs(BiFunction<Integer, ImmutableList<Argument>, ImmutableList<Argument>> transform) {
+        ImmutableMap<Integer, ImmutableList<Argument>> newArgs = getArgs()
+            .entrySet()
+            .stream()
+            .collect(toImmutableMap(e -> e.getKey(), e -> (transform.apply(e.getKey(), e.getValue()))));
+        return new Verb(getPredicate(), getPredicateCategory(), newArgs,
+                        tense, modal, voice, isPerfect, isProgressive, isNegated, particle);
+    }
+
+    /* public API */
 
     public Noun getSubject() {
         return (Noun) getArgs().get(1).get(0).getPredication(); // TODO
@@ -178,10 +240,11 @@ public final class Verb extends Predication {
             : "can only get question words for predication with exactly one arg in each slot";
         ImmutableMap<Integer, Argument> args = getArgs().entrySet().stream()
             .collect(toImmutableMap(e -> e.getKey(), e -> e.getValue().get(0)));
-        assert args.entrySet().stream()
-            .filter(e -> (e.getValue().getPredication() instanceof Noun) && ((Noun) e.getValue().getPredication()).isFocal())
-            .collect(counting()) <= 1
-            : "can't have more than one noun argument in focus";
+        // TODO: I think this causes problems when the word "what" appears in the wild, oops.
+        // assert args.entrySet().stream()
+        //     .filter(e -> (e.getValue().getPredication() instanceof Noun) && ((Noun) e.getValue().getPredication()).isFocal())
+        //     .collect(counting()) <= 1
+        //     : "can't have more than one noun argument in focus";
         // TODO: PP args, VP args, etc. and others might also hypothetically be in focus, if we had supersense questions
         Optional<Integer> focalArgNumOpt = args.keySet().stream()
             .filter(argNum -> (args.get(argNum).getPredication() instanceof Noun) && ((Noun) args.get(argNum).getPredication()).isFocal())
@@ -269,25 +332,22 @@ public final class Verb extends Predication {
                 .build();
         }
 
-        return new ImmutableList.Builder<String>()
+        ImmutableList<String> result = new ImmutableList.Builder<String>()
             .addAll(questionPrefix)
             .addAll(leftInternalArgs)
             .addAll(verbWords)
             .addAll(rightInternalArgs)
             .build();
+        if(args.entrySet().stream()
+           .filter(e -> (e.getValue().getPredication() instanceof Noun) && ((Noun) e.getValue().getPredication()).isFocal())
+           .collect(counting()) > 1) {
+            System.err.println("can't have more than one noun argument in focus:\n\t" + result);
+        }
+        return result;
     }
 
     public boolean isCopular() {
         return getPredicate().equals("be");
-    }
-
-    public Verb transformArgs(BiFunction<Integer, ImmutableList<Argument>, ImmutableList<Argument>> transform) {
-        ImmutableMap<Integer, ImmutableList<Argument>> newArgs = getArgs()
-            .entrySet()
-            .stream()
-            .collect(toImmutableMap(e -> e.getKey(), e -> (transform.apply(e.getKey(), e.getValue()))));
-        return new Verb(getPredicate(), getPredicateCategory(), newArgs,
-                        tense, modal, voice, isPerfect, isProgressive, isNegated, particle);
     }
 
     public Verb withModal(String modal) {
@@ -402,11 +462,14 @@ public final class Verb extends Predication {
                 verbStack.addFirst(VerbHelper.getPresentParticiple(getPredicate()));
             } else if(voice == Voice.ADJECTIVE) {
                 verbStack.addFirst(getPredicate());
+            } else if(voice == Voice.ACTIVE) {
+                verbStack.addFirst(getPredicate());
             } else {
                 System.err.println("unhandled case of NONE tense:");
                 System.err.println(getPredicateCategory());
                 System.err.println(getPredicate());
                 System.err.println(voice.name());
+                assert false;
             }
             return verbStack;
         } else {

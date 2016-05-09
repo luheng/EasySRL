@@ -3,6 +3,7 @@ package edu.uw.easysrl.qasrl.qg.util;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Optional;
+import java.util.function.BiFunction;
 
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.dependencies.ResolvedDependency; 
@@ -25,6 +26,11 @@ public class BasicNoun extends Noun {
     @Override
     public ImmutableSet<ResolvedDependency> getLocalDependencies() {
         return deps;
+    }
+
+    @Override
+    public BasicNoun transformArgs(BiFunction<Integer, ImmutableList<Argument>, ImmutableList<Argument>> transform) {
+        return this;
     }
 
     // transformers -- subclasses should override

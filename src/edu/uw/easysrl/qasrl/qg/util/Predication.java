@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.Optional;
 import java.util.function.Supplier;
+import java.util.function.BiFunction;
 
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
@@ -72,6 +73,9 @@ public abstract class Predication {
     // }
 
     /* abstract methods */
+
+    // should be overridden to return something of same type.
+    public abstract Predication transformArgs(BiFunction<Integer, ImmutableList<Argument>, ImmutableList<Argument>> transform);
 
     public abstract ImmutableSet<ResolvedDependency> getLocalDependencies();
 

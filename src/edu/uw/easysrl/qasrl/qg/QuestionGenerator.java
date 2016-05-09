@@ -15,6 +15,7 @@ import static edu.uw.easysrl.qasrl.TextGenerationHelper.TextWithDependencies;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import static java.util.stream.Collectors.*;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -39,7 +40,7 @@ public class QuestionGenerator {
     }
 
     // if this is true, the previous three don't matter
-    private static boolean askPPAttachmentQuestions = true; // if true: include PP attachment questions
+    private static boolean askPPAttachmentQuestions = false; // if true: include PP attachment questions
     public static void setAskPPAttachmentQuestions(boolean flag) {
         askPPAttachmentQuestions = flag;
     }
@@ -98,43 +99,77 @@ public class QuestionGenerator {
             .flatMap(verb -> IntStream.range(1, verb.getPredicateCategory().getNumberOfArguments() + 1)
             .boxed()
             .filter(argNum -> Category.NP.matches(verb.getPredicateCategory().getArgument(argNum)))
-            .flatMap(askingArgNum -> {
-                    Verb questionPred = verb.transformArgs((argNum, args) -> {
+            .flatMap(askingArgNum -> verb.getArgs().get(askingArgNum).stream()
+            .filter(answerArg -> !((Noun) answerArg.getPredication()).isExpletive()) // this should always be true when arg cat is NP
+            .filter(answerArg -> answerArg.getDependency().isPresent())
+            .flatMap(answerArg -> PredicationUtils
+                     .sequenceVerbArgChoices((Verb) PredicationUtils
+                     .withIndefinitePronouns(PredicationUtils
+                     .addPlaceholderArguments(verb))).stream()
+            .map(sequencedVerb -> {
+                    Verb questionPred = sequencedVerb.transformArgs((argNum, args) -> argNum == askingArgNum
+                                   ? ImmutableList.of(Argument.withNoDependency(((Noun) args.get(0).getPredication()).withDefiniteness(Noun.Definiteness.FOCAL)))
+                                   : args)
+                    .withModal("would");
+                    // ImmutableList<String> question = questionPredication.getQuestionWords();
+                    return new BasicQuestionAnswerPair(sentenceId, parseId, parse,
+                                                       predicateIndex, verb.getPredicateCategory(), askingArgNum,
+                                                       predicateIndex, null,
+                                                       questionPred.getAllDependencies(), questionPred.getQuestionWords(),
+                                                       answerArg.getDependency().get(),
+                                                       new TextWithDependencies(answerArg.getPredication().getPhrase(),
+                                                                                answerArg.getPredication().getAllDependencies()));
+                })))))
+            .collect(toImmutableList());
+        return qaPairs;
+    }
+
+    public static ImmutableList<QuestionAnswerPair> newCopulaQuestions(int sentenceId, int parseId, Parse parse) {
+        final PredicateCache preds = new PredicateCache(parse);
+        final ImmutableList<QuestionAnswerPair> qaPairs = IntStream
+            .range(0, parse.categories.size())
+            .boxed()
+            .filter(index -> parse.categories.get(index).isFunctionInto(Category.valueOf("S\\NP"))
+                    && !parse.categories.get(index).isFunctionInto(Category.valueOf("(S\\NP)|(S\\NP)")))
+            .flatMap(predicateIndex -> Stream.of(Verb.getFromParse(predicateIndex, preds, parse))
+            .filter(verb -> verb.isCopular())
+            .flatMap(verb -> IntStream.range(1, verb.getPredicateCategory().getNumberOfArguments() + 1)
+            .boxed()
+            .filter(argNum -> Category.NP.matches(verb.getPredicateCategory().getArgument(argNum)))
+            .flatMap(askingArgNum -> verb.getArgs().get(askingArgNum).stream()
+            .filter(answerArg -> !((Noun) answerArg.getPredication()).isExpletive()) // this should always be a noun when arg cat is NP
+            .filter(answerArg -> answerArg.getDependency().isPresent())
+            .flatMap(answerArg -> PredicationUtils.sequenceVerbArgChoices(PredicationUtils.addPlaceholderArguments(verb)).stream()
+            .map(reducedVerb -> {
+                    Verb whPred = reducedVerb.withModal("would").transformArgs((argNum, args) -> {
                             if(argNum == askingArgNum) {
-                                if(args.isEmpty()) {
-                                    return ImmutableList.of(Argument.withNoDependency(Pronoun.fromString("what").get()));
-                                } else {
-                                    return ImmutableList.of(Argument.withNoDependency(((Noun) args.get(0).getPredication())
-                                                                                      .getPronoun()
-                                                                                      .withPerson(Noun.Person.THIRD)
-                                                                                      .withDefiniteness(Noun.Definiteness.FOCAL)));
-                                }
+                                // args is not empty; was filled in before.
+                                return ImmutableList.of(Argument.withNoDependency(((Noun) args.get(0).getPredication())
+                                                                                  .getPronoun()
+                                                                                  .withPerson(Noun.Person.THIRD)
+                                                                                  .withDefiniteness(Noun.Definiteness.FOCAL)));
                             } else {
                                 Category argCat = verb.getPredicateCategory().getArgument(argNum);
                                 if(!Category.NP.matches(argCat)) {
+                                    System.err.println("gapping arg category: " + argCat);
+                                    System.err.println("gapping preds:\n" + args.stream()
+                                                       .map(arg -> "\t" + arg.getPredication().getPredicate())
+                                                       // .map(arg -> "\t" + PredicationUtils.addPlaceholderArgumentsIfVerb(arg.getPredication()).getPhrase())
+                                                       .collect(joining("\n")));
                                     return ImmutableList.of(Argument.withNoDependency(new Gap(argCat)));
-                                } else if(args.isEmpty()) {
-                                    return ImmutableList.of(Argument.withNoDependency(Pronoun.fromString("something").get()));
                                 } else {
-                                    return ImmutableList.of(Argument.withNoDependency(((Noun) args.get(0).getPredication())
-                                                                                      .getPronoun().withDefiniteness(Noun.Definiteness.INDEFINITE)));
+                                    return args;
                                 }
                             }
-                        }).withModal("would");
-                    // ImmutableList<String> question = questionPredication.getQuestionWords();
-                    return verb.getArgs().get(askingArgNum).stream()
-                        .filter(answerArg -> answerArg.getDependency().isPresent())
-                        .map(answerArg -> {
-                                QuestionAnswerPair qaPair = new BasicQuestionAnswerPair(sentenceId, parseId, parse,
-                                                                                        predicateIndex, verb.getPredicateCategory(), askingArgNum,
-                                                                                        predicateIndex, null,
-                                                                                        questionPred.getAllDependencies(), questionPred.getQuestionWords(),
-                                                                                        answerArg.getDependency().get(),
-                                                                                        new TextWithDependencies(answerArg.getPredication().getPhrase(),
-                                                                                                                 answerArg.getPredication().getAllDependencies()));
-                                return qaPair;
-                            });
-                })))
+                        });
+                    return new BasicQuestionAnswerPair(sentenceId, parseId, parse,
+                                                       predicateIndex, verb.getPredicateCategory(), askingArgNum,
+                                                       predicateIndex, null,
+                                                       whPred.getAllDependencies(), whPred.getQuestionWords(),
+                                                       answerArg.getDependency().get(),
+                                                       new TextWithDependencies(answerArg.getPredication().getPhrase(),
+                                                                                answerArg.getPredication().getAllDependencies()));
+                })))))
             .collect(toImmutableList());
         return qaPairs;
     }
@@ -154,7 +189,9 @@ public class QuestionGenerator {
                 Parse goldParse = devData.getGoldParses().get(sentenceId);
                 System.out.println(String.format("========== SID = %04d ==========", sentenceId));
                 System.out.println(TextGenerationHelper.renderString(words));
-                for(QuestionAnswerPair qaPair : generateQAPairsForParse(sentenceId, -1, words, goldParse)) {
+                // for(QuestionAnswerPair qaPair : generateQAPairsForParse(sentenceId, -1, words, goldParse)) {
+                // for(QuestionAnswerPair qaPair : newCoreNPArgPronounQuestions(sentenceId, -1, goldParse)) {
+                for(QuestionAnswerPair qaPair : newCopulaQuestions(sentenceId, -1, goldParse)) {
                     printQAPair(words, qaPair);
                 }
             }
@@ -242,22 +279,23 @@ public class QuestionGenerator {
         System.out.println("--");
         System.out.println(words.get(qaPair.getPredicateIndex()));
         System.out.println(qaPair.getPredicateCategory());
-        System.out.println(Optional.ofNullable(qaPair.getTargetDependency()).map(targetDep -> words.get(targetDep.getHead())).orElse("something") + "\t-"
-                           + Optional.ofNullable(qaPair.getTargetDependency()).map(dep -> new Integer(dep.getArgNumber()).toString()).orElse("?") + "->\t"
-                           + Optional.ofNullable(qaPair.getTargetDependency()).map(targetDep -> words.get(targetDep.getArgument())).orElse("something"));
+        String targetDepString = Optional.ofNullable(qaPair.getTargetDependency()).map(dep -> dependencyString(words, dep)).orElse("???\t-?->\t???");
+        System.out.println(targetDepString);
         for(ResolvedDependency dep : qaPair.getQuestionDependencies()) {
-            System.out.println("\t" + words.get(dep.getHead()) + "\t-"
-                               + dep.getArgNumber() + "->\t"
-                               + words.get(dep.getArgument()));
+            System.out.println("\t" + dependencyString(words, dep));
         }
         System.out.println(qaPair.getQuestion());
         for(ResolvedDependency dep : qaPair.getAnswerDependencies()) {
-            System.out.println("\t" + words.get(dep.getHead()) + "\t-"
-                               + dep.getArgNumber() + "->\t"
-                               + words.get(dep.getArgument()));
+            System.out.println("\t" + dependencyString(words, dep));
         }
         System.out.println("\t" + qaPair.getAnswer());
         System.out.println("--");
+    }
+
+    private static String dependencyString(ImmutableList<String> words, ResolvedDependency dep) {
+        return words.get(dep.getHead()) + "\t-"
+            + dep.getArgNumber() + "->\t"
+            + words.get(dep.getArgument());
     }
 }
 

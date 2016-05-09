@@ -179,6 +179,7 @@ public abstract class Noun extends Predication {
 
     // overrides
 
+    // transformArgs is left abstract
     // getPhrase is left abstract
 
     // getters
