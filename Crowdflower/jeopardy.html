@@ -1,0 +1,66 @@
+<p>We want to teach our smart robot to understand human language and we need your help! The robot will read a sentence and then ask you some questions about it. But the questions by in the style of the game show <em>Jeopardy!</em> where the robot will give you an <em>answer</em> and require you to respond with valid <em>questions</em>. For example, given the sentence:</p>
+
+<blockquote>Assets of the 400 taxable funds grew by $1.5 billion during the latest week.</blockquote>
+
+<p>The robot may show you the answer:</p>
+
+<blockquote>the latest week</blockquote>
+
+<p>along with the following options as possible questions:</p>
+
+<ul>
+	<li>What would $1.5 billion be during?</li>
+	<li>What would something grow during?</li>
+	<li>None of the Above.</li>
+</ul>
+
+<p>You need to choose every sensible question for which the answer is explicitly indicated by the sentence. In this case, there is just one: <strong><span style="color: #61BD6D;"><em>What would something grow during?</em></span></strong></p>
+<hr>
+
+<h2>Choosing Questions</h2>
+
+<p>You should choose all the questions, and only the questions, that satisfy the three following criteria:</p>
+
+<ol>
+	<li>The question is <strong>(mostly)</strong>&nbsp;<strong>grammatical and sensible</strong> in the context of the sentence.</li>
+	<li>The question is <strong>explicitly, directly answered</strong> in the sentence with the given answer.</li>
+</ol>
+
+<p>For example, consider the sentence</p>
+
+<blockquote>She was waiting in anticipation for Barack Obama, the president of the United States, to pay her a visit in her hometown.</blockquote>
+
+<p>The robot may show you the answer</p>
+
+<blockquote>her hometown</blockquote>
+
+<p>and the questions:</p>
+
+<ul>
+	<li><span style="color: rgb(226, 80, 65);">What would someone to pay her a visit in?</span></li>
+	<li><span style="color: rgb(97, 189, 109);">What would Barack Obama pay her a visit in?</span></li>
+	<li><span style="color: rgb(97, 189, 109);">What would the president of the United States pay her a visit in?</span></li>
+	<li><span style="color: rgb(226, 80, 65);">What would she pay her a visit in?</span></li>
+	<li><span style="color: rgb(97, 189, 109);">What would a visit be in?</span></li>
+	<li><span style="color: rgb(226, 80, 65);">What would she be waiting in?</span></li>
+	<li>None of the Above.</li>
+</ul>
+
+<p>In this case, there are four correct choices: <strong><em><span style="color: rgb(97, 189, 109);">What would someone pay her a visit in?</span></em></strong>&nbsp;<span style="color: rgb(97, 189, 109);"><strong style="font-style: italic;">What would Barack Obama pay her a visit in? What would the president of the United States pay her a visit in?</strong></span> and <span style="color: rgb(97, 189, 109);"><strong><em>What would a visit be in?</em></strong></span> The other four choices are incorrect.</p>
+
+<p>First, <strong><em><span style="color: rgb(226, 80, 65);">What would someone to pay her a visit in?</span></em></strong> is ungrammatical, so it violates criterion 1.</p>
+
+<p>Second, <strong><em><span style="color: rgb(226, 80, 65);">What would she pay her a visit in?</span></em></strong> assumes that <em>she</em> would be paying someone a visit, where it is actually <em>Barack Obama</em> who would pay the visit, so the question does not make sense in the context of the sentence and violates criterion 1.</p>
+
+<p>Third, <strong><em><span style="color: rgb(226, 80, 65);">What would she be waiting in?</span></em></strong> has the answer <em>anticipation</em>, not <em>her hometown</em>. Even though the reader might conclude that she is waiting in her hometown, the sentence does not explicitly, directly say this. So this option violates criterion 2.</p>
+
+<p>In the actual task, robot will generally not give you this many options. This was just a contrived example to illustrate the two criteria.</p>
+
+<p><strong>Note:</strong> there are three kinds of errors that you should forgive in questions. First, the robot may make mistakes between "who" and "what," and "someone" and "something." Second, the robot does not know how to ask "when" or "where" questions, and will always phrase them as "what" questions, as in the above example. Third, the robot might forget to say "not" in the question. In these cases, proceed as though this error had not been made.</p>
+
+<p>If none of the questions meet all three criteria, then please just choose <em>None of the Above</em>.</p>
+<hr>
+
+<h2><strong>Thank You!</strong></h2>
+
+<p>Thank you for your help! Your work will help us build more intelligent machine reading systems! If you have any questions or suggestions, please let us know in the comment box. We're still iterating on this, so there might be some problems with the overall design or the test questions. Your feedback would be very valuable in helping us improve.</p>

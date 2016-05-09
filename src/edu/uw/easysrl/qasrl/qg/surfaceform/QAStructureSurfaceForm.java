@@ -1,10 +1,17 @@
 package edu.uw.easysrl.qasrl.qg.surfaceform;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import edu.uw.easysrl.dependencies.ResolvedDependency;
+import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.syntax.AnswerStructure;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
 import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.util.GuavaCollectors;
+
+import java.util.Collection;
+import java.util.stream.Collectors;
 
 /**
  * Stores a list of QuestionStructure and AnswerStructure.
@@ -76,5 +83,23 @@ public class QAStructureSurfaceForm implements QAPairSurfaceForm {
         this.qaPairs    =  qaPairs;
         this.questionStructures = questionStructures;
         this.answerStructures = answerStructures;
+    }
+
+    public boolean canBeGeneratedBy(Parse parse) {
+        return questionStructures.stream()
+                .filter(qStr -> parse.categories.get(qStr.predicateIndex) == qStr.category)
+                .map(qStr -> qStr.filter(parse.dependencies))
+                .anyMatch(qdeps -> answerStructures.stream()
+                        .anyMatch(aStr -> !aStr.filter(qdeps).isEmpty())) &&
+              answerStructures.stream()
+                      .anyMatch(aStr -> aStr.adjunctDependencies.stream()
+                              .allMatch(d -> coveredUndirected(d, parse.dependencies)));
+    }
+
+    private boolean coveredUndirected(final ResolvedDependency dep, final Collection<ResolvedDependency> depSet) {
+        return depSet.stream().anyMatch(d ->
+            (d.getHead() == dep.getHead() && d.getArgument() == dep.getArgument()) ||
+                    (d.getArgument() == dep.getHead() && d.getHead() == dep.getArgument())
+        );
     }
 }

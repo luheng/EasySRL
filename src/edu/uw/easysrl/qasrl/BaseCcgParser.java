@@ -3,12 +3,13 @@ package edu.uw.easysrl.qasrl;
 import edu.uw.easysrl.dependencies.*;
 import edu.uw.easysrl.main.EasySRL;
 import edu.uw.easysrl.main.InputReader;
-import edu.uw.easysrl.qasrl.model.Evidence;
+import edu.uw.easysrl.qasrl.model.Constraint;
 import edu.uw.easysrl.qasrl.corpora.CountDictionary;
 import edu.uw.easysrl.syntax.evaluation.CCGBankEvaluation;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.Preposition;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
+import edu.uw.easysrl.syntax.model.ConstrainedParsingModel.*;
 import edu.uw.easysrl.syntax.model.ConstrainedSupertagFactoredModel.ConstrainedSupertagModelFactory;
 import edu.uw.easysrl.syntax.model.Model;
 import edu.uw.easysrl.syntax.model.SupertagFactoredModel;
@@ -208,24 +209,84 @@ public abstract class BaseCcgParser {
             return parseNBestWithConstraint(sentence, new HashSet<>());
         }
 
-        public Parse parseWithConstraint(List<InputReader.InputWord> sentence, Set<Evidence> evidenceSet) {
+        public Parse parseWithConstraint(List<InputReader.InputWord> sentence, Set<Constraint> constraintSet) {
             if (sentence.size() > maxSentenceLength) {
                 System.err.println("Skipping sentence of length " + sentence.size());
                 return null;
             }
             List<Scored<SyntaxTreeNode>> parses = parser.parseAstarWithConstraints(
-                    new InputReader.InputToParser(sentence, null, null, false), evidenceSet, dependencyGenerator);
+                    new InputReader.InputToParser(sentence, null, null, false), constraintSet, dependencyGenerator);
             return (parses == null || parses.size() == 0) ? null :
                     getParse(sentence, parses.get(0), dependencyGenerator);
         }
 
-        public List<Parse> parseNBestWithConstraint(List<InputReader.InputWord> sentence, Set<Evidence> evidenceSet) {
+        public List<Parse> parseNBestWithConstraint(List<InputReader.InputWord> sentence, Set<Constraint> constraintSet) {
             if (sentence.size() > maxSentenceLength) {
                 System.err.println("Skipping sentence of length " + sentence.size());
                 return null;
             }
             List<Scored<SyntaxTreeNode>> parses = parser.parseAstarWithConstraints(
-                    new InputReader.InputToParser(sentence, null, null, false), evidenceSet, dependencyGenerator);
+                    new InputReader.InputToParser(sentence, null, null, false), constraintSet, dependencyGenerator);
+            return (parses == null || parses.size() == 0) ? null :
+                    parses.stream().map(p -> getParse(sentence, p, dependencyGenerator)).collect(Collectors.toList());
+        }
+    }
+
+    public static class ConstrainedCcgParser2 extends BaseCcgParser {
+        private DependencyGenerator dependencyGenerator;
+        private ConstrainedParserAStar parser;
+        private final double supertaggerBeam = 0.000001;
+        private final int maxChartSize = 100000;
+        private final int maxSentenceLength = 70;
+
+        public ConstrainedCcgParser2(String modelFolderPath, List<Category> rootCategories, int maxTagsPerWord,
+                                     int nBest) {
+            final File modelFolder = Util.getFile(modelFolderPath);
+            if (!modelFolder.exists()) {
+                throw new InputMismatchException("Couldn't load model from from: " + modelFolder);
+            }
+            System.err.println("====Starting loading model====");
+            try {
+                Coindexation.parseMarkedUpFile(new File(modelFolder, "markedup"));
+                ConstrainedParsingModelFactory modelFactory = new ConstrainedParsingModelFactory(
+                        Tagger.make(modelFolder, supertaggerBeam, maxTagsPerWord /* default  50 */, null /* cutoffs */));
+                parser = new ConstrainedParserAStar(modelFactory, maxSentenceLength, nBest, rootCategories, modelFolder,
+                        maxChartSize);
+                dependencyGenerator = new DependencyGenerator(parser.getUnaryRules());
+            } catch (Exception e) {
+                System.err.println("Parser initialization failed.");
+                e.printStackTrace();
+            }
+        }
+
+        @Override
+        public Parse parse(List<InputReader.InputWord> sentence) {
+            return parseWithConstraint(sentence, new HashSet<>());
+        }
+
+        @Override
+        public List<Parse> parseNBest(List<InputReader.InputWord> sentence) {
+            return parseNBestWithConstraint(sentence, new HashSet<>());
+        }
+
+        public Parse parseWithConstraint(List<InputReader.InputWord> sentence, Set<Constraint> constraintSet) {
+            if (sentence.size() > maxSentenceLength) {
+                System.err.println("Skipping sentence of length " + sentence.size());
+                return null;
+            }
+            List<Scored<SyntaxTreeNode>> parses = parser.parseAstarWithConstraints(
+                    new InputReader.InputToParser(sentence, null, null, false), constraintSet);
+            return (parses == null || parses.size() == 0) ? null :
+                    getParse(sentence, parses.get(0), dependencyGenerator);
+        }
+
+        public List<Parse> parseNBestWithConstraint(List<InputReader.InputWord> sentence, Set<Constraint> constraintSet) {
+            if (sentence.size() > maxSentenceLength) {
+                System.err.println("Skipping sentence of length " + sentence.size());
+                return null;
+            }
+            List<Scored<SyntaxTreeNode>> parses = parser.parseAstarWithConstraints(
+                    new InputReader.InputToParser(sentence, null, null, false), constraintSet);
             return (parses == null || parses.size() == 0) ? null :
                     parses.stream().map(p -> getParse(sentence, p, dependencyGenerator)).collect(Collectors.toList());
         }
@@ -238,7 +299,6 @@ public abstract class BaseCcgParser {
      * I personally like that way better so I deprecated this.
      * but feel free to un-deprecate it if you think it's still good. --julian
      */
-    @Deprecated
     public static class MockParser extends BaseCcgParser {
         private Map<Integer, List<Parse>> allParses;
 

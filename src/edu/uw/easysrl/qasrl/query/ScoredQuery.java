@@ -1,14 +1,15 @@
 package edu.uw.easysrl.qasrl.query;
 
 import com.google.common.collect.ImmutableList;
-import edu.uw.easysrl.qasrl.experiments.DebugPrinter;
+import com.google.common.collect.ImmutableSet;
+import edu.uw.easysrl.qasrl.TextGenerationHelper;
 import edu.uw.easysrl.qasrl.NBestList;
+import edu.uw.easysrl.qasrl.experiments.DebugPrinter;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.GuavaCollectors;
 
-import java.util.Optional;
-import java.util.OptionalInt;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -37,56 +38,78 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
     private final String prompt;
     private final ImmutableList<String> options;
     private final ImmutableList<QA> qaPairSurfaceForms;
-    private boolean isJeopardyStyle, allowMultipleChoices;
+    private QueryType queryType;
+    private boolean allowMultipleChoices;
 
     private int queryId;
     private double promptScore, optionEntropy;
     private ImmutableList<Double> optionScores;
+    private ImmutableList<ImmutableSet<Integer>> optionToParseIds;
 
     public ScoredQuery(int sentenceId,
                        String prompt,
                        ImmutableList<String> options,
                        ImmutableList<QA> qaPairSurfaceForms,
-                       boolean isJeopardyStyle,
+                       QueryType queryType,
                        boolean allowMultipleChoices) {
         this.sentenceId = sentenceId;
         this.prompt = prompt;
         this.options = options;
         this.qaPairSurfaceForms = qaPairSurfaceForms;
-        this.isJeopardyStyle = isJeopardyStyle;
+        this.queryType = queryType;
         this.allowMultipleChoices = allowMultipleChoices;
+        this.optionScores = null;
+        this.optionToParseIds = null;
+    }
+
+    @Deprecated
+    public ScoredQuery(int sentenceId,
+                       String prompt,
+                       ImmutableList<String> options,
+                       ImmutableList<QA> qaPairSurfaceForms,
+                       QueryType queryType,
+                       boolean allowMultipleChoices,
+                       ImmutableList<ImmutableSet<Integer>> optionToParseIds,
+                       ImmutableList<Double> optionScores) {
+        this(sentenceId, prompt, options, qaPairSurfaceForms, queryType, allowMultipleChoices);
+        this.optionToParseIds = optionToParseIds;
+        this.optionScores = optionScores;
     }
 
     public void computeScores(NBestList nbestList) {
-        // TODO: handle jeopardy style.
-        double totalScore = nbestList.getScores().stream().mapToDouble(s -> s).sum();
-        promptScore = qaPairSurfaceForms.stream()
-                .flatMap(qa -> qa.getQuestionStructures().stream()
-                        .flatMap(q -> q.parseIds.stream()))
-                .distinct()
-                .mapToDouble(nbestList::getScore)
-                .sum() / totalScore;
-        optionScores = IntStream.range(0, options.size())
-                .boxed()
-                .map(i -> {
-                    double optionScore = .0;
-                    if (i < qaPairSurfaceForms.size()) {
-                        optionScore = qaPairSurfaceForms.get(i).getAnswerStructures().stream()
-                                .flatMap(a -> a.parseIds.stream())
-                                .distinct()
-                                .mapToDouble(nbestList::getScore)
-                                .sum() / totalScore;
-                    } else if (options.get(i).equals(QueryGeneratorUtils.kBadQuestionOptionString)) {
-                        optionScore = 1.0 - promptScore;
-                    }
-                    return optionScore;
-                }).collect(GuavaCollectors.toImmutableList());
+        Set<Integer> allParseIds = IntStream.range(0, nbestList.getN()).boxed().collect(Collectors.toSet());
+        double totalScore = allParseIds.stream().mapToDouble(nbestList::getScore).sum();
 
+        if (optionToParseIds == null) {
+            optionToParseIds = IntStream.range(0, options.size()).boxed()
+                    .map(i -> {
+                        ImmutableSet<Integer> pids = ImmutableSet.of();
+                        if (i < qaPairSurfaceForms.size()) {
+                            pids = QueryGeneratorUtils.getParseIdsForQAPair(qaPairSurfaceForms.get(i), nbestList);
+                            allParseIds.removeAll(pids);
+                        } else if (QueryGeneratorUtils.isNAOption(options.get(i))) {
+                            pids = ImmutableSet.copyOf(allParseIds);
+                        }
+                        return pids;
+                    }).collect(GuavaCollectors.toImmutableList());
+        }
+
+        if (optionScores == null) {
+            optionScores = optionToParseIds.stream()
+                    .map(pids -> pids.stream().mapToDouble(nbestList::getScore).sum() / totalScore)
+                    .collect(GuavaCollectors.toImmutableList());
+        }
+
+        promptScore = 1.0 - optionScores.get(getBadQuestionOptionId().getAsInt());
         optionEntropy = QueryGeneratorUtils.computeEntropy(optionScores);
     }
 
     public ImmutableList<Double> getOptionScores() {
         return optionScores;
+    }
+
+    public ImmutableList<ImmutableSet<Integer>> getOptionToParseIds() {
+        return optionToParseIds;
     }
 
     public double getPromptScore() {
@@ -97,7 +120,9 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
         return optionEntropy;
     }
 
-    public boolean isJeopardyStyle() { return isJeopardyStyle; }
+    public boolean isJeopardyStyle() { return queryType == QueryType.Jeopardy; }
+
+    public QueryType getQueryType() { return queryType; }
 
     public boolean allowMultipleChoices() {
         return allowMultipleChoices;
@@ -112,7 +137,7 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
     }
 
     public String getQueryKey() {
-        return !isJeopardyStyle ?
+        return !isJeopardyStyle() ?
                 qaPairSurfaceForms.get(0).getPredicateIndex() + "\t" + prompt :
                 qaPairSurfaceForms.get(0).getArgumentIndices().stream().map(String::valueOf)
                         .collect(Collectors.joining(",")) + "\t" + prompt;
@@ -120,7 +145,7 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
 
     public OptionalInt getBadQuestionOptionId() {
         return IntStream.range(0, options.size())
-                .filter(i -> options.get(i).equals(QueryGeneratorUtils.kBadQuestionOptionString))
+                .filter(i -> QueryGeneratorUtils.isNAOption(options.get(i)))
                 .findFirst();
     }
 
@@ -131,47 +156,66 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
     }
 
     public OptionalInt getPredicateId() {
-        return isJeopardyStyle ? OptionalInt.empty() : OptionalInt.of(qaPairSurfaceForms.get(0).getPredicateIndex());
+        return isJeopardyStyle() ? OptionalInt.empty() : OptionalInt.of(qaPairSurfaceForms.get(0).getPredicateIndex());
     }
 
     public Optional<Category> getPredicateCategory() {
-        return isJeopardyStyle ? Optional.empty() : Optional.of(qaPairSurfaceForms.get(0).getCategory());
+        return isJeopardyStyle() ? Optional.empty() : Optional.of(qaPairSurfaceForms.get(0).getCategory());
     }
 
     public OptionalInt getArgumentNumber() {
-        return isJeopardyStyle ? OptionalInt.empty() : OptionalInt.of(qaPairSurfaceForms.get(0).getArgumentNumber());
+        return isJeopardyStyle()? OptionalInt.empty() : OptionalInt.of(qaPairSurfaceForms.get(0).getArgumentNumber());
     }
 
+    /**
+     *
+     * @param sentence
+     * @param optionLegends: example: 'G', goldOptions, 'U', userOptions
+     * @return
+     */
+    public String toString(final ImmutableList<String> sentence, Object ... optionLegends) {
+        String result = String.format("SID=%d\t%s\n", sentenceId, TextGenerationHelper.renderString(sentence) + ".");
 
-    public String toString(final ImmutableList<String> sentence) {
-        // TODO: handle jeopardy style.
-        String result = String.format("SID=%d\t%s\n", sentenceId, sentence.stream().collect(Collectors.joining(" ")));
-
-        if (!isJeopardyStyle) {
-            final int predicateIndex = getPredicateId().getAsInt();
-            final Category category = getPredicateCategory().get();
-            final int argumentNumber = getArgumentNumber().getAsInt();
-            result += String.format("%d:%s\t%s\t%d\n", predicateIndex, sentence.get(predicateIndex), category, argumentNumber);
-        }
+        // Prompt structure.
+        String promptStructStr = isJeopardyStyle() ?
+                qaPairSurfaceForms.stream()
+                        .flatMap(qa -> qa.getAnswerStructures().stream())
+                        .distinct()
+                        .map(s -> s.toString(sentence))
+                        .collect(Collectors.joining(" / ")) :
+                qaPairSurfaceForms.stream()
+                        .flatMap(qa -> qa.getQuestionStructures().stream())
+                        .distinct()
+                        .map(s -> s.toString(sentence))
+                        .collect(Collectors.joining(" / "));
 
         // Prompt.
-        result += String.format("%.2f\t%s\n", promptScore, prompt);
+        result += String.format("[prompt]:\t \t%.2f\t%s\t%s\n", promptScore, prompt, promptStructStr);
 
         for (int i = 0; i < options.size(); i++) {
-            String optionString = "";
+            String matchingStr = "";
+            for (int j = 0; j + 1 < optionLegends.length; j += 2) {
+                char legend = (char) optionLegends[j];
+                if (legend == '*') {
+                    final int[] optionDist = (int[]) optionLegends[j + 1];
+                    for (int k = 0; k < optionDist[i]; k++) {
+                        matchingStr += legend;
+                    }
+                } else {
+                    final ImmutableList<Integer> chosenOptions = (ImmutableList<Integer>) optionLegends[j + 1];
+                    matchingStr += chosenOptions.contains(i) ? (char) optionLegends[j] : "";
+                }
+            }
+            String structStr = "";
             if (i < qaPairSurfaceForms.size()) {
                 final QAStructureSurfaceForm qa = qaPairSurfaceForms.get(i);
-                final ImmutableList<Integer> argList = qa.getAnswerStructures().get(0).argumentIndices;
-                String argIdsStr = argList.stream().map(String::valueOf).collect(Collectors.joining(","));
-                String argHeadsStr = argList.stream().map(sentence::get).collect(Collectors.joining(","));
-                String parseIdsStr = DebugPrinter.getShortListString(qa.getAnswerStructures().get(0).parseIds);
-                // Option info.
-                optionString += String.format("%.2f\t%d\t%s\t%s:%s\t%s", optionScores.get(i), i, options.get(i),
-                        argIdsStr, argHeadsStr,  parseIdsStr);
-            } else {
-                optionString += String.format("%.2f\t%d\t%s", optionScores.get(i), i, options.get(i));
+                structStr = isJeopardyStyle() ?
+                        qa.getQuestionStructures().stream().map(s -> s.toString(sentence)).collect(Collectors.joining(" / ")) :
+                        qa.getAnswerStructures().stream().map(s -> s.toString(sentence)).collect(Collectors.joining(" / "));
             }
-            result += optionString + "\n";
+            String parseIdsStr = DebugPrinter.getShortListString(optionToParseIds.get(i));
+            result += String.format("[%d]\t%-10s\t%.2f\t%s\t%s\t%s\n", i, matchingStr, optionScores.get(i),
+                        options.get(i), structStr, parseIdsStr);
         }
         return result;
     }

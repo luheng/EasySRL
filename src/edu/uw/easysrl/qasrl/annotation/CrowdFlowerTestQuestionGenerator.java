@@ -8,7 +8,6 @@ import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.QueryGeneratorUtils;
-import edu.uw.easysrl.qasrl.query.QueryGenerators;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.util.GuavaCollectors;
@@ -66,7 +65,7 @@ public class CrowdFlowerTestQuestionGenerator {
                 .filter(a -> {
                     int numJudgements = a.getNumAnnotated();
                     int numOptions = a.answerDist.length;
-                    return numOptions > 3 && numJudgements >= 3 && a.answerDist[a.goldAnswerIds.get(0)] == numJudgements;
+                    return numOptions > 3 && numJudgements >= 3 && a.answerDist[a.goldOptionIds.get(0)] == numJudgements;
                 })
                 .forEach(agreedAnnotations::add);
         cfAnnotations.stream()
@@ -91,14 +90,14 @@ public class CrowdFlowerTestQuestionGenerator {
             final int sentenceId = test.sentenceId;
             final ImmutableList<String> sentence = parseData.getSentences().get(sentenceId);
             List<String> agreedAnswers = new ArrayList<>();
-            if (test.goldAnswerIds != null) {
+            if (test.goldOptionIds != null) {
                 // Inconsistency of answer delimiter..
-                agreedAnswers.add(test.answerOptions.get(test.goldAnswerIds.get(0))
+                agreedAnswers.add(test.answerOptions.get(test.goldOptionIds.get(0))
                         .replace(" # ", QAPairAggregatorUtils.answerDelimiter));
             } else {
                 for (int i = 0; i < test.answerOptions.size(); i++) {
                     if (test.answerDist[i] >= 4) {
-                        // Handle inconsistency of bad question option strings.
+                        // Handle inconsistency of bad queryPrompt option strings.
                         agreedAnswers.add(test.answerOptions.get(i).startsWith("Question is not") ?
                                 QueryGeneratorUtils.kBadQuestionOptionString :
                                 test.answerOptions.get(i));
@@ -116,7 +115,7 @@ public class CrowdFlowerTestQuestionGenerator {
                             queryPruningParameters);
             for (ScoredQuery<QAStructureSurfaceForm> query : queryList) {
                 if (query.getPredicateId().getAsInt() == test.predicateId &&
-                        query.getPrompt().equalsIgnoreCase(test.question)) {
+                        query.getPrompt().equalsIgnoreCase(test.queryPrompt)) {
                     final ImmutableList<String> options = query.getOptions();
                     final ImmutableList<Integer> goldOptionIds = goldSimulator.respondToQuery(query);
                     final ImmutableList<String> goldAnswers = goldOptionIds.stream().map(options::get)

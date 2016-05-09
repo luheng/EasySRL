@@ -35,7 +35,7 @@ public class QAPairAnalysis {
 
     // TODO methods to extract interesting information from QuestionAnswerPairs and QAPairSurfaceForms.
 
-    // maybe this can be useful in calculating question confidence?
+    // maybe this can be useful in calculating queryPrompt confidence?
     public static ImmutableSet<Integer> parseIdsSupportingQuestionString(String question,
                                                                          ImmutableList<QuestionAnswerPair> qaPairs) {
         return qaPairs.stream()
@@ -57,10 +57,10 @@ public class QAPairAnalysis {
             .map(mapper);
     }
 
-    // TODO methods for analyzing question confidence, answer confidence, that kind of thing?
+    // TODO methods for analyzing queryPrompt confidence, answer confidence, that kind of thing?
     // we need to access the list of all parses; probably those should be passed in as parameters.
 
-    // TODO useful, complex predicates on question answer pairs go here as static methods
+    // TODO useful, complex predicates on queryPrompt answer pairs go here as static methods
 
     public static boolean forAny(QAPairSurfaceForm surfaceForm, Predicate<QuestionAnswerPair> pred) {
         return surfaceForm.getQAPairs()

@@ -1,5 +1,6 @@
 package edu.uw.easysrl.qasrl.qg.surfaceform;
 
+import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.qg.*;
 
 import com.google.common.collect.ImmutableList;
@@ -8,7 +9,7 @@ import com.google.common.collect.ImmutableList;
  * Most basic instance of QAPairSurfaceForm, with just the bare necessities.
  * Created by julianmichael on 3/17/16.
  */
-public final class BasicQAPairSurfaceForm implements QAPairSurfaceForm {
+public class BasicQAPairSurfaceForm implements QAPairSurfaceForm {
     @Override
     public int getSentenceId() {
         return sentenceId;
@@ -42,5 +43,10 @@ public final class BasicQAPairSurfaceForm implements QAPairSurfaceForm {
         this.question = question;
         this.answer = answer;
         this.qaPairs = qaPairs;
+    }
+
+    // TODO
+    public boolean canBeGeneratedBy(Parse parse) {
+        return true;
     }
 }

@@ -2,7 +2,7 @@ package edu.uw.easysrl.qasrl.corpora;
 
 import java.util.Arrays;
 
-/* Encode the question into information we want.
+/* Encode the queryPrompt into information we want.
  *  
  */
 public class QuestionEncoder {

@@ -39,12 +39,9 @@ public class CrowdFlowerDataWriter {
     private static boolean isCheckboxVersion = true;
     private static boolean highlightPredicates = false;
 
-    private static final String[] cfRound1AnnotationFiles = new String[] { "./Crowdflower_data/f878213.csv" };
+
 
     private static final String csvOutputFilePrefix = "./Crowdflower_temp/crowdflower_dev_100best";
-
-    // Sentences that happened to appear in instructions ...
-    private static final int[] otherHeldOutSentences = { 1695, };
 
     // Data and parser.
     private static final String preparsedFile = "parses.100best.out";
@@ -66,13 +63,14 @@ public class CrowdFlowerDataWriter {
         // Print test questions.
         try {
             CrowdFlowerTestQuestionGenerator.printTestQuestions(heldOutSentences, parseData, nbestLists,
-                    new QueryPruningParameters(), goldSimulator, cfRound1AnnotationFiles,
+                    new QueryPruningParameters(), goldSimulator,
+                    new String[] { CrowdFlowerDataUtils.cfRound1AnnotationFile, },
                     String.format("%s_test.csv", csvOutputFilePrefix),
                     isCheckboxVersion, highlightPredicates);
         } catch (IOException e) {
             e.printStackTrace();
         }
-        for (int sid : otherHeldOutSentences) {
+        for (int sid : CrowdFlowerDataUtils.otherHeldOutSentences) {
             heldOutSentences.add(sid);
         }
 

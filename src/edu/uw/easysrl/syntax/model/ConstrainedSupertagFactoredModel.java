@@ -1,63 +1,78 @@
 package edu.uw.easysrl.syntax.model;
 
 import com.google.common.collect.HashBasedTable;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Table;
 import edu.uw.easysrl.dependencies.DependencyGenerator;
 import edu.uw.easysrl.dependencies.UnlabelledDependency;
 import edu.uw.easysrl.main.InputReader;
-import edu.uw.easysrl.qasrl.model.Evidence;
+import edu.uw.easysrl.qasrl.model.Constraint;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.syntax.parser.AbstractParser;
 import edu.uw.easysrl.syntax.tagger.Tagger;
+import edu.uw.easysrl.util.GuavaCollectors;
 
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Created by luheng on 3/10/16.
  */
+@Deprecated
 public class ConstrainedSupertagFactoredModel extends SupertagFactoredModel {
 
     private final List<List<Tagger.ScoredCategory>> tagsForWords;
     private final DependencyGenerator dependencyGenerator;
     private final boolean includeDependencies;
 
-    private Table<Integer, Category, Double> supertagEvidence;
-    private Table<Integer, Integer, Double> attachmentEvidence;
+    private Table<Integer, Category, Double> supertagConstraints;
+    private Table<Integer, Integer, Double> attachmentConstraints;
 
     public ConstrainedSupertagFactoredModel(final List<List<Tagger.ScoredCategory>> tagsForWords,
-                                            final Set<Evidence> evidenceSet,
+                                            final Set<Constraint> constraints,
                                             final DependencyGenerator dependencyGenerator,
                                             final boolean includeDependencies) {
         super(tagsForWords, includeDependencies);
         this.tagsForWords = tagsForWords;
         this.dependencyGenerator = dependencyGenerator;
         this.includeDependencies = includeDependencies;
-        supertagEvidence = HashBasedTable.create();
-        attachmentEvidence = HashBasedTable.create();
-        evidenceSet.stream()
-                .filter(ev -> !ev.isPositive())
-                .forEach(ev -> {
-                    if (Evidence.SupertagEvidence.class.isInstance(ev)) {
-                        Evidence.SupertagEvidence ev1 = (Evidence.SupertagEvidence) ev;
-                        supertagEvidence.put(ev1.getPredId(), ev1.getCategory(), ev1.getConfidence());
-                    } else if (Evidence.AttachmentEvidence.class.isInstance(ev)) {
-                        Evidence.AttachmentEvidence ev1 = (Evidence.AttachmentEvidence) ev;
-                        attachmentEvidence.put(ev1.getHeadId(), ev1.getArgId(), ev1.getConfidence());
-                        // undirected evidence.
-                        // attachmentEvidence.put(ev1.getArgId(), ev1.getHeadId(), ev1.getConfidence());
+        supertagConstraints = HashBasedTable.create();
+        attachmentConstraints = HashBasedTable.create();
+        constraints.stream()
+                .filter(constraint -> !constraint.isPositive())
+                .forEach(constraint -> {
+                    if (Constraint.SupertagConstraint.class.isInstance(constraint)) {
+                        Constraint.SupertagConstraint c = (Constraint.SupertagConstraint) constraint;
+                        final int predId = c.getPredId();
+                        final Category category = c.getCategory();
+                        final double strength = supertagConstraints.contains(predId, category) ?
+                                Math.max(supertagConstraints.get(predId, category), c.getStrength()) :
+                                c.getStrength();
+                        supertagConstraints.put(predId, category, strength);
+                    } else if (Constraint.AttachmentConstraint.class.isInstance(constraint)) {
+                        Constraint.AttachmentConstraint c = (Constraint.AttachmentConstraint) constraint;
+                        final int headId = c.getHeadId();
+                        final int argId = c.getArgId();
+                        final double strength = attachmentConstraints.contains(headId, argId) ?
+                                Math.max(attachmentConstraints.get(headId, argId), c.getStrength()) :
+                                c.getStrength();
+                        attachmentConstraints.put(headId, argId, strength);
+                        // Undirected attachment constraint.
+                        // attachmentConstraints.put(argId, headId, strength);
                     }
                 });
         // Normalize attachment evidence.
-        attachmentEvidence.rowKeySet().stream().forEach(head -> {
-            int numArgs = attachmentEvidence.row(head).size();
-            //double norm = Math.sqrt(1.0 * numArgs);
+        attachmentConstraints.rowKeySet().stream().forEach(head -> {
+            int numArgs = attachmentConstraints.row(head).size();
             double norm = 1.0 * numArgs;
-            Set<Integer> args = new HashSet<>(attachmentEvidence.row(head).keySet());
+            ImmutableSet<Integer> args = attachmentConstraints.row(head).keySet().stream()
+                    .collect(GuavaCollectors.toImmutableSet());
             args.forEach(arg -> {
-                double weight = attachmentEvidence.get(head, arg);
-                attachmentEvidence.put(head, arg, weight / norm);
+                double weight = attachmentConstraints.get(head, arg);
+                attachmentConstraints.put(head, arg, weight / norm);
             });
         });
         computeOutsideProbabilities();
@@ -68,13 +83,13 @@ public class ConstrainedSupertagFactoredModel extends SupertagFactoredModel {
         for (int i = 0; i < words.size(); i++) {
             final InputReader.InputWord word = words.get(i);
             for (final Tagger.ScoredCategory cat : tagsForWords.get(i)) {
-                double evidencePenalty = supertagEvidence.contains(i, cat.getCategory()) ?
-                        supertagEvidence.get(i, cat.getCategory()) : 0.0;
+                double supertagPenalty = supertagConstraints.contains(i, cat.getCategory()) ?
+                        supertagConstraints.get(i, cat.getCategory()) : 0.0;
                 agenda.add(
                         new AgendaItem(
                                 new SyntaxTreeNode.SyntaxTreeNodeLeaf(word.word, word.pos, word.ner, cat.getCategory(),
                                         i, includeDependencies),
-                                cat.getScore() - evidencePenalty, /* inside score */
+                                cat.getScore() - supertagPenalty, /* inside score */
                                 getOutsideUpperBound(i, i + 1),   /* outside score upperbound */
                                 i, /* start index */
                                 1, /* length */
@@ -98,33 +113,14 @@ public class ConstrainedSupertagFactoredModel extends SupertagFactoredModel {
 
         for (UnlabelledDependency dep : node.getResolvedUnlabelledDependencies()) {
             int headId = dep.getHead();
-            if (attachmentEvidence.containsRow(headId)) {
+            if (attachmentConstraints.containsRow(headId)) {
                 for (int argId : dep.getArguments()) {
-                    if (attachmentEvidence.contains(headId, argId)) {
-                        evidencePenalty += attachmentEvidence.get(headId, argId);
+                    if (attachmentConstraints.contains(headId, argId)) {
+                        evidencePenalty += attachmentConstraints.get(headId, argId);
                     }
                 }
             }
         }
-
-        // TODO: equals check
-        // TODO: keep track of dependencies
-        /*
-        Set<UnlabelledDependency> unlabelledDeps = new HashSet<>();
-        dependencyGenerator.generateDependencies(node, unlabelledDeps);
-        for (UnlabelledDependency dep : unlabelledDeps) {
-            int headId = dep.getHead();
-            if (!attachmentEvidence.containsRow(headId)) {
-                continue;
-            }
-            for (int argId : dep.getArguments()) {
-                boolean headInLeft = leftChild.startOfSpan <= headId && headId < leftChild.startOfSpan + leftChild.spanLength;
-                boolean argInLeft =  leftChild.startOfSpan <= argId &&  argId <  leftChild.startOfSpan + leftChild.spanLength;
-                if (headInLeft ^ argInLeft && attachmentEvidence.contains(headId, argId)) {
-                    evidencePenalty += attachmentEvidence.get(headId, argId);
-                }
-            }
-        }*/
 
         return new AgendaItem(node,
                 leftChild.getInsideScore() + rightChild.getInsideScore() - lengthPenalty - evidencePenalty, /* inside */
@@ -163,11 +159,11 @@ public class ConstrainedSupertagFactoredModel extends SupertagFactoredModel {
                     includeDependencies);
         }
 
-        public ConstrainedSupertagFactoredModel make(final InputReader.InputToParser input, Set<Evidence> evidenceSet,
+        public ConstrainedSupertagFactoredModel make(final InputReader.InputToParser input, Set<Constraint> constraintSet,
                                                      DependencyGenerator dependencyGenerator) {
             return new ConstrainedSupertagFactoredModel(
                     input.isAlreadyTagged() ? input.getInputSupertags() : tagger.tag(input.getInputWords()),
-                    evidenceSet,
+                    constraintSet,
                     dependencyGenerator,
                     includeDependencies);
         }

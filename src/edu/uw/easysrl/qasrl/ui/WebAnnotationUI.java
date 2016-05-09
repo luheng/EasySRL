@@ -4,6 +4,7 @@ import java.io.*;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import javax.servlet.ServletException;
@@ -12,13 +13,17 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import edu.uw.easysrl.qasrl.*;
 
-import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
+import edu.uw.easysrl.qasrl.experiments.ReparsingHistory;
+import edu.uw.easysrl.qasrl.model.Constraint;
+import edu.uw.easysrl.qasrl.model.HITLParser;
+import edu.uw.easysrl.qasrl.model.HITLParsingParameters;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
+import edu.uw.easysrl.util.GuavaCollectors;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.HandlerCollection;
@@ -36,25 +41,24 @@ public class WebAnnotationUI {
     private static int nBest = 100;
 
     // Shared data: nBestList, sentences, etc.
-    private static ParseData parseData;
-    private static ImmutableMap<Integer, NBestList> allParses;
-    private static BaseCcgParser parser;
-    private static BaseCcgParser.ConstrainedCcgParser reparser;
-    private static int maxTagsPerWord = 50;
+    private static HITLParser myHITLParser;
 
     // user name -> all the queries for the current sentence.
     private static Map<String, List<ScoredQuery<QAStructureSurfaceForm>>> activeLearningMap;
     // user name -> all the answered queries.
-    private static Map<String, List<ScoredQuery<QAStructureSurfaceForm>>> activeLearningHistoryMap;
+    private static Map<String, ReparsingHistory> activeLearningHistoryMap;
+
     // user name -> current query id.
     private static Map<String, Integer> queryIdMap;
     // user name -> remaining sentence ids.
     private static Map<String, List<Integer>> sentenceIdsMap;
+
     // user name -> annotation file.
     private static Map<String, BufferedWriter> annotationFileWriterMap;
     private static Map<String, String> annotationFileNameMap;
+
     // user name -> parameters
-    // private static Map<String, QueryPruningParameters> parametersMap;
+    private static Map<String, Set<String>> parametersMap;
 
     private static final DateFormat dateFormat = new SimpleDateFormat("yyyyMMdd-HHmm");
     private static final String annotationPath  = "./webapp/annotation_files/";
@@ -63,37 +67,39 @@ public class WebAnnotationUI {
     private static final int[] sentencesToAnnotate = new int[] {
             90, 99, 156, 192, 199, 217, 224, 268, 294, 397, 444, 469, 563, 705, 762, 992, 1016, 1078, 1105, 1124, 1199,
             1232, 1261, 1304, 1305, 1489, 1495, 1516, 1564, 1674, 1695
+
+            //0, 3, 5, 6, 8, 12, 13
     };
 
 
     private static boolean isJeopardyStyle = true;
     private static boolean isCheckboxVersion = true;
+
     private static QueryPruningParameters queryPruningParameters;
     static {
         queryPruningParameters = new QueryPruningParameters();
         queryPruningParameters.skipPPQuestions = false;
-        queryPruningParameters.skipBinaryQueries = false;
+        queryPruningParameters.skipBinaryQueries = true;
+    }
+    private static HITLParsingParameters reparsingParameters;
+    static {
+        reparsingParameters = new HITLParsingParameters();
+        reparsingParameters.supertagPenaltyWeight = 5.0;
+        reparsingParameters.skipJeopardyQuestions = false;
     }
 
     private static void initializeData() {
         activeLearningMap = new HashMap<>();
         activeLearningHistoryMap = new HashMap<>();
+
         annotationFileWriterMap = new HashMap<>();
         annotationFileNameMap = new HashMap<>();
         queryIdMap = new HashMap<>();
         sentenceIdsMap = new HashMap<>();
+        parametersMap = new HashMap<>();
 
-        // Load parseData and nBestLists;
-        parseData = ParseData.loadFromDevPool().get();
-        System.out.println(String.format("Read %d sentences from the dev set.", parseData.getGoldParses().size()));
-
-        String preparsedFile = "parses.100best.out";
-        parser = new BaseCcgParser.MockParser(preparsedFile, nBest);
-        System.err.println("Parse initialized.");
-        reparser = new BaseCcgParser.ConstrainedCcgParser(BaseCcgParser.modelFolder, BaseCcgParser.rootCategories,
-                maxTagsPerWord, 1 /* nbest */);
-
-        allParses = NBestList.getAllNBestLists(parser, parseData.getSentenceInputWords());
+        myHITLParser = new HITLParser(nBest);
+        myHITLParser.setQueryPruningParameters(queryPruningParameters);
     }
 
     public static void main(final String[] args) throws Exception {
@@ -136,8 +142,8 @@ public class WebAnnotationUI {
                 String userName = request.getParameter("UserName");
                 String newRequest = "/annotate?UserName=" + userName;
                 // Forward parameters.
-                if (request.getParameter("KeepBinary") != null) {
-                    newRequest += "&KeepBinary=True";
+                if (request.getParameter("UsePronouns") != null) {
+                    newRequest += "&UsePronouns=True";
                 }
                 httpResponse.sendRedirect(httpResponse.encodeRedirectURL(newRequest));
             } else {
@@ -148,7 +154,7 @@ public class WebAnnotationUI {
                         + "<label for=\"UserName\">Please enter your name here: </label>\n"
                         + "<input type=\"text\" input name=\"UserName\"/>\n"
                         + "<br/>"
-                        //+ "<input name=\"KeepBinary\" type=\"checkbox\" value=\"True\" />&nbsp Keep binary queries. <br/>"
+                        + "<input name=\"UsePronouns\" type=\"checkbox\" value=\"True\" />&nbsp Use pronoun in questions. <br/>"
                         + "<br/><button class=\"btn btn-primary\" type=\"submit\" class=\"btn btn-primary\">Go!</button>\n"
                         + "</form>");
                 httpWriter.println("</body>");
@@ -166,40 +172,28 @@ public class WebAnnotationUI {
                 return;
             }
             final String userName = request.getParameter("UserName");
+
             // Add new user.
             if (!activeLearningMap.containsKey(userName)) {
-                String userFileName = userName + "_" + dateFormat.format(new Date()) + ".txt";
-                annotationFileWriterMap.put(userName, new BufferedWriter(new FileWriter(
-                        new File(annotationPath + userFileName))));
-                annotationFileNameMap.put(userName, userFileName);
-                List<Integer> sentIds = new ArrayList<>();
-                for (int sid : sentencesToAnnotate) {
-                    sentIds.add(sid);
-                }
-                sentenceIdsMap.put(userName, sentIds);
-                activeLearningHistoryMap.put(userName, new ArrayList<>());
-
-                initializeForUserAndSentence(userName, sentIds.get(0));
+                initializeUser(userName, request);
             }
 
             final BufferedWriter fileWriter = annotationFileWriterMap.get(userName);
-            final String[] userAnswers = request.getParameterValues("UserAnswer");
-            if (userAnswers != null) {
-                int lastQueryId = queryIdMap.get(userName);
+
+            // Handle response.
+            if (request.getParameterValues("UserAnswer") != null) {
+                final ImmutableList<String> userAnswers = ImmutableList.copyOf(request.getParameterValues("UserAnswer"));
+                final int lastQueryId = queryIdMap.get(userName);
                 final List<ScoredQuery<QAStructureSurfaceForm>> queryPool = activeLearningMap.get(userName);
-                ScoredQuery<QAStructureSurfaceForm> query = queryPool.get(lastQueryId);
-                int sentId = query.getSentenceId();
+                final ScoredQuery<QAStructureSurfaceForm> query = queryPool.get(lastQueryId);
+                final int sentId = query.getSentenceId();
+                final ImmutableList<String> sentence = myHITLParser.getSentence(sentId);
 
-                // TODO: response simulator.
-                // TODO: append to history.
-
-                // TODO: print history.
                 String annotationStr = "";
                 annotationStr += "SID=" + sentId + "\n";
                 annotationStr += "QID=" + lastQueryId + "\n";
 
-                // FIXME: to string method of Multi Query
-                annotationStr += query.toString() + "\n";
+                annotationStr += query.toString(sentence) + "\n";
                 annotationStr += "[RESPONSES]:\n";
                 for (String answer : userAnswers) {
                     annotationStr += answer + "\n";
@@ -211,27 +205,71 @@ public class WebAnnotationUI {
                 fileWriter.write(annotationStr + "\n");
                 fileWriter.flush();
 
+                // TODO: store user options.
+                ImmutableList<Integer> userOptions = IntStream.range(0, query.getOptions().size())
+                        .boxed()
+                        .filter(i -> userAnswers.contains(query.getOptions().get(i)))
+                        .collect(GuavaCollectors.toImmutableList());
+
                 // Advance to the next query.
                 queryIdMap.put(userName, lastQueryId + 1);
-                activeLearningHistoryMap.get(userName).add(query);
+                final ImmutableSet<Constraint> constraintSet = myHITLParser.getConstraints(query, userOptions);
+                activeLearningHistoryMap.get(userName).addEntry(
+                        sentId,
+                        query,
+                        userOptions,
+                        constraintSet);
+                System.out.println(query.toString(myHITLParser.getSentence(sentId),
+                        'G', myHITLParser.getGoldOptions(query),
+                        'U', userOptions));
+                constraintSet.forEach(ev -> System.out.println(ev.toString(myHITLParser.getSentence(sentId))));
+                System.out.println();
             }
             httpResponse.setContentType("text/html; charset=utf-8");
             httpResponse.setStatus(HttpServletResponse.SC_OK);
             update(userName, httpResponse.getWriter());
         }
 
-        private void initializeForUserAndSentence(String userName, int sentenceId) {
-            final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList = ExperimentUtils.generateAllQueries(
-                    sentenceId,
-                    parseData.getSentences().get(sentenceId),
-                    allParses.get(sentenceId),
-                    isJeopardyStyle,
-                    isCheckboxVersion,
-                    queryPruningParameters);
-            activeLearningMap.put(userName, queryList);
-            System.err.println("sentence " + sentenceId + " has " + queryList.size() + " queries.");
+        private void initializeUser(String userName, final HttpServletRequest request) throws IOException {
+            String userFileName = userName + "_" + dateFormat.format(new Date()) + ".txt";
+            annotationFileWriterMap.put(userName, new BufferedWriter(new FileWriter(
+                    new File(annotationPath + userFileName))));
+            annotationFileNameMap.put(userName, userFileName);
+            List<Integer> sentIds = myHITLParser.getAllSentenceIds().stream().collect(Collectors.toList());
+            /* for (int sid : sentencesToAnnotate) {
+                sentIds.add(sid);
+            }*/
+            sentenceIdsMap.put(userName, sentIds);
+            activeLearningHistoryMap.put(userName, new ReparsingHistory(myHITLParser));
+            parametersMap.put(userName, new HashSet<>());
+            if (request.getParameter("UsePronouns") != null) {
+                parametersMap.get(userName).add("UsePronouns");
+            }
+            initializeNextSentenceForUser(userName);
+        }
+
+        private boolean initializeNextSentenceForUser(String userName) {
+            final List<Integer> sentenceIds = sentenceIdsMap.get(userName);
+            final Set<String> parameters = parametersMap.get(userName);
+            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList = null;
+            while (sentenceIds.size() > 1) {
+                queryList = myHITLParser.getAllQueriesForSentence(
+                                sentenceIds.get(0),
+                                isJeopardyStyle,
+                                isCheckboxVersion,
+                                parameters.contains("UsePronouns"));
+                if (!queryList.isEmpty()) {
+                    break;
+                }
+                sentenceIds.remove(0);
+            }
+            if (queryList == null || queryList.isEmpty()) {
+                return false;
+            }
+            System.err.println("sentence " + sentenceIds.get(0) + " has " + queryList.size() + " queries.");
             activeLearningMap.put(userName, queryList);
             queryIdMap.put(userName, 0);
+            return true;
         }
 
         private void update(final String userName, final PrintWriter httpWriter) {
@@ -242,11 +280,9 @@ public class WebAnnotationUI {
             // Get next query from pool.
             if (queryId >= queryPool.size()) {
                 sentenceIds.remove(0);
-                if (sentenceIds.size() == 0) {
+                if (!initializeNextSentenceForUser(userName)) {
                     return;
                 }
-                int newSentId = sentenceIds.get(0);
-                initializeForUserAndSentence(userName, newSentId);
                 queryPool = activeLearningMap.get(userName);
                 queryId = 0;
             }
@@ -260,31 +296,47 @@ public class WebAnnotationUI {
             //httpWriter.println("<container>\n" + WebUIHelper.printInstructions() + "</container>\n");
 
             // Print the progress bar.
-            int numTotalSentences = sentencesToAnnotate.length;
+            int numTotalSentences = myHITLParser.getAllSentenceIds().size();
             int numAnsweredSentences = numTotalSentences - sentenceIds.size();
             int numTotalQueries = queryPool.size();
             httpWriter.println(WebUIHelper.printProgressBar(numAnsweredSentences, 0 /* numSkipped */, numTotalSentences));
             httpWriter.println(WebUIHelper.printProgressBar(queryId, 0 /* numSkipped */, numTotalQueries));
 
             // Print sentence.
-            final List<String> words = parseData.getSentences().get(query.getSentenceId());
+            final ImmutableList<String> words = myHITLParser.getSentence(query.getSentenceId());
 
             httpWriter.println("<container><div class=\"row\">\n");
             httpWriter.println("<div class=\"col-md-12\">");
+
             // Annotation margin.
             httpWriter.println("<panel panel-default>\n");
             httpWriter.println("<h5><span class=\"label label-primary\" for=\"Sentence\">Sentence:</span></h5>");
             httpWriter.println("<div id=\"Sentence\"> " + TextGenerationHelper.renderHTMLSentenceString(words,
-                    -1 /* don't the predicate id */, true /* highlight predicate */) + " </div>");
-            httpWriter.println("<h5><span class=\"label label-primary\" for=\"Question\">Question:</span><br></h5>");
-            httpWriter.println("<div id=\"Question\"> " + query.getPrompt() + " </div>");
+                    -1 /* don't know the predicate id */, false /* highlight predicate */) + " </div>");
 
-            httpWriter.println("<h5><span class=\"label label-primary\" for=\"AnswerOptions\">Answer Options:</span></h5>");
-            httpWriter.println("<form class=\"form-group\" id=\"AnswerOptions\" action=\"\" method=\"get\">");
+            // TODO: handle radiobutton.
+            if (isJeopardyStyle) {
+                httpWriter.println("<h5><span class=\"label label-primary\" for=\"AnswerOptions\">Question Options:</span></h5>");
+                httpWriter.println("<form class=\"form-group\" id=\"AnswerOptions\" action=\"\" method=\"get\">");
+                query.getOptions().forEach(optionStr ->
+                        httpWriter.println(String.format("<input name=\"UserAnswer\" type=\"checkbox\" value=\"%s\" />&nbsp %s <br/>",
+                                optionStr, optionStr)));
+
+                httpWriter.println("<h5><span class=\"label label-primary\" for=\"Question\">Answer:</span><br></h5>");
+                httpWriter.println("<div id=\"Question\"> " + query.getPrompt() + " </div>");
+            } else {
+                httpWriter.println("<h5><span class=\"label label-primary\" for=\"Question\">Question:</span><br></h5>");
+                httpWriter.println("<div id=\"Question\"> " + query.getPrompt() + " </div>");
+
+                httpWriter.println("<h5><span class=\"label label-primary\" for=\"AnswerOptions\">Answer Options:</span></h5>");
+                httpWriter.println("<form class=\"form-group\" id=\"AnswerOptions\" action=\"\" method=\"get\">");
+                query.getOptions().forEach(optionStr ->
+                        httpWriter.println(String.format("<input name=\"UserAnswer\" type=\"checkbox\" value=\"%s\" />&nbsp %s <br/>",
+                                optionStr, optionStr)));
+            }
+
+            // Add user name.
             httpWriter.println(String.format("<input type=\"hidden\" input name=\"UserName\" value=\"%s\"/>", userName));
-
-            query.getOptions().forEach(optionStr ->
-                httpWriter.println(String.format("<input name=\"UserAnswer\" type=\"checkbox\" value=\"%s\" />&nbsp %s <br/>", optionStr, optionStr)));
 
             // Comment box.
             httpWriter.println("<br><span class=\"label label-primary\" for=\"Comment\">Comments (if any):</span> <br>");
@@ -293,11 +345,35 @@ public class WebAnnotationUI {
             httpWriter.println("</form>");
             httpWriter.println("</panel>\n");
 
-            // Debugging info
-            httpWriter.write("<br/><br/><h3>Debugging Information</h3><br/> <p> query confidence:\t" + query.getPromptScore() + "</p>");
+            // Debugging info.
+            httpWriter.write("<br/><br/><hr/>");
 
-            IntStream.range(0, query.getOptions().size()).boxed().forEach(i ->
-                httpWriter.write("<br/>" + query.getOptions().get(i) + "&nbsp&nbsp&nbsp&nbsp" + query.getOptionScores().get(i)));
+            final ReparsingHistory myHistory = activeLearningHistoryMap.get(userName);
+            /*
+            httpWriter.write("<p>" + ("Baseline:\n" + myHistory.getAvgBaseline() + "\n" +
+                            "Reranked:\n" + myHistory.getAvgReranked() + "\n" +
+                            "Reparsed:\n" + myHistory.getAvgReparsed() + "\n" +
+                            "Oracle  :\n" + myHistory.getAvgOracle() + "\n")
+                    .replace("\n", "<br/>") + "</p>");
+
+            httpWriter.write("<p>" + ("Baseline-changed:\n" + myHistory.getAvgBaselineOnModifiedSentences() + "\n" +
+                            "Reranked-changed:\n" + myHistory.getAvgRerankedOnModifiedSentences() + "\n" +
+                            "Reparsed-changed:\n" + myHistory.getAvgReparsedOnModifiedSentences() + "\n" +
+                            "Oracle-changed  :\n" + myHistory.getAvgOracleOnModifiedSentences())
+                    .replace("\n", "<br/>") + "</p>");
+
+            httpWriter.write("<p>" + ("Num modified: " + myHistory.getNumModifiedSentences() + "\n" +
+                            "Num improved: " + myHistory.getNumImprovedSentences() + "\n" +
+                            "Num worsened: " + myHistory.getNumWorsenedSentences() + "\n")
+                    .replace("\n", "<br/>") + "</p>");
+            */
+            httpWriter.write("<br/><br/><hr/>");
+
+            httpWriter.write("<p>" + query.toString(words,
+                    'G', myHITLParser.getGoldOptions(query),
+                    'O', myHITLParser.getOracleOptions(query),
+                    'B', myHITLParser.getOneBestOptions(query))
+                    .replace("\t", "&nbsp&nbsp&nbsp").replace("\n", "<br/>") + "</p>");
 
             httpWriter.write("<br/><br/>");
 
@@ -307,14 +383,11 @@ public class WebAnnotationUI {
             //            + "Switch to Next Sentence</button>");
             httpWriter.println("</form>");
 
-            // TODO: Gold info and debugging info.
-
             // File download link
-            if (activeLearningHistoryMap.get(userName).size() > 0) {
-                String annotationFileName = annotationFileNameMap.get(userName);
-                httpWriter.println(String.format("<br><a href=\"%s\" download=\"%s\">Click to download annotation file.</a>",
-                        "/annotation_files/" + annotationFileName, annotationFileName));
-            }
+            String annotationFileName = annotationFileNameMap.get(userName);
+            httpWriter.println(String.format("<br><a href=\"%s\" download=\"%s\">Click to download annotation file.</a>",
+                    "/annotation_files/" + annotationFileName, annotationFileName));
+
 
             httpWriter.println("</div></div></container>\n");
             httpWriter.println("</body>");

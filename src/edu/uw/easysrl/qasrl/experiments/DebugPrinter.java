@@ -29,5 +29,4 @@ public class DebugPrinter {
         return shortList.stream().map(r -> (r[0] == r[1] ? String.valueOf(r[0]) : String.valueOf(r[0]) + "-" + r[1]))
                 .collect(Collectors.joining(","));
     }
-
 }

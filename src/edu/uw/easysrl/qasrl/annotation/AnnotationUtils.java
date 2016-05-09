@@ -1,13 +1,14 @@
 package edu.uw.easysrl.qasrl.annotation;
 
-import edu.uw.easysrl.qasrl.corpora.PronounList;
+import com.google.common.collect.ImmutableList;
+import edu.uw.easysrl.qasrl.qg.util.PronounList;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.Query;
 import edu.uw.easysrl.qasrl.query.QueryGeneratorUtils;
-import edu.uw.easysrl.qasrl.query.QueryGenerators;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -18,7 +19,7 @@ import java.util.Set;
  * Filtering stuff.
  * Created by luheng on 3/7/16.
  */
-public class QualityControl {
+public class AnnotationUtils {
     static Set<Category> propositionalCategories = new HashSet<>();
     static {
         Collections.addAll(propositionalCategories,
@@ -29,8 +30,9 @@ public class QualityControl {
 
     static Set<String> badQuestionStrings = new HashSet<>();
     static {
-        badQuestionStrings.add("Question is not valid.");
-        badQuestionStrings.add("Bad question.");
+        badQuestionStrings.add(QueryGeneratorUtils.kOldBadQuestionOptionString);
+        badQuestionStrings.add(QueryGeneratorUtils.kBadQuestionOptionString);
+        badQuestionStrings.add(QueryGeneratorUtils.kNoneApplicableString);
     }
 
     // FIXME: stream doesn't work here ... why?
@@ -70,26 +72,17 @@ public class QualityControl {
     }
 
     public static boolean queryIsPrepositional(ScoredQuery<QAStructureSurfaceForm> query) {
-        return !query.isJeopardyStyle() && propositionalCategories.contains(
-                query.getQAPairSurfaceForms().get(0).getCategory());
+        return (!query.isJeopardyStyle() && query.getQAPairSurfaceForms().get(0)
+                                            .getQuestionStructures().stream()
+                                            .anyMatch(qs -> propositionalCategories.contains(qs.category))) ||
+                query.isJeopardyStyle();
     }
 
-    public static int getAgreementNumber(Query query, AlignedAnnotation annotation) {
-        int[] optionDist = getUserResponses(query, annotation);
-        int agreement = 1;
-        for (int i = 0; i < optionDist.length; i++) {
-            agreement = Math.max(agreement, optionDist[i]);
-        }
-        return agreement;
-    }
-
-    public static int[] getUserResponses(Query query, AlignedAnnotation annotation) {
-        String qkey = query.getQueryKey();
+    public static int[] getUserResponseDistribution(Query query, AlignedAnnotation annotation) {
         int numOptions = query.getOptions().size();
         int[] optionDist = new int[numOptions];
         Arrays.fill(optionDist, 0);
-        String qkey2 = annotation.predicateId + "\t" + annotation.question;
-        if (qkey.equals(qkey2)) {
+        if (query.getPrompt().equals(annotation.queryPrompt)) {
             for (int i = 0; i < numOptions; i++) {
                 for (int j = 0; j < annotation.answerOptions.size(); j++) {
                     String optionStr = (String) query.getOptions().get(i);
@@ -103,5 +96,24 @@ public class QualityControl {
             }
         }
         return optionDist;
+    }
+
+    public static ImmutableList<Integer> getSingleUserResponse(Query query, RecordedAnnotation annotation) {
+        int numOptions = query.getOptions().size();
+        final Set<Integer> optionIds = new HashSet<>();
+        //if (query.getPrompt().equals(annotation.queryPrompt)) {
+            for (int i = 0; i < numOptions; i++) {
+                String optionStr = (String) query.getOptions().get(i);
+                for (String annotatedStr : annotation.userOptions) {
+                    if (optionStr.equals(annotatedStr) ||
+                            (badQuestionStrings.contains(optionStr) &&
+                             badQuestionStrings.contains(annotatedStr))) {
+                        optionIds.add(i);
+                        break;
+                    }
+                }
+            }
+        //}
+        return optionIds.stream().distinct().sorted().collect(GuavaCollectors.toImmutableList());
     }
 }

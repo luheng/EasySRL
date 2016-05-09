@@ -5,6 +5,7 @@ import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.Category.Slash;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeLeaf;
+import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeBinary;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -14,13 +15,19 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.function.Predicate;
 
+import static java.util.stream.Collectors.*;
 import static edu.uw.easysrl.util.GuavaCollectors.*;
+
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableList;
 
 /**
  * Tools for generating text from trees, dependencies, and lists of tokens.
  * Created by luheng on 1/20/16.
  */
 public class TextGenerationHelper {
+
+    private static final boolean useShorterNPs = false;
 
     // Reference: https://www.cis.upenn.edu/~treebank/tokenization.html
     private static final String trimPunctuation = " ,.:;!?-";
@@ -96,15 +103,18 @@ public class TextGenerationHelper {
             if(!noSpace) {
                 result.append(" ");
             }
-            // only for use with NP shortcut
-            // if(word.equalsIgnoreCase("a") && nextWord.isPresent() && startsWithVowel(nextWord.get())) {
-            //     result.append("an");
-            // } else if(word.equalsIgnoreCase("an") && nextWord.isPresent() && !startsWithVowel(nextWord.get())) {
-            //     result.append("a");
-            // } else {
-            //     result.append(word);
-            // }
-            result.append(word);
+            // NP shortcut
+            if(useShorterNPs) {
+                if(word.equalsIgnoreCase("a") && nextWord.isPresent() && startsWithVowel(nextWord.get())) {
+                    result.append("an");
+                } else if(word.equalsIgnoreCase("an") && nextWord.isPresent() && !startsWithVowel(nextWord.get())) {
+                    result.append("a");
+                } else {
+                    result.append(word);
+                }
+            } else {
+                result.append(word);
+            }
             prevWord = Optional.of(prevIterator.next());
             if(nextIterator.hasNext()) {
                 nextWord = Optional.of(nextIterator.next());
@@ -332,7 +342,7 @@ public class TextGenerationHelper {
      * takes an optional (by overloading---see above) argument asking for the head word to be replaced by something else.
      *   the optional argument is used when stripping verbs of their tense. (maybe there's a less hacky way to deal with that...)
      * In particular this would be for the phrases inside questions: consider "What did something do between April 1991?"
-     * For multiple answers to the same question, we just call this multiple times. (it should only get one of multiple
+     * For multiple answers to the same queryPrompt, we just call this multiple times. (it should only get one of multiple
      * constituents together in a coordination construction.)
      */
     private static List<TextWithDependencies> getRepresentativePhrases(Optional<Integer> headIndexOpt, Category neededCategory,
@@ -359,39 +369,42 @@ public class TextGenerationHelper {
 
         // TODO figure out if this is better: optional fix for reducing the size of noun phrases
         // if asking for an NP, just take the determiner and the noun itself.
-        // Buts then when aking for a noun, get one modifier if present.
-        // if(Category.valueOf("N").matches(node.getCategory())) {
-        //     Optional<SyntaxTreeNode> parentOpt = getParent(node, tree);
-        //     if(parentOpt.isPresent()) {
-        //         SyntaxTreeNode parent = parentOpt.get();
-        //         if(Category.valueOf("N").matches(parent.getCategory())) {
-        //             List<TextWithDependencies> result = new LinkedList<>();
-        //             result.add(new TextWithDependencies(getNodeWords(parent, replacementIndexOpt, replacementWord),
-        //                                                 getContainedDependencies(parent, parse)));
-        //             return result;
-        //         }
-        //     }
-        // } else if((node instanceof SyntaxTreeNodeBinary) &&
-        //           Category.valueOf("NP").matches(node.getCategory()) &&
-        //           Category.valueOf("NP/N").matches(((SyntaxTreeNodeBinary) node).getLeftChild().getHead().getCategory()) &&
-        //           !(lookForOf && // don't do the NP shortcut when there's an of-phrase later that we need to include.
-        //             node.getEndIndex() < tree.getEndIndex() &&
-        //             tree.getLeaves().get(node.getEndIndex()).getWord().equals("of"))) {
-        //     SyntaxTreeNodeLeaf detHead = ((SyntaxTreeNodeBinary) node).getLeftChild().getHead();
-        //     List<TextWithDependencies> phrases = getRepresentativePhrases(headIndexOpt, Category.valueOf("N"), parse, replacementIndexOpt, replacementWord, lookForOf);
-        //     // System.err.println("Reworking headedness of node: category " + node.getCategory() + ", word " + node.getWord());
-        //     // System.err.println("Head node: category " + detHead.getCategory() + ", word " + detHead.getWord());
-        //     // System.err.println("Sub phrase: " + renderString(phrases.get(0).tokens));
-        //     return phrases
-        //         .stream()
-        //         .map(twd -> {
-        //                 List<String> tokens = new LinkedList<>();
-        //                 tokens.addAll(getNodeWords(detHead, replacementIndexOpt, replacementWord));
-        //                 tokens.addAll(twd.tokens);
-        //                 return new TextWithDependencies(tokens, twd.dependencies);
-        //                     })
-        //         .collect(Collectors.toList());
-        // }
+        // But then when aking for a noun, get one modifier if present.
+        // And don't do this for proper nouns.
+        if(useShorterNPs && !node.getHead().getPos().equals("NNP") && !node.getHead().getPos().equals("NNPS")) {
+            if(Category.valueOf("N").matches(node.getCategory())) {
+                Optional<SyntaxTreeNode> parentOpt = getParent(node, tree);
+                if(parentOpt.isPresent()) {
+                    SyntaxTreeNode parent = parentOpt.get();
+                    if(Category.valueOf("N").matches(parent.getCategory())) {
+                        List<TextWithDependencies> result = new LinkedList<>();
+                        result.add(new TextWithDependencies(getNodeWords(parent, replacementIndexOpt, replacementWord),
+                                                            getContainedDependencies(parent, parse)));
+                        return result;
+                    }
+                }
+            } else if((node instanceof SyntaxTreeNodeBinary) &&
+                      Category.valueOf("NP").matches(node.getCategory()) &&
+                      Category.valueOf("NP/N").matches(((SyntaxTreeNodeBinary) node).getLeftChild().getHead().getCategory()) &&
+                      !(lookForOf && // don't do the NP shortcut when there's an of-phrase later that we need to include.
+                        node.getEndIndex() < tree.getEndIndex() &&
+                        tree.getLeaves().get(node.getEndIndex()).getWord().equals("of"))) {
+                SyntaxTreeNodeLeaf detHead = ((SyntaxTreeNodeBinary) node).getLeftChild().getHead();
+                List<TextWithDependencies> phrases = getRepresentativePhrases(headIndexOpt, Category.valueOf("N"), parse, replacementIndexOpt, replacementWord, lookForOf);
+                // System.err.println("Reworking headedness of node: category " + node.getCategory() + ", word " + node.getWord());
+                // System.err.println("Head node: category " + detHead.getCategory() + ", word " + detHead.getWord());
+                // System.err.println("Sub phrase: " + renderString(phrases.get(0).tokens));
+                return phrases
+                    .stream()
+                    .map(twd -> {
+                            List<String> tokens = new LinkedList<>();
+                            tokens.addAll(getNodeWords(detHead, replacementIndexOpt, replacementWord));
+                            tokens.addAll(twd.tokens);
+                            return new TextWithDependencies(tokens, twd.dependencies);
+                        })
+                    .collect(Collectors.toList());
+            }
+        }
 
         // get all of the dependencies that were (presumably) touched in the course of getting the lowest good ancestor
         touchedDeps.addAll(getContainedDependencies(node, parse));
@@ -402,7 +415,7 @@ public class TextGenerationHelper {
         // until he exactly matches the category we're looking for.
         // using this method will capture and appropriately rearrange extracted arguments and such.
 
-        Category currentCategory = node.getCategory();
+        final Category currentCategory = node.getCategory();
 
         if(neededCategory.matches(currentCategory)) {
             // if we already have the right kind of phrase, consider adding a trailing "of"-phrase.
@@ -446,12 +459,11 @@ public class TextGenerationHelper {
                  i++) {
                 allArgDeps.put(i, new HashSet<ResolvedDependency>());
             }
-            final Category curCat = currentCategory; // for lambda below
             parse.dependencies
                 .stream()
                 .filter(dep -> dep.getHead() == headIndex)
                 .filter(dep -> dep.getArgNumber() > neededCategory.getNumberOfArguments())
-                .filter(dep -> dep.getArgNumber() <= curCat.getNumberOfArguments())
+                .filter(dep -> dep.getArgNumber() <= currentCategory.getNumberOfArguments())
                 .forEach(dep -> allArgDeps.get(dep.getArgNumber()).add(dep));
             List<Map<Integer, Optional<ResolvedDependency>>> argumentChoicePaths = getAllArgumentChoicePaths(allArgDeps);
 
@@ -466,11 +478,12 @@ public class TextGenerationHelper {
 
                 Set<ResolvedDependency> localDeps = new HashSet<>();
 
-                for(int currentArgNum = currentCategory.getNumberOfArguments();
+                Category shrinkingCategory = currentCategory;
+                for(int currentArgNum = shrinkingCategory.getNumberOfArguments();
                     currentArgNum > neededCategory.getNumberOfArguments();
                     currentArgNum--) {
                     // otherwise, add arguments on either side until done, according to CCG category.
-                    Category argCat = currentCategory.getRight();
+                    Category argCat = shrinkingCategory.getRight();
                     Optional<ResolvedDependency> argDepOpt = chosenArgDeps.get(currentArgNum);
                     Optional<Integer> argIndexOpt = argDepOpt.map(ResolvedDependency::getArgument);
                     // recover dep using the fact that we know the head leaf, arg num, and arg index.
@@ -478,7 +491,7 @@ public class TextGenerationHelper {
                     List<TextWithDependencies> argTWDs =
                         getRepresentativePhrases(argIndexOpt, argCat, parse, replacementIndexOpt, replacementWord, lookForOf);
                     // add the argument on the left or right side, depending on the slash
-                    Slash slash = currentCategory.getSlash();
+                    Slash slash = shrinkingCategory.getSlash();
                     switch(slash) {
                     case FWD:
                         rights = rights.stream()
@@ -497,7 +510,7 @@ public class TextGenerationHelper {
                         break;
                     }
                     // proceed to the next argument
-                    currentCategory = currentCategory.getLeft();
+                    shrinkingCategory = shrinkingCategory.getLeft();
                 }
                 for(TextWithDependencies left : lefts) {
                     for(TextWithDependencies right : rights) {
@@ -517,7 +530,7 @@ public class TextGenerationHelper {
             return phrases
                 .stream()
                 .filter(twd -> twd.tokens.size() > 0)
-                .collect(Collectors.toList());
+                .collect(toList());
         }
 
     }
@@ -656,6 +669,10 @@ public class TextGenerationHelper {
             this.dependencies = dependencies;
         }
 
+        public String toString() {
+            return tokens.toString() + ", " + dependencies.toString();
+        }
+
         // functional concat
         public TextWithDependencies concat(TextWithDependencies other) {
             List<String> newTokens = new LinkedList<>();
@@ -665,6 +682,26 @@ public class TextGenerationHelper {
             newDependencies.addAll(this.dependencies);
             newDependencies.addAll(other.dependencies);
             return new TextWithDependencies(newTokens, newDependencies);
+        }
+
+        public TextWithDependencies concatWithDep(TextWithDependencies other, Optional<ResolvedDependency> depOpt) {
+            if(depOpt.isPresent()) {
+                return concatWithDep(other, depOpt.get());
+            } else {
+                return concat(other);
+            }
+        }
+
+        public TextWithDependencies concatWithDep(TextWithDependencies other, ResolvedDependency dep) {
+            TextWithDependencies newTWD = this.concat(other);
+            newTWD.dependencies.add(dep);
+            return newTWD;
+        }
+
+        public static TextWithDependencies fromWord(String word) {
+            List<String> tokens = new LinkedList<>();
+            tokens.add(word);
+            return new TextWithDependencies(tokens, new HashSet<>());
         }
     }
 }

@@ -1,4 +1,4 @@
-package edu.uw.easysrl.qasrl.corpora;
+package edu.uw.easysrl.qasrl.qg.util;
 
 import java.util.Collections;
 import java.util.HashSet;
