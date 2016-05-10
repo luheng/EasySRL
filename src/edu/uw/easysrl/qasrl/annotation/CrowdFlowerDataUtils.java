@@ -1,6 +1,8 @@
 package edu.uw.easysrl.qasrl.annotation;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableTable;
 import edu.uw.easysrl.qasrl.TextGenerationHelper;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
@@ -13,11 +15,11 @@ import edu.uw.easysrl.util.GuavaCollectors;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 
-import java.io.BufferedWriter;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 import java.util.stream.Collectors;
 
 /**
@@ -39,6 +41,16 @@ public class CrowdFlowerDataUtils {
     public static final String cfRound1AnnotationFile =  "./Crowdflower_data/f878213.csv" ;
     public static final String cfRound2AnnotationFile =  "./Crowdflower_data/f882410.csv" ;
     public static final String cfRound3AnnotationFile =  "./Crowdflower_data/all-checkbox-responses.csv" ;
+    public static final String cfRound3PrnonounAnnotationFile = "./Crowdflower_data/f893900.csv";
+    public static final String cfRound3CleftingAnnotationFile = "./Crowdflower_data/f893900.csv";
+
+    public static final ImmutableList<String> allCfAnnotationFiles = ImmutableList.of(
+            cfRound1AnnotationFile,
+            cfRound2AnnotationFile,
+            cfRound3AnnotationFile,
+            cfRound3PrnonounAnnotationFile,
+            cfRound3CleftingAnnotationFile
+    );
 
     // Sentences that happened to appear in instructions ...
     public static final int[] otherHeldOutSentences = { 1695, };
@@ -89,6 +101,53 @@ public class CrowdFlowerDataUtils {
         return cfAnnotations.stream()
                 .map(annotation -> annotation.sentenceId).distinct().sorted()
                 .collect(GuavaCollectors.toImmutableList());
+    }
+
+    public static ImmutableList<Integer> getAllAnnotatedSentenceIds() {
+        final List<AlignedAnnotation> cfAnnotations = new ArrayList<>();
+        allCfAnnotationFiles.forEach(cfFile -> {
+            try {
+                cfAnnotations.addAll(CrowdFlowerDataReader.readAggregatedAnnotationFromFile(cfFile));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
+        return cfAnnotations.stream()
+                .map(annot -> annot.sentenceId)
+                .distinct()
+                .collect(GuavaCollectors.toImmutableList());
+    }
+
+    /**
+     * Sample unannotated sentence ids.
+     * @param numSentences
+     * @return
+     */
+    public static ImmutableList<Integer> sampleNewSentenceIds(int numSentences, int randomSeed,
+                                                              final ImmutableList<Integer> allSentenceIds) {
+        final ImmutableList<Integer> annotatedSentenceIds = getAllAnnotatedSentenceIds();
+        System.out.println("Excluding sentences:\t" + annotatedSentenceIds.size());
+        final List<Integer> sentIds = allSentenceIds.stream()
+                .distinct().sorted()
+                .filter(id -> !annotatedSentenceIds.contains(id))
+                .collect(Collectors.toList());
+        Collections.shuffle(sentIds, new Random(randomSeed));
+        return sentIds.stream().limit(numSentences)
+                .sorted()
+                .collect(GuavaCollectors.toImmutableList());
+    }
+
+    public static ImmutableList<Integer> loadSentenceIdsFromFile(final String filePath) throws IOException {
+        final BufferedReader reader = new BufferedReader(new FileReader(new File(filePath)));
+        String line;
+        final List<Integer> sentenceIds = new ArrayList<>();
+        while ((line = reader.readLine()) != null) {
+            if (!line.trim().isEmpty()) {
+                sentenceIds.add(Integer.parseInt(line.trim()));
+            }
+        }
+        reader.close();
+        return sentenceIds.stream().distinct().sorted().collect(GuavaCollectors.toImmutableList());
     }
 
     public static void printQueryToCSVFile(final ScoredQuery<QAStructureSurfaceForm> query,

@@ -2,6 +2,7 @@ package edu.uw.easysrl.qasrl.query;
 
 import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
+import edu.uw.easysrl.qasrl.NBestList;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
@@ -41,9 +42,38 @@ public class QueryFilters {
                         option.equalsIgnoreCase(op1 + " or " + op2) ||
                         option.equalsIgnoreCase(op1 + ", and " + op2) ||
                         option.equalsIgnoreCase(op1 + ", or " + op2)) {
-                    System.err.println(option);
+                    //System.err.println(option);
                     return true;
                 }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Detect appositive: A, B
+     * @param qa
+     * @param allQAs
+     * @param nBestList: just to get the sentence
+     * @return
+     */
+    private static boolean isAppositive(final QAStructureSurfaceForm qa,
+                                        final ImmutableList<QAStructureSurfaceForm> allQAs,
+                                        final NBestList nBestList) {
+        final ImmutableList<String> sentence = nBestList.getParse(0).syntaxTree.getLeaves().stream()
+                .map(SyntaxTreeNode.SyntaxTreeNodeLeaf::getWord)
+                .collect(GuavaCollectors.toImmutableList());
+        final String sentenceStr = sentence.stream().collect(Collectors.joining(" ")).toLowerCase();
+        for (QAStructureSurfaceForm qa0 : allQAs) {
+            final int argId0 = qa0.getArgumentIndices().get(0);
+            final int argId = qa.getArgumentIndices().get(0);
+
+            //if (sentenceStr.contains(qa0.getAnswer().toLowerCase() + " , " + qa.getAnswer().toLowerCase())) {
+            if (argId0 < argId && IntStream.range(argId0 + 1, argId).anyMatch(i -> sentence.get(i).equals(","))) {
+                System.out.println(sentence.stream().collect(Collectors.joining(" ")));
+                System.out.println(qa.getQuestion());
+                System.out.println(qa0.getAnswer() + " ... " + qa.getAnswer() + "\n");
+                return true;
             }
         }
         return false;
@@ -92,6 +122,7 @@ public class QueryFilters {
                                     .filter(i -> !query.getOptions().get(i).isEmpty())
                                     .filter(i -> query.getOptionScores().get(i) > queryPruningParameters.minOptionConfidence)
                                     .filter(i -> !canBeSplitted(query.getOptions().get(i), options))
+                                   // .filter(i -> !isAppositive(query.getQAPairSurfaceForms().get(i), query.getQAPairSurfaceForms(), nBestList))
                                     .collect(Collectors.toList());
                     // TODO: handle max number of options
                     final List<QAStructureSurfaceForm> filteredQAList = filteredOptionIds.stream()
