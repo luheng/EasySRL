@@ -3,6 +3,7 @@ package edu.uw.easysrl.qasrl.classification;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.NBestList;
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
@@ -145,6 +146,7 @@ public class ClassificationUtils {
                                 final ImmutableList<ImmutableList<Integer>> annotation = alignedAnnotations.get(sid).get(qid);
                                 final int naOptionId = query.getBadQuestionOptionId().getAsInt();
                                 final int numNAVotes = (int) annotation.stream().filter(ops -> ops.contains(naOptionId)).count();
+                                final Set<ResolvedDependency> oneBest = myParser.getNBestList(sid).getParse(0).dependencies;
                                 if (numNAVotes > maxAllowedNAVotes) {
                                     return Stream.empty();
                                 }
@@ -160,20 +162,24 @@ public class ClassificationUtils {
                                                     final DependencyInstanceType dtype =
                                                             DependencyInstanceHelper.getDependencyType(query, headId, argId);
                                                     final boolean inGold = gold.dependencies.stream()
-                                                            .anyMatch(dep -> dep.getHead() == headId && dep.getArgument() == argId);
+                                                            .anyMatch(d -> d.getHead() == headId && d.getArgument() == argId);
+                                                    final boolean inOneBest = oneBest.stream()
+                                                            .anyMatch(d -> d.getHead() == headId && d.getArgument() == argId);
                                                     final ImmutableMap<Integer, Double> features = query.getQueryType() == QueryType.Forward ?
                                                             featureExtractor.getCoreArgFeatures(headId, argId, dtype, query, annotation, sentence, nbestList) :
                                                             featureExtractor.getNPCleftingFeatures(headId, argId, dtype, query, annotation, sentence, nbestList);
-                                                    return new DependencyInstance(sid, qid, headId, argId, query.getQueryType(), dtype, inGold, features);
+                                                    return new DependencyInstance(sid, qid, headId, argId, query.getQueryType(), dtype, inGold, inOneBest, features);
                                                 }));
                             });
                 })
                 .collect(GuavaCollectors.toImmutableList());
     }
 
-    static DMatrix getDMatrix(ImmutableList<DependencyInstance> instances) throws XGBoostError {
+    static DMatrix getDMatrix(ImmutableList<DependencyInstance> instances)
+            throws XGBoostError {
         final int numInstances = instances.size();
         final float[] labels = new float[numInstances];
+        final float[] weights = new float[numInstances];
         final long[] rowHeaders = new long[numInstances + 1];
         rowHeaders[0] = 0;
         for (int i = 0; i < numInstances; i++) {
@@ -186,6 +192,7 @@ public class ClassificationUtils {
         for (int i = 0; i < numInstances; i++) {
             final DependencyInstance instance = instances.get(i);
             labels[i] = instance.inGold ? 1 : 0;
+            weights[i] = (instance.inGold == instance.inOneBest) ? 1 : 10;
             instance.features.keySet().stream().sorted()
                     .forEach(fid -> {
                         colIndices[ptr.get()] = fid;
@@ -194,6 +201,7 @@ public class ClassificationUtils {
         }
         DMatrix dmat = new DMatrix(rowHeaders, colIndices, data, DMatrix.SparseType.CSR);
         dmat.setLabel(labels);
+        dmat.setWeight(weights);
         return dmat;
     }
 

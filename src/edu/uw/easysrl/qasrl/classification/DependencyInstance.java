@@ -13,14 +13,15 @@ import java.util.Map;
  * Created by luheng on 4/21/16.
  */
 public class DependencyInstance {
-    final boolean inGold;
+    final boolean inGold, inOneBest;
     final int sentenceId, queryId, headId, argId;
     final ImmutableMap<Integer, Double> features;
     final DependencyInstanceType instanceType;
     final QueryType queryType;
 
     DependencyInstance(int sentenceId, int queryId, int headId, int argId, QueryType queryType,
-                       DependencyInstanceType instanceType, boolean inGold, ImmutableMap<Integer, Double> features) {
+                       DependencyInstanceType instanceType, boolean inGold, boolean inOneBest,
+                       ImmutableMap<Integer, Double> features) {
         this.sentenceId = sentenceId;
         this.queryId = queryId;
         this.queryType = queryType;
@@ -28,6 +29,7 @@ public class DependencyInstance {
         this.headId = headId;
         this.argId = argId;
         this.inGold = inGold;
+        this.inOneBest = inOneBest;
         this.features = features;
     }
 }

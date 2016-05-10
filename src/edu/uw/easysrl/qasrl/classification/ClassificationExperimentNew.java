@@ -1,6 +1,7 @@
 package edu.uw.easysrl.qasrl.classification;
 
 import com.google.common.collect.*;
+import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.TextGenerationHelper;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
@@ -116,7 +117,15 @@ public class ClassificationExperimentNew {
         cleftingFeatureExtractor = new FeatureExtractor();
 
         coreArgTrainInstances = ClassificationUtils.getInstances(trainSents, myParser,
-                ImmutableSet.of(QueryType.Forward), coreArgsFeatureExtractor, alignedQueries, alignedAnnotations);
+                ImmutableSet.of(QueryType.Forward), coreArgsFeatureExtractor, alignedQueries, alignedAnnotations)
+                .stream()
+              /*  .filter(inst -> {
+                    final Set<ResolvedDependency> oneBest = myParser.getNBestList(inst.sentenceId).getParse(0).dependencies;
+                    boolean inOneBest = oneBest.stream().anyMatch(d -> d.getHead() == inst.headId && d.getArgument() == inst.argId);
+                    return inOneBest != inst.inGold;
+                }) */
+                .collect(GuavaCollectors.toImmutableList());
+
         cleftingTrainInstances = ClassificationUtils.getInstances(trainSents, myParser,
                 ImmutableSet.of(QueryType.Clefted), cleftingFeatureExtractor, alignedQueries, alignedAnnotations);
 
@@ -244,9 +253,9 @@ public class ClassificationExperimentNew {
                                         new Constraint.AttachmentConstraint(inst.headId, inst.argId, true, reparsingParameters.attachmentPenaltyWeight) :
                                         new Constraint.AttachmentConstraint(inst.headId, inst.argId, false, reparsingParameters.attachmentPenaltyWeight);
                                 newConstraint.prediction = coreArgsPred.get(i);
-                                //if (coreArgsPred.get(i) > 0.7 || coreArgsPred.get(i) < 0.2) {
+                               // if (coreArgsPred.get(i) > 0.7 || coreArgsPred.get(i) < 0.2) {
                                     constraints.add(newConstraint);
-                                //}
+                               // }
                                 predictions.add(String.format("%s\tGold=%b\tPred=%.2f\t%d:%s-->%d:%s",
                                         pred == inst.inGold ? "[Y]" : "[N]", inst.inGold, coreArgsPred.get(i),
                                         inst.headId, sentence.get(inst.headId), inst.argId, sentence.get(inst.argId)));
@@ -303,21 +312,28 @@ public class ClassificationExperimentNew {
 
                 if (!heuristicConstraints.stream().anyMatch(Constraint.SupertagConstraint.class::isInstance)) {
                     // Compute positive/negative F1 of heuristic vs. oracle.
+                    final Set<ResolvedDependency> onebest = myParser.getNBestList(sentenceId).getParse(0).dependencies;
                     final ImmutableSet<Constraint.AttachmentConstraint> positiveOracle = oracleConstraints.stream()
                             .filter(Constraint.AttachmentConstraint.class::isInstance)
                             .filter(Constraint::isPositive)
                             .map(c -> (Constraint.AttachmentConstraint) c)
+                            .filter(c -> !onebest.stream().anyMatch(d -> c.getHeadId() == d.getHead()
+                                                                    && c.getArgId() == d.getArgument()))
                             .collect(GuavaCollectors.toImmutableSet());
                     final ImmutableSet<Constraint.AttachmentConstraint> negativeOracle = oracleConstraints.stream()
                             .filter(Constraint.AttachmentConstraint.class::isInstance)
                             .filter(c -> !c.isPositive())
                             .map(c -> (Constraint.AttachmentConstraint) c)
+                            .filter(c -> onebest.stream().anyMatch(d -> c.getHeadId() == d.getHead()
+                                                                    && c.getArgId() == d.getArgument()))
                             .collect(GuavaCollectors.toImmutableSet());
                     heuristicPositive.add(F1.computeConstraintF1(
                             heuristicConstraints.stream()
                                     .filter(Constraint.AttachmentConstraint.class::isInstance)
                                     .filter(Constraint::isPositive)
                                     .map(c -> (Constraint.AttachmentConstraint) c)
+                                    .filter(c -> !onebest.stream().anyMatch(d -> c.getHeadId() == d.getHead()
+                                                                                && c.getArgId() == d.getArgument()))
                                     .collect(GuavaCollectors.toImmutableSet()),
                             positiveOracle));
                     heuristicNegative.add(F1.computeConstraintF1(
@@ -325,6 +341,8 @@ public class ClassificationExperimentNew {
                                     .filter(Constraint.AttachmentConstraint.class::isInstance)
                                     .filter(c -> !c.isPositive())
                                     .map(c -> (Constraint.AttachmentConstraint) c)
+                                    .filter(c -> onebest.stream().anyMatch(d -> c.getHeadId() == d.getHead()
+                                                                            && c.getArgId() == d.getArgument()))
                                     .collect(GuavaCollectors.toImmutableSet()),
                             negativeOracle));
                     classifierPositive.entrySet()
@@ -336,6 +354,8 @@ public class ClassificationExperimentNew {
                                                 .filter(Constraint::isPositive)
                                                 .filter(c -> c.prediction > threshold + 1e-6)
                                                 .map(c -> (Constraint.AttachmentConstraint) c)
+                                                .filter(c -> !onebest.stream().anyMatch(d -> c.getHeadId() == d.getHead()
+                                                                                    && c.getArgId() == d.getArgument()))
                                                 .collect(GuavaCollectors.toImmutableSet()),
                                         positiveOracle));
                             });
@@ -348,6 +368,8 @@ public class ClassificationExperimentNew {
                                                 .filter(c -> !c.isPositive())
                                                 .filter(c -> c.prediction < threshold - 1e-6)
                                                 .map(c -> (Constraint.AttachmentConstraint) c)
+                                                .filter(c -> onebest.stream().anyMatch(d -> c.getHeadId() == d.getHead()
+                                                                                    && c.getArgId() == d.getArgument()))
                                                 .collect(GuavaCollectors.toImmutableSet()),
                                         negativeOracle));
                             });
@@ -443,7 +465,7 @@ public class ClassificationExperimentNew {
 
     public static void main(String[] args) {
         final int initialRandomSeed = 12345;
-        final int numRandomRuns = 1;
+        final int numRandomRuns = 10;
 
         Random random = new Random(initialRandomSeed);
         ImmutableList<Integer> randomSeeds = IntStream.range(0, numRandomRuns)
