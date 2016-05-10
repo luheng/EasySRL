@@ -13,7 +13,10 @@ public final class Gap extends Predication {
     public static final String PRED = "'e'";
 
     @Override
-    public ImmutableList<String> getPhrase() {
+    public ImmutableList<String> getPhrase(Category desiredCategory) {
+        // TODO make this check more stringent
+        assert desiredCategory.matches(getPredicateCategory()) || getPredicateCategory().matches(desiredCategory)
+            : "gap category has to match desired category";
         return words;
     }
 

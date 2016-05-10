@@ -74,7 +74,8 @@ public final class Pronoun extends Noun {
     }
 
     @Override
-    public ImmutableList<String> getPhrase() {
+    public ImmutableList<String> getPhrase(Category desiredCategory) {
+        // TODO check that we want an NP.
         return ImmutableList.of(this.toString());
     }
 

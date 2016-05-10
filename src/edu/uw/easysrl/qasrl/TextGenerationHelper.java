@@ -535,6 +535,10 @@ public class TextGenerationHelper {
 
     }
 
+    public static List<String> getNodeWords(SyntaxTreeNode node) {
+        return getNodeWords(node, Optional.empty(), Optional.empty());
+    }
+
     // helper method to make sure we decapitalize the first letter of the sentence
     // and replace a word if necessary.
     public static List<String> getNodeWords(SyntaxTreeNode node, Optional<Integer> replaceIndexOpt, Optional<String> replacementWord) {

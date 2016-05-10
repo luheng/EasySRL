@@ -43,7 +43,9 @@ public class ExpletiveNoun extends Noun {
     }
 
     @Override
-    public ImmutableList<String> getPhrase() {
+    public ImmutableList<String> getPhrase(Category desiredCategory) {
+        assert desiredCategory.matches(getPredicateCategory()) && getPredicateCategory().matches(desiredCategory)
+            : "must want an expletive NP if getting phrase of expletive NP";
         return ImmutableList.of(word);
     }
 

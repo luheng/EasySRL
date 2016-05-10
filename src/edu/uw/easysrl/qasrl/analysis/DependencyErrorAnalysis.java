@@ -256,6 +256,21 @@ public class DependencyErrorAnalysis {
                     dep.getCategory().getArgument(dep.getArgNumber()).matches(Category.PP));
         }
 
+        private static boolean isVerbOpenCompArgDep(ResolvedDependency dep) {
+            return (dep.getCategory().isFunctionInto(Category.valueOf("S\\NP")) &&
+                    Category.valueOf("S\\NP").matches(dep.getCategory().getArgument(dep.getArgNumber())));
+        }
+
+        private static boolean isVerbClosedCompArgDep(ResolvedDependency dep) {
+            return (dep.getCategory().isFunctionInto(Category.valueOf("S\\NP")) &&
+                    Category.S.matches(dep.getCategory().getArgument(dep.getArgNumber())));
+        }
+
+        private static boolean isVerbOtherArgDep(ResolvedDependency dep) {
+            return (dep.getCategory().isFunctionInto(Category.valueOf("S\\NP")) &&
+                    !isVerbNPArgDep(dep) && !isPPArgDep(dep) && !isVerbOpenCompArgDep(dep) && !isVerbClosedCompArgDep(dep));
+        }
+
         private static boolean isVerbAdjunctDep(ResolvedDependency dep) {
             return (dep.getCategory().isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)")) &&
                     dep.getArgNumber() == 2);
@@ -506,6 +521,24 @@ public class DependencyErrorAnalysis {
                                              PrecisionRecallMistakes.extractorForDependencyType(depMatcher, DependencyMistake::isPPArgDep),
                                              depMatchingLabel + " pp-arg");
         logDependencyMistakes(ppArgMistakes, csvStringBuilder, fullRunLabel, "pp arg scoring", Optional.of(depMistakes));
+
+        final PrecisionRecallMistakeLogger openCompArgMistakes =
+            new PrecisionRecallMistakeLogger(parses,
+                                             PrecisionRecallMistakes.extractorForDependencyType(depMatcher, DependencyMistake::isVerbOpenCompArgDep),
+                                             depMatchingLabel + " open-comp");
+        logDependencyMistakes(ppArgMistakes, csvStringBuilder, fullRunLabel, "xcomp arg scoring", Optional.of(depMistakes));
+
+        final PrecisionRecallMistakeLogger closedCompArgMistakes =
+            new PrecisionRecallMistakeLogger(parses,
+                                             PrecisionRecallMistakes.extractorForDependencyType(depMatcher, DependencyMistake::isVerbClosedCompArgDep),
+                                             depMatchingLabel + " closed-comp");
+        logDependencyMistakes(ppArgMistakes, csvStringBuilder, fullRunLabel, "comp arg scoring", Optional.of(depMistakes));
+
+        final PrecisionRecallMistakeLogger otherArgMistakes =
+            new PrecisionRecallMistakeLogger(parses,
+                                             PrecisionRecallMistakes.extractorForDependencyType(depMatcher, DependencyMistake::isVerbOtherArgDep),
+                                             depMatchingLabel + " other-arg");
+        logDependencyMistakes(ppArgMistakes, csvStringBuilder, fullRunLabel, "misc verb arg scoring", Optional.of(depMistakes));
 
         final PrecisionRecallMistakeLogger ppAttachmentMistakes =
             new PrecisionRecallMistakeLogger(parses,

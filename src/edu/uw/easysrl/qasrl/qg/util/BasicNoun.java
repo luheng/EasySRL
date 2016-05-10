@@ -19,7 +19,8 @@ public class BasicNoun extends Noun {
     // overrides
 
     @Override
-    public ImmutableList<String> getPhrase() {
+    public ImmutableList<String> getPhrase(Category desiredCategory) {
+        // TODO verify that we want an NP out of it.
         return words;
     }
 

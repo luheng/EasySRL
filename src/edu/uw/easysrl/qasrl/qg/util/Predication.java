@@ -23,14 +23,22 @@ import com.google.common.collect.ImmutableSet;
 public abstract class Predication {
 
     public static enum Type {
-        VERB, NOUN;
+        CLAUSE, VERB, NOUN, PREPOSITION, ADVERB;
 
         public static Optional<Type> getTypeForArgCategory(Category category) {
             if(Category.valueOf("S\\NP").matches(category)) {
                 return Optional.of(VERB);
-            } else if(Category.NP.matches(category)) {
+            } else if(Category.valueOf("(S\\NP)\\(S\\NP)").matches(category)) {
+                return Optional.of(ADVERB);
+            } else if(Category.S.matches(category)) {
+                return Optional.empty();
+                // return Optional.of(CLAUSE);
+            } else if(Category.NP.matches(category) || Category.N.matches(category)) {
                 return Optional.of(NOUN);
+            } else if(category.isFunctionInto(Category.PP)) {
+                return Optional.of(PREPOSITION);
             } else {
+                System.err.println("No predication type exists for category: " + category);
                 return Optional.empty();
             }
         }
@@ -68,22 +76,21 @@ public abstract class Predication {
             .build();
     }
 
-    // public final Gap elide() {
-    //     return new Gap(predicateCategory);
-    // }
-
     /* abstract methods */
 
-    // should be overridden to return something of same type.
     public abstract Predication transformArgs(BiFunction<Integer, ImmutableList<Argument>, ImmutableList<Argument>> transform);
 
     public abstract ImmutableSet<ResolvedDependency> getLocalDependencies();
 
-    public abstract ImmutableList<String> getPhrase();
-    // consider
-    // public abstract ImmutableList<String> getPhrase(Category desiredCategory);
+    public abstract ImmutableList<String> getPhrase(Category desiredCategory);
 
     /* protected methods and fields */
+
+    protected final ImmutableMap<Integer, ImmutableList<Argument>>
+        transformArgsAux(BiFunction<Integer, ImmutableList<Argument>, ImmutableList<Argument>> transform) {
+        return getArgs().entrySet().stream()
+            .collect(toImmutableMap(e -> e.getKey(), e -> (transform.apply(e.getKey(), e.getValue()))));
+    }
 
     protected Predication(String predicate,
                           Category predicateCategory,

@@ -62,6 +62,10 @@ public final class Verb extends Predication {
                 .renderString(TextGenerationHelper
                 .getNodeWords(headLeaf, Optional.empty(), Optional.empty())));
         }
+
+        if(!predicateCategory.isFunctionInto(Category.valueOf("S\\NP"))) {
+            System.err.println("non verbal category for verb. what we got: " + predicate + "(" + predicateCategory + ")" );
+        }
         assert predicateCategory.isFunctionInto(Category.valueOf("S\\NP"))
             : "verb predication must arise from verb category";
 
@@ -70,14 +74,17 @@ public final class Verb extends Predication {
             .boxed()
             .collect(toImmutableMap(argNum -> argNum, argNum -> parse.dependencies.stream()
             .filter(dep -> dep.getHead() == headIndex && dep.getArgument() != headIndex && argNum == dep.getArgNumber())
-            .flatMap(argDep -> {
-                    Optional<Predication.Type> predTypeOpt = Predication.Type.getTypeForArgCategory(predicateCategory.getArgument(argDep.getArgNumber()));
-                    if(predTypeOpt.isPresent()) {
-                        return Stream.of(new Argument(Optional.of(argDep), preds.getPredication(argDep.getArgument(), predTypeOpt.get())));
-                    } else {
-                        return Stream.empty();
-                    }
+            .flatMap(argDep -> Stream.of(Predication.Type.getTypeForArgCategory(predicateCategory.getArgument(argDep.getArgNumber())))
+            .filter(Optional::isPresent).map(Optional::get)
+            .map(predType -> {
+                    // System.err.println(String.format("got argument.\nsentence: %s\narg cat: %s\narg word: %s\narg word cat: %s",
+                    //                                  words,
+                    //                                  predicateCategory.getArgument(argDep.getArgNumber()),
+                    //                                  words.get(argDep.getArgument()),
+                    //                                  parse.categories.get(argDep.getArgument())));
+                    return predType;
                 })
+            .map(predType -> new Argument(Optional.of(argDep), preds.getPredication(argDep.getArgument(), predType))))
             .collect(toImmutableList())));
 
 
@@ -159,7 +166,7 @@ public final class Verb extends Predication {
     // overrides
 
     @Override
-    public ImmutableList<String> getPhrase() {
+    public ImmutableList<String> getPhrase(Category desiredCategory) {
         // assert getArgs().entrySet().stream().allMatch(e -> e.getValue().size() == 1)
         //     : "can only get phrase for predication with exactly one arg in each slot"; // do i want this?
         // assert getArgs().entrySet().stream().allMatch(e -> e.getValue().size() > 0) 
@@ -168,33 +175,7 @@ public final class Verb extends Predication {
             .collect(toImmutableMap(e -> e.getKey(), e -> e.getValue().size() > 0 ? e.getValue().get(0)
                                     : Argument.withNoDependency(Pronoun.fromString("something").get())));
 
-        ImmutableList<String> leftInternalArgs = ImmutableList.of();
-        ImmutableList<String> rightInternalArgs = ImmutableList.of();
-        Category done = Category.valueOf("(S\\NP)");
-        Category curCat = getPredicateCategory();
-        while(!done.matches(curCat)) { // we're not including the subject
-            Predication curArg = args.get(curCat.getNumberOfArguments()).getPredication();
-            Slash slash = curCat.getSlash();
-            switch(slash) {
-            case BWD: leftInternalArgs = new ImmutableList.Builder<String>()
-                    .addAll(curArg.getPhrase())
-                    .addAll(leftInternalArgs)
-                    .build();
-                break;
-            case FWD: rightInternalArgs = new ImmutableList.Builder<String>()
-                    .addAll(rightInternalArgs)
-                    .addAll(curArg.getPhrase())
-                    .build();
-                break;
-            default: assert false;
-            }
-            curCat = curCat.getLeft();
-        }
-
-        final Noun subject = (Noun) args.get(1).getPredication();
         final ImmutableList<String> allVerbWords = getVerbWithoutSplit();
-
-        final ImmutableList<String> subjWords = subject.getPhrase();
         final ImmutableList<String> auxChain;
         final ImmutableList<String> verbWords;
         if(particle.isPresent()) {
@@ -205,12 +186,48 @@ public final class Verb extends Predication {
             verbWords = allVerbWords.subList(allVerbWords.size() - 1, allVerbWords.size());
         }
 
+        ImmutableList<String> leftArgs = ImmutableList.of();
+        ImmutableList<String> rightArgs = ImmutableList.of();
+        Category curCat = getPredicateCategory();
+        while(!(desiredCategory.matches(curCat) || curCat.matches(desiredCategory))) { // in case there are disagreeing features (we want to ignore them)
+            Predication curArg = args.get(curCat.getNumberOfArguments()).getPredication();
+            Category curArgCat = curCat.getArgument(curCat.getNumberOfArguments());
+            Slash slash = curCat.getSlash();
+            switch(slash) {
+            case BWD: leftArgs = new ImmutableList.Builder<String>()
+                    .addAll(curArg.getPhrase(curArgCat))
+                    .addAll(leftArgs)
+                    .build();
+                break;
+            case FWD: rightArgs = new ImmutableList.Builder<String>()
+                    .addAll(rightArgs)
+                    .addAll(curArg.getPhrase(curArgCat))
+                    .build();
+                break;
+            default: assert false;
+            }
+            curCat = curCat.getLeft();
+            if(Category.valueOf("(S\\NP)").matches(curCat)) {
+                leftArgs = new ImmutableList.Builder<String>()
+                    .addAll(auxChain)
+                    .addAll(leftArgs)
+                    .build();
+            }
+        }
+
+        // ImmutableList<String> prefix;
+        // if(Category.valueOf("S[em]").matches(desiredCategory)) {
+        //     prefix = ImmutableList.of("that");
+        // } else if(Category.valueOf("S[for]").matches(desiredCategory)) {
+        //     prefix = ImmutableList.of("for");
+        // } else {
+        //     prefix = ImmutableList.of();
+        // }
+
         return new ImmutableList.Builder<String>()
-            .addAll(subjWords)
-            .addAll(auxChain)
-            .addAll(leftInternalArgs)
+            .addAll(leftArgs)
             .addAll(verbWords)
-            .addAll(rightInternalArgs)
+            .addAll(rightArgs)
             .build();
     }
 
@@ -221,11 +238,7 @@ public final class Verb extends Predication {
 
     @Override
     public Verb transformArgs(BiFunction<Integer, ImmutableList<Argument>, ImmutableList<Argument>> transform) {
-        ImmutableMap<Integer, ImmutableList<Argument>> newArgs = getArgs()
-            .entrySet()
-            .stream()
-            .collect(toImmutableMap(e -> e.getKey(), e -> (transform.apply(e.getKey(), e.getValue()))));
-        return new Verb(getPredicate(), getPredicateCategory(), newArgs,
+        return new Verb(getPredicate(), getPredicateCategory(), transformArgsAux(transform),
                         tense, modal, voice, isPerfect, isProgressive, isNegated, particle);
     }
 
@@ -257,16 +270,17 @@ public final class Verb extends Predication {
         while(!done.matches(curCat)) { // we're not including the subject
             if(!focalArgNumOpt.isPresent() || focalArgNumOpt.get() != curCat.getNumberOfArguments()) {
                 Predication curArg = args.get(curCat.getNumberOfArguments()).getPredication();
+                Category curArgCat = curCat.getArgument(curCat.getNumberOfArguments());
                 Slash slash = curCat.getSlash();
                 switch(slash) {
                 case BWD: leftInternalArgs = new ImmutableList.Builder<String>()
-                        .addAll(curArg.getPhrase())
+                        .addAll(curArg.getPhrase(curArgCat))
                         .addAll(leftInternalArgs)
                         .build();
                     break;
                 case FWD: rightInternalArgs = new ImmutableList.Builder<String>()
                         .addAll(rightInternalArgs)
-                        .addAll(curArg.getPhrase())
+                        .addAll(curArg.getPhrase(curArgCat))
                         .build();
                     break;
                 default: assert false;
@@ -276,7 +290,7 @@ public final class Verb extends Predication {
         }
 
         Noun subject = (Noun) args.get(1).getPredication();
-        ImmutableList<String> subjWords = subject.getPhrase();
+        ImmutableList<String> subjWords = subject.getPhrase(Category.NP);
 
         // we're going to flip the auxiliary only if the subject is not focal and the subject's string form is nonempty
         boolean flipAuxiliary = (!focalArgNumOpt.isPresent() || focalArgNumOpt.get() != 1) && subjWords.size() > 0;
@@ -309,7 +323,7 @@ public final class Verb extends Predication {
                 verbWords = wordsForFlip.subList(wordsForFlip.size() - 1, wordsForFlip.size());
             }
             questionPrefix = new ImmutableList.Builder<String>()
-                .addAll(args.get(focalArgNumOpt.get()).getPredication().getPhrase())
+                .addAll(args.get(focalArgNumOpt.get()).getPredication().getPhrase(Category.NP))
                 .addAll(flippedAux)
                 .addAll(subjWords)
                 .addAll(remainingAuxChain)
@@ -350,15 +364,51 @@ public final class Verb extends Predication {
         return getPredicate().equals("be");
     }
 
+    public Tense getTense() {
+        return tense;
+    }
+
+    public Voice getVoice() {
+        return voice;
+    }
+
+    public boolean isPerfect() {
+        return isPerfect;
+    }
+
+    public boolean isProgressive() {
+        return isProgressive;
+    }
+
+    public boolean isNegated() {
+        return isNegated;
+    }
+
+    public Verb withTense(Tense newTense) {
+        if(newTense == Tense.MODAL) {
+            throw new IllegalArgumentException("must use withModal() to give modal tense");
+        }
+        return new Verb(getPredicate(), getPredicateCategory(), getArgs(),
+                        newTense, Optional.empty(),
+                        voice, isPerfect, isProgressive, isNegated, particle);
+    }
+
     public Verb withModal(String modal) {
         return new Verb(getPredicate(), getPredicateCategory(), getArgs(),
                         Tense.MODAL, Optional.of(modal),
                         voice, isPerfect, isProgressive, isNegated, particle);
     }
 
+    public Verb withNegation(boolean newNegated) {
+        return new Verb(getPredicate(), getPredicateCategory(), getArgs(),
+                        tense, modal,
+                        voice, isPerfect, isProgressive, newNegated, particle);
+    }
+
     /* protected methods */
 
-    protected Verb(String predicate,
+    // TODO: make a pro-verb constructor so this can be protected again
+    public Verb(String predicate,
                    Category predicateCategory,
                    ImmutableMap<Integer, ImmutableList<Argument>> args,
                    Tense tense,
@@ -456,20 +506,18 @@ public final class Verb extends Predication {
         }
 
         if(tense == Tense.BARE_VERB) {
-            if(isPerfect || voice == Voice.PASSIVE) {
-                verbStack.addFirst(VerbHelper.getPastParticiple(getPredicate()));
-            } else if(isProgressive) {
-                verbStack.addFirst(VerbHelper.getPresentParticiple(getPredicate()));
-            } else if(voice == Voice.ADJECTIVE) {
-                verbStack.addFirst(getPredicate());
-            } else if(voice == Voice.ACTIVE) {
-                verbStack.addFirst(getPredicate());
-            } else {
-                System.err.println("unhandled case of NONE tense:");
-                System.err.println(getPredicateCategory());
-                System.err.println(getPredicate());
-                System.err.println(voice.name());
-                assert false;
+            switch(voice) {
+            case PASSIVE: verbStack.addFirst(VerbHelper.getPastParticiple(getPredicate())); break;
+            case ADJECTIVE: verbStack.addFirst(getPredicate()); break;
+            case ACTIVE:
+                if(isPerfect) {
+                    verbStack.addFirst(VerbHelper.getPastParticiple(getPredicate()));
+                } else if(isProgressive) {
+                    verbStack.addFirst(VerbHelper.getPresentParticiple(getPredicate()));
+                } else {
+                    verbStack.addFirst(getPredicate());
+                }
+                break;
             }
             return verbStack;
         } else {

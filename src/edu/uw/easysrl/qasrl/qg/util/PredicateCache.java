@@ -5,13 +5,13 @@ import com.google.common.collect.HashBasedTable;
 
 public final class PredicateCache {
 
-    public Noun getNoun(int index) {
-        return (Noun) getPredication(index, Predication.Type.NOUN);
-    }
+    // public Noun getNoun(int index) {
+    //     return (Noun) getPredication(index, Predication.Type.NOUN);
+    // }
 
-    public Verb getVerb(int index) {
-        return (Verb) getPredication(index, Predication.Type.VERB);
-    }
+    // public Verb getVerb(int index) {
+    //     return (Verb) getPredication(index, Predication.Type.VERB);
+    // }
 
     public Predication getPredication(int index, Predication.Type predType) {
         if(preds.contains(index, predType)) {
@@ -21,6 +21,9 @@ public final class PredicateCache {
             switch(predType) {
             case VERB: result = Verb.getFromParse(index, this, parse); break;
             case NOUN: result = Noun.getFromParse(index, parse); break;
+            case PREPOSITION: result = Preposition.getFromParse(index, this, parse); break;
+            case ADVERB: result = Adverb.getFromParse(index, this, parse); break;
+            // case CLAUSE: result = Clause.getFromParse(index, this, parse); break;
             default: assert false; result = null;
             }
             preds.put(index, predType, result);

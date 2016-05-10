@@ -17,10 +17,11 @@ import com.google.common.collect.ImmutableSet;
 
 public final class PredicationUtils {
 
-
-    public static Predication withIndefinitePronouns(Predication pred) {
-        if(pred instanceof Verb) {
-            return ((Verb) pred).transformArgs((argNum, args) -> {
+    public static <T extends Predication> T withIndefinitePronouns(T pred) {
+        if(pred instanceof Noun) {
+            return (T) ((Noun) pred).getPronoun().withDefiniteness(Noun.Definiteness.INDEFINITE);
+        } else {
+            return (T) pred.transformArgs((argNum, args) -> {
                     if(Category.NP.matches(pred.getPredicateCategory().getArgument(argNum))) {
                         final Pronoun pro;
                         if(args.isEmpty()) {
@@ -37,24 +38,15 @@ public final class PredicationUtils {
                             .collect(toImmutableList());
                     }
                 });
-        } else if(pred instanceof Noun) {
-            return ((Noun) pred).getPronoun().withDefiniteness(Noun.Definiteness.INDEFINITE);
-        } else {
-            System.err.println("Skipping replacing args with indefinite pronouns. pred: " +
-                               pred.getPredicate() + " (" + pred.getPredicateCategory() + ")");
-            return pred;
         }
     }
 
-    // :( this is sad. need better abstraction. thing to transform from any A <: Predication to A.
-    public static Verb addPlaceholderArguments(Verb verb) {
-        return (Verb) addPlaceholderArguments((Predication) verb);
-    }
-
-    public static Predication addPlaceholderArguments(Predication pred) {
-        return pred.transformArgs((argNum, args) -> {
+    public static <T extends Predication> T addPlaceholderArguments(T pred) {
+        return (T) pred.transformArgs((argNum, args) -> {
                 if(args.size() > 0) {
-                    return args;
+                    return args.stream()
+                        .map(arg -> new Argument(arg.getDependency(), addPlaceholderArguments(arg.getPredication())))
+                        .collect(toImmutableList());
                 } else {
                     // TODO XXX should add indefinite pro-form of the correct category.
                     if(!pred.getPredicateCategory().getArgument(argNum).matches(Category.NP)) {
@@ -67,10 +59,10 @@ public final class PredicationUtils {
             });
     }
 
-    public static ImmutableList<Verb> sequenceVerbArgChoices(Verb verb) {
-        final ImmutableList<ImmutableMap<Integer, Argument>> sequencedArgChoices = sequenceMap(verb.getArgs());
-        return sequencedArgChoices.stream()
-            .map(argChoice -> verb.transformArgs((argNum, args) -> ImmutableList.of(argChoice.get(argNum))))
+    public static <T extends Predication> ImmutableList<T> sequenceArgChoices(T pred) {
+        final ImmutableList<ImmutableMap<Integer, Argument>> sequencedArgChoices = sequenceMap(pred.getArgs());
+        return (ImmutableList<T>) sequencedArgChoices.stream()
+            .map(argChoice -> pred.transformArgs((argNum, args) -> ImmutableList.of(argChoice.get(argNum))))
             .collect(toImmutableList());
     }
 

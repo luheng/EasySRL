@@ -118,8 +118,14 @@ public abstract class Noun extends Predication {
             number = Optional.empty();
         }
 
-        // TODO we could try and predict this... not clear how though
-        final Optional<Gender> gender = Optional.empty();
+        // TODO we could try and predict this... not clear how though.
+        // heuristic: proper nouns animate, all others inanimate
+        final Optional<Gender> gender;
+        if(nounPOS.equals("NNP") || nounPOS.equals("NNPS")) {
+            gender = Optional.of(Gender.ANIMATE);
+        } else {
+            gender = Optional.of(Gender.INANIMATE);
+        }
 
         // only pronouns can be non-third person
         final Person person = Person.THIRD;

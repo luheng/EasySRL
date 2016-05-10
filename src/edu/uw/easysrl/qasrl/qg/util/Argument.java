@@ -18,4 +18,9 @@ public final class Argument {
     public static Argument withNoDependency(Predication pred) {
         return new Argument(Optional.empty(), pred);
     }
+
+    @Override
+    public String toString() {
+        return String.format("(%s, %s)", depOpt, pred.getPredicate());
+    }
 }
