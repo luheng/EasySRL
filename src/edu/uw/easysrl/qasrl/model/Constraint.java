@@ -16,6 +16,9 @@ public abstract class Constraint {
     protected double strength;
     protected String hashString;
 
+    // A hack.
+    public double prediction;
+
     Constraint(boolean isPositive, double strength) {
         this.isPositive = isPositive;
         this.strength = strength;

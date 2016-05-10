@@ -46,7 +46,7 @@ public class DependencyInstanceHelper {
         return false;
     }
 
-    static DependencyInstanceType getDependencyType(ScoredQuery<QAStructureSurfaceForm> query, int headId, int argId) {
+    public static DependencyInstanceType getDependencyType(ScoredQuery<QAStructureSurfaceForm> query, int headId, int argId) {
         for (QAStructureSurfaceForm qa : query.getQAPairSurfaceForms()) {
             for (QuestionStructure qstr : qa.getQuestionStructures()) {
                 // Verb-PP argument (undirected).

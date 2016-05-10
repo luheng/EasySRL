@@ -25,13 +25,13 @@ public class FeatureExtractor {
     CountDictionary featureMap;
     private boolean acceptNewFeatures = true;
 
-    boolean addCategoryFeatures = true;
+    boolean addCategoryFeatures = false;
     boolean addNBestPriorFeatures = true;
     boolean addTemplateBasedFeatures = true;
     boolean addAnnotationFeatures = true;
-    boolean addNAOptionFeature = true;
-    boolean addAnswerLexicalFeatures = true;
-    boolean addArgumentPositionFeatures = true;
+    boolean addNAOptionFeature = false;
+    boolean addAnswerLexicalFeatures = false;
+    boolean addArgumentPositionFeatures = false;
 
     FeatureExtractor() {
         featureMap = new CountDictionary();
@@ -157,7 +157,7 @@ public class FeatureExtractor {
             final String sentenceStr = sentence.stream().collect(Collectors.joining(" "));
             if (options.stream()
                     .map(op -> query.getOptions().get(op).toLowerCase())
-                    .anyMatch(op -> Stream.of(" who ", " that ", " which ")
+                    .anyMatch(op -> Stream.of(" who ", " that ", " which ", " , who ", " , which ")
                             .anyMatch(tok -> sentenceStr.contains(op + tok)))) {
                 addFeature(features, "FollowedBy=who/that/which", 1);
             }
@@ -221,12 +221,13 @@ public class FeatureExtractor {
                 .map(i -> (int) annotation.stream().filter(ops -> ops.contains(i)).count())
                 .collect(GuavaCollectors.toImmutableList());
 
-        addFeature(features, "DependencyType=" + instanceType, 1.0);
-        if (instanceType == DependencyInstanceType.PPGovernor || instanceType == DependencyInstanceType.PPObject) {
-            if (headId > 0 && sentence.get(headId - 1).equalsIgnoreCase("such") && sentence.get(headId).equals("as")) {
-                addFeature(features, "Preposition=" + "such as", 1.0);
-            } else {
-                addFeature(features, "Preposition=" + sentence.get(headId).toLowerCase(), 1.0);
+        if (addAnswerLexicalFeatures) {
+            if (instanceType == DependencyInstanceType.PPGovernor || instanceType == DependencyInstanceType.PPObject) {
+                if (headId > 0 && sentence.get(headId - 1).equalsIgnoreCase("such") && sentence.get(headId).equals("as")) {
+                    addFeature(features, "Preposition=" + "such as", 1.0);
+                } else {
+                    addFeature(features, "Preposition=" + sentence.get(headId).toLowerCase(), 1.0);
+                }
             }
         }
 
@@ -235,6 +236,8 @@ public class FeatureExtractor {
             addFeature(features, "NAOptionReceivedVotes", 1.0 * annotation.stream()
                     .filter(ops -> ops.contains(naOptionId)).count() / numAnnotators);
         }
+
+        addFeature(features, "DependencyType=" + instanceType, 1.0);
 
         final double nBestPrior = nBestList.getParses().stream()
                 .filter(parse -> parse.dependencies.stream()
@@ -252,14 +255,16 @@ public class FeatureExtractor {
             addFeature(features, "MaxReceivedVotes", maxVotes);
         }
 
-        // Head arg distance.
-        addFeature(features, "HeadArgDist", Math.abs(headId - argId));
+        if (addArgumentPositionFeatures) {
+            // Head arg distance.
+            addFeature(features, "HeadArgDist", Math.abs(headId - argId));
 
-        // Comma and other stuff in between.
-        for (int i = Math.min(headId, argId) + 1; i < Math.max(headId, argId); i++) {
-            final String token = sentence.get(i).toLowerCase();
-            if (ImmutableSet.of(",", "and", "of").contains(token)) {
-                addFeature(features, "TokenBetweenHeadAndArg=" + token, 1.0);
+            // Comma and other stuff in between.
+            for (int i = Math.min(headId, argId) + 1; i < Math.max(headId, argId); i++) {
+                final String token = sentence.get(i).toLowerCase();
+                if (ImmutableSet.of(",", "and", "of").contains(token)) {
+                    addFeature(features, "TokenBetweenHeadAndArg=" + token, 1.0);
+                }
             }
         }
 

@@ -27,6 +27,7 @@ import ml.dmlc.xgboost4j.java.XGBoostError;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static com.google.common.collect.ImmutableMap.builder;
 
@@ -74,8 +75,9 @@ public class ClassificationExperimentNew {
         reparsingParameters.negativeConstraintMaxAgreement = 1;
         reparsingParameters.skipPronounEvidence = false;
         reparsingParameters.jeopardyQuestionWeight = 1.0;
-        reparsingParameters.attachmentPenaltyWeight = 1.0;
-        reparsingParameters.supertagPenaltyWeight = 1.0;
+        reparsingParameters.attachmentPenaltyWeight = 5.0;
+        reparsingParameters.supertagPenaltyWeight = 5.0;
+        reparsingParameters.oraclePenaltyWeight = 5.0;
 
         myParser = new HITLParser(nBest);
         myParser.setQueryPruningParameters(queryPruningParameters);
@@ -138,19 +140,20 @@ public class ClassificationExperimentNew {
                 cleftingFeatureExtractor, alignedQueries, alignedAnnotations);
 
         final Map<String, Object> params1 = ImmutableMap.of(
-                "eta", 0.05,
+                "eta", 0.1, // 0.05,
                 "min_child_weight", 0.1,
                 "max_depth", 3,
                 "objective", "binary:logistic"
         );
+        /*
         final Map<String, Object> params2 = ImmutableMap.of(
                 "eta", 0.05,
-                "min_child_weight", 5.0,
-                "max_depth", 20,
+                "min_child_weight", 0.1,
+                "max_depth", 3,
                 "objective", "binary:logistic"
-        );
+        );*/
         coreArgClassifier = Classifier.trainClassifier(coreArgTrainInstances, params1, 100);
-        cleftingClassifier = Classifier.trainClassifier(cleftingTrainInstances, params2, 20);
+        cleftingClassifier = Classifier.trainClassifier(cleftingTrainInstances, params1, 30);
     }
 
     private ImmutableMap<String, Double> reparse(boolean skipCleftingQueries) {
@@ -195,7 +198,6 @@ public class ClassificationExperimentNew {
                 avgUnlabeledHeuristicReparsed = new Results(),
                 avgUnlabeledOracleReparsed = new Results();
         int numImproved = 0, numWorsened = 0, numUnlabeledImproved = 0, numUnlabeledWorsened = 0;
-        int numHeuristicConstraints = 0;
 
         for (int sentenceId : devSents) {
             Set<Constraint> allConstraints = new HashSet<>(),
@@ -211,6 +213,8 @@ public class ClassificationExperimentNew {
                     unlabeledReparsedF1 = unlabeledBaselineF1, unlabeledHeuristicReparsedF1 = unlabeledBaselineF1,
                     unlabeledOracleReparsedF1 = unlabeledReparsedF1;
 
+            String debugBuffer = "";
+
             for (int r = 0; r < alignedQueries.get(sentenceId).size(); r++) {
                 final int qid = r;
                 final ScoredQuery<QAStructureSurfaceForm> query = alignedQueries.get(sentenceId).get(qid);
@@ -220,15 +224,15 @@ public class ClassificationExperimentNew {
                     continue;
                 }
 
-                System.out.println(query.toString(sentence,
+                debugBuffer += query.toString(sentence,
                         'G', myParser.getGoldOptions(query),
                         'U', myParser.getUserOptions(query, annotation),
                         'B', myParser.getOneBestOptions(query),
-                        '*', AnnotationUtils.getUserResponseDistribution(query, annotation)));
+                        '*', AnnotationUtils.getUserResponseDistribution(query, annotation)) + "\n";
 
                 Set<Constraint> constraints = new HashSet<>(),
                                 heuristicConstraints = myParser.getConstraints(query, annotation),
-                                oracleConstraints = myParser.getOracleConstraints(query, myParser.getGoldOptions(query));
+                                oracleConstraints = myParser.getOracleConstraints(query); //, myParser.getGoldOptions(query));
 
                 Set<String> predictions = new HashSet<>();
                 IntStream.range(0, coreArgsPred.size()).boxed()
@@ -236,9 +240,13 @@ public class ClassificationExperimentNew {
                             final DependencyInstance inst = coreArgDevInstances.get(i);
                             if (inst.sentenceId == sentenceId && inst.queryId == qid) {
                                 final boolean pred = coreArgsPred.get(i) > 0.5;
-                                constraints.add(pred ?
-                                        new Constraint.AttachmentConstraint(inst.headId, inst.argId, true, 1.0) :
-                                        new Constraint.AttachmentConstraint(inst.headId, inst.argId, false, 1.0));
+                                Constraint newConstraint = pred ?
+                                        new Constraint.AttachmentConstraint(inst.headId, inst.argId, true, reparsingParameters.attachmentPenaltyWeight) :
+                                        new Constraint.AttachmentConstraint(inst.headId, inst.argId, false, reparsingParameters.attachmentPenaltyWeight);
+                                newConstraint.prediction = coreArgsPred.get(i);
+                                //if (coreArgsPred.get(i) > 0.7 || coreArgsPred.get(i) < 0.2) {
+                                    constraints.add(newConstraint);
+                                //}
                                 predictions.add(String.format("%s\tGold=%b\tPred=%.2f\t%d:%s-->%d:%s",
                                         pred == inst.inGold ? "[Y]" : "[N]", inst.inGold, coreArgsPred.get(i),
                                         inst.headId, sentence.get(inst.headId), inst.argId, sentence.get(inst.argId)));
@@ -250,14 +258,21 @@ public class ClassificationExperimentNew {
                             final DependencyInstance inst = cleftingDevInstances.get(i);
                             if (inst.sentenceId == sentenceId && inst.queryId == qid) {
                                 final boolean pred = cleftingPred.get(i) > 0.5;
-                                constraints.add(pred ?
-                                        new Constraint.AttachmentConstraint(inst.headId, inst.argId, true, 1.0) :
-                                        new Constraint.AttachmentConstraint(inst.headId, inst.argId, false, 1.0));
-                                predictions.add(String.format("%s\tGold=%b\tPred=%.2f\t%d:%s-->%d:%s",
-                                        pred == inst.inGold ? "[Y]" : "[N]", inst.inGold, cleftingPred.get(i),
-                                        inst.headId, sentence.get(inst.headId), inst.argId, sentence.get(inst.argId)));
+                                Constraint newConstraint = pred ?
+                                        new Constraint.AttachmentConstraint(inst.headId, inst.argId, true, reparsingParameters.attachmentPenaltyWeight) :
+                                        new Constraint.AttachmentConstraint(inst.headId, inst.argId, false, reparsingParameters.attachmentPenaltyWeight);
+                                newConstraint.prediction = cleftingPred.get(i);
+                                //if (cleftingPred.get(i) > 0.7 || cleftingPred.get(i) < 0.5) {
+                                    constraints.add(newConstraint);
+                                    predictions.add(String.format("%s\tGold=%b\tPred=%.2f\t%d:%s-->%d:%s",
+                                            pred == inst.inGold ? "[Y]" : "[N]", inst.inGold, cleftingPred.get(i),
+                                            inst.headId, sentence.get(inst.headId), inst.argId, sentence.get(inst.argId)));
+                                //}
                             }
                         });
+
+                heuristicConstraints.stream().filter(Constraint.SupertagConstraint.class::isInstance)
+                        .forEach(constraints::add);
 
                 allConstraints.addAll(constraints);
                 allHeuristicConstraints.addAll(heuristicConstraints);
@@ -273,23 +288,71 @@ public class ClassificationExperimentNew {
                 unlabeledHeuristicReparsedF1 = CcgEvaluation.evaluateUnlabeled(heuristicReparsed.dependencies, gold.dependencies);
                 unlabeledOracleReparsedF1 = CcgEvaluation.evaluateUnlabeled(oracleReparsed.dependencies, gold.dependencies);
 
-                System.out.println(String.format("Baseline  :\t%.2f%%\tunlabeled:\t%.2f%%", 100.0 * baselineF1.getF1(), 100.0 * unlabeledBaselineF1.getF1()));
-                System.out.println(String.format("Heuristic :\t%.2f%%\tunlabeled:\t%.2f%%", 100.0 * heuristicReparsedF1.getF1(), 100.0 * unlabeledHeuristicReparsedF1.getF1()));
-                System.out.println(String.format("Classifier:\t%.2f%%\tunlabeled:\t%.2f%%", 100.0 * reparsedF1.getF1(), 100.0 * unlabeledReparsedF1.getF1()));
-                System.out.println(String.format("Oracle    :\t%.2f%%\tunlabeled:\t%.2f%%", 100.0 * oracleReparsedF1.getF1(), 100.0 * unlabeledOracleReparsedF1.getF1()));
+                debugBuffer += String.format("Baseline  :\t%.2f%%\tunlabeled:\t%.2f%%\n", 100.0 * baselineF1.getF1(), 100.0 * unlabeledBaselineF1.getF1())
+                        + String.format("Heuristic :\t%.2f%%\tunlabeled:\t%.2f%%\n", 100.0 * heuristicReparsedF1.getF1(), 100.0 * unlabeledHeuristicReparsedF1.getF1())
+                        + String.format("Classifier:\t%.2f%%\tunlabeled:\t%.2f%%\n", 100.0 * reparsedF1.getF1(), 100.0 * unlabeledReparsedF1.getF1())
+                        + String.format("Oracle    :\t%.2f%%\tunlabeled:\t%.2f%%\n", 100.0 * oracleReparsedF1.getF1(), 100.0 * unlabeledOracleReparsedF1.getF1())
+                        + "----- prediction -----\n"
+                        + predictions.stream().collect(Collectors.joining("\n")) + "\n"
+                        + "----- classifier constraints -----\n"
+                        + constraints.stream().map(c -> c.toString(sentence)).collect(Collectors.joining("\n")) + "\n"
+                        + "----- heuristic constraints -----\n"
+                        + heuristicConstraints.stream().map(c -> c.toString(sentence)).collect(Collectors.joining("\n")) + "\n"
+                        + "----- oracle constraints -----\n"
+                        + oracleConstraints.stream().map(c -> c.toString(sentence)).collect(Collectors.joining("\n")) + "\n\n";
 
-                System.out.println("----- prediction -----");
-                predictions.forEach(System.out::println);
-                System.out.println("----- classifier constraints -----");
-                constraints.forEach(c -> System.out.println(c.toString(sentence)));
-                System.out.println("----- heuristic constraints -----");
-                heuristicConstraints.forEach(c -> System.out.println(c.toString(sentence)));
-                System.out.println("----- oracle constraints -----");
-                oracleConstraints.forEach(c -> System.out.println(c.toString(sentence)));
-                System.out.println();
+                if (!heuristicConstraints.stream().anyMatch(Constraint.SupertagConstraint.class::isInstance)) {
+                    // Compute positive/negative F1 of heuristic vs. oracle.
+                    final ImmutableSet<Constraint.AttachmentConstraint> positiveOracle = oracleConstraints.stream()
+                            .filter(Constraint.AttachmentConstraint.class::isInstance)
+                            .filter(Constraint::isPositive)
+                            .map(c -> (Constraint.AttachmentConstraint) c)
+                            .collect(GuavaCollectors.toImmutableSet());
+                    final ImmutableSet<Constraint.AttachmentConstraint> negativeOracle = oracleConstraints.stream()
+                            .filter(Constraint.AttachmentConstraint.class::isInstance)
+                            .filter(c -> !c.isPositive())
+                            .map(c -> (Constraint.AttachmentConstraint) c)
+                            .collect(GuavaCollectors.toImmutableSet());
+                    heuristicPositive.add(F1.computeConstraintF1(
+                            heuristicConstraints.stream()
+                                    .filter(Constraint.AttachmentConstraint.class::isInstance)
+                                    .filter(Constraint::isPositive)
+                                    .map(c -> (Constraint.AttachmentConstraint) c)
+                                    .collect(GuavaCollectors.toImmutableSet()),
+                            positiveOracle));
+                    heuristicNegative.add(F1.computeConstraintF1(
+                            heuristicConstraints.stream()
+                                    .filter(Constraint.AttachmentConstraint.class::isInstance)
+                                    .filter(c -> !c.isPositive())
+                                    .map(c -> (Constraint.AttachmentConstraint) c)
+                                    .collect(GuavaCollectors.toImmutableSet()),
+                            negativeOracle));
+                    classifierPositive.entrySet()
+                            .forEach(e -> {
+                                final double threshold = e.getKey();
+                                e.getValue().add(F1.computeConstraintF1(
+                                        constraints.stream()
+                                                .filter(Constraint.AttachmentConstraint.class::isInstance)
+                                                .filter(Constraint::isPositive)
+                                                .filter(c -> c.prediction > threshold + 1e-6)
+                                                .map(c -> (Constraint.AttachmentConstraint) c)
+                                                .collect(GuavaCollectors.toImmutableSet()),
+                                        positiveOracle));
+                            });
+                    classifierNegative.entrySet()
+                            .forEach(e -> {
+                                final double threshold = e.getKey();
+                                e.getValue().add(F1.computeConstraintF1(
+                                        constraints.stream()
+                                                .filter(Constraint.AttachmentConstraint.class::isInstance)
+                                                .filter(c -> !c.isPositive())
+                                                .filter(c -> c.prediction < threshold - 1e-6)
+                                                .map(c -> (Constraint.AttachmentConstraint) c)
+                                                .collect(GuavaCollectors.toImmutableSet()),
+                                        negativeOracle));
+                            });
+                }
             }
-
-            numHeuristicConstraints += allHeuristicConstraints.size();
 
             avgBaseline.add(baselineF1);
             avgReparsed.add(reparsedF1);
@@ -300,23 +363,30 @@ public class ClassificationExperimentNew {
             avgUnlabeledOracleReparsed.add(unlabeledOracleReparsedF1);
             avgUnlabeledHeuristicReparsed.add(unlabeledHeuristicReparsedF1);
 
-            System.out.print(String.format("SID=%d\t%.2f%% --> %.2f%%\t\t", sentenceId,
-                    100.0 * baselineF1.getF1(), 100.0 * reparsedF1.getF1()));
             if (baselineF1.getF1() + 1e-6 < reparsedF1.getF1()) {
-                numImproved ++;
-                System.out.println("[improved]");
+                numImproved++;
             } else if (baselineF1.getF1() > reparsedF1.getF1() + 1e-6) {
-                numWorsened ++;
-                System.out.println("[worsened]");
-            } else {
-                System.out.println("[unchanged]");
+                numWorsened++;
             }
             if (unlabeledBaselineF1.getF1() + 1e-6 < unlabeledReparsedF1.getF1()) {
-                numUnlabeledImproved ++;
+                numUnlabeledImproved++;
             } else if (unlabeledBaselineF1.getF1() > unlabeledReparsedF1.getF1() + 1e-6) {
-                numUnlabeledWorsened ++;
+                numUnlabeledWorsened++;
             }
-            System.out.println();
+
+            if (reparsedF1.getF1() + 1e-6 < heuristicReparsedF1.getF1()) {
+                System.out.println(debugBuffer);
+                System.out.print(String.format("SID=%d\t%.2f%% --> %.2f%%\t\t", sentenceId,
+                        100.0 * baselineF1.getF1(), 100.0 * reparsedF1.getF1()));
+                if (baselineF1.getF1() + 1e-6 < reparsedF1.getF1()) {
+                    System.out.println("[improved]");
+                } else if (baselineF1.getF1() > reparsedF1.getF1() + 1e-6) {
+                    System.out.println("[worsened]");
+                } else {
+                    System.out.println("[unchanged]");
+                }
+                System.out.println();
+            }
         }
 
         System.out.println();
@@ -330,9 +400,6 @@ public class ClassificationExperimentNew {
         System.out.println("Num worsened:\t" + numWorsened);
         System.out.println("Num unlabeled improved:\t" + numUnlabeledImproved);
         System.out.println("Num unlabeled worsened:\t" + numUnlabeledWorsened);
-
-
-        System.out.println("Heuristic constraints:\t" + numHeuristicConstraints);
 
         return ImmutableMap.<String, Double>builder()
                 .put("avg_baseline", 100.0 * avgBaseline.getF1())
@@ -367,9 +434,17 @@ public class ClassificationExperimentNew {
             "num_unlabeled_worsened"
     );
 
+    static F1 heuristicPositive = new F1(), heuristicNegative = new F1();
+    static HashMap<Double, F1> classifierPositive = new HashMap<>(), classifierNegative = new HashMap<>();
+    static {
+        Stream.of(0.5, 0.6, 0.7, 0.8, 0.9).forEach(t -> classifierPositive.put(t, new F1()));
+        Stream.of(0.5, 0.4, 0.3, 0.2, 0.1).forEach(t -> classifierNegative.put(t, new F1()));
+    }
+
     public static void main(String[] args) {
         final int initialRandomSeed = 12345;
         final int numRandomRuns = 1;
+
         Random random = new Random(initialRandomSeed);
         ImmutableList<Integer> randomSeeds = IntStream.range(0, numRandomRuns)
                 .boxed().map(r -> random.nextInt())
@@ -380,14 +455,15 @@ public class ClassificationExperimentNew {
         Map<String, List<Double>> aggregatedResultsNoClefting = new HashMap<>();
         for (int i = 0; i < numRandomRuns; i++) {
             ClassificationExperimentNew experiment = new ClassificationExperimentNew(ImmutableList.of(0.6, 0.4, 0.0), randomSeeds.get(i)); //12345);
-            ImmutableMap<String, Double> results1 = experiment.reparse(false /* no clefting */);
+            //ImmutableMap<String, Double> results1 = experiment.reparse(false /* with clefting */);
             ImmutableMap<String, Double> results2 = experiment.reparse(true /* no clefting */);
+            /*
             results1.keySet().forEach(k -> {
                 if (!aggregatedResults.containsKey(k)) {
                     aggregatedResults.put(k, new ArrayList<>());
                 }
                 aggregatedResults.get(k).add(results1.get(k));
-            });
+            });*/
             results2.keySet().forEach(k -> {
                 if (!aggregatedResultsNoClefting.containsKey(k)) {
                     aggregatedResultsNoClefting.put(k, new ArrayList<>());
@@ -397,16 +473,23 @@ public class ClassificationExperimentNew {
         }
 
         // Print aggregated results.
+        /*
         resultKeys.forEach(k -> {
             final List<Double> results = aggregatedResults.get(k);
             System.out.println(String.format("%s\t%.3f\t%.3f", k, ClassificationUtils.getAverage(results),
                     ClassificationUtils.getStd(results)));
-        });
+        }); */
         System.out.println("No clefting");
         resultKeys.forEach(k -> {
             final List<Double> results = aggregatedResultsNoClefting.get(k);
             System.out.println(String.format("%s\t%.3f\t%.3f", k, ClassificationUtils.getAverage(results),
                     ClassificationUtils.getStd(results)));
         });
+
+        System.out.println("HeuristicPositive:\t" + heuristicPositive);
+        System.out.println("HeuristicNegative:\t" + heuristicNegative);
+        classifierPositive.entrySet().forEach(e -> System.out.println("Classifier > " + e.getKey() + "\t" + e.getValue()));
+        classifierNegative.entrySet().forEach(e -> System.out.println("Classifier < " + e.getKey() + "\t" + e.getValue()));
+
     }
 }

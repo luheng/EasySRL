@@ -29,7 +29,7 @@ import java.util.stream.Stream;
  */
 public class ClassificationUtils {
 
-    static int maxAllowedNAVotes = 2;
+    static int maxAllowedNAVotes = 1;
 
     /**
      * Split a list of objects into n parts.

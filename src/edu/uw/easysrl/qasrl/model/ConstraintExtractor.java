@@ -34,13 +34,13 @@ public class ConstraintExtractor {
                                     .distinct()
                                     .filter(argId -> argId != headId)
                                     .forEach(argId -> constraints.add(new Constraint.AttachmentConstraint(headId, argId, true, 1.0)));
-
                             // Verb to PP dependency.
+                            /*
                             if (qstr.targetPrepositionIndex >= 0 && qstr.targetPrepositionIndex != qstr.predicateIndex) {
                                 constraints.add(new Constraint.AttachmentConstraint(qstr.predicateIndex, qstr.targetPrepositionIndex, true, 1.0));
                                 // Undirected PP-Verb dependency.
                                 constraints.add(new Constraint.AttachmentConstraint(qstr.targetPrepositionIndex, qstr.predicateIndex, true, 1.0));
-                            }
+                            }*/
                             // Adjunct dependencies in answer.
                             if (query.getQueryType() == QueryType.Clefted) {
                                 qa.getAnswerStructures().stream()
@@ -132,7 +132,7 @@ public class ConstraintExtractor {
                             .filter(argId -> !chosenArgIds.contains(argId))
                             .filter(argId -> !doNotPenalizePronouns ||
                                     !PronounList.englishPronounSet.contains(argIdToSpan.get(argId).toLowerCase()))
-                            .filter(argId -> argId != headId)
+                            .filter(argId -> argId.intValue() != headId.intValue())
                             .forEach(argId -> constraintList.add(
                                     new Constraint.AttachmentConstraint(headId, argId, false, 1.0)))
                     );
