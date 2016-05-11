@@ -42,6 +42,12 @@ public class FeatureExtractor {
         acceptNewFeatures = false;
     }
 
+    /*
+    void freeze(final int minFeatureFreq) {
+        featureMap = new CountDictionary(featureMap, minFeatureFreq);
+        acceptNewFeatures = false;
+    }*/
+
     /**
      *
      * @param headId

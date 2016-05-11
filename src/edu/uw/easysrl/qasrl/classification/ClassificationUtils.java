@@ -192,7 +192,8 @@ public class ClassificationUtils {
         for (int i = 0; i < numInstances; i++) {
             final DependencyInstance instance = instances.get(i);
             labels[i] = instance.inGold ? 1 : 0;
-            weights[i] = (instance.inGold == instance.inOneBest) ? 1 : 2;
+            //weights[i] = (instance.inGold == instance.inOneBest) ? 1 : 2;
+            weights[i] = 1;
             instance.features.keySet().stream().sorted()
                     .forEach(fid -> {
                         colIndices[ptr.get()] = fid;

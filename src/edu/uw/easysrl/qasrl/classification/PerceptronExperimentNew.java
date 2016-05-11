@@ -23,25 +23,21 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
+ * Stacked on XGBoost prediction ...
  * Created by luheng on 5/10/16.
  */
-public class PerceptronExperiment {
+public class PerceptronExperimentNew {
     private static final int nBest = 100;
-
     private HITLParser myParser;
     private Map<Integer, List<AlignedAnnotation>> annotations;
-    private FeatureExtractor coreArgsFeatureExtractor, cleftingFeatureExtractor;
-
+    private PerceptronFeatureExtractor perceptronFeatureExtractor;
     private Map<Integer, List<ScoredQuery<QAStructureSurfaceForm>>> alignedQueries;
     private Map<Integer, List<ImmutableList<ImmutableList<Integer>>>> alignedAnnotations;
     private Map<Integer, List<AlignedAnnotation>> alignedOldAnnotations;
-
     private ImmutableList<Integer> trainSents, devSents;
     private ImmutableList<DependencyInstance> coreArgTrainInstances, coreArgDevInstances,
                                               cleftingTrainInstances, cleftingDevInstances;
-
-    private static final int minFeatureFreq = 3;
-    private Classifier coreArgClassifier, cleftingClassifier;
+    private ImmutableList<Double> coreArgTrainPred, coreArgDevPred;
 
     private static final String[] annotationFiles = {
             "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
@@ -56,6 +52,9 @@ public class PerceptronExperiment {
     public static void main(String[] args) {
         final int initialRandomSeed = 12345;
         final int numRandomRuns = 10;
+        final ImmutableList<Double> split = ImmutableList.of(0.6, 0.4);
+        final int numEpochs = 10;
+        final double learningRate = 0.01;
 
         Random random = new Random(initialRandomSeed);
         ImmutableList<Integer> randomSeeds = IntStream.range(0, numRandomRuns)
@@ -66,10 +65,8 @@ public class PerceptronExperiment {
         Map<String, List<Double>> aggregatedResults = new HashMap<>();
 
         for (int i = 0; i < numRandomRuns; i++) {
-            PerceptronExperiment experiment = new PerceptronExperiment(ImmutableList.of(0.6, 0.4), randomSeeds.get(i));
-            ImmutableMap<String, Double> results = experiment.runPerceptron(5 /* epochs ? */, 0.005 /* learning rate */,
-                    randomSeeds.get(i));
-
+            PerceptronExperimentNew experiment = new PerceptronExperimentNew(split, randomSeeds.get(i));
+            ImmutableMap<String, Double> results = experiment.runPerceptron(numEpochs, learningRate, randomSeeds.get(i));
             results.keySet().forEach(k -> {
                 if (!aggregatedResults.containsKey(k)) {
                     aggregatedResults.put(k, new ArrayList<>());
@@ -86,7 +83,7 @@ public class PerceptronExperiment {
         });
     }
 
-    PerceptronExperiment(final ImmutableList<Double> split, final int randomSeed) {
+    PerceptronExperimentNew(final ImmutableList<Double> split, final int randomSeed) {
         queryPruningParameters = new QueryPruningParameters();
         queryPruningParameters.skipPPQuestions = false;
         queryPruningParameters.skipSAdjQuestions = true;
@@ -132,52 +129,86 @@ public class PerceptronExperiment {
         sentenceIds.forEach(sid -> ClassificationUtils.getQueriesAndAnnotationsForSentence(sid, annotations.get(sid),
                 myParser, alignedQueries, alignedAnnotations, alignedOldAnnotations));
 
-        coreArgsFeatureExtractor = new FeatureExtractor();
-        cleftingFeatureExtractor = new FeatureExtractor();
-
+        FeatureExtractor coreArgsFeatureExtractor = new FeatureExtractor();
+        FeatureExtractor cleftingFeatureExtractor = new FeatureExtractor();
 
         //coreArgsFeatureExtractor.addAnswerLexicalFeatures = false;
-        coreArgsFeatureExtractor.addCategoryFeatures = false;
+        //coreArgsFeatureExtractor.addCategoryFeatures = false;
         //coreArgsFeatureExtractor.addArgumentPositionFeatures = false;
         //coreArgsFeatureExtractor.addNAOptionFeature = false;
         //coreArgsFeatureExtractor.addTemplateBasedFeatures = false;
         //coreArgsFeatureExtractor.addNBestPriorFeatures = false;
 
-        coreArgTrainInstances = ClassificationUtils.getInstances(trainSents, myParser,
-                ImmutableSet.of(QueryType.Forward), coreArgsFeatureExtractor, alignedQueries, alignedAnnotations)
-                .stream()
-                .collect(GuavaCollectors.toImmutableList());
-
-        int numCriticalGoldConstraints = (int) coreArgTrainInstances.stream()
+        ImmutableList<DependencyInstance> xgbCoreArgTrainInstances = ClassificationUtils
+                .getInstances(trainSents, myParser, ImmutableSet.of(QueryType.Forward), coreArgsFeatureExtractor,
+                        alignedQueries, alignedAnnotations);
+        int numCriticalGoldConstraints = (int) xgbCoreArgTrainInstances.stream()
                 .filter(inst -> inst.inGold != inst.inOneBest)
                 .count();
         System.out.println(String.format("Percentage of critical gold constraints: %.3f%%.",
-                100.0 * numCriticalGoldConstraints / coreArgTrainInstances.size()));
-
-        cleftingTrainInstances = ClassificationUtils.getInstances(trainSents, myParser,
-                ImmutableSet.of(QueryType.Clefted), cleftingFeatureExtractor, alignedQueries, alignedAnnotations);
+                100.0 * numCriticalGoldConstraints / xgbCoreArgTrainInstances.size()));
+        ImmutableList<DependencyInstance> xgbCleftingTrainInstances = ClassificationUtils
+                .getInstances(trainSents, myParser, ImmutableSet.of(QueryType.Clefted), cleftingFeatureExtractor,
+                        alignedQueries, alignedAnnotations);
 
         coreArgsFeatureExtractor.freeze();
         cleftingFeatureExtractor.freeze();
 
-        final int numPositiveCoreArgs = (int) coreArgTrainInstances.stream().filter(inst -> inst.inGold).count();
+        final int numTraining = xgbCleftingTrainInstances.size();
+        final int numPositiveCoreArgs = (int) xgbCoreArgTrainInstances.stream().filter(inst -> inst.inGold).count();
         System.out.println(String.format("Extracted %d training samples and %d features, %d positive and %d negative.",
-                coreArgTrainInstances.size(), coreArgsFeatureExtractor.featureMap.size(),
-                numPositiveCoreArgs, coreArgTrainInstances.size() - numPositiveCoreArgs));
+                numTraining, coreArgsFeatureExtractor.featureMap.size(), numPositiveCoreArgs,
+                numTraining - numPositiveCoreArgs));
 
-        final int numPositiveClefting = (int) cleftingTrainInstances.stream().filter(inst -> inst.inGold).count();
+        final int numCleftingTraining = xgbCleftingTrainInstances.size();
+        final int numPositiveClefting = (int) xgbCleftingTrainInstances.stream().filter(inst -> inst.inGold).count();
         System.out.println(String.format("Extracted %d training samples and %d features, %d positive and %d negative.",
-                cleftingTrainInstances.size(), cleftingFeatureExtractor.featureMap.size(),
-                numPositiveClefting, cleftingTrainInstances.size() - numPositiveClefting));
+                numCleftingTraining, cleftingFeatureExtractor.featureMap.size(), numPositiveClefting,
+                numCleftingTraining - numPositiveClefting));
 
-        coreArgDevInstances = ClassificationUtils.getInstances(devSents, myParser, ImmutableSet.of(QueryType.Forward),
-                coreArgsFeatureExtractor, alignedQueries, alignedAnnotations);
-        cleftingDevInstances = ClassificationUtils.getInstances(devSents, myParser, ImmutableSet.of(QueryType.Clefted),
-                cleftingFeatureExtractor, alignedQueries, alignedAnnotations);
+        ImmutableList<DependencyInstance> xgbCoreArgDevInstances = ClassificationUtils
+                .getInstances(devSents, myParser, ImmutableSet.of(QueryType.Forward), coreArgsFeatureExtractor,
+                        alignedQueries, alignedAnnotations);
+        ImmutableList<DependencyInstance> xgbCleftingDevInstances = ClassificationUtils
+                .getInstances(devSents, myParser, ImmutableSet.of(QueryType.Clefted), cleftingFeatureExtractor,
+                        alignedQueries, alignedAnnotations);
+
+        final Map<String, Object> params = ImmutableMap.of(
+                "eta", 0.1,
+                "min_child_weight", 1.0,
+                "max_depth", 5,
+                "objective", "binary:logistic"
+        );
+        final int numRounds = 100;
+        Classifier coreArgClassifier = Classifier.trainClassifier(xgbCoreArgTrainInstances, params, numRounds);
+        coreArgTrainPred = coreArgClassifier.predict(xgbCoreArgTrainInstances);
+        coreArgDevPred = coreArgClassifier.predict(xgbCoreArgDevInstances);
+
+        // Re-create instances.
+        perceptronFeatureExtractor = new PerceptronFeatureExtractor();
+        coreArgTrainInstances = IntStream.range(0, xgbCoreArgTrainInstances.size())
+                .mapToObj(i -> {
+                    final DependencyInstance inst = xgbCoreArgTrainInstances.get(i);
+                    final double pred = coreArgTrainPred.get(i);
+                    return new DependencyInstance(inst.sentenceId, inst.queryId, inst.headId, inst.argId,
+                            inst.queryType, inst.instanceType, inst.inGold, inst.inOneBest,
+                            perceptronFeatureExtractor.getFeatures(inst, pred));
+                })
+                .collect(GuavaCollectors.toImmutableList());
+        perceptronFeatureExtractor.freeze();
+        coreArgDevInstances = IntStream.range(0, xgbCoreArgDevInstances.size())
+                .mapToObj(i -> {
+                    final DependencyInstance inst = xgbCoreArgDevInstances.get(i);
+                    final double pred = coreArgDevPred.get(i);
+                    return new DependencyInstance(inst.sentenceId, inst.queryId, inst.headId, inst.argId,
+                            inst.queryType, inst.instanceType, inst.inGold, inst.inOneBest,
+                            perceptronFeatureExtractor.getFeatures(inst, pred));
+                })
+                .collect(GuavaCollectors.toImmutableList());
     }
 
     private ImmutableMap<String, Double> runPerceptron(final int numEpochs, final double alpha, final int randomSeed) {
-        double[] params = new double[coreArgsFeatureExtractor.featureMap.size()];
+        double[] params = new double[perceptronFeatureExtractor.featureMap.size()];
         double[] avgParams = new double[params.length];
         int counter = 0;
 
@@ -229,7 +260,6 @@ public class PerceptronExperiment {
                 }
                 counter ++;
             }
-
             final double weightNorm = getL2Norm(params);
             /*
             double[] tempParams = Arrays.copyOf(avgParams, avgParams.length);
@@ -257,7 +287,7 @@ public class PerceptronExperiment {
 
         // Print feature weights.
         for (int fid = 0; fid < avgParams.length; fid++) {
-            System.out.println(coreArgsFeatureExtractor.featureMap.getString(fid) + "\t=\t" + avgParams[fid]);
+            System.out.println(perceptronFeatureExtractor.featureMap.getString(fid) + "\t=\t" + avgParams[fid]);
         }
 
         return ImmutableMap.<String, Double>builder()
@@ -307,7 +337,7 @@ public class PerceptronExperiment {
 
     private Optional<Constraint.AttachmentConstraint> getConstraint(final DependencyInstance instance,
                                                                     final double[] weights) {
-        final double gate = 1e-3; //1.0;
+        final double gate = 1e-6; //1.0;
         double f = instance.features.entrySet().stream()
                 .mapToDouble(e -> e.getValue() * weights[e.getKey()])
                 .sum();

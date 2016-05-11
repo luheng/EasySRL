@@ -35,7 +35,6 @@ public class Classifier {
         return classifier;
     }
 
-    // TODO: predict
     public ImmutableList<Double> predict(final ImmutableList<DependencyInstance> devInstances) {
         List<Double> predList = new ArrayList<>();
         try {
