@@ -119,12 +119,13 @@ public class ClassificationExperimentNew {
         coreArgTrainInstances = ClassificationUtils.getInstances(trainSents, myParser,
                 ImmutableSet.of(QueryType.Forward), coreArgsFeatureExtractor, alignedQueries, alignedAnnotations)
                 .stream()
-              /*  .filter(inst -> {
-                    final Set<ResolvedDependency> oneBest = myParser.getNBestList(inst.sentenceId).getParse(0).dependencies;
-                    boolean inOneBest = oneBest.stream().anyMatch(d -> d.getHead() == inst.headId && d.getArgument() == inst.argId);
-                    return inOneBest != inst.inGold;
-                }) */
                 .collect(GuavaCollectors.toImmutableList());
+
+        int numCriticalGoldConstraints = (int) coreArgTrainInstances.stream()
+                .filter(inst -> inst.inGold != inst.inOneBest)
+                .count();
+        System.out.println(String.format("Percentage of critical gold constraints: %.3f%%.",
+                100.0 * numCriticalGoldConstraints / coreArgTrainInstances.size()));
 
         cleftingTrainInstances = ClassificationUtils.getInstances(trainSents, myParser,
                 ImmutableSet.of(QueryType.Clefted), cleftingFeatureExtractor, alignedQueries, alignedAnnotations);
@@ -149,9 +150,9 @@ public class ClassificationExperimentNew {
                 cleftingFeatureExtractor, alignedQueries, alignedAnnotations);
 
         final Map<String, Object> params1 = ImmutableMap.of(
-                "eta", 0.1, // 0.05,
-                "min_child_weight", 0.1,
-                "max_depth", 3,
+                "eta", 0.05,
+                "min_child_weight", 3.0,
+                "max_depth", 5,
                 "objective", "binary:logistic"
         );
         /*
@@ -253,9 +254,7 @@ public class ClassificationExperimentNew {
                                         new Constraint.AttachmentConstraint(inst.headId, inst.argId, true, reparsingParameters.attachmentPenaltyWeight) :
                                         new Constraint.AttachmentConstraint(inst.headId, inst.argId, false, reparsingParameters.attachmentPenaltyWeight);
                                 newConstraint.prediction = coreArgsPred.get(i);
-                               // if (coreArgsPred.get(i) > 0.7 || coreArgsPred.get(i) < 0.2) {
-                                    constraints.add(newConstraint);
-                               // }
+                                constraints.add(newConstraint);
                                 predictions.add(String.format("%s\tGold=%b\tPred=%.2f\t%d:%s-->%d:%s",
                                         pred == inst.inGold ? "[Y]" : "[N]", inst.inGold, coreArgsPred.get(i),
                                         inst.headId, sentence.get(inst.headId), inst.argId, sentence.get(inst.argId)));
@@ -271,19 +270,15 @@ public class ClassificationExperimentNew {
                                         new Constraint.AttachmentConstraint(inst.headId, inst.argId, true, reparsingParameters.attachmentPenaltyWeight) :
                                         new Constraint.AttachmentConstraint(inst.headId, inst.argId, false, reparsingParameters.attachmentPenaltyWeight);
                                 newConstraint.prediction = cleftingPred.get(i);
-                                //if (cleftingPred.get(i) > 0.7 || cleftingPred.get(i) < 0.5) {
-                                    constraints.add(newConstraint);
-                                    predictions.add(String.format("%s\tGold=%b\tPred=%.2f\t%d:%s-->%d:%s",
-                                            pred == inst.inGold ? "[Y]" : "[N]", inst.inGold, cleftingPred.get(i),
-                                            inst.headId, sentence.get(inst.headId), inst.argId, sentence.get(inst.argId)));
-                                //}
+                                constraints.add(newConstraint);
+                                predictions.add(String.format("%s\tGold=%b\tPred=%.2f\t%d:%s-->%d:%s",
+                                        pred == inst.inGold ? "[Y]" : "[N]", inst.inGold, cleftingPred.get(i),
+                                        inst.headId, sentence.get(inst.headId), inst.argId, sentence.get(inst.argId)));
                             }
                         });
 
-                heuristicConstraints.stream().filter(Constraint.SupertagConstraint.class::isInstance)
-                        .forEach(constraints::add);
-
-                allConstraints.addAll(constraints);
+                heuristicConstraints.stream().filter(Constraint.SupertagConstraint.class::isInstance).forEach(constraints::add);
+                constraints.stream().filter(c -> c.prediction > 0.8 || c.prediction < 0.35).forEach(allConstraints::add);
                 allHeuristicConstraints.addAll(heuristicConstraints);
                 allOracleConstraints.addAll(oracleConstraints);
 
@@ -317,23 +312,20 @@ public class ClassificationExperimentNew {
                             .filter(Constraint.AttachmentConstraint.class::isInstance)
                             .filter(Constraint::isPositive)
                             .map(c -> (Constraint.AttachmentConstraint) c)
-                            .filter(c -> !onebest.stream().anyMatch(d -> c.getHeadId() == d.getHead()
-                                                                    && c.getArgId() == d.getArgument()))
+                            .filter(c -> !onebest.stream().anyMatch(d -> c.getHeadId() == d.getHead() && c.getArgId() == d.getArgument()))
                             .collect(GuavaCollectors.toImmutableSet());
                     final ImmutableSet<Constraint.AttachmentConstraint> negativeOracle = oracleConstraints.stream()
                             .filter(Constraint.AttachmentConstraint.class::isInstance)
                             .filter(c -> !c.isPositive())
                             .map(c -> (Constraint.AttachmentConstraint) c)
-                            .filter(c -> onebest.stream().anyMatch(d -> c.getHeadId() == d.getHead()
-                                                                    && c.getArgId() == d.getArgument()))
+                            .filter(c -> onebest.stream().anyMatch(d -> c.getHeadId() == d.getHead() && c.getArgId() == d.getArgument()))
                             .collect(GuavaCollectors.toImmutableSet());
                     heuristicPositive.add(F1.computeConstraintF1(
                             heuristicConstraints.stream()
                                     .filter(Constraint.AttachmentConstraint.class::isInstance)
                                     .filter(Constraint::isPositive)
                                     .map(c -> (Constraint.AttachmentConstraint) c)
-                                    .filter(c -> !onebest.stream().anyMatch(d -> c.getHeadId() == d.getHead()
-                                                                                && c.getArgId() == d.getArgument()))
+                                    .filter(c -> !onebest.stream().anyMatch(d -> c.getHeadId() == d.getHead() && c.getArgId() == d.getArgument()))
                                     .collect(GuavaCollectors.toImmutableSet()),
                             positiveOracle));
                     heuristicNegative.add(F1.computeConstraintF1(
@@ -341,8 +333,7 @@ public class ClassificationExperimentNew {
                                     .filter(Constraint.AttachmentConstraint.class::isInstance)
                                     .filter(c -> !c.isPositive())
                                     .map(c -> (Constraint.AttachmentConstraint) c)
-                                    .filter(c -> onebest.stream().anyMatch(d -> c.getHeadId() == d.getHead()
-                                                                            && c.getArgId() == d.getArgument()))
+                                    .filter(c -> onebest.stream().anyMatch(d -> c.getHeadId() == d.getHead() && c.getArgId() == d.getArgument()))
                                     .collect(GuavaCollectors.toImmutableSet()),
                             negativeOracle));
                     classifierPositive.entrySet()

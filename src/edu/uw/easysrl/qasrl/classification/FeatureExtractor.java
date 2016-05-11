@@ -25,13 +25,13 @@ public class FeatureExtractor {
     CountDictionary featureMap;
     private boolean acceptNewFeatures = true;
 
-    boolean addCategoryFeatures = false;
-    boolean addNBestPriorFeatures = false;
+    boolean addCategoryFeatures = true;
+    boolean addNBestPriorFeatures = true;
     boolean addTemplateBasedFeatures = true;
     boolean addAnnotationFeatures = true;
-    boolean addNAOptionFeature = false;
-    boolean addAnswerLexicalFeatures = false;
-    boolean addArgumentPositionFeatures = false;
+    boolean addNAOptionFeature = true;
+    boolean addAnswerLexicalFeatures = true;
+    boolean addArgumentPositionFeatures = true;
 
     FeatureExtractor() {
         featureMap = new CountDictionary();
@@ -104,7 +104,8 @@ public class FeatureExtractor {
                 .collect(GuavaCollectors.toImmutableList());
 
 
-        addFeature(features, "DependencyType=" + instanceType, 1.0);
+        //addFeature(features, "DependencyType=" + instanceType, 1.0);
+        addFeature(features, "BIAS", 1.0);
 
         if (addCategoryFeatures) {
             questionStructures.stream()

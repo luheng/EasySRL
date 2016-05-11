@@ -22,11 +22,11 @@ public class GridSearch {
     final static ImmutableList<Double> minChildWeightValues = ImmutableList.of(0.1, 1.0);
      */
 
-    final static ImmutableList<Double> etaValues = ImmutableList.of(0.05, 0.1, 0.3);
-    final static ImmutableList<Integer> treeDepthValues = ImmutableList.of(3, 5, 10, 15, 20, 25, 30, 40);
-    final static ImmutableList<Double> minChildWeightValues = ImmutableList.of(0.1, 1.0, 3.0, 5.0);
+    final static ImmutableList<Double> etaValues = ImmutableList.of(0.05, 0.1, 0.3, 0.5);
+    final static ImmutableList<Integer> treeDepthValues = ImmutableList.of(3, 5, 10, 15, 20, 30);
+    final static ImmutableList<Double> minChildWeightValues = ImmutableList.of(0.1, 3.0, 5.0);
 
-    final static int numRounds = 20;
+    final static int numRounds = 100;
 
     public static double runGridSearch(final DMatrix trainData, final int numFolds) {
         final List<String> results = new ArrayList<>();
