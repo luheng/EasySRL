@@ -181,14 +181,14 @@ public class FeatureExtractor {
                         final double otherVotes = 1.0 * allVotes.get(j);
                         final double otherPrior = nBestPriors.get(otherHead) / nBestPriorNorm;
                         addFeature(features, template + ".1." + "votes", otherVotes);
-                        //addFeature(features, template + ".1." + "prior", otherPrior);
+                        addFeature(features, template + ".1." + "prior", otherPrior);
                         //addFeature(features, template + ".1." + "votes+", Math.min(votes + otherVotes, numAnnotators));
                     } else if (options.contains(j)) {
                         final int otherHead = query.getQAPairSurfaceForms().get(i).getAnswerStructures().get(0).argumentIndices.get(0);
                         final double otherVotes = 1.0 * allVotes.get(i);
                         final double otherPrior = nBestPriors.get(otherHead) / nBestPriorNorm;
                         addFeature(features, template + ".2." + "votes", otherVotes);
-                        //addFeature(features, template + ".2." + "prior", otherPrior);
+                        addFeature(features, template + ".2." + "prior", otherPrior);
                         //addFeature(features, template + ".2." + "votes+", Math.min(votes + otherVotes, numAnnotators));
                     }
                 }
