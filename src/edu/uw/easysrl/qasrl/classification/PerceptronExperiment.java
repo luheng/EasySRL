@@ -53,7 +53,7 @@ public class PerceptronExperiment {
 
     public static void main(String[] args) {
         PerceptronExperiment experiment = new PerceptronExperiment(ImmutableList.of(0.6, 0.4), 12345);
-        experiment.runPerceptron(30 /* epochs ? */, 0.01 /* learning rate */, 12345);
+        experiment.runPerceptron(20 /* epochs ? */, 0.005 /* learning rate */, 12345);
     }
 
     PerceptronExperiment(final ImmutableList<Double> split, final int randomSeed) {
@@ -106,10 +106,10 @@ public class PerceptronExperiment {
         cleftingFeatureExtractor = new FeatureExtractor();
 
 
-        coreArgsFeatureExtractor.addAnswerLexicalFeatures = false;
-        coreArgsFeatureExtractor.addCategoryFeatures = false;
-        coreArgsFeatureExtractor.addArgumentPositionFeatures = false;
-        coreArgsFeatureExtractor.addNAOptionFeature = false;
+        //coreArgsFeatureExtractor.addAnswerLexicalFeatures = false;
+        //coreArgsFeatureExtractor.addCategoryFeatures = false;
+        //coreArgsFeatureExtractor.addArgumentPositionFeatures = false;
+        //coreArgsFeatureExtractor.addNAOptionFeature = false;
         //coreArgsFeatureExtractor.addTemplateBasedFeatures = false;
         //coreArgsFeatureExtractor.addNBestPriorFeatures = false;
 
@@ -201,7 +201,11 @@ public class PerceptronExperiment {
             }
 
             final double weightNorm = getL2Norm(params);
-            final Results avgDevF1 = getDevF1(params);
+            double[] tempParams = Arrays.copyOf(avgParams, avgParams.length);
+            for (int i = 0; i < tempParams.length; i++) {
+                tempParams[i] /= avgParamsNorm;
+            }
+            final Results avgDevF1 = getCorpusF1(devSents, coreArgDevInstances, tempParams);
             System.out.print("Epoch=\t" + epoch);
             System.out.print("\tWeightNorm=\t" + weightNorm);
             System.out.print("\tMaxPenalty=\t" + maxConstraintStrength);
@@ -213,8 +217,9 @@ public class PerceptronExperiment {
             avgParams[i] /= avgParamsNorm;
         }
         System.out.println("Train-baseline:\n" + trainBaseline);
+        System.out.println("Train-reparsed:\n" + getCorpusF1(trainSents, coreArgTrainInstances, avgParams));
         System.out.println("Dev-baseline:\n" + devBaseline);
-        System.out.println("Dev-reparsed:\n" + getDevF1(avgParams));
+        System.out.println("Dev-reparsed:\n" + getCorpusF1(devSents, coreArgDevInstances, avgParams));
 
         // Print feature weights.
         for (int fid = 0; fid < avgParams.length; fid++) {
@@ -222,19 +227,22 @@ public class PerceptronExperiment {
         }
     }
 
-    private Results getDevF1(final double[] params) {
-        Results avgDevF1 = new Results();
-        for (int sid : devSents) {
-            final ImmutableList<DependencyInstance> instances = coreArgDevInstances.stream()
+    // TODO: get heuristic baseline
+    // TODO: print constraints
+
+    private Results getCorpusF1(final List<Integer> sentIds, final List<DependencyInstance> instances, final double[] params) {
+        Results avgF1 = new Results();
+        for (int sid : sentIds) {
+            final ImmutableList<DependencyInstance> sentInstances = instances.stream()
                     .filter(inst -> inst.sentenceId == sid)
                     .collect(GuavaCollectors.toImmutableList());
-            final ImmutableSet<Constraint> constraints = instances.stream()
+            final ImmutableSet<Constraint> constraints = sentInstances.stream()
                     .map(inst -> getConstraint(inst, params))
                     .collect(GuavaCollectors.toImmutableSet());
             final Parse reparsed = myParser.getReparsed(sid, constraints);
-            avgDevF1.add(CcgEvaluation.evaluate(reparsed.dependencies, myParser.getGoldParse(sid).dependencies));
+            avgF1.add(CcgEvaluation.evaluate(reparsed.dependencies, myParser.getGoldParse(sid).dependencies));
         }
-        return avgDevF1;
+        return avgF1;
     }
 
     private double getL2Norm(final double[] weights) {
