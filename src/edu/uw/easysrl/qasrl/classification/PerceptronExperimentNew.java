@@ -174,12 +174,12 @@ public class PerceptronExperimentNew {
                         alignedQueries, alignedAnnotations);
 
         final Map<String, Object> params = ImmutableMap.of(
-                "eta", 0.1,
+                "eta", 0.05,
                 "min_child_weight", 1.0,
-                "max_depth", 5,
+                "max_depth", 3,
                 "objective", "binary:logistic"
         );
-        final int numRounds = 100;
+        final int numRounds = 50;
         Classifier coreArgClassifier = Classifier.trainClassifier(xgbCoreArgTrainInstances, params, numRounds);
         coreArgTrainPred = coreArgClassifier.predict(xgbCoreArgTrainInstances);
         coreArgDevPred = coreArgClassifier.predict(xgbCoreArgDevInstances);
