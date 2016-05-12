@@ -67,7 +67,7 @@ public class PerceptronExperiment {
 
         for (int i = 0; i < numRandomRuns; i++) {
             PerceptronExperiment experiment = new PerceptronExperiment(ImmutableList.of(0.6, 0.4), randomSeeds.get(i));
-            ImmutableMap<String, Double> results = experiment.runPerceptron(5 /* epochs ? */, 0.005 /* learning rate */,
+            ImmutableMap<String, Double> results = experiment.runPerceptron(10 /* epochs */, 0.01 /* learning rate */,
                     randomSeeds.get(i));
 
             results.keySet().forEach(k -> {

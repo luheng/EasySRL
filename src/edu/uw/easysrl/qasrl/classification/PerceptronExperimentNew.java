@@ -21,6 +21,7 @@ import edu.uw.easysrl.syntax.evaluation.Results;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 /**
  * Stacked on XGBoost prediction ...
@@ -37,7 +38,7 @@ public class PerceptronExperimentNew {
     private ImmutableList<Integer> trainSents, devSents;
     private ImmutableList<DependencyInstance> coreArgTrainInstances, coreArgDevInstances,
                                               cleftingTrainInstances, cleftingDevInstances;
-    private ImmutableList<Double> coreArgTrainPred, coreArgDevPred;
+    private ImmutableList<Double> coreArgTrainPred, coreArgDevPred, cleftingTrainPred, cleftingDevPred;
 
     private static final String[] annotationFiles = {
             "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
@@ -53,8 +54,8 @@ public class PerceptronExperimentNew {
         final int initialRandomSeed = 12345;
         final int numRandomRuns = 10;
         final ImmutableList<Double> split = ImmutableList.of(0.6, 0.4);
-        final int numEpochs = 10;
-        final double learningRate = 0.01;
+        final int numEpochs = 20;
+        final double learningRate = 0.005;
 
         Random random = new Random(initialRandomSeed);
         ImmutableList<Integer> randomSeeds = IntStream.range(0, numRandomRuns)
@@ -174,15 +175,18 @@ public class PerceptronExperimentNew {
                         alignedQueries, alignedAnnotations);
 
         final Map<String, Object> params = ImmutableMap.of(
-                "eta", 0.05,
+                "eta", 0.1,
                 "min_child_weight", 1.0,
-                "max_depth", 3,
+                "max_depth", 5,
                 "objective", "binary:logistic"
         );
-        final int numRounds = 50;
+        final int numRounds = 100;
         Classifier coreArgClassifier = Classifier.trainClassifier(xgbCoreArgTrainInstances, params, numRounds);
+        Classifier cleftingClassifier = Classifier.trainClassifier(xgbCleftingTrainInstances, params, numRounds);
         coreArgTrainPred = coreArgClassifier.predict(xgbCoreArgTrainInstances);
         coreArgDevPred = coreArgClassifier.predict(xgbCoreArgDevInstances);
+        cleftingTrainPred = cleftingClassifier.predict(xgbCleftingTrainInstances);
+        cleftingDevPred = cleftingClassifier.predict(xgbCleftingDevInstances);
 
         // Re-create instances.
         perceptronFeatureExtractor = new PerceptronFeatureExtractor();
@@ -195,11 +199,29 @@ public class PerceptronExperimentNew {
                             perceptronFeatureExtractor.getFeatures(inst, pred));
                 })
                 .collect(GuavaCollectors.toImmutableList());
+        cleftingTrainInstances = IntStream.range(0, xgbCleftingTrainInstances.size())
+                .mapToObj(i -> {
+                    final DependencyInstance inst = xgbCleftingTrainInstances.get(i);
+                    final double pred = cleftingTrainPred.get(i);
+                    return new DependencyInstance(inst.sentenceId, inst.queryId, inst.headId, inst.argId,
+                            inst.queryType, inst.instanceType, inst.inGold, inst.inOneBest,
+                            perceptronFeatureExtractor.getFeatures(inst, pred));
+                })
+                .collect(GuavaCollectors.toImmutableList());
         perceptronFeatureExtractor.freeze();
         coreArgDevInstances = IntStream.range(0, xgbCoreArgDevInstances.size())
                 .mapToObj(i -> {
                     final DependencyInstance inst = xgbCoreArgDevInstances.get(i);
                     final double pred = coreArgDevPred.get(i);
+                    return new DependencyInstance(inst.sentenceId, inst.queryId, inst.headId, inst.argId,
+                            inst.queryType, inst.instanceType, inst.inGold, inst.inOneBest,
+                            perceptronFeatureExtractor.getFeatures(inst, pred));
+                })
+                .collect(GuavaCollectors.toImmutableList());
+        cleftingDevInstances = IntStream.range(0, xgbCleftingDevInstances.size())
+                .mapToObj(i -> {
+                    final DependencyInstance inst = xgbCleftingDevInstances.get(i);
+                    final double pred = cleftingDevPred.get(i);
                     return new DependencyInstance(inst.sentenceId, inst.queryId, inst.headId, inst.argId,
                             inst.queryType, inst.instanceType, inst.inGold, inst.inOneBest,
                             perceptronFeatureExtractor.getFeatures(inst, pred));
@@ -228,9 +250,10 @@ public class PerceptronExperimentNew {
             double maxConstraintStrength = 0.0;
 
             for (int sid : order) {
-                final ImmutableList<DependencyInstance> instances = coreArgTrainInstances.stream()
-                        .filter(inst -> inst.sentenceId == sid)
-                        .collect(GuavaCollectors.toImmutableList());
+                final ImmutableList<DependencyInstance> instances =
+                        Stream.concat(coreArgTrainInstances.stream(), cleftingTrainInstances.stream())
+                                .filter(inst -> inst.sentenceId == sid)
+                                .collect(GuavaCollectors.toImmutableList());
                 // Compute constraints using weights.
                 final ImmutableSet<Constraint> constraints = instances.stream()
                         .map(inst -> getConstraint(inst, params))
@@ -246,7 +269,6 @@ public class PerceptronExperimentNew {
                 avgTrainF1.add(reparsedF1);
                 //System.out.println(sid + "\t" + reparsedF1.getF1());
                 // Do perceptron update ...
-                final int C = counter;
                 instances.stream()
                         .filter(inst -> inst.inGold && !inParse(inst, reparsed))
                         .forEach(inst -> inst.features.entrySet()
@@ -280,9 +302,9 @@ public class PerceptronExperimentNew {
             avgParams[i] /= counter;
         }
         System.out.println("Train-baseline:\n" + trainBaseline);
-        System.out.println("Train-reparsed:\n" + getCorpusF1(trainSents, coreArgTrainInstances, avgParams));
+        System.out.println("Train-reparsed:\n" + getCorpusF1(trainSents, coreArgTrainInstances, cleftingTrainInstances, avgParams));
         System.out.println("Dev-baseline:\n" + devBaseline);
-        final Results devReparsed = getCorpusF1(devSents, coreArgDevInstances, avgParams);
+        final Results devReparsed = getCorpusF1(devSents, coreArgDevInstances, cleftingDevInstances, avgParams);
         System.out.println("Dev-reparsed:\n" + devReparsed);
 
         // Print feature weights.
@@ -310,12 +332,14 @@ public class PerceptronExperimentNew {
     // TODO: get heuristic baseline
     // TODO: print constraints
 
-    private Results getCorpusF1(final List<Integer> sentIds, final List<DependencyInstance> instances, final double[] params) {
+    private Results getCorpusF1(final List<Integer> sentIds, final List<DependencyInstance> coreArgInstances,
+                                final List<DependencyInstance> cleftingInstances, final double[] params) {
         Results avgF1 = new Results();
         for (int sid : sentIds) {
-            final ImmutableList<DependencyInstance> sentInstances = instances.stream()
-                    .filter(inst -> inst.sentenceId == sid)
-                    .collect(GuavaCollectors.toImmutableList());
+            final ImmutableList<DependencyInstance> sentInstances =
+                    Stream.concat(coreArgInstances.stream(), cleftingInstances.stream())
+                            .filter(inst -> inst.sentenceId == sid)
+                            .collect(GuavaCollectors.toImmutableList());
             final ImmutableSet<Constraint> constraints = sentInstances.stream()
                     .map(inst -> getConstraint(inst, params))
                     .filter(Optional::isPresent)
@@ -339,8 +363,8 @@ public class PerceptronExperimentNew {
                                                                     final double[] weights) {
         final double gate = 1e-6; //1.0;
         double f = instance.features.entrySet().stream()
-                .mapToDouble(e -> e.getValue() * weights[e.getKey()])
-                .sum();
+                    .mapToDouble(e -> e.getValue() * weights[e.getKey()])
+                    .sum();
         if (f > gate) {
             return Optional.of(new Constraint.AttachmentConstraint(instance.headId, instance.argId, true, Math.min(f, 10.0)));
         } else if (f < -gate) {

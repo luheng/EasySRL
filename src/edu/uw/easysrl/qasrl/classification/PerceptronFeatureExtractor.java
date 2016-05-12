@@ -39,15 +39,15 @@ public class PerceptronFeatureExtractor {
         Map<Integer, Double> features = new HashMap<>();
         Stream.of(0.1, 0.2, 0.3, 0.4, 0.5).forEach(threshold -> {
             if (xgbPrediction < threshold) {
-                addFeature(features, String.format("p<%.2f", threshold), 1.0);
+                addFeature(features, String.format("%s_p<%.2f", instance.instanceType, threshold), 1.0);
             }
         });
         Stream.of(0.9, 0.8, 0.7, 0.6, 0.5).forEach(threshold -> {
             if (xgbPrediction > threshold) {
-                addFeature(features, String.format("p>%.2f", threshold), 1.0);
+                addFeature(features, String.format("%s_p>%.2f", instance.instanceType, threshold), 1.0);
             }
         });
-        addFeature(features, "BIAS", 1.0);
+        addFeature(features, instance.instanceType + "_BIAS", 1.0);
         return ImmutableMap.copyOf(features);
     }
 

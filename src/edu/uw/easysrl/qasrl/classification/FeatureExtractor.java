@@ -136,7 +136,7 @@ public class FeatureExtractor {
         final double votes = 1.0 * options.stream().mapToInt(allVotes::get).max().orElse(0);
         if (addAnnotationFeatures) {
             addFeature(features, "NumReceivedVotes", votes); // / numAnnotators);
-            addFeature(features, "NumReceivedVotes=" + votes, 1.0);
+            //addFeature(features, "NumReceivedVotes=" + votes, 1.0);
             /*
             int numSingleVotes = options.stream()
                     .mapToInt(i -> (int) annotation.stream().filter(ops -> ops.contains(i) && ops.size() == 1).count())
