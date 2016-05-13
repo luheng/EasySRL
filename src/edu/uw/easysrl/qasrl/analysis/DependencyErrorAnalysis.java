@@ -18,6 +18,7 @@ import static edu.uw.easysrl.qasrl.model.Constraint.AttachmentConstraint;
 import edu.uw.easysrl.qasrl.model.HITLParser;
 import edu.uw.easysrl.qasrl.model.HITLParsingParameters;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
+import edu.uw.easysrl.qasrl.qg.util.VerbHelper;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.syntax.evaluation.Results;
@@ -134,10 +135,13 @@ public class DependencyErrorAnalysis {
         public static SentenceMistakesExtractor<DependencyMistake, PrecisionRecallMistakes<DependencyMistake>>
             extractorForDependencyType(DependencyMatcher depMatcher, DependencyClassifier depClass) {
             return (parse, goldParse) -> {
+                final ImmutableList<String> words = goldParse.syntaxTree.getLeaves().stream().map(l -> l.getWord()).collect(toImmutableList());
                 final ImmutableSet<ResolvedDependency> goldDepsOfType = goldParse.dependencies.stream()
+                    .filter(dep -> !VerbHelper.isAuxiliaryVerb(words.get(dep.getHead()), parse.categories.get(dep.getHead())))
                     .filter(depClass::isMember)
                     .collect(toImmutableSet());
                 final ImmutableSet<ResolvedDependency> predictedDepsOfType = parse.dependencies.stream()
+                    .filter(dep -> !VerbHelper.isAuxiliaryVerb(words.get(dep.getHead()), parse.categories.get(dep.getHead())))
                     .filter(depClass::isMember)
                     .collect(toImmutableSet());
                 final int numCorrect = toIntExact(goldDepsOfType.stream()
@@ -246,34 +250,46 @@ public class DependencyErrorAnalysis {
             return isPPArgDep(dep) || isVerbAdjunctDep(dep) || isNounAdjunctDep(dep);
         }
 
+        private static boolean isVerbArgDep(ResolvedDependency dep) {
+            return !dep.getCategory().isFunctionInto(Category.valueOf("(S\\NP)|(S\\NP)")) &&
+                (dep.getCategory().isFunctionInto(Category.valueOf("S\\NP")) ||
+                 dep.getCategory().matches(Category.valueOf("(S[dcl]\\S[dcl])/NP")) || // "...", said the stupid man.
+                 dep.getCategory().matches(Category.valueOf("(S[dcl]\\S[dcl])\\NP"))); // "...", analysts warn.
+        }
+
         private static boolean isVerbNPArgDep(ResolvedDependency dep) {
-            return (dep.getCategory().isFunctionInto(Category.valueOf("S\\NP")) &&
-                    dep.getCategory().getArgument(dep.getArgNumber()).matches(Category.NP));
+            return isVerbArgDep(dep) &&
+                dep.getCategory().getArgument(dep.getArgNumber()).matches(Category.NP);
         }
 
         private static boolean isPPArgDep(ResolvedDependency dep) {
-            return (dep.getCategory().isFunctionInto(Category.valueOf("S\\NP")) &&
-                    dep.getCategory().getArgument(dep.getArgNumber()).matches(Category.PP));
+            return isVerbArgDep(dep) &&
+                dep.getCategory().getArgument(dep.getArgNumber()).matches(Category.PP);
         }
 
         private static boolean isVerbOpenCompArgDep(ResolvedDependency dep) {
-            return (dep.getCategory().isFunctionInto(Category.valueOf("S\\NP")) &&
-                    Category.valueOf("S\\NP").matches(dep.getCategory().getArgument(dep.getArgNumber())));
+            return isVerbArgDep(dep) &&
+                Category.valueOf("S\\NP").matches(dep.getCategory().getArgument(dep.getArgNumber()));
+        }
+
+        private static boolean isVerbOpenAdjCompArgDep(ResolvedDependency dep) {
+            return isVerbArgDep(dep) &&
+                Category.valueOf("S[adj]\\NP").matches(dep.getCategory().getArgument(dep.getArgNumber()));
         }
 
         private static boolean isVerbClosedCompArgDep(ResolvedDependency dep) {
-            return (dep.getCategory().isFunctionInto(Category.valueOf("S\\NP")) &&
-                    Category.S.matches(dep.getCategory().getArgument(dep.getArgNumber())));
+            return isVerbArgDep(dep) &&
+                Category.S.matches(dep.getCategory().getArgument(dep.getArgNumber()));
         }
 
         private static boolean isVerbOtherArgDep(ResolvedDependency dep) {
-            return (dep.getCategory().isFunctionInto(Category.valueOf("S\\NP")) &&
-                    !isVerbNPArgDep(dep) && !isPPArgDep(dep) && !isVerbOpenCompArgDep(dep) && !isVerbClosedCompArgDep(dep));
+            return isVerbArgDep(dep) &&
+                !isVerbNPArgDep(dep) && !isPPArgDep(dep) && !isVerbOpenCompArgDep(dep) && !isVerbClosedCompArgDep(dep);
         }
 
         private static boolean isVerbAdjunctDep(ResolvedDependency dep) {
-            return (dep.getCategory().isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)")) &&
-                    dep.getArgNumber() == 2);
+            return dep.getCategory().isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)")) &&
+                dep.getArgNumber() == 2;
         }
 
         private static boolean isNounAdjunctDep(ResolvedDependency dep) {
@@ -395,6 +411,7 @@ public class DependencyErrorAnalysis {
 
     private static final ParseData parseData = ParseData.loadFromDevPool().get();
     private static final ImmutableList<Parse> goldParses = parseData.getGoldParses();
+    private static final ImmutableList<ImmutableList<String>> sentences = parseData.getSentences();
     private static final String[] round3CoreArgAnnotationFiles = {
         "./Crowdflower_data/f893900.csv"                 // Round3-pronouns: checkbox, core only, pronouns.
     };
@@ -510,35 +527,47 @@ public class DependencyErrorAnalysis {
                                              depMatchingLabel);
         logDependencyMistakes(depMistakes, csvStringBuilder, fullRunLabel, "all dependency scoring", Optional.empty());
 
+        final PrecisionRecallMistakeLogger verbArgMistakes =
+            new PrecisionRecallMistakeLogger(parses,
+                                             PrecisionRecallMistakes.extractorForDependencyType(depMatcher, DependencyMistake::isVerbArgDep),
+                                             depMatchingLabel + " verb-arg");
+        logDependencyMistakes(verbArgMistakes, csvStringBuilder, fullRunLabel, "core NP arg scoring", Optional.of(depMistakes));
+
         final PrecisionRecallMistakeLogger coreNPArgMistakes =
             new PrecisionRecallMistakeLogger(parses,
                                              PrecisionRecallMistakes.extractorForDependencyType(depMatcher, DependencyMistake::isVerbNPArgDep),
                                              depMatchingLabel + " core-np-arg");
-        logDependencyMistakes(coreNPArgMistakes, csvStringBuilder, fullRunLabel, "core NP arg scoring", Optional.of(depMistakes));
+        logDependencyMistakes(coreNPArgMistakes, csvStringBuilder, fullRunLabel, "core NP arg scoring", Optional.of(verbArgMistakes));
 
         final PrecisionRecallMistakeLogger ppArgMistakes =
             new PrecisionRecallMistakeLogger(parses,
                                              PrecisionRecallMistakes.extractorForDependencyType(depMatcher, DependencyMistake::isPPArgDep),
                                              depMatchingLabel + " pp-arg");
-        logDependencyMistakes(ppArgMistakes, csvStringBuilder, fullRunLabel, "pp arg scoring", Optional.of(depMistakes));
+        logDependencyMistakes(ppArgMistakes, csvStringBuilder, fullRunLabel, "pp arg scoring", Optional.of(verbArgMistakes));
 
         final PrecisionRecallMistakeLogger openCompArgMistakes =
             new PrecisionRecallMistakeLogger(parses,
                                              PrecisionRecallMistakes.extractorForDependencyType(depMatcher, DependencyMistake::isVerbOpenCompArgDep),
                                              depMatchingLabel + " open-comp");
-        logDependencyMistakes(ppArgMistakes, csvStringBuilder, fullRunLabel, "xcomp arg scoring", Optional.of(depMistakes));
+        logDependencyMistakes(openCompArgMistakes, csvStringBuilder, fullRunLabel, "xcomp arg scoring", Optional.of(verbArgMistakes));
+
+        final PrecisionRecallMistakeLogger openAdjCompArgMistakes =
+            new PrecisionRecallMistakeLogger(parses,
+                                             PrecisionRecallMistakes.extractorForDependencyType(depMatcher, DependencyMistake::isVerbOpenAdjCompArgDep),
+                                             depMatchingLabel + " open-adj-comp");
+        logDependencyMistakes(openAdjCompArgMistakes, csvStringBuilder, fullRunLabel, "adj-xcomp arg scoring", Optional.of(openCompArgMistakes));
 
         final PrecisionRecallMistakeLogger closedCompArgMistakes =
             new PrecisionRecallMistakeLogger(parses,
                                              PrecisionRecallMistakes.extractorForDependencyType(depMatcher, DependencyMistake::isVerbClosedCompArgDep),
                                              depMatchingLabel + " closed-comp");
-        logDependencyMistakes(ppArgMistakes, csvStringBuilder, fullRunLabel, "comp arg scoring", Optional.of(depMistakes));
+        logDependencyMistakes(closedCompArgMistakes, csvStringBuilder, fullRunLabel, "comp arg scoring", Optional.of(verbArgMistakes));
 
-        final PrecisionRecallMistakeLogger otherArgMistakes =
+        final PrecisionRecallMistakeLogger otherVerbArgMistakes =
             new PrecisionRecallMistakeLogger(parses,
                                              PrecisionRecallMistakes.extractorForDependencyType(depMatcher, DependencyMistake::isVerbOtherArgDep),
                                              depMatchingLabel + " other-arg");
-        logDependencyMistakes(ppArgMistakes, csvStringBuilder, fullRunLabel, "misc verb arg scoring", Optional.of(depMistakes));
+        logDependencyMistakes(otherVerbArgMistakes, csvStringBuilder, fullRunLabel, "misc verb arg scoring", Optional.of(verbArgMistakes));
 
         final PrecisionRecallMistakeLogger ppAttachmentMistakes =
             new PrecisionRecallMistakeLogger(parses,
@@ -568,7 +597,7 @@ public class DependencyErrorAnalysis {
         final PrecisionRecallMistakeLogger coreNPOrPPAttachmentMistakes =
             new PrecisionRecallMistakeLogger(parses,
                                              PrecisionRecallMistakes.extractorForDependencyType(depMatcher, dep ->
-                                                                                                DependencyMistake.isVerbNPArgDep(dep) ||
+                                                                                                DependencyMistake.isVerbArgDep(dep) ||
                                                                                                 DependencyMistake.isPPAttachment(dep)),
                                              depMatchingLabel + " core-np+pp-attach");
         logDependencyMistakes(coreNPOrPPAttachmentMistakes, csvStringBuilder, fullRunLabel, "core NP arg or pp attachment scoring", Optional.of(depMistakes));
@@ -576,7 +605,7 @@ public class DependencyErrorAnalysis {
         final PrecisionRecallMistakeLogger mysteriousMistakes =
             new PrecisionRecallMistakeLogger(parses,
                               PrecisionRecallMistakes.extractorForDependencyType(depMatcher, dep ->
-                                                                                 !DependencyMistake.isVerbNPArgDep(dep) &&
+                                                                                 !DependencyMistake.isVerbArgDep(dep) &&
                                                                                  !DependencyMistake.isPPAttachment(dep)),
                               depMatchingLabel + " mysterious");
         logDependencyMistakes(mysteriousMistakes, csvStringBuilder, fullRunLabel, "non core NP arg or pp attachment scoring", Optional.of(depMistakes));
@@ -1161,6 +1190,44 @@ public class DependencyErrorAnalysis {
         }
     }
 
+    private static void runSentenceWiseErrorAnalysis() {
+        final ImmutableMap<Integer, List<AlignedAnnotation>> coreArgAnnotations = ImmutableMap
+            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(round3CoreArgAnnotationFiles));
+        final ImmutableMap<Integer, List<AlignedAnnotation>> cleftedQuestionAnnotations = ImmutableMap
+            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(round2To3CleftedQuestionAnnotationFiles));
+        final ImmutableMap<Integer, List<AlignedAnnotation>> annotations = ImmutableMap
+            .copyOf(ExperimentUtils.loadCrowdflowerAnnotation(round2To3AnnotationFiles));
+
+        // final HITLParser hitlParser = new HITLParser(100);
+        // hitlParser.setQueryPruningParameters(queryPruningParameters);
+        // hitlParser.setReparsingParameters(reparsingParameters);
+
+        final ImmutableMap<Integer, NBestList> originalOneBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 1).get();
+        final ImmutableMap<Integer, Parse> parsesOriginal = originalOneBestLists.entrySet().stream()
+            .collect(toImmutableMap(e -> e.getKey(), e -> e.getValue().getParse(0)));
+
+        final SentenceMistakesExtractor<DependencyMistake, PrecisionRecallMistakes<DependencyMistake>> extractor = PrecisionRecallMistakes
+            .extractorForDependencyType(labeledDirectedDepMatcher, DependencyMistake::isVerbOpenCompArgDep);
+
+        for(int sentenceId = 0; sentenceId < sentences.size(); sentenceId++) {
+            ImmutableList<String> sentence = sentences.get(sentenceId);
+            PrecisionRecallMistakes prMistakes = extractor.extract(parsesOriginal.get(sentenceId), goldParses.get(sentenceId));
+            ImmutableList<DependencyMistake> allMistakes = prMistakes.getMistakes();
+            System.out.println("-- SID = " + sentenceId + " --");
+            System.out.println(TextGenerationHelper.renderString(sentence));
+            for(DependencyMistake mistake : allMistakes) {
+                final String depString;
+                if(mistake.isFalsePositive) {
+                    depString = "+ " + TextGenerationHelper.dependencyString(sentence, mistake.getDependency());
+                } else {
+                    depString = "- " + TextGenerationHelper.dependencyString(sentence, mistake.getDependency());
+                }
+                System.out.println(depString);
+            }
+            System.out.println();
+        }
+    }
+
     public static void runFullAnalysis(ImmutableMap<Integer, Parse> parses,
                                        String runLabel,
                                        StringBuilder csvStringBuilder) {
@@ -1634,6 +1701,7 @@ public class DependencyErrorAnalysis {
     }
 
     public static void main(String[] args) {
+        // runSentenceWiseErrorAnalysis();
         runIndependentAnalyses();
         // runCoreArgQueryWiseConstraintAnalysis();
         // runCleftedQuestionQueryWiseConstraintAnalysis();

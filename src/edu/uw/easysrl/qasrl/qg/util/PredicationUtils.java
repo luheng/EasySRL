@@ -4,10 +4,12 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.Optional;
 import java.util.function.Supplier;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.syntax.grammar.Category.Slash;
 import edu.uw.easysrl.qasrl.Parse;
 import static edu.uw.easysrl.util.GuavaCollectors.*;
 
@@ -19,25 +21,53 @@ public final class PredicationUtils {
 
     public static <T extends Predication> T withIndefinitePronouns(T pred) {
         if(pred instanceof Noun) {
-            return (T) ((Noun) pred).getPronoun().withDefiniteness(Noun.Definiteness.INDEFINITE);
+            Noun nounPred = (Noun) pred;
+            if(nounPred.isExpletive()) {
+                return (T) nounPred;
+            } else {
+                return (T) nounPred.getPronoun().withDefiniteness(Noun.Definiteness.INDEFINITE);
+            }
         } else {
             return (T) pred.transformArgs((argNum, args) -> {
-                    if(Category.NP.matches(pred.getPredicateCategory().getArgument(argNum))) {
-                        final Pronoun pro;
+                    if(pred.getPredicateCategory().getArgument(argNum).matches(Category.NP)) {
+                        final Predication replacement;
                         if(args.isEmpty()) {
-                            pro = Pronoun.fromString("something").get();
+                            replacement = Pronoun.fromString("something").get();
                         } else {
-                            pro = ((Noun) args.get(0).getPredication())
-                                .getPronoun()
-                                .withDefiniteness(Noun.Definiteness.INDEFINITE);
+                            Predication predToReplace = args.get(0).getPredication();
+                            if(predToReplace instanceof Noun) {
+                                Noun noun = (Noun) predToReplace;
+                                if(noun.isPronoun()) {
+                                    replacement = (Pronoun) noun;
+                                } else {
+                                    replacement = noun.getPronoun()
+                                        .withDefiniteness(Noun.Definiteness.INDEFINITE);
+                                }
+                            } else {
+                                assert predToReplace instanceof Gap;
+                                replacement = predToReplace;
+                            }
                         }
-                        return ImmutableList.of(Argument.withNoDependency(pro));
+                        return ImmutableList.of(Argument.withNoDependency(replacement));
                     } else {
                         return args.stream()
                             .map(arg -> new Argument(arg.getDependency(), withIndefinitePronouns(arg.getPredication())))
                             .collect(toImmutableList());
                     }
                 });
+        }
+    }
+
+    public static Noun fillerNoun(Category cat) {
+        if(cat.matches(Category.NP)) {
+            return Pronoun.fromString("something").get();
+        } else if(cat.matches(Category.NPexpl)) {
+            return ExpletiveNoun.it;
+        } else if(cat.matches(Category.NPthr)) {
+            return ExpletiveNoun.there;
+        } else {
+            assert !Category.NP.matches(cat);
+            throw new IllegalArgumentException("must make filler noun for an NP category");
         }
     }
 
@@ -49,12 +79,17 @@ public final class PredicationUtils {
                         .collect(toImmutableList());
                 } else {
                     // TODO XXX should add indefinite pro-form of the correct category.
-                    if(!pred.getPredicateCategory().getArgument(argNum).matches(Category.NP)) {
-                        System.err.println("Filling in empty non-NP argument with pronoun. initial pred: " +
-                                           pred.getPredicate() + " (" + pred.getPredicateCategory() + ")");
-                        System.err.println("arg category: " + pred.getPredicateCategory().getArgument(argNum));
+                    Category argCat = pred.getPredicateCategory().getArgument(argNum);
+                    if(Category.NP.matches(argCat)) {
+                        return ImmutableList.of(Argument.withNoDependency(fillerNoun(argCat)));
                     }
-                    return ImmutableList.of(Argument.withNoDependency(Pronoun.fromString("something").get()));
+                    else {
+                        // TODO low-pri. may want more pro forms. probably fine though.
+                        // System.err.println("Filling in empty argument with gap (no pro-form available). initial pred: " +
+                        //                    pred.getPredicate() + " (" + pred.getPredicateCategory() + ")");
+                        // System.err.println("arg category: " + argCat);
+                        return ImmutableList.of(Argument.withNoDependency(new Gap(argCat)));
+                    }
                 }
             });
     }
@@ -79,6 +114,31 @@ public final class PredicationUtils {
                      .build()));
         }
         return paths.collect(toImmutableList());
+    }
+
+    public static Category permuteCategoryArgs(final Category category, Function<Integer, Integer> permutation) {
+        final int numArgs = category.getNumberOfArguments();
+        Category newCategory = category.getHeadCategory();
+        for(int newArgNum = 1; newArgNum <= numArgs; newArgNum++) {
+            final int oldArgNum = permutation.apply(newArgNum);
+            Category reducedCategory = category;
+            int auxArgNum = numArgs;
+            while(auxArgNum > oldArgNum) {
+                reducedCategory = reducedCategory.getLeft();
+                auxArgNum--;
+            }
+            final Category newArgCategory = reducedCategory.getRight();
+            final Slash newSlash = reducedCategory.getSlash();
+            newCategory = Category.valueOf("(" + newCategory.toString() + ")" +
+                                           newSlash.toString() +
+                                           "(" + newArgCategory.toString() + ")");
+        }
+        return newCategory;
+    }
+
+    public static ImmutableMap<Integer, ImmutableList<Argument>> permuteArgs(final ImmutableMap<Integer, ImmutableList<Argument>> args, Function<Integer, Integer> permutation) {
+        return args.keySet().stream()
+            .collect(toImmutableMap(argNum -> argNum, argNum -> args.get(permutation.apply(argNum))));
     }
 
 }

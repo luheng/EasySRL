@@ -659,6 +659,12 @@ public class TextGenerationHelper {
         return pastPaths;
     }
 
+    public static String dependencyString(ImmutableList<String> words, ResolvedDependency dep) {
+        return words.get(dep.getHead()) + "\t-"
+            + dep.getArgNumber() + "->\t"
+            + words.get(dep.getArgument());
+    }
+
     /**
      * Data structure used to return text generated from a parsed sentence.
      * Indicates which dependencies were used in constructing the text.

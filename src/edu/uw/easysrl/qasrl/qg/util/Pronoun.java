@@ -131,6 +131,16 @@ public final class Pronoun extends Noun {
         return new Pronoun(getCase(), getNumber(), getGender(), getPerson(), definiteness);
     }
 
+    @Override
+    public Pronoun getPronoun() {
+        return this;
+    }
+
+    @Override
+    public boolean isPronoun() {
+        return true;
+    }
+
     /* protected methods */
 
     protected Pronoun(Optional<Case> caseMarking, Optional<Number> number, Optional<Gender> gender, Person person,

@@ -31,14 +31,14 @@ public abstract class Predication {
             } else if(Category.valueOf("(S\\NP)\\(S\\NP)").matches(category)) {
                 return Optional.of(ADVERB);
             } else if(Category.S.matches(category)) {
-                return Optional.empty();
-                // return Optional.of(CLAUSE);
+                return Optional.of(CLAUSE);
             } else if(Category.NP.matches(category) || Category.N.matches(category)) {
                 return Optional.of(NOUN);
             } else if(category.isFunctionInto(Category.PP)) {
                 return Optional.of(PREPOSITION);
             } else {
-                System.err.println("No predication type exists for category: " + category);
+                // TODO low-pri. special modifiers and other things.
+                // System.err.println("No predication type exists for category: " + category);
                 return Optional.empty();
             }
         }

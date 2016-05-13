@@ -45,7 +45,8 @@ public final class Adverb extends Predication {
             .collect(toImmutableList())));
 
         if(!adverbCategories.contains(predicateCategory)) {
-            System.err.println("new adverb category: " + predicateCategory);
+            // System.err.println(String.format("new adverb category: %s (e.g., %s)",
+            //                                  predicateCategory, predicate));
             adverbCategories.add(predicateCategory);
         }
 

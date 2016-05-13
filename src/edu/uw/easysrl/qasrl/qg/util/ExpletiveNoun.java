@@ -18,16 +18,14 @@ public class ExpletiveNoun extends Noun {
 
     public static final String PRED = "'e'";
 
-    public static final ExpletiveNoun there = new ExpletiveNoun(PRED,
-                                                                Category.valueOf("NP[thr]"),
+    public static final ExpletiveNoun there = new ExpletiveNoun(Category.NPthr,
                                                                 Optional.empty(),
-                                                                Optional.empty(),
+                                                                Optional.of(Number.SINGULAR),
                                                                 Optional.empty(),
                                                                 Person.THIRD,
                                                                 Definiteness.DEFINITE,
                                                                 "there");
-    public static final ExpletiveNoun it = new ExpletiveNoun(PRED,
-                                                             Category.valueOf("NP[expl]"),
+    public static final ExpletiveNoun it = new ExpletiveNoun(Category.NPexpl,
                                                              Optional.empty(),
                                                              Optional.of(Number.SINGULAR),
                                                              Optional.empty(),
@@ -45,7 +43,8 @@ public class ExpletiveNoun extends Noun {
     @Override
     public ImmutableList<String> getPhrase(Category desiredCategory) {
         assert desiredCategory.matches(getPredicateCategory()) && getPredicateCategory().matches(desiredCategory)
-            : "must want an expletive NP if getting phrase of expletive NP";
+            : "must want an expletive NP if getting phrase of expletive NP. Expletive category: " +
+            getPredicateCategory() + "; desired category: " + desiredCategory;
         return ImmutableList.of(word);
     }
 
@@ -96,17 +95,26 @@ public class ExpletiveNoun extends Noun {
         throw new UnsupportedOperationException("cannot tweak with the grammar of expletive nouns");
     }
 
+    @Override
+    public boolean isPronoun() {
+        return false;
+    }
+
+    @Override
+    public Pronoun getPronoun() {
+        throw new UnsupportedOperationException("cannot make a pronoun from an expletive noun");
+    }
+
     /* private methods and fields */
 
-    private ExpletiveNoun(String predicate,
-                          Category predicateCategory,
+    private ExpletiveNoun(Category predicateCategory,
                           Optional<Case> caseMarking,
                           Optional<Number> number,
                           Optional<Gender> gender,
                           Person person,
                           Definiteness definiteness,
                           String word) {
-        super(predicate, predicateCategory, ImmutableMap.of(), caseMarking, number, gender, person, definiteness);
+        super(PRED, predicateCategory, ImmutableMap.of(), caseMarking, number, gender, person, definiteness);
         this.word = word;
     }
 

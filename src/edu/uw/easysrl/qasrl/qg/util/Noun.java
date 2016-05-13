@@ -102,7 +102,7 @@ public abstract class Noun extends Predication {
 
         final String nounPOS = headLeaf.getPos();
         final Optional<Number> number;
-        if(nounPOS.equals("NN") || nounPOS.equals("NNP") || nounPOS.equals("VBG")) {
+        if(nounPOS.equals("NN") || nounPOS.equals("NNP") || nounPOS.equals("VBG") || nounPOS.equals("$")) {
             number = Optional.of(Number.SINGULAR);
         } else if(nounPOS.equals("NNS") || nounPOS.equals("NNPS")) {
             number = Optional.of(Number.PLURAL);
@@ -224,10 +224,6 @@ public abstract class Noun extends Predication {
         return definiteness == Definiteness.FOCAL;
     }
 
-    public final Pronoun getPronoun() {
-        return new Pronoun(caseMarking, number, gender, person, definiteness);
-    }
-
     // transformers -- subclasses need to override
 
     public abstract Noun withCase(Case caseMarking);
@@ -242,6 +238,9 @@ public abstract class Noun extends Predication {
     public abstract Noun withPerson(Person person);
 
     public abstract Noun withDefiniteness(Definiteness definiteness);
+
+    public abstract boolean isPronoun();
+    public abstract Pronoun getPronoun();
 
     /* protected methods and fields */
 

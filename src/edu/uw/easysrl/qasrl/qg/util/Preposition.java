@@ -50,7 +50,8 @@ public final class Preposition extends Predication {
             .collect(toImmutableList())));
 
         if(!prepositionCategories.contains(predicateCategory)) {
-            System.err.println("new preposition category: " + predicateCategory);
+            // System.err.println(String.format("new preposition category: %s (e.g., %s)",
+            //                                  predicateCategory, predicate));
             prepositionCategories.add(predicateCategory);
         }
 
