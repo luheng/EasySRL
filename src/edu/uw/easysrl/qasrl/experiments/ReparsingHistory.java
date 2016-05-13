@@ -97,7 +97,7 @@ public class ReparsingHistory {
         queries.get(sentenceId).add(query);
         userOptions.get(sentenceId).add(options);
         constraints.get(sentenceId).add(constraintSet);
-        oracleConstraints.get(sentenceId).add(hitlParser.getOracleConstraints(query, hitlParser.getGoldOptions(query)));
+        oracleConstraints.get(sentenceId).add(hitlParser.getOracleConstraints(query));
         final ImmutableSet<Constraint> allConstraints = getAllConstraints(constraints, sentenceId),
                                        allOracleConstraints = getAllConstraints(oracleConstraints, sentenceId);
         final Parse reparsed = hitlParser.getReparsed(sentenceId, allConstraints);

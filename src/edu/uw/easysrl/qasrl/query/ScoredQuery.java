@@ -78,7 +78,6 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
     public void computeScores(NBestList nbestList) {
         Set<Integer> allParseIds = IntStream.range(0, nbestList.getN()).boxed().collect(Collectors.toSet());
         double totalScore = allParseIds.stream().mapToDouble(nbestList::getScore).sum();
-
         if (optionToParseIds == null) {
             optionToParseIds = IntStream.range(0, options.size()).boxed()
                     .map(i -> {
@@ -92,7 +91,6 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
                         return pids;
                     }).collect(GuavaCollectors.toImmutableList());
         }
-
         if (optionScores == null) {
             optionScores = optionToParseIds.stream()
                     .map(pids -> pids.stream().mapToDouble(nbestList::getScore).sum() / totalScore)

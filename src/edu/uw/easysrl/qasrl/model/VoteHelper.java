@@ -2,17 +2,13 @@ package edu.uw.easysrl.qasrl.model;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.ImmutableTable;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.util.Partitive;
-import edu.uw.easysrl.qasrl.qg.util.Prepositions;
 import edu.uw.easysrl.qasrl.qg.util.PronounList;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.util.GuavaCollectors;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -21,6 +17,12 @@ import java.util.stream.Stream;
  * Created by luheng on 5/12/16.
  */
 public class VoteHelper {
+    public static boolean fixAppostiveRestrictive = true;
+    public static boolean fixCoordinatedAppostive = false;
+    public static boolean fixPartitiveNP = false;
+    public static boolean fixNonPartitiveNP = true;
+    public static boolean fixPronoun = true;
+
     public static ImmutableList<ImmutableList<Integer>> adjustVotes(final ImmutableList<String> sentence,
                                                                     final ScoredQuery<QAStructureSurfaceForm> query,
                                                                     final ImmutableList<ImmutableList<Integer>> annotation) {
@@ -77,61 +79,72 @@ public class VoteHelper {
                         && sentence.get(argId2 + 1).equalsIgnoreCase("old");
                 boolean arg2StartsWithDet = Stream.of("a ", "an ", "the ").anyMatch(op2::startsWith);
 
-                // Appositive-restrictive:
-                // [op1], [(a/the) op2] ...who/that/which [pred]  v(op1) -> v(op2)
-                if (argId1 < argId2 && argId2 < predicateId && commaBetweenArgs == 1 && commaBetweenArg2Pred == 0 &&
-                        arg2StartsWithDet && votes[opId1] > 0 && votes[opId2] > 0) {
-                    for (int i = 0; i < numAnnotators; i++) {
-                        adjustedVotes[i][opId2] = Math.max(adjustedVotes[i][opId1], adjustedVotes[i][opId2]);
-                        adjustedVotes[i][opId1] = 0;
+                if (fixAppostiveRestrictive) {
+                    // Appositive-restrictive:
+                    // [op1], [(a/the) op2] ...who/that/which [pred]  v(op1) -> v(op2)
+                    if (argId1 < argId2 && argId2 < predicateId && commaBetweenArgs == 1 && commaBetweenArg2Pred == 0 &&
+                            arg2StartsWithDet && votes[opId1] > 0 && votes[opId2] > 0) {
+                        for (int i = 0; i < numAnnotators; i++) {
+                            adjustedVotes[i][opId2] = Math.max(adjustedVotes[i][opId1], adjustedVotes[i][opId2]);
+                            adjustedVotes[i][opId1] = 0;
+                        }
+                        continue;
                     }
-                    continue;
                 }
 
-                // Other appositives:
-                // [op1], [op2], [pred] or [pred] [op1], [op2]: v(op1) -> v(op1, op2)
-                if (argId1 < argId2 && argId2 < predicateId && commaBetweenArgs == 1 && commaBetweenArg2Pred == 1
-                        && arg2StartsWithDet && !arg2HasYearsOld && votes[opId1] > 0 && votes[opId2] > 0) {
-                    for (int i = 0; i < numAnnotators; i++) {
-                        adjustedVotes[i][opId2] = Math.max(adjustedVotes[i][opId1], adjustedVotes[i][opId2]);
+                if (fixCoordinatedAppostive) {
+                    // Other appositives:
+                    // [op1], [op2], [pred] or [pred] [op1], [op2]: v(op1) -> v(op1, op2)
+                    if (argId1 < argId2 && argId2 < predicateId && commaBetweenArgs == 1 && commaBetweenArg2Pred == 1
+                            && arg2StartsWithDet && !arg2HasYearsOld && votes[opId1] > 0 && votes[opId2] > 0) {
+                        for (int i = 0; i < numAnnotators; i++) {
+                            adjustedVotes[i][opId2] = Math.max(adjustedVotes[i][opId1], adjustedVotes[i][opId2]);
+                        }
                     }
-                }
-                if (predicateId < argId1 && argId1 < argId2 && commaBetweenArgs == 1 && !arg2HasYearsOld
-                        && arg2StartsWithDet && votes[opId1] > 0 && votes[opId2] > 0) {
-                    for (int i = 0; i < numAnnotators; i++) {
-                        adjustedVotes[i][opId2] = Math.max(adjustedVotes[i][opId1], adjustedVotes[i][opId2]);
+                    if (predicateId < argId1 && argId1 < argId2 && commaBetweenArgs == 1 && !arg2HasYearsOld
+                            && arg2StartsWithDet && votes[opId1] > 0 && votes[opId2] > 0) {
+                        for (int i = 0; i < numAnnotators; i++) {
+                            adjustedVotes[i][opId2] = Math.max(adjustedVotes[i][opId1], adjustedVotes[i][opId2]);
+                        }
                     }
                 }
 
                 // op1 = partitive of op2: v(op1) -> v(op2)
                 boolean isPartitive = false;
                 for (String tok : Partitive.tokens) {
-                    if (op1.equals(tok + " of " + op2) && votes[opId1] > 0 && votes[opId2] > 0) {
-                        for (int i = 0; i < numAnnotators; i++) {
-                            adjustedVotes[i][opId2] = Math.max(adjustedVotes[i][opId1], adjustedVotes[i][opId2]);
-                            adjustedVotes[i][opId1] = 0;
+                    if (op1.equals(tok + " of " + op2)) {
+                        if (fixPartitiveNP && votes[opId1] > 0 && votes[opId2] > 0) {
+                            for (int i = 0; i < numAnnotators; i++) {
+                                adjustedVotes[i][opId2] = Math.max(adjustedVotes[i][opId1], adjustedVotes[i][opId2]);
+                                adjustedVotes[i][opId1] = 0;
+                            }
                         }
                         isPartitive = true;
                         break;
                     }
                 }
-                // op1 = X of op2: v(op2) -> v(op1)
-                if (op1.contains(" of " + op2) && !isPartitive && votes[opId1] > 0 && votes[opId2] > 0) {
-                    for (int i = 0; i < numAnnotators; i++) {
-                        adjustedVotes[i][opId1] = Math.max(adjustedVotes[i][opId1], adjustedVotes[i][opId2]);
-                        adjustedVotes[i][opId2] = 0;
+
+                if (fixNonPartitiveNP) {
+                    // op1 = X of op2: v(op2) -> v(op1)
+                    if (op1.contains(" of " + op2) && !isPartitive && votes[opId1] > 0 && votes[opId2] > 0) {
+                        for (int i = 0; i < numAnnotators; i++) {
+                            adjustedVotes[i][opId1] = Math.max(adjustedVotes[i][opId1], adjustedVotes[i][opId2]);
+                            adjustedVotes[i][opId2] = 0;
+                        }
+                        continue;
                     }
-                    continue;
                 }
 
-                // op2[pron] [pred] / [pred] op2[pron]: v(op1) -> v(op2)
-                if (PronounList.englishPronounSet.contains(op2) &&
-                        (argId2 == predicateId - 1 || argId2 == predicateId + 1)) {
-                    for (int i = 0; i < numAnnotators; i++) {
-                        adjustedVotes[i][opId2] = Math.max(adjustedVotes[i][opId1], adjustedVotes[i][opId2]);
-                        adjustedVotes[i][opId1] = 0;
+                if (fixPronoun) {
+                    // op2[pron] [pred] / [pred] op2[pron]: v(op1) -> v(op2)
+                    if (PronounList.englishPronounSet.contains(op2) &&
+                            (argId2 == predicateId - 1 || argId2 == predicateId + 1)) {
+                        for (int i = 0; i < numAnnotators; i++) {
+                            adjustedVotes[i][opId2] = Math.max(adjustedVotes[i][opId1], adjustedVotes[i][opId2]);
+                            adjustedVotes[i][opId1] = 0;
+                        }
+                        continue;
                     }
-                    continue;
                 }
             }
         }
