@@ -75,11 +75,10 @@ public class VoteHelper {
                 }
                 boolean arg2HasYearsOld = sentence.get(argId2).equalsIgnoreCase("years") && argId2 < sentence.size()
                         && sentence.get(argId2 + 1).equalsIgnoreCase("old");
-                boolean arg2StartsWithDet = Stream.of("a", "the").anyMatch(op2::startsWith);
+                boolean arg2StartsWithDet = Stream.of("a ", "an ", "the ").anyMatch(op2::startsWith);
 
                 // Appositive-restrictive:
                 // [op1], [(a/the) op2] ...who/that/which [pred]  v(op1) -> v(op2)
-                /*
                 if (argId1 < argId2 && argId2 < predicateId && commaBetweenArgs == 1 && commaBetweenArg2Pred == 0 &&
                         arg2StartsWithDet && votes[opId1] > 0 && votes[opId2] > 0) {
                     for (int i = 0; i < numAnnotators; i++) {
@@ -88,9 +87,7 @@ public class VoteHelper {
                     }
                     continue;
                 }
-                */
 
-                /*
                 // Other appositives:
                 // [op1], [op2], [pred] or [pred] [op1], [op2]: v(op1) -> v(op1, op2)
                 if (argId1 < argId2 && argId2 < predicateId && commaBetweenArgs == 1 && commaBetweenArg2Pred == 1
@@ -105,8 +102,7 @@ public class VoteHelper {
                         adjustedVotes[i][opId2] = Math.max(adjustedVotes[i][opId1], adjustedVotes[i][opId2]);
                     }
                 }
-                */
-                /*
+
                 // op1 = partitive of op2: v(op1) -> v(op2)
                 boolean isPartitive = false;
                 for (String tok : Partitive.tokens) {
@@ -127,7 +123,7 @@ public class VoteHelper {
                     }
                     continue;
                 }
-                */
+
                 // op2[pron] [pred] / [pred] op2[pron]: v(op1) -> v(op2)
                 if (PronounList.englishPronounSet.contains(op2) &&
                         (argId2 == predicateId - 1 || argId2 == predicateId + 1)) {
