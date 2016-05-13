@@ -28,28 +28,25 @@ public class ConstraintExtractor {
                 .map(query.getQAPairSurfaceForms()::get)
                 .forEach(qa -> qa.getQuestionStructures().stream()
                         .forEach(qstr -> {
-                            final int headId = qstr.targetPrepositionIndex >= 0 ?
-                                    qstr.targetPrepositionIndex : qstr.predicateIndex;
+                            final int headId = qstr.targetPrepositionIndex >= 0 ? qstr.targetPrepositionIndex : qstr.predicateIndex;
                             qa.getAnswerStructures().stream()
                                     .flatMap(astr -> astr.argumentIndices.stream())
                                     .distinct()
-                                    .forEach(argId -> constraints.add(
-                                            new Constraint.AttachmentConstraint(headId, argId, true, 1.0)));
+                                    .filter(argId -> argId != headId)
+                                    .forEach(argId -> constraints.add(new Constraint.AttachmentConstraint(headId, argId, true, 1.0)));
                             // Verb to PP dependency.
-                            if (qstr.targetPrepositionIndex >= 0) {
-                                constraints.add(new Constraint.AttachmentConstraint(qstr.predicateIndex,
-                                        qstr.targetPrepositionIndex, true, 1.0));
+                            /*
+                            if (qstr.targetPrepositionIndex >= 0 && qstr.targetPrepositionIndex != qstr.predicateIndex) {
+                                constraints.add(new Constraint.AttachmentConstraint(qstr.predicateIndex, qstr.targetPrepositionIndex, true, 1.0));
                                 // Undirected PP-Verb dependency.
-                                constraints.add(new Constraint.AttachmentConstraint(qstr.targetPrepositionIndex,
-                                        qstr.predicateIndex, true, 1.0));
-                            }
+                                constraints.add(new Constraint.AttachmentConstraint(qstr.targetPrepositionIndex, qstr.predicateIndex, true, 1.0));
+                            }*/
                             // Adjunct dependencies in answer.
                             if (query.getQueryType() == QueryType.Clefted) {
                                 qa.getAnswerStructures().stream()
                                         .flatMap(astr -> astr.adjunctDependencies.stream())
                                         .distinct()
-                                        .forEach(dep -> constraints.add(
-                                                new Constraint.AttachmentConstraint(dep.getHead(), dep.getArgument(), true, 1.0)));
+                                        .forEach(dep -> constraints.add(new Constraint.AttachmentConstraint(dep.getHead(), dep.getArgument(), true, 1.0)));
                             }
                         })
                 );
@@ -135,6 +132,7 @@ public class ConstraintExtractor {
                             .filter(argId -> !chosenArgIds.contains(argId))
                             .filter(argId -> !doNotPenalizePronouns ||
                                     !PronounList.englishPronounSet.contains(argIdToSpan.get(argId).toLowerCase()))
+                            .filter(argId -> argId.intValue() != headId.intValue())
                             .forEach(argId -> constraintList.add(
                                     new Constraint.AttachmentConstraint(headId, argId, false, 1.0)))
                     );

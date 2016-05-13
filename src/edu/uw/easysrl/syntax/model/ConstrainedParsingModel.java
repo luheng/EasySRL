@@ -22,6 +22,7 @@ import java.util.stream.IntStream;
  */
 public class ConstrainedParsingModel extends SupertagFactoredModel {
     private static final boolean kIncludeDependencies = true;
+    private static final boolean kNormalizeConstraints = false;
     private final List<List<Tagger.ScoredCategory>> tagsForWords;
     private Table<Integer, Integer, Double> mustLinks, cannotLinks;
     private Table<Integer, Category, Double> mustSupertags, cannotSupertags;
@@ -56,29 +57,39 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                 .filter(c -> !c.isPositive())
                 .filter(Constraint.AttachmentConstraint.class::isInstance)
                 .map(c -> (Constraint.AttachmentConstraint) c)
-                .filter(c -> !mustLinks.contains(c.getHeadId(), c.getArgId()) &&
-                             !mustLinks.contains(c.getArgId(), c.getHeadId()))
+                .filter(c -> !mustLinks.contains(c.getHeadId(), c.getArgId()))
+                        //&& !mustLinks.contains(c.getArgId(), c.getHeadId()))
                 .forEach(c -> cannotLinks.put(c.getHeadId(), c.getArgId(), c.getStrength()));
 
         constraints.stream()
                 .filter(c -> !c.isPositive())
                 .filter(Constraint.SupertagConstraint.class::isInstance)
-                .map(c -> (Constraint.SupertagConstraint) c)
+                 .map(c -> (Constraint.SupertagConstraint) c)
                 .filter(c -> !mustSupertags.contains(c.getPredId(), c.getCategory()))
                 .forEach(c -> cannotSupertags.put(c.getPredId(), c.getCategory(), c.getStrength()));
 
-        //TODO: Normalize supertag and attachment evidence.
-        /*
-        mustLinks.rowKeySet().stream().forEach(head -> {
-            int numArgs = mustLinks.row(head).size();
-            double norm = 1.0 * numArgs;
-            ImmutableSet<Integer> args = mustLinks.row(head).keySet().stream()
-                    .collect(GuavaCollectors.toImmutableSet());
-            args.forEach(arg -> {
-                double weight = mustLinks.get(head, arg);
-                mustLinks.put(head, arg, weight / norm);
+        if (kNormalizeConstraints) {
+            mustLinks.rowKeySet().stream().forEach(head -> {
+                int numArgs = mustLinks.row(head).size();
+                double norm = 1.0 * numArgs;
+                ImmutableSet<Integer> args = mustLinks.row(head).keySet().stream()
+                        .collect(GuavaCollectors.toImmutableSet());
+                args.forEach(arg -> {
+                    double weight = mustLinks.get(head, arg);
+                    mustLinks.put(head, arg, weight / norm);
+                });
             });
-        }); */
+            cannotLinks.rowKeySet().stream().forEach(head -> {
+                int numArgs = cannotLinks.row(head).size();
+                double norm = 1.0 * numArgs;
+                ImmutableSet<Integer> args = cannotLinks.row(head).keySet().stream()
+                        .collect(GuavaCollectors.toImmutableSet());
+                args.forEach(arg -> {
+                    double weight = cannotLinks.get(head, arg);
+                    cannotLinks.put(head, arg, weight / norm);
+                });
+            });
+        }
     }
 
     @Override
@@ -142,8 +153,8 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                     final int cHead = c.getRowKey(), cArg = c.getColumnKey();
                     return !dependencies.stream()
                             // Undirected match.
-                            .anyMatch(dep -> (dep.getHead() == cHead && dep.getArguments().contains(cArg) ||
-                                             (dep.getHead() == cArg && dep.getArguments().contains(cHead))));
+                            .anyMatch(dep -> (dep.getHead() == cHead && dep.getArguments().contains(cArg)));
+                                    //|| (dep.getHead() == cArg && dep.getArguments().contains(cHead))));
                 })
                 .mapToDouble(Table.Cell::getValue)
                 .sum();

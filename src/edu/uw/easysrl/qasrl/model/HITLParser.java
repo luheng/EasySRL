@@ -1,21 +1,28 @@
 package edu.uw.easysrl.qasrl.model;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
 import edu.uw.easysrl.qasrl.annotation.AnnotationUtils;
+import edu.uw.easysrl.qasrl.classification.DependencyInstance;
+import edu.uw.easysrl.qasrl.classification.DependencyInstanceHelper;
+import edu.uw.easysrl.qasrl.classification.DependencyInstanceType;
+import edu.uw.easysrl.qasrl.classification.TemplateHelper;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.util.VerbHelper;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
+import edu.uw.easysrl.qasrl.query.QueryType;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 /**
  * Contains data and convenient interface for HITL experiments.
@@ -34,10 +41,16 @@ public class HITLParser {
     public void setQueryPruningParameters(QueryPruningParameters queryPruningParameters) {
         this.queryPruningParameters = queryPruningParameters;
     }
+    public QueryPruningParameters getQueryPruningParameters() {
+        return queryPruningParameters;
+    }
 
     private HITLParsingParameters reparsingParameters = new HITLParsingParameters();
     public void setReparsingParameters(HITLParsingParameters reparsingParameters) {
         this.reparsingParameters = reparsingParameters;
+    }
+    public HITLParsingParameters getReparsingParameters() {
+        return reparsingParameters;
     }
 
     private BaseCcgParser.ConstrainedCcgParser2 reparser;
@@ -236,8 +249,8 @@ public class HITLParser {
 
     // FIXME: A bug where reparsing with empty constraint set makes results worse.
     public Parse getReparsed(int sentenceId, Set<Constraint> constraintSet) {
-        if (constraintSet.isEmpty()) {
-            nbestLists.get(sentenceId).getParse(0);
+        if (constraintSet == null || constraintSet.isEmpty()) {
+            return nbestLists.get(sentenceId).getParse(0);
         }
         final Parse reparsed = reparser.parseWithConstraint(inputSentences.get(sentenceId), constraintSet);
         if (reparsed == null) {
@@ -290,11 +303,16 @@ public class HITLParser {
     public ImmutableList<Integer> getUserOptions(final ScoredQuery<QAStructureSurfaceForm> query,
                                                  final AlignedAnnotation annotation) {
         final int[] optionDist = AnnotationUtils.getUserResponseDistribution(query, annotation);
+        return getUserOptions(query, optionDist);
+    }
+
+    public ImmutableList<Integer> getUserOptions(final ScoredQuery<QAStructureSurfaceForm> query,
+                                                 final int[] optionDist) {
         return IntStream.range(0, query.getOptions().size())
                 .filter(i -> (!query.isJeopardyStyle()
-                                    && optionDist[i] > reparsingParameters.negativeConstraintMaxAgreement) ||
-                             (query.isJeopardyStyle()
-                                     && optionDist[i] >= reparsingParameters.jeopardyQuestionMinAgreement))
+                        && optionDist[i] > reparsingParameters.negativeConstraintMaxAgreement) ||
+                        (query.isJeopardyStyle()
+                                && optionDist[i] >= reparsingParameters.jeopardyQuestionMinAgreement))
                 .boxed()
                 .collect(GuavaCollectors.toImmutableList());
     }
@@ -308,16 +326,21 @@ public class HITLParser {
     public ImmutableSet<Constraint> getConstraints(final ScoredQuery<QAStructureSurfaceForm> query,
                                                    final AlignedAnnotation annotation) {
         final int[] optionDist = AnnotationUtils.getUserResponseDistribution(query, annotation);
+        return getConstraints(query, optionDist);
+    }
+
+    public ImmutableSet<Constraint> getConstraints(final ScoredQuery<QAStructureSurfaceForm> query,
+                                                   final int[] optionDist) {
         final Set<Constraint> constraints = new HashSet<>();
         final Set<Integer> hitOptions = IntStream.range(0, optionDist.length).boxed()
                 .filter(i -> optionDist[i] >= reparsingParameters.positiveConstraintMinAgreement)
                 .collect(Collectors.toSet());
-        final Set<Integer> skipOptions = IntStream.range(0, optionDist.length).boxed()
+        final Set<Integer> chosenOptions = IntStream.range(0, optionDist.length).boxed()
                 .filter(i -> optionDist[i] > reparsingParameters.negativeConstraintMaxAgreement)
                 .collect(Collectors.toSet());
         ConstraintExtractor.extractPositiveConstraints(query, hitOptions)
                 .forEach(constraints::add);
-        ConstraintExtractor.extractNegativeConstraints(query, skipOptions, reparsingParameters.skipPronounEvidence)
+        ConstraintExtractor.extractNegativeConstraints(query, chosenOptions, reparsingParameters.skipPronounEvidence)
                 .forEach(constraints::add);
         constraints.forEach(c -> c.setStrength(
                 (Constraint.SupertagConstraint.class.isInstance(c) ?
@@ -355,4 +378,28 @@ public class HITLParser {
                 .collect(GuavaCollectors.toImmutableSet());
     }
 
+    public ImmutableSet<Constraint> getOracleConstraints(final ScoredQuery<QAStructureSurfaceForm> query) {
+        final Set<Constraint> constraints = new HashSet<>();
+        final Parse gold = getGoldParse(query.getSentenceId());
+        final ImmutableList<String> sentence = sentences.get(query.getSentenceId());
+
+        for (int i = 0; i < sentence.size(); i++) {
+            final int headId = i;
+            for (int j = 0; j < sentence.size(); j++) {
+                final int argId = j;
+                if (headId == argId || DependencyInstanceHelper.getDependencyType(query, headId, argId) == DependencyInstanceType.NONE) {
+                    continue;
+                }
+                //final DependencyInstanceType dtype = DependencyInstanceHelper.getDependencyType(query, headId, argId);
+                final boolean inGold = gold.dependencies.stream()
+                        .anyMatch(dep -> dep.getHead() == headId && dep.getArgument() == argId);
+                constraints.add(inGold ?
+                        new Constraint.AttachmentConstraint(headId, argId, true, reparsingParameters.oraclePenaltyWeight) :
+                        new Constraint.AttachmentConstraint(headId, argId, false, reparsingParameters.oraclePenaltyWeight));
+            }
+        }
+        return constraints.stream()
+                .distinct()
+                .collect(GuavaCollectors.toImmutableSet());
+    }
 }

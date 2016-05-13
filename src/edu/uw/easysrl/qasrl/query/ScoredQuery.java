@@ -213,8 +213,9 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
                         qa.getAnswerStructures().stream().map(s -> s.toString(sentence)).collect(Collectors.joining(" / "));
             }
             String parseIdsStr = DebugPrinter.getShortListString(optionToParseIds.get(i));
-            result += String.format("[%d]\t%-10s\t%.2f\t%s\t%s\t%s\n", i, matchingStr, optionScores.get(i),
-                        options.get(i), structStr, parseIdsStr);
+            //result += String.format("[%d]\t%-10s\t%.2f\t%s\t%s\t%s\n", i, matchingStr, optionScores.get(i),
+            //            options.get(i), structStr, parseIdsStr);
+            result += String.format("[%d]\t%-10s\t%.2f\t%s\t%s\n", i, matchingStr, optionScores.get(i), options.get(i), structStr);
         }
         return result;
     }

@@ -5,14 +5,17 @@ import com.google.common.collect.ImmutableSet;
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
 import edu.uw.easysrl.qasrl.annotation.AnnotationUtils;
+import edu.uw.easysrl.qasrl.classification.TemplateHelper;
 import edu.uw.easysrl.qasrl.evaluation.Accuracy;
 import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils.*;
 import edu.uw.easysrl.qasrl.model.Constraint;
 import edu.uw.easysrl.qasrl.model.HITLParser;
 import edu.uw.easysrl.qasrl.model.HITLParsingParameters;
+import edu.uw.easysrl.qasrl.model.VoteHelper;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
+import edu.uw.easysrl.qasrl.qg.util.Prepositions;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.syntax.evaluation.Results;
@@ -60,8 +63,9 @@ public class ReparsingExperiment {
         reparsingParameters.negativeConstraintMaxAgreement = 1; //3; // 1;
         reparsingParameters.skipPronounEvidence = false;
         reparsingParameters.jeopardyQuestionWeight = 1.0;
-        reparsingParameters.attachmentPenaltyWeight = 1.0;
-        reparsingParameters.supertagPenaltyWeight = 1.0;
+        reparsingParameters.oraclePenaltyWeight = 5.0;
+        reparsingParameters.attachmentPenaltyWeight = 5.0;
+        reparsingParameters.supertagPenaltyWeight = 5.0;
     }
 
     public static void main(String[] args) {
@@ -130,10 +134,16 @@ public class ReparsingExperiment {
                     continue;
                 }
                 int[] optionDist = AnnotationUtils.getUserResponseDistribution(query, annotation);
+                ImmutableList<ImmutableList<Integer>> responses = AnnotationUtils.getAllUserResponses(query, annotation);
+                ImmutableList<ImmutableList<Integer>> newResponses = VoteHelper.adjustVotes(sentence, query, responses);
+                int[] newOptionDist = new int[optionDist.length];
+                newResponses.stream().forEach(resp -> resp.stream().forEach(op -> newOptionDist[op]++));
+
                 ImmutableList<Integer> goldOptions    = myHTILParser.getGoldOptions(query),
                                        oneBestOptions = myHTILParser.getOneBestOptions(query),
                                        oracleOptions  = myHTILParser.getOracleOptions(query),
-                                       userOptions    = myHTILParser.getUserOptions(query, annotation);
+                                       userOptions    = myHTILParser.getUserOptions(query, annotation),
+                                       userOptions2    = myHTILParser.getUserOptions(query, newOptionDist);
 
                 // Update stats.
                 for (int i = 0; i < 5; i++) {
@@ -149,24 +159,18 @@ public class ReparsingExperiment {
                 }
                 numMatchedAnnotations ++;
 
-                if (userOptions.size() == 0) {
+                if (userOptions.isEmpty()) {
+                    continue;
+                }
+                if (Prepositions.prepositionWords.contains(sentence.get(query.getPredicateId().getAsInt()).toLowerCase())) {
                     continue;
                 }
                 if (query.isJeopardyStyle() && userOptions.contains(query.getBadQuestionOptionId().getAsInt())) {
                     continue;
                 }
+                ImmutableSet<Constraint> constraints = myHTILParser.getConstraints(query, newOptionDist),
+                                         oracleConstraints = myHTILParser.getOracleConstraints(query); //, goldOptions);
 
-                /*
-                ImmutableList<ImmutableList<Integer>> appositives = PatterDetector.getAppositives(query, sentence);
-                if (appositives.isEmpty()) {
-                    continue;
-                }*/
-
-                ImmutableSet<Constraint> constraints = myHTILParser.getConstraints(query, annotation),
-                                         oracleConstraints = myHTILParser.getOracleConstraints(query, goldOptions);
-                /*if (constraintSet == null || constraintSet.isEmpty()) {
-                    continue;
-                }*/
                 allConstraints.addAll(constraints);
                 allOracleConstraints.addAll(oracleConstraints);
 
@@ -185,6 +189,7 @@ public class ReparsingExperiment {
                         'O', oracleOptions,
                         'B', oneBestOptions,
                         'U', userOptions,
+                        'R', userOptions2,
                         '*', optionDist);
                 // Debugging.
                 // result += "-----\n" + annotation.toString() + "\n";
@@ -227,9 +232,10 @@ public class ReparsingExperiment {
 
         myHistory.printSummary();
 
+
         debugging.stream()
                 .sorted((b1, b2) -> Double.compare(b1.deltaF1, b2.deltaF1))
-                // .filter(b -> Math.abs(b.deltaF1) > 1e-3)
+        //         .filter(b -> Math.abs(b.deltaF1) > 1e-3)
                 .forEach(b -> System.out.println(b.block));
 
         System.out.println("Num. matched annotations:\t" + numMatchedAnnotations);
