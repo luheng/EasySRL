@@ -26,7 +26,6 @@ import java.util.stream.IntStream;
  */
 public class TemplateHelper {
 
-
     public static String identifyTemplate(final ImmutableList<String> sentence,
                                           final ScoredQuery<QAStructureSurfaceForm> query,
                                           final int opId1, final int opId2) {
@@ -74,7 +73,9 @@ public class TemplateHelper {
                 commaBetweenArg2Pred ++;
             }
         }
-        if (argId1 < argId2 && argId2 < predicateId && commaBetweenArgs == 1) {
+        if (argId1 < argId2 && argId2 < predicateId && commaBetweenArgs == 1 &&
+                !(sentence.get(argId2).equalsIgnoreCase("years") && argId2 < sentence.size()
+                        && sentence.get(argId2 + 1).equalsIgnoreCase("old"))) {
             if (commaBetweenArg2Pred == 0) {
                 //return "[op1] , [op2] [pred]";
                 return "[appositive-restrictive]";

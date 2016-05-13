@@ -10,6 +10,7 @@ import edu.uw.easysrl.qasrl.annotation.AnnotationUtils;
 import edu.uw.easysrl.qasrl.classification.DependencyInstance;
 import edu.uw.easysrl.qasrl.classification.DependencyInstanceHelper;
 import edu.uw.easysrl.qasrl.classification.DependencyInstanceType;
+import edu.uw.easysrl.qasrl.classification.TemplateHelper;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.util.VerbHelper;
@@ -302,11 +303,16 @@ public class HITLParser {
     public ImmutableList<Integer> getUserOptions(final ScoredQuery<QAStructureSurfaceForm> query,
                                                  final AlignedAnnotation annotation) {
         final int[] optionDist = AnnotationUtils.getUserResponseDistribution(query, annotation);
+        return getUserOptions(query, optionDist);
+    }
+
+    public ImmutableList<Integer> getUserOptions(final ScoredQuery<QAStructureSurfaceForm> query,
+                                                 final int[] optionDist) {
         return IntStream.range(0, query.getOptions().size())
                 .filter(i -> (!query.isJeopardyStyle()
-                                    && optionDist[i] > reparsingParameters.negativeConstraintMaxAgreement) ||
-                             (query.isJeopardyStyle()
-                                     && optionDist[i] >= reparsingParameters.jeopardyQuestionMinAgreement))
+                        && optionDist[i] > reparsingParameters.negativeConstraintMaxAgreement) ||
+                        (query.isJeopardyStyle()
+                                && optionDist[i] >= reparsingParameters.jeopardyQuestionMinAgreement))
                 .boxed()
                 .collect(GuavaCollectors.toImmutableList());
     }
@@ -320,6 +326,11 @@ public class HITLParser {
     public ImmutableSet<Constraint> getConstraints(final ScoredQuery<QAStructureSurfaceForm> query,
                                                    final AlignedAnnotation annotation) {
         final int[] optionDist = AnnotationUtils.getUserResponseDistribution(query, annotation);
+        return getConstraints(query, optionDist);
+    }
+
+    public ImmutableSet<Constraint> getConstraints(final ScoredQuery<QAStructureSurfaceForm> query,
+                                                   final int[] optionDist) {
         final Set<Constraint> constraints = new HashSet<>();
         final Set<Integer> hitOptions = IntStream.range(0, optionDist.length).boxed()
                 .filter(i -> optionDist[i] >= reparsingParameters.positiveConstraintMinAgreement)

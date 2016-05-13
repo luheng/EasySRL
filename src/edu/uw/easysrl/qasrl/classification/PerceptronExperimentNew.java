@@ -43,8 +43,8 @@ public class PerceptronExperimentNew {
     private static final String[] annotationFiles = {
             "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
             "./Crowdflower_data/f902142.csv",                   // Round4: checkbox, pronouns, core only, 300 sentences.
-            "./Crowdflower_data/f897179.csv",                 // Round2-3: NP clefting questions.
-            "./Crowdflower_data/f903842.csv"              // Round4: clefting.
+            "./Crowdflower_data/f897179.csv",                   // Round2-3: NP clefting questions.
+            "./Crowdflower_data/f903842.csv"                    // Round4: clefting.
     };
 
     private QueryPruningParameters queryPruningParameters;
@@ -54,8 +54,8 @@ public class PerceptronExperimentNew {
         final int initialRandomSeed = 12345;
         final int numRandomRuns = 10;
         final ImmutableList<Double> split = ImmutableList.of(0.6, 0.4);
-        final int numEpochs = 20;
-        final double learningRate = 0.005;
+        final int numEpochs = 10;
+        final double learningRate = 0.01;
 
         Random random = new Random(initialRandomSeed);
         ImmutableList<Integer> randomSeeds = IntStream.range(0, numRandomRuns)
@@ -177,10 +177,10 @@ public class PerceptronExperimentNew {
         final Map<String, Object> params = ImmutableMap.of(
                 "eta", 0.1,
                 "min_child_weight", 1.0,
-                "max_depth", 5,
+                "max_depth", 3,
                 "objective", "binary:logistic"
         );
-        final int numRounds = 100;
+        final int numRounds = 50;
         Classifier coreArgClassifier = Classifier.trainClassifier(xgbCoreArgTrainInstances, params, numRounds);
         Classifier cleftingClassifier = Classifier.trainClassifier(xgbCleftingTrainInstances, params, numRounds);
         coreArgTrainPred = coreArgClassifier.predict(xgbCoreArgTrainInstances);
@@ -271,12 +271,16 @@ public class PerceptronExperimentNew {
                 // Do perceptron update ...
                 instances.stream()
                         .filter(inst -> inst.inGold && !inParse(inst, reparsed))
-                        .forEach(inst -> inst.features.entrySet()
-                                .forEach(e -> params[e.getKey()] += alpha * e.getValue()));
+                        .forEach(inst -> {
+                            final double lr = inst.queryType == QueryType.Forward ? alpha : alpha * 0.1;
+                            inst.features.entrySet().forEach(e -> params[e.getKey()] += lr * e.getValue());
+                        });
                 instances.stream()
                         .filter(inst -> !inst.inGold && inParse(inst, reparsed))
-                        .forEach(inst -> inst.features.entrySet()
-                                .forEach(e -> params[e.getKey()] -= alpha * e.getValue()));
+                        .forEach(inst -> {
+                            final double lr = inst.queryType == QueryType.Forward ? alpha : alpha * 0.1;
+                            inst.features.entrySet().forEach(e -> params[e.getKey()] -= lr * e.getValue());
+                        });
                 for (int i = 0; i < params.length; i++) {
                     avgParams[i] += params[i];
                 }

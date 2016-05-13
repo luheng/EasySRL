@@ -67,7 +67,7 @@ public class PerceptronExperiment {
 
         for (int i = 0; i < numRandomRuns; i++) {
             PerceptronExperiment experiment = new PerceptronExperiment(ImmutableList.of(0.6, 0.4), randomSeeds.get(i));
-            ImmutableMap<String, Double> results = experiment.runPerceptron(10 /* epochs */, 0.01 /* learning rate */,
+            ImmutableMap<String, Double> results = experiment.runPerceptron(20 /* epochs */, 1.0 /* learning rate */,
                     randomSeeds.get(i));
 
             results.keySet().forEach(k -> {
@@ -98,8 +98,8 @@ public class PerceptronExperiment {
         reparsingParameters.negativeConstraintMaxAgreement = 1;
         reparsingParameters.skipPronounEvidence = false;
         reparsingParameters.jeopardyQuestionWeight = 1.0;
-        reparsingParameters.attachmentPenaltyWeight = 5.0;
-        reparsingParameters.supertagPenaltyWeight = 5.0;
+        reparsingParameters.attachmentPenaltyWeight = 1.0;
+        reparsingParameters.supertagPenaltyWeight = 1.0;
         reparsingParameters.oraclePenaltyWeight = 5.0;
 
         myParser = new HITLParser(nBest);
@@ -136,12 +136,12 @@ public class PerceptronExperiment {
         cleftingFeatureExtractor = new FeatureExtractor();
 
 
-        //coreArgsFeatureExtractor.addAnswerLexicalFeatures = false;
+        coreArgsFeatureExtractor.addAnswerLexicalFeatures = false;
         coreArgsFeatureExtractor.addCategoryFeatures = false;
-        //coreArgsFeatureExtractor.addArgumentPositionFeatures = false;
-        //coreArgsFeatureExtractor.addNAOptionFeature = false;
-        //coreArgsFeatureExtractor.addTemplateBasedFeatures = false;
-        //coreArgsFeatureExtractor.addNBestPriorFeatures = false;
+        coreArgsFeatureExtractor.addArgumentPositionFeatures = false;
+        coreArgsFeatureExtractor.addNAOptionFeature = false;
+        coreArgsFeatureExtractor.addTemplateBasedFeatures = false;
+        coreArgsFeatureExtractor.addNBestPriorFeatures = false;
 
         coreArgTrainInstances = ClassificationUtils.getInstances(trainSents, myParser,
                 ImmutableSet.of(QueryType.Forward), coreArgsFeatureExtractor, alignedQueries, alignedAnnotations)

@@ -111,7 +111,7 @@ public class FeatureExtractor {
 
 
         //addFeature(features, "DependencyType=" + instanceType, 1.0);
-        addFeature(features, "BIAS", 1.0);
+        //addFeature(features, "BIAS", 1.0);
 
         if (addCategoryFeatures) {
             questionStructures.stream()
@@ -135,8 +135,13 @@ public class FeatureExtractor {
 
         final double votes = 1.0 * options.stream().mapToInt(allVotes::get).max().orElse(0);
         if (addAnnotationFeatures) {
-            addFeature(features, "NumReceivedVotes", votes); // / numAnnotators);
-            //addFeature(features, "NumReceivedVotes=" + votes, 1.0);
+            //addFeature(features, "NumReceivedVotes", votes); // / numAnnotators);
+            if (votes > 4.999) {
+                addFeature(features, "NumReceivedVotes>=5", 1.0);
+            }
+            if (votes < 1.999) {
+                addFeature(features, "NumReceivedVotes<2", 1.0);
+            }
             /*
             int numSingleVotes = options.stream()
                     .mapToInt(i -> (int) annotation.stream().filter(ops -> ops.contains(i) && ops.size() == 1).count())
