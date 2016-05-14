@@ -31,7 +31,7 @@ public class CrowdFlowerDataWriterCorePronouns {
 
     static final int nBest = 100;
     static final int maxNumQueriesPerFile = 200;
-    static final int numSentences = 600;
+    static final int numSentences = 2000;
     static final int randomSeed = 12345;
 
     private final static HITLParser hitlParser = new HITLParser(nBest);
@@ -39,17 +39,20 @@ public class CrowdFlowerDataWriterCorePronouns {
 
     private static final String csvOutputFilePrefix =
            // "./Crowdflower_unannotated/pronoun_core_r4_100best";
-            "./Crowdflower_unannotated/pronoun_core_r5_100best";
+          //  "./Crowdflower_unannotated/pronoun_core_r5_100best";
+            "./Crowdflower_temp/pronoun_core_r5_100best";
 
     private static final String[] inputSentenceIdsFiles = new String[] {
             "./Crowdflower_unannotated/pronoun_core_r4_100best.sent_ids.txt"
     };
 
     private static final String outputSentenceIdsFile =
-            "./Crowdflower_unannotated/pronoun_core_r5_100best.sent_ids.txt";
+          //  "./Crowdflower_unannotated/pronoun_core_r5_100best.sent_ids.txt";
+            "./Crowdflower_temp/pronoun_core_r5_100best.sent_ids.txt";
 
     private static final String[] reviewedTestQuestionFiles = new String[] {
             "./Crowdflower_unannotated/test_questions/test_question_core_pronoun_r04.tsv",
+         //   "./Crowdflower_temp/test_questions/test_question_core_pronoun_r04.tsv",
     };
 
     private static ImmutableList<Integer> testSentenceIds;
