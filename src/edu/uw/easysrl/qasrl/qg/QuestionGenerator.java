@@ -7,6 +7,12 @@ import edu.uw.easysrl.qasrl.qg.surfaceform.*;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.qasrl.qg.util.*;
+import edu.uw.easysrl.qasrl.qg.QAPairAggregator;
+import edu.uw.easysrl.qasrl.qg.QAPairAggregators;
+import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
+import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
+import edu.uw.easysrl.qasrl.query.*;
+import edu.uw.easysrl.qasrl.model.HITLParser;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -20,6 +26,7 @@ import java.util.stream.Collectors;
 import static java.util.stream.Collectors.*;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+import java.util.function.Function;
 
 /**
  * Created by luheng on 12/8/15.
@@ -242,7 +249,6 @@ public class QuestionGenerator {
 
     // TODO filter out punctuation predicates
     public static ImmutableList<QuestionAnswerPair> newVPAttachmentQuestions(int sentenceId, int parseId, Parse parse) {
-        final PredicateCache preds = new PredicateCache(parse);
         class QATemplate {
             final int predicateIndex;
             final Verb verb;
@@ -259,13 +265,23 @@ public class QuestionGenerator {
             }
         }
 
+        final PredicateCache preds = new PredicateCache(parse);
+        final ImmutableList<String> words = parse.syntaxTree.getLeaves().stream().map(l -> l.getWord()).collect(toImmutableList());
+
         final Stream<QATemplate> verbTemplates = IntStream
             .range(0, parse.categories.size())
             .boxed()
             .filter(index -> parse.categories.get(index).isFunctionInto(Category.valueOf("((S\\NP)/NP)/PP")) ||
                     parse.categories.get(index).isFunctionInto(Category.valueOf("((S\\NP)/PP)/NP")))
-            .flatMap(predicateIndex -> Stream.of(Verb.getFromParse(predicateIndex, preds, parse))
-            .filter(verb -> !verb.isCopular() && verb.getVoice() != Verb.Voice.ADJECTIVE)
+            .flatMap(predicateIndex -> {
+                    Verb v = null;
+                    try {
+                        v = Verb.getFromParse(predicateIndex, preds, parse);
+                    } catch(IllegalArgumentException e) {
+                        System.err.println(e.getMessage());
+                    }
+                    return Stream.of(v)
+            .filter(verb -> verb != null && !verb.isCopular() && verb.getVoice() == Verb.Voice.ACTIVE)
             .map(verb -> {
                     if(parse.categories.get(predicateIndex).isFunctionInto(Category.valueOf("((S\\NP)/NP)/PP"))) {
                         return verb.permuteArgs(i -> i == 2 ? 3 : (i == 3 ? 2 : i)); // swap 2 and 3
@@ -276,13 +292,24 @@ public class QuestionGenerator {
             .flatMap(verb -> PredicationUtils.sequenceArgChoices(PredicationUtils.addPlaceholderArguments(verb)).stream()
             .filter(sequencedVerb -> sequencedVerb.getArgs().get(2).get(0).getDependency().isPresent() &&
                     sequencedVerb.getArgs().get(3).get(0).getDependency().isPresent()) // both have to be taken from the sentence
-            .map(sequencedVerb -> new QATemplate(predicateIndex, sequencedVerb, 3, Optional.empty(), Optional.empty()))));
+            .map(sequencedVerb -> new QATemplate(predicateIndex, sequencedVerb, 3, Optional.empty(), Optional.empty())));});
 
         final Stream<QATemplate> adverbTemplates = IntStream
             .range(0, parse.categories.size())
             .boxed()
-            .filter(index -> parse.categories.get(index).isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)")))
-            .flatMap(predicateIndex -> Stream.of(Adverb.getFromParse(predicateIndex, preds, parse))
+            .filter(index -> parse.categories.get(index).isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)")) &&
+                    !VerbHelper.isAuxiliaryVerb(words.get(index), parse.categories.get(index)) &&
+                    !VerbHelper.isNegationWord(words.get(index)))
+            .flatMap(predicateIndex -> {
+                    Adverb adv;
+                    try {
+                        adv = Adverb.getFromParse(predicateIndex, preds, parse);
+                    } catch(IllegalArgumentException e) {
+                        System.err.println(e.getMessage());
+                        adv = null;
+                    }
+                    return Stream.of(adv)
+            .filter(adverb -> adverb != null)
             .filter(adverb -> !(Prepositions.prepositionWords.contains(adverb.getPredicate()) &&
                                 parse.categories.get(predicateIndex).matches(Category.valueOf("(S\\NP)\\(S\\NP)"))))
             .flatMap(adverb -> adverb.getArgs().get(2).stream()
@@ -299,23 +326,23 @@ public class QuestionGenerator {
             .flatMap(verb -> {
                     OptionalInt dirObjectArgNumOpt = IntStream.range(1, verb.getPredicateCategory().getNumberOfArguments() + 1)
                     .filter(i -> i > 1 && Category.NP.matches(verb.getPredicateCategory().getArgument(i)))
-                    .min();
-                    if(dirObjectArgNumOpt.isPresent()) {
-                        return Stream.of(new QATemplate(predicateIndex, verb, dirObjectArgNumOpt.getAsInt(),
+                    .max();
+                    if(dirObjectArgNumOpt.isPresent() && verb.getArgs().get(dirObjectArgNumOpt.getAsInt()).get(0).getDependency().isPresent()) {
+                        return Stream.of(new QATemplate(answerArg.getDependency().get().getArgument(), verb, dirObjectArgNumOpt.getAsInt(),
                                                         Optional.of(new TextWithDependencies(sequencedAdverb.getPhrase(Category.ADVERB),
                                                                                              sequencedAdverb.getAllDependencies())),
                                                         answerArg.getDependency()));
                     } else {
                         return Stream.empty();
                     }
-                })))));
+                }))));});
 
         final Stream<QATemplate> templates = Stream.concat(verbTemplates, adverbTemplates);
 
-        return templates.map(template -> {
+        return templates.flatMap(template -> {
                 final Argument dirObjectArgument = template.verb.getArgs().get(template.dirObjectArgNum).get(0);
                 final Noun dirObject = (Noun) dirObjectArgument.getPredication();
-                final ResolvedDependency dirObjectDep = dirObjectArgument.getDependency().orElse(null);
+                final ResolvedDependency dirObjectDep = dirObjectArgument.getDependency().get();
                 final Noun subject = template.verb.getSubject();
                 Verb questionProVerb = new Verb("do", Category.valueOf("((S[dcl]\\" + subject.getPredicateCategory() + ")/NP)/PP"),
                                                 new ImmutableMap.Builder<Integer, ImmutableList<Argument>>()
@@ -335,22 +362,32 @@ public class QuestionGenerator {
                         .withTense(answerTense)
                         .withNegation(false) // trying this out
                         .withPerfect(false) // trying this out
-                        .withProgressive(false)
-                        .transformArgs((argNum, args) -> argNum != template.dirObjectArgNum ? args
+                        .withProgressive(false) // trying this out
+                        .transformArgs((argNum, args) -> argNum == 1
+                                       ? ImmutableList.of(Argument.withNoDependency(template.verb.getSubject().getPronounOrExpletive()))
+                                       : (argNum != template.dirObjectArgNum ? args
                                        : ImmutableList.of(Argument.withNoDependency(dirObject.getPronoun()
                                                                                     .withCase(Noun.Case.ACCUSATIVE)
-                                                                                    .withDefiniteness(Noun.Definiteness.DEFINITE))));
+                                                                                    .withDefiniteness(Noun.Definiteness.DEFINITE)))));
                     TextWithDependencies answerTWD = new TextWithDependencies(answerVerb.getPhrase(Category.valueOf("S\\NP")),
                                                                              answerVerb.getAllDependencies());
+
+                    QuestionAnswerPair withoutPPqaPair = new BasicQuestionAnswerPair(sentenceId, parseId, parse,
+                                                                                     template.predicateIndex, parse.categories.get(template.predicateIndex), 2,
+                                                                                     template.predicateIndex, null,
+                                                                                     ImmutableSet.of(), questionProVerb.getQuestionWords(),
+                                                                                     dirObjectDep, answerTWD);
                     if(template.attachedPP.isPresent()) {
                         answerTWD = answerTWD.concatWithDep(template.attachedPP.get(), template.vpAttachmentDep);
+                        return Stream.of(withoutPPqaPair,
+                                         new BasicQuestionAnswerPair(sentenceId, parseId, parse,
+                                                                     template.predicateIndex, parse.categories.get(template.predicateIndex), 2,
+                                                                     template.predicateIndex, null,
+                                                                     ImmutableSet.of(), questionProVerb.getQuestionWords(),
+                                                                     dirObjectDep, answerTWD));
+                    } else {
+                        return Stream.of(withoutPPqaPair);
                     }
-
-                    return new BasicQuestionAnswerPair(sentenceId, parseId, parse,
-                                                       template.predicateIndex, parse.categories.get(template.predicateIndex), 2,
-                                                       template.predicateIndex, null,
-                                                       ImmutableSet.of(), questionProVerb.getQuestionWords(),
-                                                       dirObjectDep, answerTWD);
             })
             .collect(toImmutableList());
     }
@@ -440,7 +477,10 @@ public class QuestionGenerator {
             System.out.println("\nQA Pairs for tricky sentences:\n");
             ImmutableList<Integer> trickySentences = new ImmutableList.Builder<Integer>()
                 // .add(42).add(1489).add(36)
-                .add(90)
+                // .add(90)
+                .add(3)
+                // .add(268, 1016, 1232, 1695, 444, 1495, 1516, 1304, 1564, 397, 217, 90, 224, 563, 1489, 199, 1105, 1124, 1199, 294,
+                //      1305, 705, 762)
                 .build();
             ImmutableMap<Integer, NBestList> nBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 100).get();
             for(int sentenceId : trickySentences) {
@@ -469,46 +509,141 @@ public class QuestionGenerator {
                 }
             }
         } else if (args[0].equalsIgnoreCase("queries")) {
-            System.out.println("All queries:\n");
-            final ImmutableMap<Integer, NBestList> nBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 100).get();
-            for(int sentenceId = 0; sentenceId < 40; sentenceId++) {
-                if(!nBestLists.containsKey(sentenceId)) {
-                    continue;
-                }
-                ImmutableList<String> words = devData.getSentences().get(sentenceId);
-                NBestList nBestList = nBestLists.get(sentenceId);
-                System.out.println("--------- All Queries --------");
-                System.out.println(TextGenerationHelper.renderString(words));
-                ImmutableList<QuestionAnswerPair> qaPairs = generateAllNewQAPairs(sentenceId, nBestList);
+            if(args.length > 1 && args[1].equalsIgnoreCase("structured")) {
 
-                /*
-                qaPairs.forEach(qa -> {
-                    System.out.println(qa.getQuestion() + "\t" + qa.getAnswer());
-                    System.out.println(qa.getQuestionDependencies().stream().map(dep -> dep.toString(words)).collect(Collectors.joining(";\t")));
-                    System.out.println(qa.getTargetDependency().toString(words));
-                    System.out.println(qa.getAnswerDependencies().stream().map(dep -> dep.toString(words)).collect(Collectors.joining(";\t")));
-                    System.out.println();
-                }); */
+                final QueryPruningParameters noFilterQueryPruningParameters = new QueryPruningParameters();
+                noFilterQueryPruningParameters.minPromptConfidence = 0.0;
+                noFilterQueryPruningParameters.minOptionConfidence = 0.0;
+                noFilterQueryPruningParameters.minOptionEntropy = 0.0;
+                noFilterQueryPruningParameters.maxNumOptionsPerQuery = 50;
+                noFilterQueryPruningParameters.skipBinaryQueries = false;
+                noFilterQueryPruningParameters.skipSAdjQuestions = false;
+                noFilterQueryPruningParameters.skipPPQuestions = false;
+                noFilterQueryPruningParameters.skipQueriesWithPronounOptions = false;
 
-                if(args.length > 1 && args[1].equalsIgnoreCase("aggDeps")) {
-                    ImmutableList<QADependenciesSurfaceForm> surfaceForms = QAPairAggregators
-                        .aggregateBySalientDependencies().aggregate(qaPairs);
-                    ImmutableList<Query<QADependenciesSurfaceForm>> queries = QueryGenerators
-                        .answerAdjunctPartitioningQueryGenerator().generate(surfaceForms);
-                    for(Query<QADependenciesSurfaceForm> query : queries) {
-                        System.out.println(query.getPrompt());
-                        for(String option : query.getOptions()) {
-                            System.out.println("\t" + option);
-                        }
+                final QAPairAggregator<QAStructureSurfaceForm> qaPairAggregator =
+                    QAPairAggregators.aggregateWithAnswerAdverbAndPPArgDependencies();
+                final QueryGenerator<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> queryGenerator =
+                    QueryGenerators.checkboxQueryGenerator();
+                final QueryFilter<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> queryFilter =
+                    QueryFilters.scoredQueryFilter();
+
+                final ImmutableMap<Integer, NBestList> nBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 100).get();
+                final ImmutableMap<Integer, ImmutableList<ScoredQuery<QAStructureSurfaceForm>>> queriesBySentenceId = nBestLists.entrySet().stream()
+                    .collect(toImmutableMap(e -> e.getKey(), e -> {
+                                int sentenceId = e.getKey();
+                                NBestList nBestList = e.getValue();
+                                ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries =
+                                queryGenerator.generate(qaPairAggregator.aggregate(generateAllNewQAPairs(sentenceId, nBestList)));
+                                for(ScoredQuery<QAStructureSurfaceForm> query : queries) {
+                                    query.computeScores(nBestList);
+                                }
+                                return queries;
+                            }));
+
+                // final HITLParsingParameters reparsingParameters = new HITLParsingParameters();
+                // reparsingParameters.jeopardyQuestionMinAgreement = 1;
+                // reparsingParameters.positiveConstraintMinAgreement = 5;
+                // reparsingParameters.negativeConstraintMaxAgreement = 1;
+                // reparsingParameters.skipPronounEvidence = false;
+                // reparsingParameters.jeopardyQuestionWeight = 1.0;
+                // reparsingParameters.attachmentPenaltyWeight = 1.0;
+                // reparsingParameters.supertagPenaltyWeight = 1.0;
+
+                final HITLParser hitlParser = new HITLParser(100);
+                // hitlParser.setQueryPruningParameters(noFilterQueryPruningParameters);
+                // hitlParser.setReparsingParameters(reparsingParameters);
+
+                System.out.println(queriesBySentenceId.entrySet().stream().mapToInt(e -> e.getValue().size()).sum() +
+                                   " queries total for " + queriesBySentenceId.keySet().stream().collect(counting()) +
+                                   " sentences");
+                ImmutableSet<Integer> testSentences = new ImmutableSet.Builder<Integer>()
+                    .add(268, 1016, 1232, 1695, 444, 1495, 1516, 1304, 1564, 397, 217, 90, 224, 563, 1489, 199, 1105, 1124, 1199, 294,
+                         1305, 705, 762)
+                    .build();
+                for(int sentenceId : testSentences) {
+                    ImmutableList<String> words = devData.getSentences().get(sentenceId);
+                    for(ScoredQuery<QAStructureSurfaceForm> query : queriesBySentenceId.get(sentenceId)) {
+
+                        final ImmutableList<QAStructureSurfaceForm> qaOptions = query.getQAPairSurfaceForms();
+                        // assume the target dep is the same for all
+                        final ResolvedDependency targetDep = qaOptions.get(0).getQAPairs().get(0).getTargetDependency();
+                        final Function<Parse, ImmutableList<Integer>> optionsForParse = (parse -> {
+                                ImmutableList<Integer> opts = IntStream.range(0, qaOptions.size())
+                                .filter(optionId -> qaOptions.get(optionId).getAnswerStructures().stream()
+                                        .anyMatch(astr -> Stream.concat(Stream.of(targetDep), astr.adjunctDependencies.stream())
+                                        .allMatch(answerDep -> parse.dependencies.stream()
+                                        .anyMatch(goldDep -> !(goldDep.getCategory().isFunctionInto(Category.valueOf("S\\NP")) && goldDep.getArgNumber() == 1) &&
+                                                  (answerDep.getHead() == goldDep.getHead() &&
+                                                   answerDep.getArgument() == goldDep.getArgument()) ||
+                                                  (answerDep.getHead() == goldDep.getArgument() &&
+                                                   answerDep.getArgument() == goldDep.getHead())))))
+                                .boxed()
+                                .collect(toImmutableList());
+                                if(opts.isEmpty() || query.getQAPairSurfaceForms().stream().flatMap(sf -> sf.getQuestionStructures().stream()).noneMatch(qStr -> {
+                                            Category category = qStr.category;
+                                            Category parseCategory = parse.categories.get(qStr.predicateIndex);
+                                            return category.isFunctionInto(parseCategory) ||
+                                                parseCategory.isFunctionInto(category);
+                                        })) {
+                                    return ImmutableList.of(qaOptions.size());
+                                } else {
+                                    return opts;
+                                }
+                            });
+                        final Parse goldParse = devData.getGoldParses().get(sentenceId);
+                        final ImmutableList<Integer> goldOptions = optionsForParse.apply(goldParse);
+                        final ImmutableList<Integer> oneBestOptions = optionsForParse.apply(nBestLists.get(sentenceId).getParse(0));
+
+                        System.out.println();
+                        System.out.println(query.toString(words,
+                                                          'G', goldOptions,
+                                                          'B', oneBestOptions));
                     }
-                } else {
-                    QAPairAggregator<QAPairSurfaceForm> qaPairAggregator = QAPairAggregators.aggregateByString();
-                    ImmutableList<QAPairSurfaceForm> surfaceForms = qaPairAggregator.aggregate(qaPairs);
-                    ImmutableList<Query<QAPairSurfaceForm>> queries = QueryGenerators.maximalForwardGenerator().generate(surfaceForms);
-                    for(Query<QAPairSurfaceForm> query : queries) {
-                        System.out.println(query.getPrompt());
-                        for(String option : query.getOptions()) {
-                            System.out.println("\t" + option);
+                }
+
+            } else {
+                System.out.println("All queries:\n");
+                final ImmutableMap<Integer, NBestList> nBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 100).get();
+                for(int sentenceId = 0; sentenceId < 40; sentenceId++) {
+                    if(!nBestLists.containsKey(sentenceId)) {
+                        continue;
+                    }
+                    ImmutableList<String> words = devData.getSentences().get(sentenceId);
+                    NBestList nBestList = nBestLists.get(sentenceId);
+                    System.out.println("--------- All Queries --------");
+                    System.out.println(TextGenerationHelper.renderString(words));
+                    ImmutableList<QuestionAnswerPair> qaPairs = generateAllNewQAPairs(sentenceId, nBestList);
+
+                    /*
+                      qaPairs.forEach(qa -> {
+                      System.out.println(qa.getQuestion() + "\t" + qa.getAnswer());
+                      System.out.println(qa.getQuestionDependencies().stream().map(dep -> dep.toString(words)).collect(Collectors.joining(";\t")));
+                      System.out.println(qa.getTargetDependency().toString(words));
+                      System.out.println(qa.getAnswerDependencies().stream().map(dep -> dep.toString(words)).collect(Collectors.joining(";\t")));
+                      System.out.println();
+                      }); */
+
+                    if(args.length > 1 && args[1].equalsIgnoreCase("aggDeps")) {
+                        ImmutableList<QADependenciesSurfaceForm> surfaceForms = QAPairAggregators
+                            .aggregateBySalientDependencies().aggregate(qaPairs);
+                        ImmutableList<Query<QADependenciesSurfaceForm>> queries = QueryGenerators
+                            .answerAdjunctPartitioningQueryGenerator().generate(surfaceForms);
+                        for(Query<QADependenciesSurfaceForm> query : queries) {
+                            System.out.println(query.getPrompt());
+                            for(String option : query.getOptions()) {
+                                System.out.println("\t" + option);
+                            }
+                        }
+                    } else {
+                        QAPairAggregator<QAPairSurfaceForm> qaPairAggregator = QAPairAggregators.aggregateByString();
+                        ImmutableList<QAPairSurfaceForm> surfaceForms = qaPairAggregator.aggregate(qaPairs);
+                        ImmutableList<Query<QAPairSurfaceForm>> queries = QueryGenerators.maximalForwardGenerator().generate(surfaceForms);
+                        for(Query<QAPairSurfaceForm> query : queries) {
+                            System.out.println(query.getPrompt());
+                            for(String option : query.getOptions()) {
+                                System.out.println("\t" + option);
+                            }
                         }
                     }
                 }

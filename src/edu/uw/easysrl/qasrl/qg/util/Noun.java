@@ -242,6 +242,8 @@ public abstract class Noun extends Predication {
     public abstract boolean isPronoun();
     public abstract Pronoun getPronoun();
 
+    public abstract Noun getPronounOrExpletive();
+
     /* protected methods and fields */
 
     protected Noun(String predicate,

@@ -39,6 +39,7 @@ public final class Clause extends Predication {
         EMBEDDED_QUESTION(Category.valueOf("S[qem]")),
         POSS(Category.valueOf("S[poss]")),
         AS(Category.valueOf("S[poss]")),
+        NG(Category.valueOf("S[ng]")),
         INV(Category.valueOf("S[inv]"));
 
         public Category getHeadCategory() {
@@ -124,6 +125,8 @@ public final class Clause extends Predication {
                 clauseType = Type.WH_QUESTION;
             } else if(Category.valueOf("S[as]").matches(clauseCategory)) {
                 clauseType = Type.AS;
+            } else if(Category.valueOf("S[ng]").matches(clauseCategory)) {
+                clauseType = Type.NG;
             } else {
                 assert Category.S.matches(clauseCategory);
                 if(!clauseCategory.matches(Category.S)) {

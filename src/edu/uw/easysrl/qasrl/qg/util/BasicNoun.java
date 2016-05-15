@@ -91,6 +91,11 @@ public class BasicNoun extends Noun {
         return new Pronoun(getCase(), getNumber(), getGender(), getPerson(), getDefiniteness());
     }
 
+    @Override
+    public Noun getPronounOrExpletive() {
+        return getPronoun();
+    }
+
     /* protected methods and fields */
 
     protected BasicNoun(String predicate,

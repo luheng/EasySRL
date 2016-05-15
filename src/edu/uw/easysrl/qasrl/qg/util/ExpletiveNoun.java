@@ -105,6 +105,11 @@ public class ExpletiveNoun extends Noun {
         throw new UnsupportedOperationException("cannot make a pronoun from an expletive noun");
     }
 
+    @Override
+    public Noun getPronounOrExpletive() {
+        return this;
+    }
+
     /* private methods and fields */
 
     private ExpletiveNoun(Category predicateCategory,

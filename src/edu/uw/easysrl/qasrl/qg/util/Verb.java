@@ -51,6 +51,7 @@ public final class Verb extends Predication {
             .collect(toImmutableList());
         final SyntaxTreeNodeLeaf headLeaf = tree.getLeaves().get(headIndex);
         final Category initCategory = parse.categories.get(headIndex);
+
         final ImmutableMap<Integer, ImmutableList<Argument>> initArgs = IntStream
             .range(1, initCategory.getNumberOfArguments() + 1)
             .boxed()
@@ -62,12 +63,7 @@ public final class Verb extends Predication {
                                     .collect(toImmutableList())));
         final Category predicateCategory;
         final ImmutableMap<Integer, ImmutableList<Argument>> args;
-        if(Category.valueOf("(S[dcl]\\S[dcl])/NP").matches(initCategory)) { // "...", said one stupid, stupid man.
-            Category npCat = initCategory.getArgument(2);
-            predicateCategory = Category.valueOf("(S[dcl]\\" + npCat + ")/S[dcl]");
-            Function<Integer, Integer> permutation = i -> i == 1 ? 2 : (i == 2 ? 1 : i); // switch 1 and 2
-            args = PredicationUtils.permuteArgs(initArgs, permutation);
-        } else if(Category.valueOf("(S[dcl]\\S[dcl])\\NP").matches(initCategory)) { // "...", analysts warn.
+        if(Category.valueOf("(S[dcl]|S[dcl])|NP").matches(initCategory)) { // "...", said one stupid, stupid man.
             Category npCat = initCategory.getArgument(2);
             predicateCategory = Category.valueOf("(S[dcl]\\" + npCat + ")/S[dcl]");
             Function<Integer, Integer> permutation = i -> i == 1 ? 2 : (i == 2 ? 1 : i); // switch 1 and 2
@@ -91,10 +87,11 @@ public final class Verb extends Predication {
         }
 
 
-        assert predicateCategory.isFunctionInto(Category.valueOf("S\\NP"))
-            : "verb predication must arise from verb category; bad word " +
-            predicate + " (" + predicateCategory + ") in sentence\n" +
-            TextGenerationHelper.renderString(words);
+        if(!predicateCategory.isFunctionInto(Category.valueOf("S\\NP"))) {
+            throw new IllegalArgumentException("verb must be a S\\NP (or other known verb); bad word " +
+                                               predicate + " (" + predicateCategory + ") in sentence\n" +
+                                               TextGenerationHelper.renderString(words));
+        }
 
         // final ImmutableList<Noun> subjects = args.get(1).stream()
         //     .map(arg -> (Noun) arg.getPredication())
@@ -109,7 +106,9 @@ public final class Verb extends Predication {
         Voice voice = Voice.ACTIVE;
 
         final Optional<String> particle;
-        if(headIndex + 1 < parse.categories.size() && Category.valueOf("(S\\NP)\\(S\\NP)").matches(parse.categories.get(headIndex + 1))) {
+        if(headIndex + 1 < parse.categories.size() &&
+           Category.valueOf("(S\\NP)\\(S\\NP)").matches(parse.categories.get(headIndex + 1)) &&
+           !VerbHelper.isNegationWord(words.get(headIndex + 1))) {
             particle = Optional.of(words.get(headIndex + 1));
         } else {
             particle = Optional.empty();
@@ -161,6 +160,11 @@ public final class Verb extends Predication {
             }
         }
 
+        if(tense != Tense.MODAL) {
+            // in case we see another aux after the modal. shouldn't happen, but...with horrid parses, you never know.
+            modal = Optional.empty();
+        }
+
         return new Verb(predicate, predicateCategory, args,
                         tense, modal, voice,
                         isPerfect, isProgressive, isNegated,
@@ -180,19 +184,17 @@ public final class Verb extends Predication {
                                     : Argument.withNoDependency(Pronoun.fromString("something").get())));
 
         final ImmutableList<String> allVerbWords = getVerbWithoutSplit();
-        final ImmutableList<String> auxChain;
-        final ImmutableList<String> verbWords;
-        if(particle.isPresent()) {
-            auxChain = allVerbWords.subList(0, allVerbWords.size() - 2);
-            verbWords = allVerbWords.subList(allVerbWords.size() - 2, allVerbWords.size());
-        } else {
-            auxChain = allVerbWords.subList(0, allVerbWords.size() - 1);
-            verbWords = allVerbWords.subList(allVerbWords.size() - 1, allVerbWords.size());
-        }
+        final ImmutableList<String> auxChain = allVerbWords.subList(0, allVerbWords.size() - 1);
+        final ImmutableList<String> verbWords = allVerbWords.subList(allVerbWords.size() - 1, allVerbWords.size());
 
         ImmutableList<String> leftArgs = ImmutableList.of();
         ImmutableList<String> rightArgs = ImmutableList.of();
         Category curCat = getPredicateCategory();
+
+        // add the particle now if we're never going to drop into the while loop below.
+        if(desiredCategory.dropFeatures().matches(curCat) && particle.isPresent()) {
+            rightArgs = ImmutableList.of(particle.get());
+        }
 
         while(!desiredCategory.dropFeatures().matches(curCat)) { // in case there are disagreeing features (we want to ignore them)
             Predication curArg = args.get(curCat.getNumberOfArguments()).getPredication();
@@ -211,6 +213,27 @@ public final class Verb extends Predication {
                 break;
             default: assert false;
             }
+
+            if(particle.isPresent()) {
+                // if we just added the first argument, (this will happen exactly once if we're in this loop)
+                if(curCat.matches(getPredicateCategory())) {
+                    // and the argument is a pronoun or expletive noun,
+                    if(curArg instanceof Noun && (((Noun) curArg).isPronoun() || ((Noun) curArg).isExpletive())) {
+                        // then we should put the particle on the RIGHT of the rightArgs (e.g., "I showed him up")
+                        rightArgs = new ImmutableList.Builder<String>()
+                            .addAll(rightArgs)
+                            .add(particle.get())
+                            .build();
+                    } else {
+                        // otherwise the particle goes on the LEFT of the right args.
+                        rightArgs = new ImmutableList.Builder<String>()
+                            .add(particle.get())
+                            .addAll(rightArgs)
+                            .build();
+                    }
+                }
+            }
+
             curCat = curCat.getLeft();
             if(Category.valueOf("(S\\NP)").matches(curCat)) {
                 leftArgs = new ImmutableList.Builder<String>()
@@ -436,7 +459,6 @@ public final class Verb extends Predication {
         return getPredicate().equals("be");
     }
 
-
     /* protected methods */
 
     // TODO: make a pro-verb constructor so this can be protected again
@@ -524,10 +546,6 @@ public final class Verb extends Predication {
     private Deque<String> getVerbWordStack() {
         Deque<String> verbStack = new LinkedList<>();
 
-        if(particle.isPresent()) {
-            verbStack.addFirst(particle.get());
-        }
-
         if(tense == Tense.BARE_VERB) {
             switch(voice) {
             case PASSIVE: verbStack.addFirst(VerbHelper.getPastParticiple(getPredicate())); break;
@@ -570,11 +588,12 @@ public final class Verb extends Predication {
 
             switch(tense) {
             case BARE: break;
-            case TO: verbStack.addFirst("to");
+            case TO: verbStack.addFirst("to"); break;
             case MODAL: verbStack.addFirst(modal.get()); break;
             case PAST: verbStack.addFirst(VerbHelper.getPastTense(verbStack.removeFirst(), getSubject())); break;
             case PRESENT: verbStack.addFirst(VerbHelper.getPresentTense(verbStack.removeFirst(), getSubject())); break;
             case FUTURE: verbStack.addFirst("will"); break;
+            default: assert false;
             }
 
             if(isNegated) {

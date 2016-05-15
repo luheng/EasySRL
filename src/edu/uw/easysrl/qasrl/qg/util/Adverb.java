@@ -120,7 +120,7 @@ public final class Adverb extends Predication {
 
     private void validate() {
         if(!getPredicateCategory().isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)"))) {
-            throw new IllegalArgumentException("Adverb must be a (S\\NP)\\(S\\NP)");
+            throw new IllegalArgumentException("Adverb must be a (S\\NP)\\(S\\NP); given: " + getPredicate() + " (" + getPredicateCategory() + ")");
         }
     }
 }

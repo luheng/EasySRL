@@ -141,6 +141,11 @@ public final class Pronoun extends Noun {
         return true;
     }
 
+    @Override
+    public Noun getPronounOrExpletive() {
+        return this;
+    }
+
     /* protected methods */
 
     protected Pronoun(Optional<Case> caseMarking, Optional<Number> number, Optional<Gender> gender, Person person,
