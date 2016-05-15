@@ -17,10 +17,10 @@ import java.util.stream.Stream;
  * Created by luheng on 5/12/16.
  */
 public class VoteHelper {
-    public static boolean fixAppostiveRestrictive = true;
+    public static boolean fixAppostiveRestrictive = false;
     public static boolean fixCoordinatedAppostive = false;
     public static boolean fixPartitiveNP = false;
-    public static boolean fixNonPartitiveNP = true;
+    public static boolean fixNonPartitiveNP = false;
     public static boolean fixPronoun = true;
 
     public static ImmutableList<ImmutableList<Integer>> adjustVotes(final ImmutableList<String> sentence,
@@ -137,8 +137,8 @@ public class VoteHelper {
 
                 if (fixPronoun) {
                     // op2[pron] [pred] / [pred] op2[pron]: v(op1) -> v(op2)
-                    if (PronounList.englishPronounSet.contains(op2) &&
-                            (argId2 == predicateId - 1 || argId2 == predicateId + 1)) {
+                    if (PronounList.englishPronounSet.contains(op2) && votes[opId1] > 0 && votes[opId2] > 0) {
+                            //(argId2 == predicateId - 1 || argId2 == predicateId + 1)) {
                         for (int i = 0; i < numAnnotators; i++) {
                             adjustedVotes[i][opId2] = Math.max(adjustedVotes[i][opId1], adjustedVotes[i][opId2]);
                             adjustedVotes[i][opId1] = 0;

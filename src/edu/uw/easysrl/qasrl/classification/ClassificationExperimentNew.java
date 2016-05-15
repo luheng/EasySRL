@@ -57,8 +57,9 @@ public class ClassificationExperimentNew {
     private static final String[] annotationFiles = {
             "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
             "./Crowdflower_data/f902142.csv",                   // Round4: checkbox, pronouns, core only, 300 sentences.
+            "./Crowdflower_data/f909211.csv",                 // Round5: core.
             "./Crowdflower_data/f897179.csv",                 // Round2-3: NP clefting questions.
-            "./Crowdflower_data/f903842.csv"              // Round4: clefting.
+            "./Crowdflower_data/f903842.csv"                  // Round4: clefting.
     };
 
     private QueryPruningParameters queryPruningParameters;
@@ -261,6 +262,7 @@ public class ClassificationExperimentNew {
                             }
                         });
 
+                /*
                 IntStream.range(0, cleftingPred.size()).boxed()
                         .forEach(i -> {
                             final DependencyInstance inst = cleftingDevInstances.get(i);
@@ -276,6 +278,7 @@ public class ClassificationExperimentNew {
                                         inst.headId, sentence.get(inst.headId), inst.argId, sentence.get(inst.argId)));
                             }
                         });
+                        */
 
                 heuristicConstraints.stream().filter(Constraint.SupertagConstraint.class::isInstance).forEach(constraints::add);
                 constraints.stream().filter(c -> c.prediction > 0.8 || c.prediction < 0.35).forEach(allConstraints::add);

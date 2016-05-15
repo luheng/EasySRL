@@ -42,17 +42,18 @@ public class ReparsingExperiment {
           //  "./Crowdflower_data/f882410.csv",                // Round2: radio-button, core only
           //  "./Crowdflower_data/all-checkbox-responses.csv", // Round3: checkbox, core + pp
           //  "./Crowdflower_data/f891522.csv",                // Round4: jeopardy checkbox, pp only
-            "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
+          //  "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
           //  "./Crowdflower_data/f897179.csv"                 // Round2-3: NP clefting questions.
-            "./Crowdflower_data/f902142.csv",                   // Round4: checkbox, pronouns, core only, 300 sentences.
+          //  "./Crowdflower_data/f902142.csv",                   // Round4: checkbox, pronouns, core only, 300 sentences.
           //  "./Crowdflower_data/f903842.csv"                   // Round4: np-clefting prnouns
+            "./Crowdflower_data/f909211.csv",                   // Round5: checkbox, pronouns, core only, 300+ sentences.
     };
 
     private static QueryPruningParameters queryPruningParameters;
     static {
         queryPruningParameters = new QueryPruningParameters();
-        queryPruningParameters.skipPPQuestions = false;
-        queryPruningParameters.skipSAdjQuestions = true;
+        queryPruningParameters.skipPPQuestions = true;
+        queryPruningParameters.skipSAdjQuestions = false;
     }
 
     private static HITLParsingParameters reparsingParameters;
@@ -61,7 +62,7 @@ public class ReparsingExperiment {
         reparsingParameters.jeopardyQuestionMinAgreement = 1;
         reparsingParameters.positiveConstraintMinAgreement = 5;
         reparsingParameters.negativeConstraintMaxAgreement = 1;
-        reparsingParameters.skipPronounEvidence = false;
+        reparsingParameters.skipPronounEvidence = true;
         reparsingParameters.jeopardyQuestionWeight = 1.0;
         reparsingParameters.oraclePenaltyWeight = 5.0;
         reparsingParameters.attachmentPenaltyWeight = 5.0;
