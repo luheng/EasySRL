@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
+import com.google.common.collect.Lists;
 import com.google.common.collect.Table;
 import com.google.common.collect.Table.Cell;
 import com.google.common.collect.TreeBasedTable;
@@ -183,6 +184,10 @@ public class ParallelCorpusReader {
 	private static List<SyntaxTreeNode> parsesDev;
 	private static List<DependencyParse> depParsesDev;
 
+	private static List<SyntaxTreeNode> parsesTest;
+	private static List<DependencyParse> depParsesTest;
+
+
 	private Table<String, Integer, TreebankParse> PTB;
 	private Table<String, Integer, SyntacticDependencyParse> CoNLL;
 	private Table<String, Integer, SRLParse> srlParses;
@@ -350,6 +355,57 @@ public class ParallelCorpusReader {
 						PTB.get(depParse.getFile(), depParse.getSentenceNumber()));
 			}
 		};
+	}
+
+	public Iterator<Sentence> readCcgTestSet() throws IOException {
+		System.err.println("Reading CcgBank Test Set...");
+		synchronized (this) {
+			if (PTB == null) {
+				PTB = new PennTreebank().readCorpus(treebank);
+			}
+			if (CoNLL == null) {
+				CoNLL = new DependencyTreebank().readCorpus(treebank);
+			}
+			if (srlParses == null) {
+				srlParses = SRLParse.parseCorpus(
+						PTB,
+						Util.readFileLineByLine(new File(propbank,  "prop.txt")),
+						nombank != null ? Util.readFileLineByLine(nombank) : null);
+			}
+		}
+		List<SyntaxTreeNode> parses;
+		List<DependencyParse> depParses;
+		synchronized (ccgbank) {
+			if (parsesTest == null) {
+				parsesTest = Lists.newArrayList(CCGBankParseReader.loadCorpus(ccgbank, CCGBankParseReader.testRegex));
+			}
+			if (depParsesTest == null) {
+				depParsesTest = CCGBankDependencies.loadCorpus(ccgbank, Partition.TEST);
+			}
+			parses = parsesTest;
+			depParses = depParsesTest;
+		}
+
+		return new Iterator<Sentence>() {
+			int i = 0;
+
+			@Override
+			public boolean hasNext() {
+				return i < parses.size();
+			}
+
+			@Override
+			public Sentence next() {
+				final SyntaxTreeNode parse = parses.get(i);
+				final DependencyParse depParse = depParses.get(i);
+				final SyntacticDependencyParse conll = CoNLL.get(
+						depParse.getFile(), depParse.getSentenceNumber());
+				i++;
+				return new Sentence(parse, depParse, conll, null /* SRL */,
+						PTB.get(depParse.getFile(), depParse.getSentenceNumber()));
+			}
+		};
+
 	}
 
 }

@@ -193,6 +193,9 @@ public class ReparsingExperiment {
                 ImmutableSet<Constraint> constraints = myHTILParser.getConstraints(query, newOptionDist),
                                          oracleConstraints = myHTILParser.getOracleConstraints(query); //, goldOptions);
 
+                // Set constraint strength proportional to sentence length.
+                //constraints.stream().forEach(c -> c.setStrength(0.2 * sentence.size()));
+
                 allConstraints.addAll(constraints);
                 allOracleConstraints.addAll(oracleConstraints);
 
@@ -269,7 +272,7 @@ public class ReparsingExperiment {
 
         debugging.stream()
                 .sorted((b1, b2) -> Double.compare(b1.deltaF1, b2.deltaF1))
-                .filter(b -> b.oracleDeltaF1 > 1e-3)
+        //                .filter(b -> b.oracleDeltaF1 > 1e-3)
         //         .filter(b -> Math.abs(b.deltaF1) > 1e-3)
                 .forEach(b -> System.out.println(b.block));
 

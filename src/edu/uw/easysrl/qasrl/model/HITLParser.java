@@ -60,8 +60,12 @@ public class HITLParser {
      * Initialize data and re-parser.
      */
     public HITLParser(int nBest) {
+        this(nBest, false /* load from test */);
+    }
+
+    public HITLParser(int nBest, boolean getTestSet) {
         this.nBest = nBest;
-        parseData = ParseData.loadFromDevPool().get();
+        parseData = getTestSet ? ParseData.loadFromTestPool().get() : ParseData.loadFromDevPool().get();
         sentences = parseData.getSentences();
         inputSentences = parseData.getSentenceInputWords();
         goldParses = parseData.getGoldParses();

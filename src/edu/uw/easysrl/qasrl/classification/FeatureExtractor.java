@@ -140,7 +140,7 @@ public class FeatureExtractor {
         if (addAnnotationFeatures) {
             //addFeature(features, "NumReceivedVotes", votes); // / numAnnotators);
             if (votes > 4.001) {
-                addFeature(features, "NumReceivedVotes>5", 1.0);
+                addFeature(features, "NumReceivedVotes>4", 1.0);
             }
             if (votes > 3.001) {
                 addFeature(features, "NumReceivedVotes>3", 1.0);
@@ -234,7 +234,7 @@ public class FeatureExtractor {
         } else {
             addFeature(features, "SLEN>45", 1.0);
         }
-        
+
         return ImmutableMap.copyOf(features);
     }
 
