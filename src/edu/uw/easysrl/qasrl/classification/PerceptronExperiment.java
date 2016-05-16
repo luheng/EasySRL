@@ -46,9 +46,9 @@ public class PerceptronExperiment {
     private static final String[] annotationFiles = {
             "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
             "./Crowdflower_data/f902142.csv",                   // Round4: checkbox, pronouns, core only, 300 sentences.
-            "./Crowdflower_data/f909211.csv",                 // Round5: core.
-            "./Crowdflower_data/f897179.csv",                 // Round2-3: NP clefting questions.
-            "./Crowdflower_data/f903842.csv"              // Round4: clefting.
+            "./Crowdflower_data/f909211.csv",                   // Round5: core.
+            "./Crowdflower_data/f897179.csv",                   // Round2-3: NP clefting questions.
+            "./Crowdflower_data/f903842.csv"                    // Round4: clefting.
     };
 
     private QueryPruningParameters queryPruningParameters;
@@ -68,7 +68,7 @@ public class PerceptronExperiment {
 
         for (int i = 0; i < numRandomRuns; i++) {
             PerceptronExperiment experiment = new PerceptronExperiment(ImmutableList.of(0.6, 0.4), randomSeeds.get(i));
-            ImmutableMap<String, Double> results = experiment.runPerceptron(20 /* epochs */, 1.0 /* learning rate */,
+            ImmutableMap<String, Double> results = experiment.runPerceptron(20 /* epochs */, 0.5 /* learning rate */,
                     randomSeeds.get(i));
 
             results.keySet().forEach(k -> {
@@ -89,7 +89,7 @@ public class PerceptronExperiment {
 
     PerceptronExperiment(final ImmutableList<Double> split, final int randomSeed) {
         queryPruningParameters = new QueryPruningParameters();
-        queryPruningParameters.skipPPQuestions = false;
+        queryPruningParameters.skipPPQuestions = true;
         queryPruningParameters.skipSAdjQuestions = true;
         queryPruningParameters.skipQueriesWithPronounOptions = false;
 
@@ -136,13 +136,14 @@ public class PerceptronExperiment {
         coreArgsFeatureExtractor = new FeatureExtractor();
         cleftingFeatureExtractor = new FeatureExtractor();
 
-
+        /*
         coreArgsFeatureExtractor.addAnswerLexicalFeatures = false;
         coreArgsFeatureExtractor.addCategoryFeatures = false;
         coreArgsFeatureExtractor.addArgumentPositionFeatures = false;
         coreArgsFeatureExtractor.addNAOptionFeature = false;
         coreArgsFeatureExtractor.addTemplateBasedFeatures = false;
         coreArgsFeatureExtractor.addNBestPriorFeatures = false;
+        */
 
         coreArgTrainInstances = ClassificationUtils.getInstances(trainSents, myParser,
                 ImmutableSet.of(QueryType.Forward), coreArgsFeatureExtractor, alignedQueries, alignedAnnotations)

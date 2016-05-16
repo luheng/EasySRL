@@ -4,7 +4,9 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import edu.uw.easysrl.qasrl.NBestList;
+import edu.uw.easysrl.qasrl.annotation.AnnotationUtils;
 import edu.uw.easysrl.qasrl.corpora.CountDictionary;
+import edu.uw.easysrl.qasrl.model.HeuristicHelper;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.syntax.AnswerStructure;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
@@ -25,13 +27,13 @@ public class FeatureExtractor {
     CountDictionary featureMap;
     private boolean acceptNewFeatures = true;
 
-    boolean addCategoryFeatures = true;
-    boolean addNBestPriorFeatures = true;
-    boolean addTemplateBasedFeatures = true;
+    boolean addCategoryFeatures = false;
+    boolean addNBestPriorFeatures = false;
+    boolean addTemplateBasedFeatures = false;
     boolean addAnnotationFeatures = true;
-    boolean addNAOptionFeature = true;
-    boolean addAnswerLexicalFeatures = true;
-    boolean addArgumentPositionFeatures = true;
+    boolean addNAOptionFeature = false;
+    boolean addAnswerLexicalFeatures = false;
+    boolean addArgumentPositionFeatures = false;
 
     FeatureExtractor() {
         featureMap = new CountDictionary();
@@ -105,10 +107,11 @@ public class FeatureExtractor {
                         .mapToDouble(parse -> parse.score)
                         .sum()
                 ));
-        final ImmutableList<Integer> allVotes = IntStream.range(0, numQAOptions).boxed()
-                .map(i -> (int) annotation.stream().filter(ops -> ops.contains(i)).count())
-                .collect(GuavaCollectors.toImmutableList());
 
+        ImmutableList<ImmutableList<Integer>> fixedAnnotation = HeuristicHelper.adjustVotes(sentence, query, annotation);
+        final ImmutableList<Integer> allVotes = IntStream.range(0, numQAOptions).boxed()
+                .map(i -> (int) fixedAnnotation.stream().filter(ops -> ops.contains(i)).count())
+                .collect(GuavaCollectors.toImmutableList());
 
         //addFeature(features, "DependencyType=" + instanceType, 1.0);
         //addFeature(features, "BIAS", 1.0);
@@ -136,11 +139,17 @@ public class FeatureExtractor {
         final double votes = 1.0 * options.stream().mapToInt(allVotes::get).max().orElse(0);
         if (addAnnotationFeatures) {
             //addFeature(features, "NumReceivedVotes", votes); // / numAnnotators);
-            if (votes > 4.999) {
-                addFeature(features, "NumReceivedVotes>=5", 1.0);
+            if (votes > 4.001) {
+                addFeature(features, "NumReceivedVotes>5", 1.0);
+            }
+            if (votes > 3.001) {
+                addFeature(features, "NumReceivedVotes>3", 1.0);
             }
             if (votes < 1.999) {
                 addFeature(features, "NumReceivedVotes<2", 1.0);
+            }
+            if (votes < 0.999) {
+                addFeature(features, "NumReceivedVotes<1", 1.0);
             }
             /*
             int numSingleVotes = options.stream()
@@ -205,6 +214,25 @@ public class FeatureExtractor {
                     }
                 }
             }
+
+
+            // TODO: sentence length features
+            final int sentenceLength = sentence.size();
+            if (sentenceLength < 15) {
+                addFeature(features, "SLEN<15", 1.0);
+            } else {
+                addFeature(features, "SLEN>15", 1.0);
+            }
+            if (sentenceLength < 30) {
+                addFeature(features, "SLEN<30", 1.0);
+            } else {
+                addFeature(features, "SLEN>30", 1.0);
+            }
+            if (sentenceLength < 45) {
+                addFeature(features, "SLEN<45", 1.0);
+            } else {
+                addFeature(features, "SLEN>45", 1.0);
+            }
         }
 
         return ImmutableMap.copyOf(features);
@@ -230,8 +258,10 @@ public class FeatureExtractor {
                 .mapToDouble(parse -> parse.score)
                 .sum();
 
+
+        ImmutableList<ImmutableList<Integer>> fixedAnnotation = HeuristicHelper.adjustVotes(sentence, query, annotation);
         final ImmutableList<Integer> allVotes = IntStream.range(0, numQAOptions).boxed()
-                .map(i -> (int) annotation.stream().filter(ops -> ops.contains(i)).count())
+                .map(i -> (int) fixedAnnotation.stream().filter(ops -> ops.contains(i)).count())
                 .collect(GuavaCollectors.toImmutableList());
 
         if (addAnswerLexicalFeatures) {
@@ -265,7 +295,20 @@ public class FeatureExtractor {
         final double maxVotes = 1.0 * options.stream().mapToInt(allVotes::get).max().orElse(0);
         final double minVotes = 1.0 * options.stream().mapToInt(allVotes::get).min().orElse(0);
         if (addAnnotationFeatures) {
-            addFeature(features, "MaxReceivedVotes", maxVotes);
+            //addFeature(features, "MaxReceivedVotes", maxVotes);
+            final double votes = 1.0 * options.stream().mapToInt(allVotes::get).max().orElse(0);
+            if (votes > 4.001) {
+                addFeature(features, "NumReceivedVotes>5", 1.0);
+            }
+            if (votes > 3.001) {
+                addFeature(features, "NumReceivedVotes>3", 1.0);
+            }
+            if (votes < 1.999) {
+                addFeature(features, "NumReceivedVotes<2", 1.0);
+            }
+            if (votes < 0.999) {
+                addFeature(features, "NumReceivedVotes<1", 1.0);
+            }
         }
 
         if (addArgumentPositionFeatures) {

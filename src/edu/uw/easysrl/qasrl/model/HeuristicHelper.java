@@ -115,8 +115,9 @@ public class HeuristicHelper {
                 if (fixCoordinatedAppositive) {
                     // Other appositives:
                     // [op1], [op2], [pred] or [pred] [op1], [op2]: v(op1) -> v(op1, op2)
-                    if (sentence.contains(op1 + " , " + op2) && votes[opId1] > 0 && votes[opId2] > 0) {
-                        System.err.println(sentence + "\n" + op1 + "\n" + op2);
+                    if (sentenceStr.contains(op1 + " , " + op2) && arg2StartsWithDet && votes[opId1] > 0 &&
+                            votes[opId2] > 0) {
+                        //System.err.println(sentenceStr + "\n" + op1 + "\n" + op2);
                         for (int i = 0; i < numAnnotators; i++) {
                             adjustedVotes[i][opId2] = Math.max(adjustedVotes[i][opId1], adjustedVotes[i][opId2]);
                         }
