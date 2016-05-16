@@ -20,7 +20,7 @@ import java.util.*;
 public class ExperimentUtils {
 
     static class DebugBlock {
-        double deltaF1;
+        double deltaF1, oracleDeltaF1;
         String block;
         DebugBlock(double deltaF1, String block) {
             this.deltaF1 = deltaF1;

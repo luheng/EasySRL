@@ -40,7 +40,7 @@ public class CrowdFlowerDataWriterCorePronouns {
     private static final String csvOutputFilePrefix =
            // "./Crowdflower_unannotated/pronoun_core_r4_100best";
           //  "./Crowdflower_unannotated/pronoun_core_r5_100best";
-            "./Crowdflower_temp/pronoun_core_r5_100best";
+            "./Crowdflower_temp/pronoun_core_r6_100best";
 
     private static final String[] inputSentenceIdsFiles = new String[] {
             "./Crowdflower_unannotated/pronoun_core_r4_100best.sent_ids.txt"
@@ -48,7 +48,7 @@ public class CrowdFlowerDataWriterCorePronouns {
 
     private static final String outputSentenceIdsFile =
           //  "./Crowdflower_unannotated/pronoun_core_r5_100best.sent_ids.txt";
-            "./Crowdflower_temp/pronoun_core_r5_100best.sent_ids.txt";
+            "./Crowdflower_temp/pronoun_core_r6_100best.sent_ids.txt";
 
     private static final String[] reviewedTestQuestionFiles = new String[] {
             "./Crowdflower_unannotated/test_questions/test_question_core_pronoun_r04.tsv",
@@ -60,7 +60,7 @@ public class CrowdFlowerDataWriterCorePronouns {
     private static QueryPruningParameters queryPruningParameters;
     static {
         queryPruningParameters = new QueryPruningParameters();
-        queryPruningParameters.skipSAdjQuestions = false; // R4: true.
+        queryPruningParameters.skipSAdjQuestions = true;  // R5: false // R4: true.
         queryPruningParameters.minOptionConfidence = 0.05;
         queryPruningParameters.minOptionEntropy = 0.05;   // R4: unspecified.
         queryPruningParameters.minPromptConfidence = 0.1;

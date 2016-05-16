@@ -4,11 +4,14 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.util.Partitive;
+import edu.uw.easysrl.qasrl.qg.util.Prepositions;
 import edu.uw.easysrl.qasrl.qg.util.PronounList;
+import edu.uw.easysrl.qasrl.query.QueryType;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.Arrays;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -16,20 +19,24 @@ import java.util.stream.Stream;
  * Moves votes around according to heuristics.
  * Created by luheng on 5/12/16.
  */
-public class VoteHelper {
-    public static boolean fixAppostiveRestrictive = false;
-    public static boolean fixCoordinatedAppostive = false;
+public class HeuristicHelper {
+    public static boolean fixAppositiveRestrictive = true;
+    public static boolean fixCoordinatedAppositive = true;
     public static boolean fixPartitiveNP = false;
-    public static boolean fixNonPartitiveNP = false;
+    public static boolean fixNonPartitiveNP = true;
     public static boolean fixPronoun = true;
 
     public static ImmutableList<ImmutableList<Integer>> adjustVotes(final ImmutableList<String> sentence,
                                                                     final ScoredQuery<QAStructureSurfaceForm> query,
                                                                     final ImmutableList<ImmutableList<Integer>> annotation) {
+        if (query.getQueryType() != QueryType.Forward) {
+            return annotation;
+        }
         final int numAnnotators = annotation.size();
         final int numOptions = query.getOptions().size();
         final int numQAs = query.getQAPairSurfaceForms().size();
         final int predicateId = query.getPredicateId().getAsInt();
+        final String sentenceStr = sentence.stream().collect(Collectors.joining(" ")).toLowerCase();
 
         int[][] adjustedVotes = new int[numAnnotators][numOptions];
         int[] votes = new int[numOptions];
@@ -38,6 +45,19 @@ public class VoteHelper {
             for (int j = 0; j < numOptions; j++) {
                 adjustedVotes[i][j] = annotation.get(i).contains(j) ? 1 : 0;
                 votes[j] += adjustedVotes[i][j];
+            }
+        }
+
+        // Look for best pronoun.
+        int minPronounPredicateDist = sentence.size();
+        int bestPronounOpId = -1;
+        for (int opId : IntStream.range(0, numQAs).toArray()) {
+            final String op = query.getOptions().get(opId).toLowerCase();
+            final int argId = query.getQAPairSurfaceForms().get(opId).getAnswerStructures().get(0).argumentIndices.get(0);
+            final int dist = Math.abs(predicateId - argId);
+            if (PronounList.englishPronounSet.contains(op) && votes[opId] > 0 && dist < minPronounPredicateDist) {
+                bestPronounOpId = opId;
+                minPronounPredicateDist = dist;
             }
         }
 
@@ -79,7 +99,7 @@ public class VoteHelper {
                         && sentence.get(argId2 + 1).equalsIgnoreCase("old");
                 boolean arg2StartsWithDet = Stream.of("a ", "an ", "the ").anyMatch(op2::startsWith);
 
-                if (fixAppostiveRestrictive) {
+                if (fixAppositiveRestrictive) {
                     // Appositive-restrictive:
                     // [op1], [(a/the) op2] ...who/that/which [pred]  v(op1) -> v(op2)
                     if (argId1 < argId2 && argId2 < predicateId && commaBetweenArgs == 1 && commaBetweenArg2Pred == 0 &&
@@ -92,9 +112,16 @@ public class VoteHelper {
                     }
                 }
 
-                if (fixCoordinatedAppostive) {
+                if (fixCoordinatedAppositive) {
                     // Other appositives:
                     // [op1], [op2], [pred] or [pred] [op1], [op2]: v(op1) -> v(op1, op2)
+                    if (sentence.contains(op1 + " , " + op2) && votes[opId1] > 0 && votes[opId2] > 0) {
+                        System.err.println(sentence + "\n" + op1 + "\n" + op2);
+                        for (int i = 0; i < numAnnotators; i++) {
+                            adjustedVotes[i][opId2] = Math.max(adjustedVotes[i][opId1], adjustedVotes[i][opId2]);
+                        }
+                    }
+                    /*
                     if (argId1 < argId2 && argId2 < predicateId && commaBetweenArgs == 1 && commaBetweenArg2Pred == 1
                             && arg2StartsWithDet && !arg2HasYearsOld && votes[opId1] > 0 && votes[opId2] > 0) {
                         for (int i = 0; i < numAnnotators; i++) {
@@ -107,6 +134,7 @@ public class VoteHelper {
                             adjustedVotes[i][opId2] = Math.max(adjustedVotes[i][opId1], adjustedVotes[i][opId2]);
                         }
                     }
+                    */
                 }
 
                 // op1 = partitive of op2: v(op1) -> v(op2)
@@ -125,25 +153,44 @@ public class VoteHelper {
                 }
 
                 if (fixNonPartitiveNP) {
+                    // TODO: consider predicate type
                     // op1 = X of op2: v(op2) -> v(op1)
-                    if (op1.contains(" of " + op2) && !isPartitive && votes[opId1] > 0 && votes[opId2] > 0) {
+                    if (op1.contains(" of " + op2) && !isPartitive && commaBetweenArg2Pred > 0 && votes[opId1] > 0
+                            && votes[opId2] > 0) {
                         for (int i = 0; i < numAnnotators; i++) {
                             adjustedVotes[i][opId1] = Math.max(adjustedVotes[i][opId1], adjustedVotes[i][opId2]);
                             adjustedVotes[i][opId2] = 0;
                         }
                         continue;
                     }
+                    // op1 = op2 and X: v(op1, op2) -> max v(op1, op2)
+                    if (op1.contains(op2 + " and ") && votes[opId1] > 0 && votes[opId2] > 0) {
+                        for (int i = 0; i < numAnnotators; i++) {
+                            adjustedVotes[i][opId1] = Math.max(adjustedVotes[i][opId1], adjustedVotes[i][opId2]);
+                            adjustedVotes[i][opId2] = Math.max(adjustedVotes[i][opId1], adjustedVotes[i][opId2]);
+                        }
+                        continue;
+                    }
+                    // op1 = op2 pp X, pp != of: v(op1) -> v(op2)
+                    for (String pp : Prepositions.prepositionWords) {
+                        if (!pp.equals("of") && op1.contains(op2 + " " + pp + " ") && votes[opId1] > 0
+                                && votes[opId2] > 0) {
+                            for (int i = 0; i < numAnnotators; i++) {
+                                adjustedVotes[i][opId2] = Math.max(adjustedVotes[i][opId1], adjustedVotes[i][opId2]);
+                                adjustedVotes[i][opId1] = 0;
+                            }
+                            break;
+                        }
+                    }
                 }
 
                 if (fixPronoun) {
-                    // op2[pron] [pred] / [pred] op2[pron]: v(op1) -> v(op2)
-                    if (PronounList.englishPronounSet.contains(op2) && votes[opId1] > 0 && votes[opId2] > 0) {
-                            //(argId2 == predicateId - 1 || argId2 == predicateId + 1)) {
+                    final int dist = Math.abs(argId1 - predicateId);
+                    if (opId2 == bestPronounOpId && dist > minPronounPredicateDist) {
                         for (int i = 0; i < numAnnotators; i++) {
                             adjustedVotes[i][opId2] = Math.max(adjustedVotes[i][opId1], adjustedVotes[i][opId2]);
                             adjustedVotes[i][opId1] = 0;
                         }
-                        continue;
                     }
                 }
             }

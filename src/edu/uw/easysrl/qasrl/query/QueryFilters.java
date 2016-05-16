@@ -113,6 +113,7 @@ public class QueryFilters {
                     query.computeScores(nBestList);
                     return query.getPromptScore() > queryPruningParameters.minPromptConfidence
                             && query.getOptionEntropy() > queryPruningParameters.minOptionEntropy
+                            && query.getQAPairSurfaceForms().size() < queryPruningParameters.maxNumOptionsPerQuery
                             && (!queryPruningParameters.skipBinaryQueries || query.getQAPairSurfaceForms().size() > 1);
                 })
                 .collect(toImmutableList());

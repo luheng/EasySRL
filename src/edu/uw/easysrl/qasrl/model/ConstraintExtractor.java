@@ -29,11 +29,13 @@ public class ConstraintExtractor {
                 .forEach(qa -> qa.getQuestionStructures().stream()
                         .forEach(qstr -> {
                             final int headId = qstr.targetPrepositionIndex >= 0 ? qstr.targetPrepositionIndex : qstr.predicateIndex;
-                            qa.getAnswerStructures().stream()
-                                    .flatMap(astr -> astr.argumentIndices.stream())
-                                    .distinct()
-                                    .filter(argId -> argId != headId)
-                                    .forEach(argId -> constraints.add(new Constraint.AttachmentConstraint(headId, argId, true, 1.0)));
+                            if (query.getQueryType() == QueryType.Forward) {
+                                qa.getAnswerStructures().stream()
+                                        .flatMap(astr -> astr.argumentIndices.stream())
+                                        .distinct()
+                                        .filter(argId -> argId != headId)
+                                        .forEach(argId -> constraints.add(new Constraint.AttachmentConstraint(headId, argId, true, 1.0)));
+                            }
                             // Verb to PP dependency.
                             /*
                             if (qstr.targetPrepositionIndex >= 0 && qstr.targetPrepositionIndex != qstr.predicateIndex) {
@@ -42,12 +44,14 @@ public class ConstraintExtractor {
                                 constraints.add(new Constraint.AttachmentConstraint(qstr.targetPrepositionIndex, qstr.predicateIndex, true, 1.0));
                             }*/
                             // Adjunct dependencies in answer.
+                            /*
                             if (query.getQueryType() == QueryType.Clefted) {
                                 qa.getAnswerStructures().stream()
                                         .flatMap(astr -> astr.adjunctDependencies.stream())
                                         .distinct()
                                         .forEach(dep -> constraints.add(new Constraint.AttachmentConstraint(dep.getHead(), dep.getArgument(), true, 1.0)));
                             }
+                            */
                         })
                 );
         return constraints;
@@ -81,12 +85,13 @@ public class ConstraintExtractor {
                     if (!attachments.contains(a[0], a[1])) {
                         attachments.put(a[0], a[1], 0);
                     }
+                    /*
                     if (!attachments.contains(a[1], a[0])) {
                         attachments.put(a[1], a[0], 0);
-                    }
+                    }*/
                     if (chosen) {
                         attachments.put(a[0], a[1], 1);
-                        attachments.put(a[1], a[0], 1);
+                      //  attachments.put(a[1], a[0], 1);
                     }
                 });
             }
