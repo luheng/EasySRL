@@ -214,27 +214,27 @@ public class FeatureExtractor {
                     }
                 }
             }
-
-
-            // TODO: sentence length features
-            final int sentenceLength = sentence.size();
-            if (sentenceLength < 15) {
-                addFeature(features, "SLEN<15", 1.0);
-            } else {
-                addFeature(features, "SLEN>15", 1.0);
-            }
-            if (sentenceLength < 30) {
-                addFeature(features, "SLEN<30", 1.0);
-            } else {
-                addFeature(features, "SLEN>30", 1.0);
-            }
-            if (sentenceLength < 45) {
-                addFeature(features, "SLEN<45", 1.0);
-            } else {
-                addFeature(features, "SLEN>45", 1.0);
-            }
         }
 
+
+        // TODO: sentence length features
+        final int sentenceLength = sentence.size();
+        if (sentenceLength < 15) {
+            addFeature(features, "SLEN<15", 1.0);
+        } else {
+            addFeature(features, "SLEN>15", 1.0);
+        }
+        if (sentenceLength < 30) {
+            addFeature(features, "SLEN<30", 1.0);
+        } else {
+            addFeature(features, "SLEN>30", 1.0);
+        }
+        if (sentenceLength < 45) {
+            addFeature(features, "SLEN<45", 1.0);
+        } else {
+            addFeature(features, "SLEN>45", 1.0);
+        }
+        
         return ImmutableMap.copyOf(features);
     }
 
