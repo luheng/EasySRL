@@ -77,6 +77,7 @@ public abstract class BaseCcgParser {
         private DependencyGenerator dependencyGenerator;
         private Parser parser;
         private final double supertaggerBeam = 0.000001;
+        private final double nbestBeam = 0.0;
         private final int maxChartSize = 1000000;
         private final int maxSentenceLength = 70;
 
@@ -91,6 +92,7 @@ public abstract class BaseCcgParser {
                     .maxChartSize(maxChartSize)
                     .maximumSentenceLength(maxSentenceLength)
                     .nBest(nBest)
+                    .nBestBeam(nbestBeam)
                     .build();
             try {
                 dependencyGenerator = new DependencyGenerator(modelFolder);

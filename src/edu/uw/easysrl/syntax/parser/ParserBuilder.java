@@ -125,25 +125,31 @@ public abstract class ParserBuilder<T extends ParserBuilder<T>> {
 		return normalForm;
 	}
 
-	protected Collection<Category> lexicalCategories;
-	protected int maxSentenceLength = 70;
-	protected int nbest = 1;
+	public double getNBestBeam() {
+		return nBestBeam;
+	}
+
+	private Collection<Category> lexicalCategories;
+	private int maxSentenceLength = 70;
+	private int nbest = 1;
 	private List<Category> validRootCategories = Training.ROOT_CATEGORIES;
 	private ListMultimap<Category, UnaryRule> unaryRules;
 	private File markedupFile;
 	private SeenRules seenRules;
 	private boolean allowUnseenRules = false;
-	protected double supertaggerBeam = 0.00001;
+	private double supertaggerBeam = 0.00001;
 
 	private Boolean jointModel;
 	private Double supertaggerWeight;
-	protected Tagger tagger;
+	private Tagger tagger;
+
 	protected ModelFactory modelFactory;
-	protected CutoffsDictionaryInterface cutoffs;
-	protected boolean useSupertaggedInput = false;
+	private  CutoffsDictionaryInterface cutoffs;
+	private boolean useSupertaggedInput = false;
 	private final List<Combinator> combinators = new ArrayList<>(Combinator.STANDARD_COMBINATORS);
-	protected int maxChartSize;
-	protected NormalForm normalForm = new NormalForm();
+	private int maxChartSize;
+	private NormalForm normalForm = new NormalForm();
+	private double nBestBeam = 0.001;
 
 	public T nBest(final int nBest) {
 		this.nbest = nBest;
@@ -197,6 +203,11 @@ public abstract class ParserBuilder<T extends ParserBuilder<T>> {
 
 	public T modelFactory(final ModelFactory modelFactory) {
 		this.modelFactory = modelFactory;
+		return getThis();
+	}
+
+	public T nBestBeam(final double nBestBeam) {
+		this.nBestBeam = nBestBeam;
 		return getThis();
 	}
 
