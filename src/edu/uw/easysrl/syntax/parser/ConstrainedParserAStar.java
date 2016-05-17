@@ -149,7 +149,7 @@ public class ConstrainedParserAStar extends AbstractParser {
     }
 
     @Override
-    protected List<Scored<SyntaxTreeNode>> parse(final InputToParser input, final boolean isEval) {
+    protected List<Scored<SyntaxTreeNode>> parse(final InputToParser input) {
         return parseWithConstraints(input, new HashSet<>());
     }
 
@@ -244,8 +244,8 @@ public class ConstrainedParserAStar extends AbstractParser {
         @Override
         public ConstrainedParserAStar build() {
             try {
-                final Tagger tagger = !useSupertaggedInput ? Tagger.make(modelFolder, supertaggerBeam, 50, cutoffs) : null;
-                modelFactory = new ConstrainedParsingModel.ConstrainedParsingModelFactory(tagger, lexicalCategories);
+                final Tagger tagger = Tagger.make(modelFolder, super.getSupertaggerBeam(), 50, super.getCutoffs());
+                modelFactory = new ConstrainedParsingModel.ConstrainedParsingModelFactory(tagger, super.getLexicalCategories());
                 return build2();
             } catch (final IOException e) {
                 throw new UncheckedIOException(e);

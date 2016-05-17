@@ -29,6 +29,7 @@ public class ParseFileGenerator {
         ImmutableList<Parse> goldParses = dev.getGoldParses();
 
         int numParsed = 0;
+        double averageN = .0;
         Results oracleF1 = new Results(), baselineF1 = new Results();
         BaseCcgParser parser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, nBest);
 
@@ -39,6 +40,7 @@ public class ParseFileGenerator {
                         .map(w -> w.word).collect(Collectors.joining(" ")));
                 continue;
             }
+            averageN += parses.size();
             // Get results for every parse in the n-best list.
             List<Results> results = CcgEvaluation.evaluateNBest(parses, goldParses.get(sentIdx).dependencies);
             // Get oracle parse id.
@@ -51,6 +53,9 @@ public class ParseFileGenerator {
             allParses.put(sentIdx, parses);
             if (allParses.size() % 100 == 0) {
                 System.out.println("Parsed:\t" + allParses.size() + " sentences ...");
+                System.out.println("Baseline:\n" + baselineF1);
+                System.out.println("Oracle:\n" + oracleF1);
+                System.out.println("Average-N:\n" + averageN / allParses.size());
             }
             oracleF1.add(results.get(oracleK));
             baselineF1.add(results.get(0));
