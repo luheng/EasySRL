@@ -131,6 +131,10 @@ public class HITLParser {
         queryPruningParams.skipPPQuestions = true;
         final ImmutableList<String> sentence = sentences.get(sentenceId);
 
+        if(nbestLists.get(sentenceId) == null) {
+            return ImmutableList.of();
+        }
+
         ImmutableList<ScoredQuery<QAStructureSurfaceForm>> copulaQueries = ExperimentUtils.generateAllQueries(
                     sentenceId, sentence, nbestLists.get(sentenceId),
                     false /* isJeopardyStyle */,

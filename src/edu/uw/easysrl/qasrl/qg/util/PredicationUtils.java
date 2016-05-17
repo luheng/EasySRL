@@ -37,8 +37,11 @@ public final class PredicationUtils {
                             Predication predToReplace = args.get(0).getPredication();
                             if(predToReplace instanceof Noun) {
                                 Noun noun = (Noun) predToReplace;
-                                if(noun.isPronoun()) {
-                                    replacement = (Pronoun) noun;
+                                if(noun.isExpletive()) {
+                                    replacement = noun;
+                                }
+                                else if(noun.isPronoun()) {
+                                    replacement = noun;
                                 } else {
                                     replacement = noun.getPronoun()
                                         .withDefiniteness(Noun.Definiteness.INDEFINITE);

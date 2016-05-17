@@ -86,7 +86,6 @@ public final class Verb extends Predication {
                 .getNodeWords(headLeaf, Optional.empty(), Optional.empty())));
         }
 
-
         if(!predicateCategory.isFunctionInto(Category.valueOf("S\\NP"))) {
             throw new IllegalArgumentException("verb must be a S\\NP (or other known verb); bad word " +
                                                predicate + " (" + predicateCategory + ") in sentence\n" +
@@ -150,9 +149,7 @@ public final class Verb extends Predication {
                 } else if(VerbHelper.isFutureTense(aux)) {
                     tense = Tense.FUTURE;
                 } else {
-                    if(!aux.equals("leapt") && !aux.equals("dreamt")) { // known cases
-                        System.err.println("error getting info from S[dcl] for " + aux + "(" + cat + ")");
-                    }
+                    // System.err.println("error getting info from S[dcl] for " + aux + "(" + cat + ")");
                     break;
                 }
             } else {
@@ -304,8 +301,8 @@ public final class Verb extends Predication {
         Category done = Category.valueOf("(S\\NP)");
         Category curCat = getPredicateCategory();
         while(!done.matches(curCat)) { // we're not including the subject
+            Predication curArg = args.get(curCat.getNumberOfArguments()).getPredication();
             if(!focalArgNumOpt.isPresent() || focalArgNumOpt.get() != curCat.getNumberOfArguments()) {
-                Predication curArg = args.get(curCat.getNumberOfArguments()).getPredication();
                 Category curArgCat = curCat.getArgument(curCat.getNumberOfArguments());
                 Slash slash = curCat.getSlash();
                 switch(slash) {
@@ -322,6 +319,28 @@ public final class Verb extends Predication {
                 default: assert false;
                 }
             }
+
+            if(particle.isPresent()) {
+                // if we just added the first argument, (this will happen exactly once if we're in this loop)
+                if(curCat.matches(getPredicateCategory())) {
+                    // and the argument is a pronoun or expletive noun,
+                    if(curArg instanceof Noun && (((Noun) curArg).isPronoun() || ((Noun) curArg).isExpletive())) {
+                        // then we should put the particle on the RIGHT of the rightArgs (e.g., "I showed him up")
+                        rightInternalArgs = new ImmutableList.Builder<String>()
+                            .addAll(rightInternalArgs)
+                            .add(particle.get())
+                            .build();
+                    } else {
+                        // otherwise the particle goes on the LEFT of the right args.
+                        rightInternalArgs = new ImmutableList.Builder<String>()
+                            .add(particle.get())
+                            .addAll(rightInternalArgs)
+                            .build();
+                    }
+                }
+            }
+
+
             curCat = curCat.getLeft();
         }
 
@@ -336,13 +355,8 @@ public final class Verb extends Predication {
         if(focalArgNumOpt.isPresent() && focalArgNumOpt.get() == 1) { // if we're asking about the subject
             ImmutableList<String> allVerbWords = getVerbWithoutSplit();
             ImmutableList<String> auxChain;
-            if(particle.isPresent()) {
-                auxChain = allVerbWords.subList(0, allVerbWords.size() - 2);
-                verbWords = allVerbWords.subList(allVerbWords.size() - 2, allVerbWords.size());
-            } else {
-                auxChain = allVerbWords.subList(0, allVerbWords.size() - 1);
-                verbWords = allVerbWords.subList(allVerbWords.size() - 1, allVerbWords.size());
-            }
+            auxChain = allVerbWords.subList(0, allVerbWords.size() - 1);
+            verbWords = allVerbWords.subList(allVerbWords.size() - 1, allVerbWords.size());
             questionPrefix = new ImmutableList.Builder<String>()
                 .addAll(subjWords) // wh-subject
                 .addAll(auxChain)
@@ -351,13 +365,8 @@ public final class Verb extends Predication {
             ImmutableList<String> wordsForFlip = getVerbWithSplit();
             ImmutableList<String> flippedAux = wordsForFlip.subList(0, 1);
             ImmutableList<String> remainingAuxChain;
-            if(particle.isPresent()) {
-                remainingAuxChain = wordsForFlip.subList(1, wordsForFlip.size() - 2);
-                verbWords = wordsForFlip.subList(wordsForFlip.size() - 2, wordsForFlip.size());
-            } else {
-                remainingAuxChain = wordsForFlip.subList(1, wordsForFlip.size() - 1);
-                verbWords = wordsForFlip.subList(wordsForFlip.size() - 1, wordsForFlip.size());
-            }
+            remainingAuxChain = wordsForFlip.subList(1, wordsForFlip.size() - 1);
+            verbWords = wordsForFlip.subList(wordsForFlip.size() - 1, wordsForFlip.size());
             questionPrefix = new ImmutableList.Builder<String>()
                 .addAll(args.get(focalArgNumOpt.get()).getPredication().getPhrase(Category.NP))
                 .addAll(flippedAux)
@@ -368,13 +377,8 @@ public final class Verb extends Predication {
             ImmutableList<String> wordsForFlip = getVerbWithSplit();
             ImmutableList<String> flippedAux = wordsForFlip.subList(0, 1);
             ImmutableList<String> remainingAuxChain;
-            if(particle.isPresent()) {
-                remainingAuxChain = wordsForFlip.subList(1, wordsForFlip.size() - 2);
-                verbWords = wordsForFlip.subList(wordsForFlip.size() - 2, wordsForFlip.size());
-            } else {
-                remainingAuxChain = wordsForFlip.subList(1, wordsForFlip.size() - 1);
-                verbWords = wordsForFlip.subList(wordsForFlip.size() - 1, wordsForFlip.size());
-            }
+            remainingAuxChain = wordsForFlip.subList(1, wordsForFlip.size() - 1);
+            verbWords = wordsForFlip.subList(wordsForFlip.size() - 1, wordsForFlip.size());
             questionPrefix = new ImmutableList.Builder<String>()
                 .addAll(flippedAux)
                 .addAll(subjWords)
