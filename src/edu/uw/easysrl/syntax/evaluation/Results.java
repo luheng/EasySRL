@@ -45,11 +45,11 @@ public class Results {
 	@Override
 	public String toString() {
 		final StringBuilder result = new StringBuilder();
-		result.append("Precision = " + Util.twoDP(getPrecision() * 100));
+		result.append("Precision = " + getPrecision() * 100);  //Util.twoDP(getPrecision() * 100));
 		result.append('\n');
-		result.append("Recall    = " + Util.twoDP(getRecall() * 100));
+		result.append("Recall    = " + getRecall() * 100);
 		result.append('\n');
-		result.append("F1        = " + Util.twoDP(getF1() * 100));
+		result.append("F1        = " + getF1() * 100);
 		return result.toString();
 	}
 
