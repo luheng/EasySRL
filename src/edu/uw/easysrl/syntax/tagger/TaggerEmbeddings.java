@@ -3,6 +3,7 @@ package edu.uw.easysrl.syntax.tagger;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -159,18 +160,12 @@ public class TaggerEmbeddings extends Tagger {
 	}
 
 	public static List<Category> loadCategories(final File catFile) throws IOException {
-		final List<Category> categories = new ArrayList<>();
-		final Iterator<String> lines = Util.readFileLineByLine(catFile);
-		while (lines.hasNext()) {
-			categories.add(Category.valueOf(lines.next()));
-		}
-
-		return categories;
+		return Files.lines(catFile.toPath()).map(Category::valueOf).collect(Collectors.toList());
 	}
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see uk.ac.ed.easyccg.syntax.Tagger#tag(java.util.List)
 	 */
 	@Override
@@ -188,7 +183,8 @@ public class TaggerEmbeddings extends Tagger {
 		final double[] vector = new double[totalFeatures];
 
 		int vectorIndex = 0;
-		for (int sentencePosition = wordIndex - contextWindow; sentencePosition <= wordIndex + contextWindow; sentencePosition++) {
+		for (int sentencePosition = wordIndex - contextWindow; sentencePosition <= wordIndex
+				+ contextWindow; sentencePosition++) {
 			vectorIndex = addToFeatureVector(vectorIndex, vector, sentencePosition, words);
 
 			// If using lexical features, update the vector.
@@ -448,8 +444,8 @@ public class TaggerEmbeddings extends Tagger {
 	public Map<Category, Double> getCategoryScores(final List<InputWord> sentence, final int wordIndex,
 			final double weight, final Collection<Category> categories) {
 
-		final List<ScoredCategory> scoredCats = getTagsForWord(getVectorForWord(sentence, wordIndex), categories
-				.stream().map(x -> categoryToIndex.get(x)).collect(Collectors.toList()));
+		final List<ScoredCategory> scoredCats = getTagsForWord(getVectorForWord(sentence, wordIndex),
+				categories.stream().map(x -> categoryToIndex.get(x)).collect(Collectors.toList()));
 		return scoredCats.stream().collect(Collectors.toMap(ScoredCategory::getCategory, x -> x.getScore() * weight));
 	}
 
