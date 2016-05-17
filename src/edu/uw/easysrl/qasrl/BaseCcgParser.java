@@ -128,7 +128,8 @@ public abstract class BaseCcgParser {
         private DependencyGenerator dependencyGenerator;
         private Parser parser;
         private final double supertaggerBeam = 0.000001;
-        private final int maxChartSize = 100000;
+        //private final double supertaggerBeam = 0.0001;
+        private final int maxChartSize = 1000000;
         private final int maxSentenceLength = 70;
 
         public AStarParser(String modelFolderPath, List<Category> rootCategories, int nBest)  {
@@ -236,7 +237,7 @@ public abstract class BaseCcgParser {
         private DependencyGenerator dependencyGenerator;
         private ConstrainedParserAStar parser;
         private final double supertaggerBeam = 0.000001;
-        private final int maxChartSize = 100000;
+        private final int maxChartSize = 1000000;
         private final int maxSentenceLength = 70;
 
         public ConstrainedCcgParser2(String modelFolderPath, List<Category> rootCategories, int maxTagsPerWord,

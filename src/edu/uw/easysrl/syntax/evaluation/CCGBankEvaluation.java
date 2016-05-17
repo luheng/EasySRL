@@ -81,7 +81,7 @@ public class CCGBankEvaluation {
 	public static void main(final String[] args) throws IOException {
 		final int maxLength = 70;// FIXME
 		// final String pipelineFolder = Util.getHomeFolder() + "/Downloads/cnn/models/model_ccgbank";
-		final String pipelineFolder = "/Users/luheng/Workspace/EasySRL/model_tritrain_big/";
+		final String pipelineFolder = "/home/luheng/Workspace/EasySRL/model_tritrain_big/";
 		// final String pipelineFolder = Util.getHomeFolder() + "/Downloads/cnn/models/ensemble";
 		// final String modelFolder = "~/Documents/workspace/ccg_srl_models/model_tritrain/";
 		// final String modelFolder = "~/Documents/workspace/ccg_srl_models/big_model/";
@@ -93,7 +93,7 @@ public class CCGBankEvaluation {
 				return words;
 			}
 		};
-		final PipelineSRLParser pipeline = new PipelineSRLParser(EasySRL.makeParser(pipelineFolder, 0.000001,
+		final PipelineSRLParser pipeline = new PipelineSRLParser(EasySRL.makeParser(pipelineFolder, 0.000001, // 0.000001,
 				ParsingAlgorithm.ASTAR, 250000, false, Optional.empty(), 1, maxLength), dummyLabelClassifier, postagger);
 
 		// POSTagger.getStanfordTagger(Util.getFile(modelFolder + "/pipeline/" + "posTagger"));
@@ -110,6 +110,7 @@ public class CCGBankEvaluation {
 		// ParsingAlgorithm.ASTAR, 2500000, false, Optional.empty(), 1, maxLength);
 
 		System.out.println(evaluate(pipeline, Partition.DEV));
+		System.out.println(evaluate(pipeline, Partition.TEST));
 	}
 
 	private static void compareParses(final DependencyParse bestParse, final SyntaxTreeNode syntaxTreeNode) {
@@ -152,7 +153,7 @@ public class CCGBankEvaluation {
 		final ErrorAnalysis errorAnalysisWithGoldCats = new ErrorAnalysis();
 
 		final DependencyGenerator dependencyGenerator = new DependencyGenerator(
-				Util.getFile("/Users/luheng/Workspace/EasySRL/model_tritrain_big/"));
+				Util.getFile("/home/luheng/Workspace/EasySRL/model_tritrain_big/"));
 
 		final Multiset<String> validDeps = getValidDeps();
 

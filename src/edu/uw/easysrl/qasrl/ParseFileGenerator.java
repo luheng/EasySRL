@@ -6,19 +6,19 @@ import edu.uw.easysrl.main.InputReader;
 
 import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
 import edu.uw.easysrl.syntax.evaluation.Results;
-import edu.uw.easysrl.syntax.grammar.Category;
 import uk.co.flamingpenguin.jewel.cli.CliFactory;
 
 import java.io.FileOutputStream;
 import java.io.ObjectOutputStream;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Generate n-best parses and save them to file.
  * Created by luheng on 1/30/16.
  */
 public class ParseFileGenerator {
-    static final int nBest = 50;
+    static final int nBest = 1;
 
     public static void main(String[] args) {
         EasySRL.CommandLineArguments commandLineOptions;
@@ -30,19 +30,25 @@ public class ParseFileGenerator {
         }
 
         Map<Integer, List<Parse>> allParses = new HashMap<>();
-        final ParseData dev = ParseData.loadFromDevPool().get();
-        ImmutableList<ImmutableList<InputReader.InputWord>> sentences = dev.getSentenceInputWords();
-        ImmutableList<Parse> goldParses = dev.getGoldParses();
+        //final ParseData dev = ParseData.loadFromDevPool().get();
+        final ParseData test = ParseData.loadFromTestPool().get();
 
-        String modelFolder = commandLineOptions.getModel();
-        List<Category> rootCategories = commandLineOptions.getRootCategories();
+        ImmutableList<ImmutableList<InputReader.InputWord>> sentences = test.getSentenceInputWords();
+        ImmutableList<Parse> goldParses = test.getGoldParses();
 
-        Results oracleF1 = new Results();
-        BaseCcgParser parser = new BaseCcgParser.AStarParser(modelFolder, rootCategories, nBest);
+        //String modelFolder = commandLineOptions.getModel();
+        //List<Category> rootCategories = commandLineOptions.getRootCategories();
+
+        int numParsed = 0;
+        Results oracleF1 = new Results(), baselineF1 = new Results();
+        //BaseCcgParser parser = new BaseCcgParser.AStarParser(modelFolder, rootCategories, nBest);
+        BaseCcgParser parser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, BaseCcgParser.rootCategories, nBest);
 
         for (int sentIdx = 0; sentIdx < sentences.size(); sentIdx ++) {
             List<Parse> parses = parser.parseNBest(sentences.get(sentIdx));
             if (parses == null) {
+                System.err.println("Skipping sentence:\t" + sentIdx + "\t" + sentences.get(sentIdx).stream()
+                        .map(w -> w.word).collect(Collectors.joining(" ")));
                 continue;
             }
             // Get results for every parse in the n-best list.
@@ -60,9 +66,11 @@ public class ParseFileGenerator {
                 System.out.println("Parsed:\t" + allParses.size() + " sentences ...");
             }
             oracleF1.add(results.get(oracleK));
+            baselineF1.add(results.get(0));
+            numParsed ++;
         }
 
-        String outputFileName = String.format("parses.%dbest.out", nBest);
+        String outputFileName = String.format("parses.test.%dbest.out", nBest);
         try {
             ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(outputFileName));
             oos.writeObject(allParses);
@@ -70,6 +78,8 @@ public class ParseFileGenerator {
         } catch (Exception e) {
         }
 
+        System.out.println("Parsed:\t" + numParsed + " sentences.");
+        System.out.println("baseline accuracy:\n" + baselineF1);
         System.out.println("oracle accuracy:\n" + oracleF1);
         System.out.println("saved to:\t" + outputFileName);
     }

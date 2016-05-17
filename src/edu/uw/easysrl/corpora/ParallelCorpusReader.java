@@ -377,7 +377,8 @@ public class ParallelCorpusReader {
 		List<DependencyParse> depParses;
 		synchronized (ccgbank) {
 			if (parsesTest == null) {
-				parsesTest = Lists.newArrayList(CCGBankParseReader.loadCorpus(ccgbank, CCGBankParseReader.testRegex));
+				parsesTest = Lists.newArrayList(CCGBankParseReader.loadCorpus(ccgbank,
+						CCGBankParseReader.testRegex + ".*.auto"));
 			}
 			if (depParsesTest == null) {
 				depParsesTest = CCGBankDependencies.loadCorpus(ccgbank, Partition.TEST);

@@ -17,6 +17,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 /**
  * Create Crowdflower data for pronoun-style core questions.
@@ -132,11 +133,15 @@ public class CrowdflowerDataWriterCoreArgs {
         csvPrinter.printRecord((Object[]) CrowdFlowerDataUtils.csvHeaderNew);
 
         for (int sid : sentenceIds) {
+            final ImmutableList<String> sentence = hitlParser.getSentence(sid);
+            history.addSentence(sid);
+            System.out.println(sid + "\t" + sentence.stream().collect(Collectors.joining(" ")));
+
             ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries =
                     hitlParser.getPronounCoreArgQueriesForSentence(sid);
-            history.addSentence(sid);
+
             for (ScoredQuery<QAStructureSurfaceForm> query : queries) {
-                final ImmutableList<String> sentence = hitlParser.getSentence(sid);
+
                 final ImmutableList<Integer> goldOptionIds = hitlParser.getGoldOptions(query);
                 CrowdFlowerDataUtils.printQueryToCSVFileNew(
                         query,
