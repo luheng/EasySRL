@@ -21,28 +21,16 @@ public class ParseFileGenerator {
     static final int nBest = 1;
 
     public static void main(String[] args) {
-        EasySRL.CommandLineArguments commandLineOptions;
-        try {
-            commandLineOptions = CliFactory.parseArguments(EasySRL.CommandLineArguments.class, args);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return;
-        }
-
         Map<Integer, List<Parse>> allParses = new HashMap<>();
-        //final ParseData dev = ParseData.loadFromDevPool().get();
-        final ParseData test = ParseData.loadFromTestPool().get();
+        final ParseData dev = ParseData.loadFromDevPool().get();
+        //final ParseData test = ParseData.loadFromTestPool().get();
 
-        ImmutableList<ImmutableList<InputReader.InputWord>> sentences = test.getSentenceInputWords();
-        ImmutableList<Parse> goldParses = test.getGoldParses();
-
-        //String modelFolder = commandLineOptions.getModel();
-        //List<Category> rootCategories = commandLineOptions.getRootCategories();
+        ImmutableList<ImmutableList<InputReader.InputWord>> sentences = dev.getSentenceInputWords();
+        ImmutableList<Parse> goldParses = dev.getGoldParses();
 
         int numParsed = 0;
         Results oracleF1 = new Results(), baselineF1 = new Results();
-        //BaseCcgParser parser = new BaseCcgParser.AStarParser(modelFolder, rootCategories, nBest);
-        BaseCcgParser parser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, BaseCcgParser.rootCategories, nBest);
+        BaseCcgParser parser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, nBest);
 
         for (int sentIdx = 0; sentIdx < sentences.size(); sentIdx ++) {
             List<Parse> parses = parser.parseNBest(sentences.get(sentIdx));
@@ -61,7 +49,6 @@ public class ParseFileGenerator {
                 }
             }
             allParses.put(sentIdx, parses);
-
             if (allParses.size() % 100 == 0) {
                 System.out.println("Parsed:\t" + allParses.size() + " sentences ...");
             }
@@ -70,12 +57,13 @@ public class ParseFileGenerator {
             numParsed ++;
         }
 
-        String outputFileName = String.format("parses.test.%dbest.out", nBest);
+        String outputFileName = String.format("parses.dev.%dbest.out", nBest);
         try {
             ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(outputFileName));
             oos.writeObject(allParses);
             oos.close();
         } catch (Exception e) {
+            e.printStackTrace();
         }
 
         System.out.println("Parsed:\t" + numParsed + " sentences.");

@@ -14,6 +14,7 @@ import edu.uw.easysrl.corpora.ParallelCorpusReader;
 import edu.uw.easysrl.corpora.ParallelCorpusReader.Sentence;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.dependencies.SRLFrame;
+import edu.uw.easysrl.syntax.evaluation.CCGBankEvaluation;
 import edu.uw.easysrl.syntax.grammar.Preposition;
 import scala.tools.cmd.Opt;
 
@@ -58,7 +59,9 @@ public final class ParseData {
         while (sentenceIterator.hasNext()) {
             Sentence sentence = sentenceIterator.next();
             sentenceInputWords.add(sentence.getInputWords());
-            Set<ResolvedDependency> goldDependencies =
+            Set<ResolvedDependency> goldDependencies = CCGBankEvaluation
+                    .asResolvedDependencies(sentence.getCCGBankDependencyParse().getDependencies());
+            /*
                     sentence.getCCGBankDependencyParse().getDependencies().stream().map(
                             dep -> new ResolvedDependency(
                                     dep.getSentencePositionOfPredicate(),
@@ -67,7 +70,7 @@ public final class ParseData {
                                     dep.getSentencePositionOfArgument(),
                                     SRLFrame.NONE,
                                     Preposition.NONE)
-                    ).collect(Collectors.toSet());
+                    ).collect(Collectors.toSet());*/
             goldParses.add(new Parse(sentence.getCcgbankParse(), sentence.getLexicalCategories(), goldDependencies));
         }
         System.out.println(String.format("Read %d sentences.", sentenceInputWords.size()));
@@ -91,7 +94,9 @@ public final class ParseData {
         while (sentenceIterator.hasNext()) {
             Sentence sentence = sentenceIterator.next();
             sentenceInputWords.add(sentence.getInputWords());
-            Set<ResolvedDependency> goldDependencies =
+            Set<ResolvedDependency> goldDependencies = CCGBankEvaluation
+                    .asResolvedDependencies(sentence.getCCGBankDependencyParse().getDependencies());
+            /*
                     sentence.getCCGBankDependencyParse().getDependencies().stream().map(
                             dep -> new ResolvedDependency(
                                     dep.getSentencePositionOfPredicate(),
@@ -100,8 +105,7 @@ public final class ParseData {
                                     dep.getSentencePositionOfArgument(),
                                     SRLFrame.NONE,
                                     Preposition.NONE)
-                    ).collect(Collectors.toSet());
-            // TODO: convert gold with CCGBankEvaluation.
+                    ).collect(Collectors.toSet());*/
             goldParses.add(new Parse(sentence.getCcgbankParse(), sentence.getLexicalCategories(), goldDependencies));
         }
         System.out.println(String.format("Read %d sentences.", sentenceInputWords.size()));
