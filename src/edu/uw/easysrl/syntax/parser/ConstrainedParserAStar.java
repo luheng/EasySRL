@@ -63,19 +63,8 @@ public class ConstrainedParserAStar extends AbstractParser {
 
     public List<Scored<SyntaxTreeNode>> parseWithConstraints(final InputToParser input, Set<Constraint> constraintSet) {
         final ChartCellFactory sentenceCellFactory = cellFactory.forNewSentence();
-        /*
-        cellFactory.newSentence();
-        return parse(input,
-                ((ConstrainedParsingModelFactory) modelFactory).make(input, constraintSet));
-                */
-        return null;
-    }
-
-    @Override
-    protected List<Scored<SyntaxTreeNode>> parse(final InputToParser input, final boolean isEval) {
-        final ChartCellFactory sentenceCellFactory = cellFactory.forNewSentence();
         final List<InputWord> sentence = input.getInputWords();
-        final Model model = modelFactory.make(input);
+        final Model model = ((ConstrainedParsingModel.ConstrainedParsingModelFactory) modelFactory).make(input, constraintSet);
         final int sentenceLength = sentence.size();
         final Agenda agenda = model.makeAgenda();
         model.buildAgenda(agenda, sentence);
@@ -157,7 +146,11 @@ public class ConstrainedParserAStar extends AbstractParser {
         }
 
         return result;
+    }
 
+    @Override
+    protected List<Scored<SyntaxTreeNode>> parse(final InputToParser input, final boolean isEval) {
+        return parseWithConstraints(input, new HashSet<>());
     }
 
     /**
@@ -197,15 +190,12 @@ public class ConstrainedParserAStar extends AbstractParser {
         }
     }
 
-    /**
-     * Updates the agenda with the result of all combinators that can be applied to leftChild and rightChild.
-     */
-    private void updateAgenda(final Agenda agenda, final AgendaItem left, final AgendaItem right, final Model model) {
+    protected void updateAgenda(final Agenda agenda, final AgendaItem left, final AgendaItem right, final Model model) {
 
         final SyntaxTreeNode leftChild = left.getParse();
         final SyntaxTreeNode rightChild = right.getParse();
 
-        if (!seenRules.isSeen(leftChild.getCategory(), rightChild.getCategory())) {
+        if (!allowUnseenRules && !seenRules.isSeen(leftChild.getCategory(), rightChild.getCategory())) {
             return;
         }
         final List<RuleProduction> rules = getRules(leftChild.getCategory(), rightChild.getCategory());
@@ -214,7 +204,7 @@ public class ConstrainedParserAStar extends AbstractParser {
         for (int i = 0; i < size; i++) {
             final RuleProduction production = rules.get(i);
             // Check if normal-form constraints let us add this rule.
-            if (NormalForm.isOk(leftChild.getRuleClass(), rightChild.getRuleClass(), production.getRuleType(),
+            if (normalForm.isOk(leftChild.getRuleClass(), rightChild.getRuleClass(), production.getRuleType(),
                     leftChild.getCategory(), rightChild.getCategory(), production.getCategory(),
                     left.getStartOfSpan() == 0)) {
 
@@ -226,11 +216,8 @@ public class ConstrainedParserAStar extends AbstractParser {
                             leftChild.getDependencyStructure(), rightChild.getDependencyStructure(),
                             resolvedDependencies);
 
-                    final boolean headIsLeft = newDependencies.getArbitraryHead() == leftChild.getDependencyStructure()
-                            .getArbitraryHead();
-
                     newNode = new SyntaxTreeNodeBinary(production.getCategory(), leftChild, rightChild,
-                            production.getRuleType(), headIsLeft, newDependencies, resolvedDependencies);
+                            production.getRuleType(), production.isHeadIsLeft(), newDependencies, resolvedDependencies);
 
                 } else {
                     // If we're not modeling dependencies, we can save a lot of work.
@@ -242,6 +229,7 @@ public class ConstrainedParserAStar extends AbstractParser {
             }
         }
     }
+
 
     public Parser make(final File modelFolder) {
         return new ConstrainedParserAStar.Builder(modelFolder).build();

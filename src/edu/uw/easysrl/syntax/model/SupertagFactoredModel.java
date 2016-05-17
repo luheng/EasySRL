@@ -60,7 +60,7 @@ public class SupertagFactoredModel extends Model {
 
 	@Override
 	public AgendaItem unary(final AgendaItem child, final SyntaxTreeNode result, final UnaryRule rule) {
-		return new AgendaItem(result, child.getInsideScore(), child.outsideScoreUpperbound, child.startOfSpan,
+		return new AgendaItem(result, child.getInsideScore() - 0.1, child.outsideScoreUpperbound, child.startOfSpan,
 				child.spanLength, includeDependencies);
 	}
 

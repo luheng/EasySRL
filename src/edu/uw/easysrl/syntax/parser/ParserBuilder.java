@@ -125,25 +125,25 @@ public abstract class ParserBuilder<T extends ParserBuilder<T>> {
 		return normalForm;
 	}
 
-	private Collection<Category> lexicalCategories;
-	private int maxSentenceLength = 70;
+	protected Collection<Category> lexicalCategories;
+	protected int maxSentenceLength = 70;
 	protected int nbest = 1;
 	private List<Category> validRootCategories = Training.ROOT_CATEGORIES;
 	private ListMultimap<Category, UnaryRule> unaryRules;
 	private File markedupFile;
 	private SeenRules seenRules;
 	private boolean allowUnseenRules = false;
-	private double supertaggerBeam = 0.00001;
+	protected double supertaggerBeam = 0.00001;
 
 	private Boolean jointModel;
 	private Double supertaggerWeight;
-	private Tagger tagger;
+	protected Tagger tagger;
 	protected ModelFactory modelFactory;
 	protected CutoffsDictionaryInterface cutoffs;
 	protected boolean useSupertaggedInput = false;
 	private final List<Combinator> combinators = new ArrayList<>(Combinator.STANDARD_COMBINATORS);
-	private int maxChartSize;
-	private NormalForm normalForm = new NormalForm();
+	protected int maxChartSize;
+	protected NormalForm normalForm = new NormalForm();
 
 	public T nBest(final int nBest) {
 		this.nbest = nBest;
