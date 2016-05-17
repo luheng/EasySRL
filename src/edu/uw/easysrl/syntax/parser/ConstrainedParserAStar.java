@@ -2,10 +2,8 @@ package edu.uw.easysrl.syntax.parser;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.PriorityQueue;
-import java.util.Set;
+import java.io.UncheckedIOException;
+import java.util.*;
 
 import edu.uw.easysrl.dependencies.DependencyGenerator;
 import edu.uw.easysrl.dependencies.DependencyStructure;
@@ -20,15 +18,16 @@ import edu.uw.easysrl.syntax.grammar.NormalForm;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeBinary;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeUnary;
-import edu.uw.easysrl.syntax.model.AgendaItem;
-import edu.uw.easysrl.syntax.model.ConstrainedParsingModel.ConstrainedParsingModelFactory;
-import edu.uw.easysrl.syntax.model.ConstrainedSupertagFactoredModel.ConstrainedSupertagModelFactory;
-import edu.uw.easysrl.syntax.model.Model;
+import edu.uw.easysrl.syntax.model.*;
 import edu.uw.easysrl.syntax.model.Model.ModelFactory;
+import edu.uw.easysrl.syntax.model.feature.Feature;
+import edu.uw.easysrl.syntax.model.feature.FeatureSet;
 import edu.uw.easysrl.syntax.parser.ChartCell.Cell1Best;
 import edu.uw.easysrl.syntax.parser.ChartCell.Cell1BestTreeBased;
 import edu.uw.easysrl.syntax.parser.ChartCell.ChartCellFactory;
 import edu.uw.easysrl.syntax.parser.ChartCell.ChartCellNbestFactory;
+import edu.uw.easysrl.syntax.tagger.Tagger;
+import edu.uw.easysrl.util.Util;
 import edu.uw.easysrl.util.Util.Scored;
 
 public class ConstrainedParserAStar extends AbstractParser {
@@ -38,43 +37,47 @@ public class ConstrainedParserAStar extends AbstractParser {
     private final ChartCellFactory cellFactory;
     private final boolean usingDependencies;
 
-    public ConstrainedParserAStar(final ModelFactory modelFactory, final int maxSentenceLength,
-                                  final int nbest, final List<Category> validRootCategories, final File modelFolder,
-                                  final int maxChartSize)
-            throws IOException {
-        super(modelFactory.getLexicalCategories(), maxSentenceLength, nbest, validRootCategories, modelFolder);
-        this.modelFactory = modelFactory;
-        this.maxChartSize = maxChartSize;
-        this.usingDependencies = modelFactory.isUsingDependencies();
-        this.cellFactory = nbest > 1 ?
-                new ChartCellNbestFactory(nbest, nbestBeam, maxSentenceLength, super.lexicalCategories) :
-                (modelFactory.isUsingDependencies() ? Cell1Best.factory() : Cell1BestTreeBased.factory());
+    protected ConstrainedParserAStar(final ConstrainedParserAStar.Builder builder) {
+        super(builder);
+        this.modelFactory = builder.getModelFactory();
+        this.maxChartSize = builder.getMaxChartSize();
+        this.usingDependencies = builder.getModelFactory().isUsingDependencies();
+        this.cellFactory = chooseCellFactory(modelFactory, nbest);
     }
 
-    public List<Scored<SyntaxTreeNode>> parseAstarWithConstraints(final InputToParser input,
-                                                                  Set<Constraint> constraintSet,
-                                                                  DependencyGenerator dependencyGenerator) {
-        cellFactory.newSentence();
-        return parseAstar(input.getInputWords(),
-                ((ConstrainedSupertagModelFactory) modelFactory).make(input, constraintSet, dependencyGenerator));
+    ChartCellFactory chooseCellFactory(final ModelFactory modelFactory, final int nbest) {
+        final ChartCellFactory cellFactory;
+        if (!this.modelFactory.isUsingDynamicProgram()) {
+            cellFactory = ChartCell.CellNoDynamicProgram.factory();
+        } else if (nbest > 1) {
+            cellFactory = new ChartCellNbestFactory(this.nbest, this.nbestBeam, super.maxLength,
+                                                    super.lexicalCategories);
+        } else if (modelFactory.isUsingDependencies()) {
+            cellFactory = Cell1Best.factory();
+        } else {
+            cellFactory = Cell1BestTreeBased.factory();
+        }
+        return cellFactory;
     }
 
-    public List<Scored<SyntaxTreeNode>> parseAstarWithConstraints(final InputToParser input,
-                                                                  Set<Constraint> constraintSet) {
+
+    public List<Scored<SyntaxTreeNode>> parseWithConstraints(final InputToParser input, Set<Constraint> constraintSet) {
+        final ChartCellFactory sentenceCellFactory = cellFactory.forNewSentence();
+        /*
         cellFactory.newSentence();
-        return parseAstar(input.getInputWords(),
+        return parse(input,
                 ((ConstrainedParsingModelFactory) modelFactory).make(input, constraintSet));
+                */
+        return null;
     }
 
     @Override
-    List<Scored<SyntaxTreeNode>> parseAstar(final InputToParser input) {
-        cellFactory.newSentence();
-        return parseAstar(input.getInputWords(), modelFactory.make(input));
-    }
-
-    private List<Scored<SyntaxTreeNode>> parseAstar(final List<InputWord> sentence, Model model) {
+    protected List<Scored<SyntaxTreeNode>> parse(final InputToParser input, final boolean isEval) {
+        final ChartCellFactory sentenceCellFactory = cellFactory.forNewSentence();
+        final List<InputWord> sentence = input.getInputWords();
+        final Model model = modelFactory.make(input);
         final int sentenceLength = sentence.size();
-        final PriorityQueue<AgendaItem> agenda = new PriorityQueue<>(1000);
+        final Agenda agenda = model.makeAgenda();
         model.buildAgenda(agenda, sentence);
         final ChartCell[][] chart = new ChartCell[sentenceLength][sentenceLength];
 
@@ -91,27 +94,31 @@ public class ConstrainedParserAStar extends AbstractParser {
         }
 
         // Dummy final cell that the complete parses are stored in.
-        final ChartCell finalCell = cellFactory.make();
+        final ChartCell finalCell = sentenceCellFactory.make();
 
         while (chartSize < maxChartSize
                 && (result.isEmpty() || (result.size() < nbest && !agenda.isEmpty() && agenda.peek().getCost() > nbestBeam
                 * result.get(0).getScore()))) {
             // Add items from the agenda, until we have enough parses.
+
             final AgendaItem agendaItem = agenda.poll();
             if (agendaItem == null) {
                 break;
             }
+
             // Try to put an entry in the chart.
             ChartCell cell = chart[agendaItem.getStartOfSpan()][agendaItem.getSpanLength() - 1];
             if (cell == null) {
-                cell = cellFactory.make();
+                cell = sentenceCellFactory.make();
                 chart[agendaItem.getStartOfSpan()][agendaItem.getSpanLength() - 1] = cell;
                 cellsStartingAt.get(agendaItem.getStartOfSpan()).add(cell);
                 cellsEndingAt.get(agendaItem.getStartOfSpan() + agendaItem.getSpanLength()).add(cell);
             }
+
             if (cell.add(agendaItem)) {
                 chartSize++;
                 // If a new entry was added, update the agenda.
+
                 // Is the new entry an acceptable complete parse?
                 if (agendaItem.getSpanLength() == sentenceLength
                         && agendaItem.getInsideScore() > Double.NEGATIVE_INFINITY
@@ -122,8 +129,10 @@ public class ConstrainedParserAStar extends AbstractParser {
                         finalCell.add("", agendaItem)) {
                     result.add(new Scored<>(agendaItem.getParse(), agendaItem.getInsideScore()));
                 }
+
                 // See if any Unary Rules can be applied to the new entry.
                 updateAgendaUnary(model, agendaItem, agenda);
+
                 // See if the new entry can be the left argument of any binary rules.
                 for (final ChartCell rightCell : cellsStartingAt.get(agendaItem.getStartOfSpan()
                         + agendaItem.getSpanLength())) {
@@ -131,7 +140,9 @@ public class ConstrainedParserAStar extends AbstractParser {
                         updateAgenda(agenda, agendaItem, rightEntry, model);
                     }
                 }
-                // See if the new entry can be the right argument of any binary rules.
+
+                // See if the new entry can be the right argument of any binary
+                // rules.
                 for (final ChartCell leftCell : cellsEndingAt.get(agendaItem.getStartOfSpan())) {
                     for (final AgendaItem leftEntry : leftCell.getEntries()) {
                         updateAgenda(agenda, leftEntry, agendaItem, model);
@@ -139,23 +150,27 @@ public class ConstrainedParserAStar extends AbstractParser {
                 }
             }
         }
+
         if (result.size() == 0) {
             // Parse failure.
             return null;
         }
+
         return result;
+
     }
 
     /**
      * Updates the agenda with of any unary rules that can be applied.
      */
-    private void updateAgendaUnary(final Model model, final AgendaItem newItem, final PriorityQueue<AgendaItem> agenda) {
+    private void updateAgendaUnary(final Model model, final AgendaItem newItem, final Agenda agenda) {
         final SyntaxTreeNode parse = newItem.getParse();
         final List<UnaryRule> ruleProductions = unaryRules.get(parse.getCategory());
         final int size = ruleProductions.size();
         if (size == 0) {
             return;
         }
+
         final boolean isNotPunctuationNode = parse.getRuleType() != RuleType.LP && parse.getRuleType() != RuleType.RP;
         for (int i = 0; i < size; i++) {
             final UnaryRule unaryRule = ruleProductions.get(i);
@@ -165,16 +180,18 @@ public class ConstrainedParserAStar extends AbstractParser {
                 // The reason for allowing type-raising is to simplify Eisner Normal Form contraints (a
                 // punctuation rule would mask the fact that a rule is the output of type-raising).
                 // TODO should probably refactor the constraint into NormalForm.
+
                 SyntaxTreeNodeUnary newNode;
+
                 if (usingDependencies) {
                     final List<UnlabelledDependency> resolvedDependencies = new ArrayList<>();
-                    newNode = new SyntaxTreeNodeUnary(unaryRule.getResult(), parse,
-                            unaryRule.getDependencyStructureTransformation()
-                                    .apply(parse.getDependencyStructure(), resolvedDependencies),
-                            unaryRule, resolvedDependencies);
+                    newNode = new SyntaxTreeNodeUnary(unaryRule.getResult(), parse, unaryRule
+                            .getDependencyStructureTransformation().apply(parse.getDependencyStructure(),
+                                    resolvedDependencies), unaryRule, resolvedDependencies);
                 } else {
                     newNode = new SyntaxTreeNodeUnary(unaryRule.getResult(), parse, null, unaryRule, null);
                 }
+
                 agenda.add(model.unary(newItem, newNode, unaryRule));
             }
         }
@@ -183,14 +200,16 @@ public class ConstrainedParserAStar extends AbstractParser {
     /**
      * Updates the agenda with the result of all combinators that can be applied to leftChild and rightChild.
      */
-    private void updateAgenda(final PriorityQueue<AgendaItem> agenda, final AgendaItem left, final AgendaItem right,
-                              final Model model) {
+    private void updateAgenda(final Agenda agenda, final AgendaItem left, final AgendaItem right, final Model model) {
+
         final SyntaxTreeNode leftChild = left.getParse();
         final SyntaxTreeNode rightChild = right.getParse();
+
         if (!seenRules.isSeen(leftChild.getCategory(), rightChild.getCategory())) {
             return;
         }
         final List<RuleProduction> rules = getRules(leftChild.getCategory(), rightChild.getCategory());
+
         final int size = rules.size();
         for (int i = 0; i < size; i++) {
             final RuleProduction production = rules.get(i);
@@ -198,6 +217,7 @@ public class ConstrainedParserAStar extends AbstractParser {
             if (NormalForm.isOk(leftChild.getRuleClass(), rightChild.getRuleClass(), production.getRuleType(),
                     leftChild.getCategory(), rightChild.getCategory(), production.getCategory(),
                     left.getStartOfSpan() == 0)) {
+
                 final SyntaxTreeNodeBinary newNode;
                 if (usingDependencies) {
                     // Update all the information for tracking dependencies.
@@ -206,17 +226,48 @@ public class ConstrainedParserAStar extends AbstractParser {
                             leftChild.getDependencyStructure(), rightChild.getDependencyStructure(),
                             resolvedDependencies);
 
-                    final boolean headIsLeft = (newDependencies.getArbitraryHead() == leftChild.getDependencyStructure().getArbitraryHead());
+                    final boolean headIsLeft = newDependencies.getArbitraryHead() == leftChild.getDependencyStructure()
+                            .getArbitraryHead();
 
                     newNode = new SyntaxTreeNodeBinary(production.getCategory(), leftChild, rightChild,
                             production.getRuleType(), headIsLeft, newDependencies, resolvedDependencies);
+
                 } else {
                     // If we're not modeling dependencies, we can save a lot of work.
                     newNode = new SyntaxTreeNodeBinary(production.getCategory(), leftChild, rightChild,
                             production.getRuleType(), production.isHeadIsLeft(), null, null);
                 }
+
                 agenda.add(model.combineNodes(left, right, newNode));
             }
         }
+    }
+
+    public Parser make(final File modelFolder) {
+        return new ConstrainedParserAStar.Builder(modelFolder).build();
+    }
+    public static class Builder extends ParserBuilder<ParserAStar.Builder> {
+
+        public Builder(final File modelFolder) {
+            super(modelFolder);
+            super.maxChartSize(20000);
+        }
+
+        @Override
+        public ConstrainedParserAStar build() {
+            try {
+                final Tagger tagger = !useSupertaggedInput ? Tagger.make(modelFolder, supertaggerBeam, 50, cutoffs) : null;
+                modelFactory = new ConstrainedParsingModel.ConstrainedParsingModelFactory(tagger, lexicalCategories);
+                return build2();
+            } catch (final IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+
+        @Override
+        protected ConstrainedParserAStar build2() {
+            return new ConstrainedParserAStar(this);
+        }
+
     }
 }

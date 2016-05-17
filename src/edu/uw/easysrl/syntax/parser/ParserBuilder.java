@@ -116,20 +116,20 @@ public abstract class ParserBuilder<T extends ParserBuilder<T>> {
 		return maxChartSize;
 	}
 
-	private Collection<Category> lexicalCategories;
+	protected Collection<Category> lexicalCategories;
 	private int maxSentenceLength = 70;
-	private int nbest = 1;
+	protected int nbest = 1;
 	private List<Category> validRootCategories = Training.ROOT_CATEGORIES;
 	private ListMultimap<Category, UnaryRule> unaryRules;
 	private File markedupFile;
 	private SeenRules seenRules;
-	private double supertaggerBeam = 0.00001;
+	protected double supertaggerBeam = 0.00001;
 	private Boolean jointModel;
 	private Double supertaggerWeight;
 	private Tagger tagger;
-	private ModelFactory modelFactory;
-	private CutoffsDictionaryInterface cutoffs;
-	private boolean useSupertaggedInput = false;
+	protected ModelFactory modelFactory;
+	protected CutoffsDictionaryInterface cutoffs;
+	protected boolean useSupertaggedInput = false;
 	private final List<Combinator> combinators = new ArrayList<>(Combinator.STANDARD_COMBINATORS);
 	private int maxChartSize;
 

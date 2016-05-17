@@ -127,22 +127,23 @@ public abstract class BaseCcgParser {
         private DependencyGenerator dependencyGenerator;
         private Parser parser;
         private final double supertaggerBeam = 0.000001;
-        //private final double supertaggerBeam = 0.0001;
         private final int maxChartSize = 1000000;
         private final int maxSentenceLength = 70;
 
         public AStarParser(String modelFolderPath, List<Category> rootCategories, int nBest)  {
             final File modelFolder = Util.getFile(modelFolderPath);
+
             if (!modelFolder.exists()) {
                 throw new InputMismatchException("Couldn't load model from from: " + modelFolder);
             }
             System.err.println("====Starting loading model====");
+            parser = new ParserAStar.Builder(modelFolder)
+                    .supertaggerBeam(supertaggerBeam)
+                    .maxChartSize(maxChartSize)
+                    .maximumSentenceLength(maxSentenceLength)
+                    .nBest(nBest)
+                    .build();
             try {
-                Coindexation.parseMarkedUpFile(new File(modelFolder, "markedup"));
-                Model.ModelFactory modelFactory = new SupertagFactoredModel.SupertagFactoredModelFactory(
-                        Tagger.make(modelFolder, supertaggerBeam, 50, null /* cutoffs */), nBest > 1);
-                parser = new ParserAStar(modelFactory, maxSentenceLength, nBest, rootCategories, modelFolder,
-                        maxChartSize);
                 dependencyGenerator = new DependencyGenerator(parser.getUnaryRules());
             } catch (Exception e) {
                 System.err.println("Parser initialization failed.");
@@ -185,12 +186,13 @@ public abstract class BaseCcgParser {
                 throw new InputMismatchException("Couldn't load model from from: " + modelFolder);
             }
             System.err.println("====Starting loading model====");
+            parser = (ConstrainedParserAStar) new ConstrainedParserAStar.Builder(modelFolder)
+                    .supertaggerBeam(supertaggerBeam)
+                    .nBest(nBest)
+                    .maxChartSize(maxChartSize)
+                    .maximumSentenceLength(maxSentenceLength)
+                    .build();
             try {
-                Coindexation.parseMarkedUpFile(new File(modelFolder, "markedup"));
-                ConstrainedParsingModelFactory modelFactory = new ConstrainedParsingModelFactory(
-                        Tagger.make(modelFolder, supertaggerBeam, maxTagsPerWord /* default  50 */, null /* cutoffs */));
-                parser = new ConstrainedParserAStar(modelFactory, maxSentenceLength, nBest, rootCategories, modelFolder,
-                        maxChartSize);
                 dependencyGenerator = new DependencyGenerator(parser.getUnaryRules());
             } catch (Exception e) {
                 System.err.println("Parser initialization failed.");
@@ -213,21 +215,23 @@ public abstract class BaseCcgParser {
                 System.err.println("Skipping sentence of length " + sentence.size());
                 return null;
             }
-            List<Scored<SyntaxTreeNode>> parses = parser.parseAstarWithConstraints(
+            List<Scored<SyntaxTreeNode>> parses = parser.parseWithConstraints(
                     new InputReader.InputToParser(sentence, null, null, false), constraintSet);
             return (parses == null || parses.size() == 0) ? null :
                     getParse(sentence, parses.get(0), dependencyGenerator);
         }
 
-        public List<Parse> parseNBestWithConstraint(List<InputReader.InputWord> sentence, Set<Constraint> constraintSet) {
+        public List<Parse> parseNBestWithConstraint(List<InputReader.InputWord> sentence,
+                                                    Set<Constraint> constraintSet) {
             if (sentence.size() > maxSentenceLength) {
                 System.err.println("Skipping sentence of length " + sentence.size());
                 return null;
             }
-            List<Scored<SyntaxTreeNode>> parses = parser.parseAstarWithConstraints(
+            List<Scored<SyntaxTreeNode>> parses = parser.parseWithConstraints(
                     new InputReader.InputToParser(sentence, null, null, false), constraintSet);
             return (parses == null || parses.size() == 0) ? null :
                     parses.stream().map(p -> getParse(sentence, p, dependencyGenerator)).collect(Collectors.toList());
+
         }
     }
 

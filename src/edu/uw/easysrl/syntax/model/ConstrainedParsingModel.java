@@ -9,6 +9,7 @@ import edu.uw.easysrl.qasrl.model.Constraint;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.syntax.parser.AbstractParser;
+import edu.uw.easysrl.syntax.parser.Agenda;
 import edu.uw.easysrl.syntax.tagger.Tagger;
 import edu.uw.easysrl.util.GuavaCollectors;
 
@@ -93,7 +94,7 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
     }
 
     @Override
-    public void buildAgenda(final PriorityQueue<AgendaItem> agenda, final List<InputReader.InputWord> words) {
+    public void buildAgenda(final Agenda agenda, final List<InputReader.InputWord> words) {
         for (int i = 0; i < words.size(); i++) {
             final InputReader.InputWord word = words.get(i);
             for (final Tagger.ScoredCategory cat : tagsForWords.get(i)) {
@@ -183,10 +184,12 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
 
     public static class ConstrainedParsingModelFactory extends Model.ModelFactory {
         private final Tagger tagger;
+        private final Collection<Category> lexicalCategories;
 
-        public ConstrainedParsingModelFactory(final Tagger tagger) {
+        public ConstrainedParsingModelFactory(final Tagger tagger, final Collection<Category> lexicalCategories) {
             super();
             this.tagger = tagger;
+            this.lexicalCategories = lexicalCategories;
         }
 
         @Override
@@ -204,7 +207,7 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
 
         @Override
         public Collection<Category> getLexicalCategories() {
-            return tagger.getLexicalCategories();
+            return lexicalCategories;
         }
 
         @Override

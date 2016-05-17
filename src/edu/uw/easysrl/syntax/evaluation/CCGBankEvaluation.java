@@ -76,7 +76,8 @@ public class CCGBankEvaluation {
 	};
 
 	public static void main(final String[] args) throws IOException {
-		final String pipelineFolder = Util.getHomeFolder() + "/Downloads/cnn/models/model_tritrain_big";
+		//final String pipelineFolder = Util.getHomeFolder() + "/Downloads/cnn/models/model_tritrain_big";
+		final String pipelineFolder = "/home/luheng/Workspace/EasySRL/model_tritrain_finetune/";
 		final SRLParser pipeline = SRLParser.wrapperOf(new ParserAStar.Builder(new File(pipelineFolder))
 				.supertaggerBeam(0.000001).build());
 
@@ -95,7 +96,6 @@ public class CCGBankEvaluation {
 			if (!predictedTags.get(i).equals(goldTags.get(i))) {
 				System.out.print("|" + goldTags.get(i) + "|" + predictedTags.get(i));
 			}
-
 			System.out.print(" ");
 		}
 		System.out.println();
@@ -124,7 +124,8 @@ public class CCGBankEvaluation {
 		final ErrorAnalysis errorAnalysisWithGoldCats = new ErrorAnalysis();
 
 		final DependencyGenerator dependencyGenerator = new DependencyGenerator(
-				Util.getFile("/home/luheng/Workspace/EasySRL/model_tritrain_big/"));
+				//Util.getFile("/home/luheng/Workspace/EasySRL/model_tritrain_big/"));
+				Util.getFile("/home/luheng/Workspace/EasySRL/model_tritrain_finetune/"));
 
 		final Multiset<String> validDeps = getValidDeps();
 
