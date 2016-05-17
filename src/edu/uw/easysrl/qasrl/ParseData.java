@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 import com.google.common.collect.ImmutableList;
 import static edu.uw.easysrl.util.GuavaCollectors.*;
 
+import edu.uw.easysrl.corpora.CCGBankDependencies;
 import edu.uw.easysrl.corpora.SRLParse;
 import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.corpora.ParallelCorpusReader;
@@ -16,6 +17,7 @@ import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.dependencies.SRLFrame;
 import edu.uw.easysrl.syntax.evaluation.CCGBankEvaluation;
 import edu.uw.easysrl.syntax.grammar.Preposition;
+import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import scala.tools.cmd.Opt;
 
 /**
@@ -61,16 +63,6 @@ public final class ParseData {
             sentenceInputWords.add(sentence.getInputWords());
             Set<ResolvedDependency> goldDependencies = CCGBankEvaluation
                     .asResolvedDependencies(sentence.getCCGBankDependencyParse().getDependencies());
-            /*
-                    sentence.getCCGBankDependencyParse().getDependencies().stream().map(
-                            dep -> new ResolvedDependency(
-                                    dep.getSentencePositionOfPredicate(),
-                                    dep.getCategory(),
-                                    dep.getArgNumber(),
-                                    dep.getSentencePositionOfArgument(),
-                                    SRLFrame.NONE,
-                                    Preposition.NONE)
-                    ).collect(Collectors.toSet());*/
             goldParses.add(new Parse(sentence.getCcgbankParse(), sentence.getLexicalCategories(), goldDependencies));
         }
         System.out.println(String.format("Read %d sentences.", sentenceInputWords.size()));
@@ -96,16 +88,6 @@ public final class ParseData {
             sentenceInputWords.add(sentence.getInputWords());
             Set<ResolvedDependency> goldDependencies = CCGBankEvaluation
                     .asResolvedDependencies(sentence.getCCGBankDependencyParse().getDependencies());
-            /*
-                    sentence.getCCGBankDependencyParse().getDependencies().stream().map(
-                            dep -> new ResolvedDependency(
-                                    dep.getSentencePositionOfPredicate(),
-                                    dep.getCategory(),
-                                    dep.getArgNumber(),
-                                    dep.getSentencePositionOfArgument(),
-                                    SRLFrame.NONE,
-                                    Preposition.NONE)
-                    ).collect(Collectors.toSet());*/
             goldParses.add(new Parse(sentence.getCcgbankParse(), sentence.getLexicalCategories(), goldDependencies));
         }
         System.out.println(String.format("Read %d sentences.", sentenceInputWords.size()));

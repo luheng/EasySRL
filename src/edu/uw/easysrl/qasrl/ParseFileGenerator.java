@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
  * Created by luheng on 1/30/16.
  */
 public class ParseFileGenerator {
-    static final int nBest = 1;
+    static final int nBest = 100;
 
     public static void main(String[] args) {
         Map<Integer, List<Parse>> allParses = new HashMap<>();

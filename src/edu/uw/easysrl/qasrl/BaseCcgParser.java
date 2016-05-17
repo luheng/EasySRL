@@ -53,8 +53,7 @@ public abstract class BaseCcgParser {
                 .collect(Collectors.toList());
         Set<UnlabelledDependency> unlabelledDeps = new HashSet<>();
         dependencyGenerator.generateDependencies(ccgParse, unlabelledDeps);
-        Set<ResolvedDependency> dependencies =
-                CCGBankEvaluation.convertDeps(sentence, unlabelledDeps)
+        Set<ResolvedDependency> dependencies = CCGBankEvaluation.convertDeps(sentence, unlabelledDeps)
                         .stream()
                         .filter(x -> x.getHead() != x.getArgument())
                         .filter(x -> frequentDependenciesSet.contains(x.getCategory() + "." +  x.getArgNumber()))
@@ -83,7 +82,6 @@ public abstract class BaseCcgParser {
 
         public AStarParser(String modelFolderPath, int nBest)  {
             final File modelFolder = Util.getFile(modelFolderPath);
-
             if (!modelFolder.exists()) {
                 throw new InputMismatchException("Couldn't load model from from: " + modelFolder);
             }
