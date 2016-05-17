@@ -214,17 +214,6 @@ public abstract class SRLParser {
 		}
 	}
 
-	public static class CcgParser extends JointSRLParser {
-		public CcgParser(final Parser parser, final POSTagger tagger) throws IOException {
-			super(parser, tagger);
-		}
-
-		@Override
-		public List<CCGandSRLparse> parseTokens2(final InputToParser tokens) {
-			return super.parseTokens2(tokens);
-		}
-	}
-
 	public List<CCGandSRLparse> parseTokens(final List<InputWord> words) {
 		return parseTokens(new InputToParser(words, null, null, false));
 	}
