@@ -1,8 +1,9 @@
 package edu.uw.easysrl.syntax.model;
 
+import com.google.common.base.Preconditions;
+
 import java.util.Collection;
 import java.util.List;
-import java.util.PriorityQueue;
 
 import edu.uw.easysrl.main.InputReader.InputToParser;
 import edu.uw.easysrl.main.InputReader.InputWord;
@@ -10,6 +11,7 @@ import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeLeaf;
 import edu.uw.easysrl.syntax.parser.AbstractParser.UnaryRule;
+import edu.uw.easysrl.syntax.parser.Agenda;
 import edu.uw.easysrl.syntax.tagger.Tagger;
 import edu.uw.easysrl.syntax.tagger.Tagger.ScoredCategory;
 
@@ -26,7 +28,7 @@ public class SupertagFactoredModel extends Model {
 	}
 
 	@Override
-	public void buildAgenda(final PriorityQueue<AgendaItem> agenda, final List<InputWord> words) {
+	public void buildAgenda(final Agenda agenda, final List<InputWord> words) {
 		for (int i = 0; i < words.size(); i++) {
 			final InputWord word = words.get(i);
 			for (final ScoredCategory cat : tagsForWords.get(i)) {
@@ -63,29 +65,38 @@ public class SupertagFactoredModel extends Model {
 	}
 
 	@Override
-	double getUpperBoundForWord(final int index) {
+	public double getUpperBoundForWord(final int index) {
 		return tagsForWords.get(index).get(0).getScore();
 	}
 
 	public static class SupertagFactoredModelFactory extends ModelFactory {
-		private final Tagger tagger;
-		private final boolean includeDependencies;
+    	private final Tagger tagger;
+    	private final Collection<Category> lexicalCategories;
+    	private final boolean includeDependencies;
 
-		public SupertagFactoredModelFactory(final Tagger tagger, final boolean includeDependencies) {
+		public SupertagFactoredModelFactory(final Tagger tagger,
+                                        	final Collection<Category> lexicalCategories,
+                                        	final boolean includeDependencies) {
 			super();
 			this.tagger = tagger;
+			this.lexicalCategories = lexicalCategories;
 			this.includeDependencies = includeDependencies;
 		}
 
 		@Override
 		public SupertagFactoredModel make(final InputToParser input) {
-			return new SupertagFactoredModel(input.isAlreadyTagged() ? input.getInputSupertags() : tagger.tag(input
-					.getInputWords()), includeDependencies);
+      		if (input.isAlreadyTagged()) {
+        		return new SupertagFactoredModel(input.getInputSupertags(), includeDependencies);
+      		} else {
+        		Preconditions.checkNotNull(tagger, "Inputs should be already tagged if no tagger is given.");
+        		return new SupertagFactoredModel(tagger.tag(input.getInputWords()),
+                                         includeDependencies);
+      		}
 		}
 
 		@Override
 		public Collection<Category> getLexicalCategories() {
-			return tagger.getLexicalCategories();
+			return lexicalCategories;
 		}
 
 		@Override

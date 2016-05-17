@@ -1,14 +1,16 @@
 package edu.uw.easysrl.syntax.model;
 
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
-import java.util.PriorityQueue;
 
 import edu.uw.easysrl.main.InputReader.InputToParser;
 import edu.uw.easysrl.main.InputReader.InputWord;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.syntax.parser.AbstractParser.UnaryRule;
+import edu.uw.easysrl.syntax.parser.Agenda;
+import edu.uw.easysrl.syntax.parser.PriorityQueueAgenda;
 
 public abstract class Model {
 
@@ -18,6 +20,10 @@ public abstract class Model {
 		public abstract Collection<Category> getLexicalCategories();
 
 		public abstract boolean isUsingDependencies();
+
+		public boolean isUsingDynamicProgram() {
+			return true;
+		}
 	}
 
 	private final int sentenceLength;
@@ -28,9 +34,13 @@ public abstract class Model {
 		this.outsideScoresUpperBound = new double[sentenceLength + 1][sentenceLength + 1];
 	}
 
-	abstract double getUpperBoundForWord(int index);
+	public Agenda makeAgenda() {
+		return new PriorityQueueAgenda(Comparator.naturalOrder());
+	}
 
-	public abstract void buildAgenda(PriorityQueue<AgendaItem> queue, List<InputWord> words);
+	public abstract double getUpperBoundForWord(int index);
+
+	public abstract void buildAgenda(Agenda queue, List<InputWord> words);
 
 	public abstract AgendaItem combineNodes(AgendaItem leftChild, AgendaItem rightChild, SyntaxTreeNode node);
 

@@ -1,8 +1,13 @@
 package edu.uw.easysrl.syntax.tagger;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.primitives.Doubles;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.Serializable;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -12,10 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.stream.Collectors;
-
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.primitives.Doubles;
+import java.util.stream.Stream;
 
 import edu.uw.easysrl.corpora.CCGBankDependencies;
 import edu.uw.easysrl.corpora.CCGBankDependencies.DependencyParse;
@@ -78,14 +80,22 @@ public abstract class Tagger {
 
 	public static Tagger make(final File folder, final double beam, final int maxTagsPerWord,
 			final CutoffsDictionaryInterface cutoffs) throws IOException {
-		if (new File(folder, "lstm").exists()) {
+		if (new File(folder, "taggerflow").exists()) {
+			if (new File(new File(folder, "taggerflow"), "graph.pb").exists()) {
+				return new TaggerflowLSTM(folder, beam, maxTagsPerWord, cutoffs);
+			} else {
+				return new TaggerflowRemoteLSTM(folder);
+			}
+		} else if (new File(folder, "lstm").exists()) {
 			return new TaggerLSTM(folder, beam, maxTagsPerWord, cutoffs);
 		} else {
 			return new TaggerEmbeddings(folder, beam, maxTagsPerWord, cutoffs);
 		}
 	}
 
-	public static class ScoredCategory implements Comparable<ScoredCategory> {
+	public static class ScoredCategory implements Comparable<ScoredCategory>, Serializable {
+		private static final long serialVersionUID = 1L;
+
 		private final Category category;
 		private final double score;
 
@@ -161,7 +171,7 @@ public abstract class Tagger {
 		return tagDict;
 	}
 
-	protected String translateBrackets(String word) {
+	protected static String translateBrackets(String word) {
 		if (word.equalsIgnoreCase("-LRB-")) {
 			word = "(";
 		} else if (word.equalsIgnoreCase("-RRB-")) {
@@ -179,6 +189,10 @@ public abstract class Tagger {
 	 * ordered list of ScoredCategory objects representing their category assignment.
 	 */
 	public abstract List<List<ScoredCategory>> tag(List<InputWord> words);
+
+	public Stream<List<List<ScoredCategory>>> tagBatch(Stream<List<InputWord>> sentences) {
+		return sentences.map(this::tag);
+	}
 
 	public abstract Map<Category, Double> getCategoryScores(List<InputWord> sentence, int wordIndex, double weight,
 			Collection<Category> categories);

@@ -2,6 +2,7 @@ package edu.uw.easysrl.syntax.parser;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -13,6 +14,8 @@ import com.google.common.collect.Table;
 
 import edu.uw.easysrl.dependencies.DependencyGenerator;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
+import edu.uw.easysrl.dependencies.SRLFrame;
+import edu.uw.easysrl.dependencies.SRLFrame.SRLLabel;
 import edu.uw.easysrl.dependencies.UnlabelledDependency;
 import edu.uw.easysrl.main.InputReader.InputToParser;
 import edu.uw.easysrl.main.InputReader.InputWord;
@@ -32,7 +35,7 @@ public abstract class SRLParser {
 	}
 
 	public final List<CCGandSRLparse> parseTokens(final InputToParser tokens) {
-		return parseTokens2(tagger.tag(tokens));
+		return parseTokens2(tokens.isPOStagged() ? tokens : tagger.tag(tokens));
 	}
 
 	protected abstract List<CCGandSRLparse> parseTokens2(InputToParser tokens);
@@ -199,14 +202,15 @@ public abstract class SRLParser {
 		private CCGandSRLparse addDependencies(final List<InputWord> tokens, final CCGandSRLparse parse) {
 			final Collection<UnlabelledDependency> unlabelledDependencies = new ArrayList<>();
 			// Get the dependencies in this parse.
-			dependencyGenerator.generateDependencies(parse.getCcgParse(), unlabelledDependencies);
+			final SyntaxTreeNode annotatedSyntaxTree = dependencyGenerator.generateDependencies(parse.getCcgParse(),
+					unlabelledDependencies);
 			final Collection<ResolvedDependency> result = new ArrayList<>();
 			for (final UnlabelledDependency dep : unlabelledDependencies) {
 				// Add labels to the dependencies using the classifier.
 				result.addAll(dep.setLabel(classifier.classify(dep, tokens)).stream()
 						.filter(x -> x.getHead() != x.getArgument()).collect(Collectors.toList()));
 			}
-			return new CCGandSRLparse(parse.getCcgParse(), result, tokens);
+			return new CCGandSRLparse(annotatedSyntaxTree, result, tokens);
 		}
 	}
 
@@ -223,5 +227,31 @@ public abstract class SRLParser {
 
 	public List<CCGandSRLparse> parseTokens(final List<InputWord> words) {
 		return parseTokens(new InputToParser(words, null, null, false));
+	}
+
+	/**
+	 * Provides a wrapper around a syntactic parser that assigned default semantic roles.
+	 */
+	public static SRLParser wrapperOf(final Parser parser) {
+		try {
+			final LabelClassifier dummyLabelClassifier = new LabelClassifier(null) {
+				private static final long serialVersionUID = 1L;
+
+				@Override
+				public SRLLabel classify(final UnlabelledDependency dep, final List<InputWord> sentence) {
+					return SRLFrame.NONE;
+				}
+			};
+			final POSTagger dummyPostagger = new POSTagger() {
+
+				@Override
+				public List<InputWord> tag(final List<InputWord> words) {
+					return words;
+				}
+			};
+			return new PipelineSRLParser(parser, dummyLabelClassifier, dummyPostagger);
+		} catch (final IOException e) {
+			throw new UncheckedIOException(e);
+		}
 	}
 }
