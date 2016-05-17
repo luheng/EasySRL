@@ -124,7 +124,6 @@ public class CCGBankEvaluation {
 		final 	ErrorAnalysis errorAnalysisWithGoldCats = new ErrorAnalysis();
 
 		final DependencyGenerator dependencyGenerator = new DependencyGenerator(
-				//Util.getFile("/home/luheng/Workspace/EasySRL/model_tritrain_big/"));
 				Util.getFile(Util.getHomeFolder() + "/Workspace/EasySRL/model_ccgbank"));
 
 		final Multiset<String> validDeps = getValidDeps();
