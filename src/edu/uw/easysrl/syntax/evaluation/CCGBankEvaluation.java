@@ -77,9 +77,9 @@ public class CCGBankEvaluation {
 
 	public static void main(final String[] args) throws IOException {
 		//final String pipelineFolder = Util.getHomeFolder() + "/Downloads/cnn/models/model_tritrain_big";
-		final String pipelineFolder = "/Users/luheng/Workspace/EasySRL/model_tritrain_finetune/";
+		final String pipelineFolder = "/home/luheng/Workspace/EasySRL/model_tritrain_finetune/";
 		final SRLParser pipeline = SRLParser.wrapperOf(new ParserAStar.Builder(new File(pipelineFolder))
-				.supertaggerBeam(0.00001).maxChartSize(250000).build());
+				.supertaggerBeam(0.000001).maxChartSize(250000).build());
 
 		System.out.println(evaluate(pipeline, Partition.DEV));
 		System.out.println(evaluate(pipeline, Partition.TEST));
@@ -125,7 +125,7 @@ public class CCGBankEvaluation {
 
 		final DependencyGenerator dependencyGenerator = new DependencyGenerator(
 				//Util.getFile("/home/luheng/Workspace/EasySRL/model_tritrain_big/"));
-				Util.getFile("/Users/luheng/Workspace/EasySRL/model_tritrain_finetune/"));
+				Util.getFile("/home/luheng/Workspace/EasySRL/model_tritrain_finetune/"));
 
 		final Multiset<String> validDeps = getValidDeps();
 
@@ -135,7 +135,7 @@ public class CCGBankEvaluation {
 		int allCorrect = 0;
 		int numParsed = 0;
 
-		final List<DependencyParse> corpus = CCGBankDependencies.loadCorpus(ParallelCorpusReader.CCGREBANK, partition);
+		final List<DependencyParse> corpus = CCGBankDependencies.loadCorpus(ParallelCorpusReader.CCGBANK, partition);
 		final Stopwatch watch = Stopwatch.createStarted();
 		for (final DependencyParse gold : corpus) {
 
@@ -297,8 +297,7 @@ public class CCGBankEvaluation {
 
 	public static Multiset<String> getValidDeps() throws IOException {
 		final Multiset<String> validDeps = HashMultiset.create();
-		for (final DependencyParse gold : CCGBankDependencies.loadCorpus(ParallelCorpusReader.CCGREBANK,
-				Partition.TRAIN)) {
+		for (final DependencyParse gold : CCGBankDependencies.loadCorpus(ParallelCorpusReader.CCGBANK, Partition.TRAIN)) {
 			for (final ResolvedDependency dep : asResolvedDependencies(gold.getDependencies())) {
 				validDeps.add(dep.getCategory().toString() + dep.getArgNumber());
 			}

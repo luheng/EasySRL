@@ -35,7 +35,8 @@ public class ParallelCorpusReader {
 	public static final File PROPBANK = Util.getFile(PROPERTIES.getProperty("propbank"));
 	private static final File NOMBANK = Util.getFile(PROPERTIES.getProperty("nombank"));
 	private static final File WSJ = Util.getFile(PROPERTIES.getProperty("ptb"));
-	public static final File CCGREBANK = Util.getFile(PROPERTIES.getProperty("ccgbank"));
+	public static final File CCGBANK = Util.getFile(PROPERTIES.getProperty("ccgbank"));
+	public static final File CCGREBANK = Util.getFile(PROPERTIES.getProperty("ccgrebank"));
 
 	public static final File BROWN = new File(PROPERTIES.getProperty("brown"));
 
@@ -138,7 +139,7 @@ public class ParallelCorpusReader {
 	private final File treebank;
 	private final File nombank;
 
-	public final static ParallelCorpusReader READER = new ParallelCorpusReader(CCGREBANK, PROPBANK, WSJ,
+	public final static ParallelCorpusReader READER = new ParallelCorpusReader(CCGBANK, PROPBANK, WSJ,
 			USING_NOMBANK ? NOMBANK : null);
 
 	private ParallelCorpusReader(final File ccgbank, final File propbank, final File treebank, final File nombank) {
