@@ -1,28 +1,23 @@
 package edu.uw.easysrl.qasrl.model;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
 import edu.uw.easysrl.qasrl.annotation.AnnotationUtils;
-import edu.uw.easysrl.qasrl.classification.DependencyInstance;
 import edu.uw.easysrl.qasrl.classification.DependencyInstanceHelper;
 import edu.uw.easysrl.qasrl.classification.DependencyInstanceType;
-import edu.uw.easysrl.qasrl.classification.TemplateHelper;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.util.VerbHelper;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
-import edu.uw.easysrl.qasrl.query.QueryType;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 /**
  * Contains data and convenient interface for HITL experiments.
@@ -53,7 +48,7 @@ public class HITLParser {
         return reparsingParameters;
     }
 
-    private BaseCcgParser.ConstrainedCcgParser2 reparser;
+    private BaseCcgParser.ConstrainedCcgParser reparser;
     private ResponseSimulatorGold goldSimulator;
 
     /**
@@ -75,7 +70,7 @@ public class HITLParser {
         nbestLists = NBestList.loadNBestListsFromFile(preparsedFile, nBest).get();
         System.out.println(String.format("Load pre-parsed %d-best lists for %d sentences.", nBest, nbestLists.size()));
 
-        reparser = new BaseCcgParser.ConstrainedCcgParser2(BaseCcgParser.modelFolder, BaseCcgParser.rootCategories,
+        reparser = new BaseCcgParser.ConstrainedCcgParser(BaseCcgParser.modelFolder, BaseCcgParser.rootCategories,
                 reparsingParameters.maxTagsPerWord, 1 /* nbest */);
         goldSimulator = new ResponseSimulatorGold(parseData);
 
