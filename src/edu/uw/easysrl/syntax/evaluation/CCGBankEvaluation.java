@@ -77,7 +77,7 @@ public class CCGBankEvaluation {
 
 	public static void main(final String[] args) throws IOException {
 		//final String pipelineFolder = Util.getHomeFolder() + "/Downloads/cnn/models/model_tritrain_big";
-		final String pipelineFolder = "/home/luheng/Workspace/EasySRL/model_tritrain_finetune/";
+		final String pipelineFolder = Util.getHomeFolder() + "/Workspace/EasySRL/model_tritrain_finetune/";
 		final SRLParser pipeline = SRLParser.wrapperOf(new ParserAStar.Builder(new File(pipelineFolder))
 				.supertaggerBeam(0.0001).maxChartSize(250000).build());
 
@@ -121,10 +121,10 @@ public class CCGBankEvaluation {
 		final ErrorAnalysis errorAnalysisUnlabelled = new ErrorAnalysis();
 		final Table<Category, Category, Integer> goldToPredictedToCount = HashBasedTable.create();
 
-		final ErrorAnalysis errorAnalysisWithGoldCats = new ErrorAnalysis();
+		final 	ErrorAnalysis errorAnalysisWithGoldCats = new ErrorAnalysis();
 
 		final DependencyGenerator dependencyGenerator = new DependencyGenerator(
-				Util.getFile("/home/luheng/Workspace/EasySRL/model_tritrain_finetune/"));
+				Util.getFile(Util.getHomeFolder() + "/Workspace/EasySRL/model_tritrain_finetune"));
 
 		final Multiset<String> validDeps = getValidDeps();
 

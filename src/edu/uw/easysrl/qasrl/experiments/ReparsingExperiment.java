@@ -19,6 +19,7 @@ import edu.uw.easysrl.qasrl.qg.util.Prepositions;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.syntax.evaluation.Results;
+import edu.uw.easysrl.syntax.parser.ParserAStar;
 import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.*;
@@ -67,9 +68,9 @@ public class ReparsingExperiment {
         reparsingParameters.negativeConstraintMaxAgreement = 1;
         reparsingParameters.skipPronounEvidence = false;
         reparsingParameters.jeopardyQuestionWeight = 1.0;
-        reparsingParameters.oraclePenaltyWeight = 5.0;
-        reparsingParameters.attachmentPenaltyWeight = 5.0;
-        reparsingParameters.supertagPenaltyWeight = 5.0;
+        reparsingParameters.oraclePenaltyWeight = 2.0;
+        reparsingParameters.attachmentPenaltyWeight = 2.0;
+        reparsingParameters.supertagPenaltyWeight = 2.0;
     }
 
     public static void main(String[] args) {
@@ -111,9 +112,14 @@ public class ReparsingExperiment {
         int numMatchedAnnotations = 0;
 
         List<DebugBlock> debugging = new ArrayList<>();
-        Results avgUnlabeledBaseline = new Results(),
+        Results avgBaseline = new Results(),
+                avgReranked = new Results(),
+                avgReparsed = new Results(),
+                avgUnlabeledBaseline = new Results(),
                 avgUnlabeledReranked = new Results(),
                 avgUnlabeledReparsed = new Results();
+
+        BaseCcgParser baseParser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, 1);
 
         for (int sentenceId : sentenceIds) {
             myHistory.addSentence(sentenceId);
@@ -123,13 +129,17 @@ public class ReparsingExperiment {
             final NBestList nBestList = myHTILParser.getNBestList(sentenceId);
             final int numParses = nBestList.getN();
             final Parse goldParse = myHTILParser.getGoldParse(sentenceId);
-            final Results baselineF1 = nBestList.getResults(0);
-            final Results unlabeledBaselineF1 = CcgEvaluation.evaluateUnlabeled(nBestList.getParse(0).dependencies,
+            final Parse baselineParse = baseParser.parse(sentenceId, myHTILParser.getInputSentence(sentenceId));
+            final Results baselineF1 = CcgEvaluation.evaluate(baselineParse.dependencies, goldParse.dependencies);
+            final Results unlabeledBaselineF1 = CcgEvaluation.evaluateUnlabeled(baselineParse.dependencies,
                     goldParse.dependencies);
+            avgBaseline.add(baselineF1);
             avgUnlabeledBaseline.add(unlabeledBaselineF1);
 
             final List<AlignedAnnotation> annotated = annotations.get(sentenceId);
             if (annotated == null || annotated.isEmpty()) {
+                avgReparsed.add(baselineF1);
+                avgReranked.add(baselineF1);
                 avgUnlabeledReranked.add(unlabeledBaselineF1);
                 avgUnlabeledReparsed.add(unlabeledBaselineF1);
                 continue;
@@ -251,6 +261,8 @@ public class ReparsingExperiment {
                 currentF1 = reparsedF1;
             }
 
+            avgReparsed.add(reparsedF1);
+            avgReranked.add(rerankedF1);
             avgUnlabeledReranked.add(unlabeledRerankedF1);
             avgUnlabeledReparsed.add(unlabeledReparsedF1);
 
@@ -267,6 +279,9 @@ public class ReparsingExperiment {
         }
 
         myHistory.printSummary();
+        System.out.println("Labeled baseline:\n" + avgBaseline);
+        System.out.println("Labeled reranked:\n" + avgReranked);
+        System.out.println("Labeled reparsed:\n" + avgReparsed);
         System.out.println("Unlabeled baseline:\n" + avgUnlabeledBaseline);
         System.out.println("Unlabeled reranked:\n" + avgUnlabeledReranked);
         System.out.println("Unlabeled reparsed:\n" + avgUnlabeledReparsed);
