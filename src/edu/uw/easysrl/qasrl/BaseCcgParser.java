@@ -77,7 +77,7 @@ public abstract class BaseCcgParser {
         private DependencyGenerator dependencyGenerator;
         private Parser parser;
         private final double supertaggerBeam = 0.000001;
-        private final double nbestBeam = 1e-8;
+        private final double nbestBeam = 0.000001;
         private final int maxChartSize = 2000000;
         private final int maxSentenceLength = 70;
 
@@ -136,7 +136,7 @@ public abstract class BaseCcgParser {
                 throw new InputMismatchException("Couldn't load model from from: " + modelFolder);
             }
             System.err.println("====Starting loading model====");
-            parser = (ConstrainedParserAStar) new ConstrainedParserAStar.Builder(modelFolder)
+            parser = new ConstrainedParserAStar.Builder(modelFolder)
                     .supertaggerBeam(supertaggerBeam)
                     .nBest(nBest)
                     .maxChartSize(maxChartSize)

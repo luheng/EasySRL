@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
  */
 public class ParseFileGenerator {
     static final int nBest = 100;
-    static ImmutableSet<Integer> skipDevSentences = ImmutableSet.of(1839);
+    static ImmutableSet<Integer> skipDevSentences = ImmutableSet.of(1244, 1839);
 
     public static void main(String[] args) {
         Map<Integer, List<Parse>> allParses = new HashMap<>();
