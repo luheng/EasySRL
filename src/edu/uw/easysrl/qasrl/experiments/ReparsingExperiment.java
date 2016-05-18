@@ -43,9 +43,9 @@ public class ReparsingExperiment {
           //  "./Crowdflower_data/all-checkbox-responses.csv", // Round3: checkbox, core + pp
           //  "./Crowdflower_data/f891522.csv",                // Round4: jeopardy checkbox, pp only
             "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
-            "./Crowdflower_data/f897179.csv",                 // Round2-3: NP clefting questions.
+          //  "./Crowdflower_data/f897179.csv",                 // Round2-3: NP clefting questions.
             "./Crowdflower_data/f902142.csv",                   // Round4: checkbox, pronouns, core only, 300 sentences.
-            "./Crowdflower_data/f903842.csv",                   // Round4: np-clefting prnouns
+          //  "./Crowdflower_data/f903842.csv",                   // Round4: np-clefting prnouns
             "./Crowdflower_data/f909211.csv",                   // Round5: checkbox, pronouns, core only, 300+ sentences.
     };
 
@@ -68,9 +68,9 @@ public class ReparsingExperiment {
         reparsingParameters.negativeConstraintMaxAgreement = 1;
         reparsingParameters.skipPronounEvidence = false;
         reparsingParameters.jeopardyQuestionWeight = 1.0;
-        reparsingParameters.oraclePenaltyWeight = 2.0;
-        reparsingParameters.attachmentPenaltyWeight = 2.0;
-        reparsingParameters.supertagPenaltyWeight = 2.0;
+        reparsingParameters.oraclePenaltyWeight = 5.0;
+        reparsingParameters.attachmentPenaltyWeight = 5.0;
+        reparsingParameters.supertagPenaltyWeight = 5.0;
     }
 
     public static void main(String[] args) {
@@ -119,7 +119,7 @@ public class ReparsingExperiment {
                 avgUnlabeledReranked = new Results(),
                 avgUnlabeledReparsed = new Results();
 
-        BaseCcgParser baseParser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, 1);
+        BaseCcgParser baseParser = null; // new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, 1);
 
         for (int sentenceId : sentenceIds) {
             myHistory.addSentence(sentenceId);
@@ -129,7 +129,10 @@ public class ReparsingExperiment {
             final NBestList nBestList = myHTILParser.getNBestList(sentenceId);
             final int numParses = nBestList.getN();
             final Parse goldParse = myHTILParser.getGoldParse(sentenceId);
-            final Parse baselineParse = baseParser.parse(sentenceId, myHTILParser.getInputSentence(sentenceId));
+            final Parse baselineParse = baseParser == null ?
+                    myHTILParser.getParse(sentenceId, 0) :
+                    baseParser.parse(sentenceId, myHTILParser.getInputSentence(sentenceId));
+
             final Results baselineF1 = CcgEvaluation.evaluate(baselineParse.dependencies, goldParse.dependencies);
             final Results unlabeledBaselineF1 = CcgEvaluation.evaluateUnlabeled(baselineParse.dependencies,
                     goldParse.dependencies);

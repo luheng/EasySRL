@@ -178,9 +178,7 @@ public class ParserAStar extends AbstractParser {
 				// The reason for allowing type-raising is to simplify Eisner Normal Form contraints (a
 				// punctuation rule would mask the fact that a rule is the output of type-raising).
 				// TODO should probably refactor the constraint into NormalForm.
-
 				SyntaxTreeNodeUnary newNode;
-
 				if (usingDependencies) {
 					final List<UnlabelledDependency> resolvedDependencies = new ArrayList<>();
 					newNode = new SyntaxTreeNodeUnary(unaryRule.getResult(), parse, unaryRule
@@ -189,7 +187,6 @@ public class ParserAStar extends AbstractParser {
 				} else {
 					newNode = new SyntaxTreeNodeUnary(unaryRule.getResult(), parse, null, unaryRule, null);
 				}
-
 				agenda.add(model.unary(newItem, newNode, unaryRule));
 			}
 		}
@@ -215,7 +212,6 @@ public class ParserAStar extends AbstractParser {
 			if (normalForm.isOk(leftChild.getRuleClass(), rightChild.getRuleClass(), production.getRuleType(),
 					leftChild.getCategory(), rightChild.getCategory(), production.getCategory(),
 					left.getStartOfSpan() == 0)) {
-
 				final SyntaxTreeNodeBinary newNode;
 				if (usingDependencies) {
 					// Update all the information for tracking dependencies.
@@ -223,10 +219,8 @@ public class ParserAStar extends AbstractParser {
 					final DependencyStructure newDependencies = production.getCombinator().apply(
 							leftChild.getDependencyStructure(), rightChild.getDependencyStructure(),
 							resolvedDependencies);
-
 					newNode = new SyntaxTreeNodeBinary(production.getCategory(), leftChild, rightChild,
 							production.getRuleType(), production.isHeadIsLeft(), newDependencies, resolvedDependencies);
-
 				} else {
 					// If we're not modeling dependencies, we can save a lot of work.
 					newNode = new SyntaxTreeNodeBinary(production.getCategory(), leftChild, rightChild,

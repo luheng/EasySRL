@@ -131,11 +131,11 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
             lengthPenalty = lengthPenalty * 10;
         }
 
-        double evidencePenalty = 0.0;
+        double constraintsPenalty = 0.0;
         final List<UnlabelledDependency> dependencies = node.getResolvedUnlabelledDependencies();
 
         // Penalize cannot-links.
-        evidencePenalty += dependencies.stream()
+        constraintsPenalty += dependencies.stream()
                 .mapToDouble(dep -> dep.getArguments().stream()
                         // Directed match.
                         .filter(argId -> cannotLinks.contains(dep.getHead(), argId))
@@ -144,7 +144,7 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                 .sum();
 
         // Penalize missed must-links.
-        evidencePenalty += mustLinks.cellSet().stream()
+        constraintsPenalty += mustLinks.cellSet().stream()
                 .filter(c -> {
                     final int cHead = c.getRowKey(), cArg = c.getColumnKey();
                     return (indexInSpan(cHead, leftChild) && indexInSpan(cArg, rightChild)) ||
@@ -161,7 +161,7 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                 .sum();
 
         return new AgendaItem(node,
-            leftChild.getInsideScore() + rightChild.getInsideScore() - lengthPenalty - evidencePenalty, /* inside */
+            leftChild.getInsideScore() + rightChild.getInsideScore() - lengthPenalty - constraintsPenalty, /* inside */
             getOutsideUpperBound(leftChild.startOfSpan, leftChild.startOfSpan + length),                /* outside */
             leftChild.startOfSpan,
             length,
@@ -174,12 +174,8 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
 
     @Override
     public AgendaItem unary(final AgendaItem child, final SyntaxTreeNode result, final AbstractParser.UnaryRule rule) {
-        return new AgendaItem(result,
-                child.getInsideScore(),
-                child.outsideScoreUpperbound,
-                child.startOfSpan,
-                child.spanLength,
-                kIncludeDependencies);
+        return new AgendaItem(result, child.getInsideScore() - 0.1, child.outsideScoreUpperbound, child.startOfSpan,
+                child.spanLength, kIncludeDependencies);
     }
 
     public static class ConstrainedParsingModelFactory extends Model.ModelFactory {
