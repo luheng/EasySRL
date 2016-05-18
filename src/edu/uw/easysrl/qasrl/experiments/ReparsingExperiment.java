@@ -117,6 +117,7 @@ public class ReparsingExperiment {
 
         for (int sentenceId : sentenceIds) {
             myHistory.addSentence(sentenceId);
+            System.out.println(sentenceId);
 
             final ImmutableList<String> sentence = myHTILParser.getSentence(sentenceId);
             final NBestList nBestList = myHTILParser.getNBestList(sentenceId);

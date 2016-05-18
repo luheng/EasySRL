@@ -234,7 +234,7 @@ public class ConstrainedParserAStar extends AbstractParser {
     public Parser make(final File modelFolder) {
         return new ConstrainedParserAStar.Builder(modelFolder).build();
     }
-    public static class Builder extends ParserBuilder<ParserAStar.Builder> {
+    public static class Builder extends ParserBuilder<ConstrainedParserAStar.Builder> {
 
         public Builder(final File modelFolder) {
             super(modelFolder);

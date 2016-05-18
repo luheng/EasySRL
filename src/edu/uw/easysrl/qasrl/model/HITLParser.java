@@ -13,6 +13,7 @@ import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.util.VerbHelper;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
+import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.*;
@@ -75,6 +76,19 @@ public class HITLParser {
 
         // Cache results.
         nbestLists.entrySet().forEach(e -> e.getValue().cacheResults(goldParses.get(e.getKey())));
+
+        // Print nbest stats
+        /* Print stats */
+        System.out.println(String.format("Read nBest lists for %d sentences", nbestLists.size()));
+        System.out.println(String.format("Average-N:\t%.3f", nbestLists.values().stream()
+                .mapToDouble(NBestList::getN).sum() / nbestLists.size()));
+        Results baseline = new Results(), oracle = new Results();
+        nbestLists.values().forEach(nb -> {
+            baseline.add(nb.getResults(0));
+            oracle.add(nb.getResults(nb.getOracleId()));
+        });
+        System.out.println(String.format("Baseline F1:\t%.5f%%\tOracle F1:\t%.5f%%", 100.0 * baseline.getF1(),
+                100.0 * oracle.getF1()));
     }
 
     public ImmutableList<Integer> getAllSentenceIds() {

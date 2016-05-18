@@ -1,6 +1,7 @@
 package edu.uw.easysrl.qasrl;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import edu.uw.easysrl.main.EasySRL;
 import edu.uw.easysrl.main.InputReader;
 
@@ -19,6 +20,7 @@ import java.util.stream.Collectors;
  */
 public class ParseFileGenerator {
     static final int nBest = 100;
+    static ImmutableSet<Integer> skipDevSentences = ImmutableSet.of(1839);
 
     public static void main(String[] args) {
         Map<Integer, List<Parse>> allParses = new HashMap<>();
@@ -31,10 +33,14 @@ public class ParseFileGenerator {
         int numParsed = 0;
         double averageN = .0;
         Results oracleF1 = new Results(), baselineF1 = new Results();
-        BaseCcgParser parser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, nBest);
+        BaseCcgParser parser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, nBest),
+                      backoffParser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, 1);
 
         for (int sentIdx = 0; sentIdx < sentences.size(); sentIdx ++) {
-            List<Parse> parses = parser.parseNBest(sentences.get(sentIdx));
+            System.out.println(sentIdx + ", " + sentences.get(sentIdx).size());
+            List<Parse> parses = skipDevSentences.contains(sentIdx) ?
+                    ImmutableList.of(backoffParser.parse(sentences.get(sentIdx))) :
+                    parser.parseNBest(sentences.get(sentIdx));
             if (parses == null) {
                 System.err.println("Skipping sentence:\t" + sentIdx + "\t" + sentences.get(sentIdx).stream()
                         .map(w -> w.word).collect(Collectors.joining(" ")));
