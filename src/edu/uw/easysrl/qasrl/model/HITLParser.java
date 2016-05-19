@@ -72,6 +72,7 @@ public class HITLParser {
         System.out.println(String.format("Load pre-parsed %d-best lists for %d sentences.", nBest, nbestLists.size()));
 
         reparser = new BaseCcgParser.ConstrainedCcgParser(BaseCcgParser.modelFolder, 1 /* nbest */);
+        reparser.cacheSupertags(parseData);
         goldSimulator = new ResponseSimulatorGold(parseData);
 
         // Cache results.
@@ -264,7 +265,7 @@ public class HITLParser {
         if (constraintSet == null || constraintSet.isEmpty()) {
             return nbestLists.get(sentenceId).getParse(0);
         }
-        final Parse reparsed = reparser.parseWithConstraint(inputSentences.get(sentenceId), constraintSet);
+        final Parse reparsed = reparser.parseWithConstraint(sentenceId, inputSentences.get(sentenceId), constraintSet);
         if (reparsed == null) {
             System.err.println(String.format("Unable to parse sentence %d with constraints: %s", sentenceId,
                     constraintSet.stream()

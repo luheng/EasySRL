@@ -8,6 +8,7 @@ import edu.uw.easysrl.qasrl.annotation.AnnotationUtils;
 import edu.uw.easysrl.qasrl.annotation.CrowdFlowerDataUtils;
 import edu.uw.easysrl.qasrl.evaluation.Accuracy;
 import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
+import edu.uw.easysrl.qasrl.evaluation.TicToc;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils.*;
 import edu.uw.easysrl.qasrl.model.Constraint;
 import edu.uw.easysrl.qasrl.model.HITLParser;
@@ -21,6 +22,7 @@ import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.parser.ParserAStar;
 import edu.uw.easysrl.util.GuavaCollectors;
+import scala.tools.nsc.doc.base.comment.Title;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -43,9 +45,9 @@ public class ReparsingExperiment {
           //  "./Crowdflower_data/all-checkbox-responses.csv", // Round3: checkbox, core + pp
           //  "./Crowdflower_data/f891522.csv",                // Round4: jeopardy checkbox, pp only
             "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
-            "./Crowdflower_data/f897179.csv",                 // Round2-3: NP clefting questions.
+          //  "./Crowdflower_data/f897179.csv",                 // Round2-3: NP clefting questions.
             "./Crowdflower_data/f902142.csv",                   // Round4: checkbox, pronouns, core only, 300 sentences.
-            "./Crowdflower_data/f903842.csv",                   // Round4: np-clefting prnouns
+          //  "./Crowdflower_data/f903842.csv",                   // Round4: np-clefting prnouns
             "./Crowdflower_data/f909211.csv",                   // Round5: checkbox, pronouns, core only, 300+ sentences.
     };
 
@@ -69,8 +71,8 @@ public class ReparsingExperiment {
         reparsingParameters.skipPronounEvidence = false;
         reparsingParameters.jeopardyQuestionWeight = 1.0;
         reparsingParameters.oraclePenaltyWeight = 5.0;
-        reparsingParameters.attachmentPenaltyWeight = 5.0;
-        reparsingParameters.supertagPenaltyWeight = 5.0;
+        reparsingParameters.attachmentPenaltyWeight = 2.0;
+        reparsingParameters.supertagPenaltyWeight = 2.0;
     }
 
     public static void main(String[] args) {
@@ -119,17 +121,26 @@ public class ReparsingExperiment {
                 avgUnlabeledReranked = new Results(),
                 avgUnlabeledReparsed = new Results();
 
-        BaseCcgParser baseParser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, 1);
+        BaseCcgParser baseParser = null; // new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, 1);
 
+        int counter = 0;
+        TicToc.tic();
         for (int sentenceId : sentenceIds) {
             myHistory.addSentence(sentenceId);
-            System.out.println(sentenceId);
+            if (++counter % 100 == 0) {
+                System.out.println(String.format("Processed %d sentences ... in %d seconds", counter, TicToc.toc()));
+                TicToc.tic();
+            }
 
             final ImmutableList<String> sentence = myHTILParser.getSentence(sentenceId);
             final NBestList nBestList = myHTILParser.getNBestList(sentenceId);
             final int numParses = nBestList.getN();
             final Parse goldParse = myHTILParser.getGoldParse(sentenceId);
-            final Parse baselineParse = baseParser.parse(sentenceId, myHTILParser.getInputSentence(sentenceId));
+            final Parse baselineParse = baseParser == null ?
+                    myHTILParser.getParse(sentenceId, 0) :
+                    baseParser.parse(sentenceId, myHTILParser.getInputSentence(sentenceId));
+            Parse reparse = baselineParse, oracleReparse = baselineParse;
+
             final Results baselineF1 = CcgEvaluation.evaluate(baselineParse.dependencies, goldParse.dependencies);
             final Results unlabeledBaselineF1 = CcgEvaluation.evaluateUnlabeled(baselineParse.dependencies,
                     goldParse.dependencies);
@@ -211,8 +222,12 @@ public class ReparsingExperiment {
                 allOracleConstraints.addAll(oracleConstraints);
 
                 int rerankedId = myHTILParser.getRerankedParseId(sentenceId, allConstraints);
-                Parse reparse = myHTILParser.getReparsed(sentenceId, allConstraints),
-                      oracleReparse = myHTILParser.getReparsed(sentenceId, allOracleConstraints);
+                if (constraints.size() > 0) {
+                    // Reparse only when there're new constraints.
+                    reparse = myHTILParser.getReparsed(sentenceId, allConstraints);
+                }
+                oracleReparse = myHTILParser.getNBestList(sentenceId)
+                        .getParse(myHTILParser.getRerankedParseId(sentenceId, allOracleConstraints));
                 rerankedF1 = nBestList.getResults(rerankedId);
                 unlabeledRerankedF1 = CcgEvaluation.evaluateUnlabeled(nBestList.getParse(rerankedId).dependencies,
                                                                       goldParse.dependencies);
@@ -276,6 +291,7 @@ public class ReparsingExperiment {
                 debugBlock.oracleDeltaF1 = oracleF1.getF1() - lastReparsedResult.get().getF1();
                 debugging.add(debugBlock);
             }
+
         }
 
         myHistory.printSummary();
