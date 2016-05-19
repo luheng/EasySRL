@@ -110,13 +110,25 @@ public class QuestionGenerator {
         return verb.withModal("would").withProgressive(false);
     }
 
+    private static boolean isVerbValid(Verb verb, boolean shouldBeCopula) {
+        return verb != null &&
+            (shouldBeCopula
+             ? verb.isCopular()
+             : !verb.isCopular() && !VerbHelper.isAuxiliaryVerb(verb.getPredicate(), verb.getPredicateCategory())) &&
+            !Preposition.prepositionWords.contains(verb.getPredicate());
+    }
+
+    private static final ImmutableSet<String> bannedAdverbs = ImmutableSet.of("--", "and", "or");
+
     public static ImmutableList<QuestionAnswerPair> newCoreNPArgQuestions(int sentenceId, int parseId, Parse parse) {
         final PredicateCache preds = new PredicateCache(parse);
+        final ImmutableList<String> words = parse.syntaxTree.getLeaves().stream().map(l -> l.getWord()).collect(toImmutableList());
         final ImmutableList<QuestionAnswerPair> qaPairs = IntStream
             .range(0, parse.categories.size())
             .boxed()
-            .filter(index -> parse.categories.get(index).isFunctionInto(Category.valueOf("S\\NP"))
-                    && !parse.categories.get(index).isFunctionInto(Category.valueOf("(S\\NP)|(S\\NP)")))
+            .filter(index -> parse.categories.get(index).isFunctionInto(Category.valueOf("S\\NP")) &&
+                    !parse.categories.get(index).isFunctionInto(Category.valueOf("(S\\NP)|(S\\NP)")) &&
+                    !VerbHelper.isAuxiliaryVerb(words.get(index), parse.categories.get(index)))
             .flatMap(predicateIndex -> {
                     Verb v = null;
                     try {
@@ -126,7 +138,7 @@ public class QuestionGenerator {
                         v = null;
                     }
                     return Stream.of(v)
-            .filter(verb -> verb != null && !verb.isCopular())
+            .filter(verb -> isVerbValid(verb, false))
             .flatMap(verb -> IntStream.range(1, verb.getPredicateCategory().getNumberOfArguments() + 1)
             .boxed()
             .filter(argNum -> Category.NP.matches(verb.getPredicateCategory().getArgument(argNum)))
@@ -162,16 +174,18 @@ public class QuestionGenerator {
 
     public static ImmutableList<QuestionAnswerPair> newPPObjPronounQuestions(int sentenceId, int parseId, Parse parse) {
         class QATemplate {
-            final int predicateIndex;
+            final int predicateIndex; // this is the preposition's index
             final Verb verb;
             final ResolvedDependency ppObjDep;
+            final int argNum;
             final Noun ppObj;
             final Optional<TextWithDependencies> attachedPreposition;
-            QATemplate(int predicateIndex, Verb verb, ResolvedDependency ppObjDep, Noun ppObj,
+            QATemplate(int predicateIndex, Verb verb, ResolvedDependency ppObjDep, int argNum, Noun ppObj,
                        Optional<TextWithDependencies> attachedPreposition) {
                 this.predicateIndex = predicateIndex; // index of verb or adverb, whichever
                 this.verb = verb; // sequenced; missing obj of pp if pp is present inside the verb
                 this.ppObjDep = ppObjDep;
+                this.argNum = argNum;
                 this.ppObj = ppObj;
                 this.attachedPreposition = attachedPreposition;
             }
@@ -183,9 +197,10 @@ public class QuestionGenerator {
         final Stream<QATemplate> verbTemplates = IntStream
             .range(0, parse.categories.size())
             .boxed()
-            .filter(index -> parse.categories.get(index).isFunctionInto(Category.valueOf("((S\\NP)/NP)/PP")) ||
+            .filter(index -> (parse.categories.get(index).isFunctionInto(Category.valueOf("((S\\NP)/NP)/PP")) ||
                     parse.categories.get(index).isFunctionInto(Category.valueOf("((S\\NP)/PP)/NP")) ||
-                    parse.categories.get(index).isFunctionInto(Category.valueOf("(S\\NP)/PP")))
+                    parse.categories.get(index).isFunctionInto(Category.valueOf("(S\\NP)/PP"))) &&
+                    !VerbHelper.isAuxiliaryVerb(words.get(index), parse.categories.get(index)))
             .flatMap(predicateIndex -> {
                     Verb v = null;
                     try {
@@ -195,7 +210,7 @@ public class QuestionGenerator {
                         v = null;
                     }
                     return Stream.of(v)
-            .filter(verb -> verb != null && !verb.isCopular())
+            .filter(verb -> isVerbValid(verb, false))
             .map(verb -> {
                     // after this, the PP is guaranteed to be arg 2.
                     if(parse.categories.get(predicateIndex).isFunctionInto(Category.valueOf("((S\\NP)/NP)/PP"))) {
@@ -223,14 +238,14 @@ public class QuestionGenerator {
                             }
                         });
                     Verb gappedVerbWithPronouns = PredicationUtils.withIndefinitePronouns(gappedVerb);
-                    return new QATemplate(predicateIndex, gappedVerbWithPronouns, targetDep, ppObj, Optional.empty());
+                    return new QATemplate(predicateIndex, gappedVerbWithPronouns, targetDep, 2, ppObj, Optional.empty());
                 }));});
 
         final Stream<QATemplate> adverbTemplates = IntStream
             .range(0, parse.categories.size())
             .boxed()
             .filter(index -> parse.categories.get(index).isFunctionInto(Category.valueOf("((S\\NP)\\(S\\NP))/NP")) &&
-                    !words.get(index).equalsIgnoreCase("--"))
+                    !bannedAdverbs.contains(words.get(index).toLowerCase()))
             .flatMap(predicateIndex -> {
                     Adverb adv = null;
                     try {
@@ -241,8 +256,8 @@ public class QuestionGenerator {
                     }
                     return Stream.of(adv)
             .filter(adverb -> adverb != null)
-            // .filter(adverb -> !(Prepositions.prepositionWords.contains(adverb.getPredicate()) &&
-            //                     parse.categories.get(predicateIndex).matches(Category.valueOf("(S\\NP)\\(S\\NP)"))))
+            .filter(adverb -> !(Prepositions.prepositionWords.contains(adverb.getPredicate()) &&
+                                parse.categories.get(predicateIndex).matches(Category.valueOf("(S\\NP)\\(S\\NP)"))))
             .flatMap(adverb -> adverb.getArgs().get(3).stream()
             .filter(ppObjArg -> ppObjArg.getDependency().isPresent())
             .flatMap(ppObjArg -> PredicationUtils
@@ -252,20 +267,24 @@ public class QuestionGenerator {
                                                                    : args))).stream()
             .flatMap(sequencedAdverb -> sequencedAdverb.getArgs().get(2).stream()
             .filter(verbArg -> verbArg.getDependency().isPresent())
+            .filter(verbArg -> !VerbHelper.isAuxiliaryVerb(words.get(verbArg.getDependency().get().getArgument()),
+                                                           parse.categories.get(verbArg.getDependency().get().getArgument())))
             .flatMap(verbArg -> PredicationUtils
                      .sequenceArgChoices(PredicationUtils.withIndefinitePronouns(PredicationUtils.addPlaceholderArguments(verbArg.getPredication()))).stream()
             .map(verb -> (Verb) verb)
-            .filter(verb -> !verb.isCopular())
+            .filter(verb -> isVerbValid(verb, false))
             .map(verb -> {
                     ResolvedDependency vpAttachmentDep = verbArg.getDependency().get();
                     ResolvedDependency ppObjDep = ppObjArg.getDependency().get();
                     TextWithDependencies attachedPreposition = new TextWithDependencies(sequencedAdverb.getPhrase(Category.ADVERB),
                                                                                         ImmutableSet.of(vpAttachmentDep));
                     // System.err.println("got a template: " + verb.getQuestionWords());
-                    return new QATemplate(vpAttachmentDep.getArgument(), verb, ppObjDep, (Noun) ppObjArg.getPredication(), Optional.of(attachedPreposition));
+                    // arg num of -1 since this is not an argument of the verb at all
+                    return new QATemplate(vpAttachmentDep.getArgument(), verb, ppObjDep, -1, (Noun) ppObjArg.getPredication(), Optional.of(attachedPreposition));
                 })))));});
 
         final Stream<QATemplate> templates = Stream.concat(verbTemplates, adverbTemplates);
+        // final Stream<QATemplate> templates = verbTemplates;
 
         return templates.map(template -> {
 
@@ -299,10 +318,11 @@ public class QuestionGenerator {
                 }
 
                 return new BasicQuestionAnswerPair(sentenceId, parseId, parse,
-                                            template.predicateIndex, parse.categories.get(template.predicateIndex), 2,
-                                            template.predicateIndex, null,
-                                            questionDeps, questionWords,
-                                            template.ppObjDep, answerTWD);
+                                                   template.predicateIndex, parse.categories.get(template.predicateIndex),
+                                                   template.argNum,
+                                                   template.predicateIndex, null,
+                                                   questionDeps, questionWords,
+                                                   template.ppObjDep, answerTWD);
             })
             .collect(toImmutableList());
     }
@@ -374,11 +394,13 @@ public class QuestionGenerator {
 
     public static ImmutableList<QuestionAnswerPair> newCopulaQuestions(int sentenceId, int parseId, Parse parse) {
         final PredicateCache preds = new PredicateCache(parse);
+        final ImmutableList<String> words = parse.syntaxTree.getLeaves().stream().map(l -> l.getWord()).collect(toImmutableList());
         final ImmutableList<QuestionAnswerPair> qaPairs = IntStream
             .range(0, parse.categories.size())
             .boxed()
-            .filter(index -> parse.categories.get(index).isFunctionInto(Category.valueOf("S\\NP"))
-                    && !parse.categories.get(index).isFunctionInto(Category.valueOf("(S\\NP)|(S\\NP)")))
+            .filter(index -> parse.categories.get(index).isFunctionInto(Category.valueOf("S\\NP")) &&
+                    !parse.categories.get(index).isFunctionInto(Category.valueOf("(S\\NP)|(S\\NP)")) &&
+                    VerbHelper.isCopulaVerb(words.get(index)))
             .flatMap(predicateIndex -> {
                     Verb v = null;
                     try {
@@ -388,7 +410,7 @@ public class QuestionGenerator {
                         v = null;
                     }
                     return Stream.of(v)
-            .filter(verb -> verb != null && verb.isCopular())
+            .filter(verb -> isVerbValid(verb, true))
             .flatMap(verb -> IntStream.range(1, verb.getPredicateCategory().getNumberOfArguments() + 1)
             .boxed()
             .filter(argNum -> Category.NP.matches(verb.getPredicateCategory().getArgument(argNum)))
@@ -466,7 +488,8 @@ public class QuestionGenerator {
                         v = null;
                     }
                     return Stream.of(v)
-            .filter(verb -> verb != null && !verb.isCopular() && verb.getVoice() == Verb.Voice.ACTIVE)
+            .filter(verb -> isVerbValid(verb, false))
+            .filter(verb -> verb.getVoice() == Verb.Voice.ACTIVE)
             .map(verb -> {
                     if(parse.categories.get(predicateIndex).isFunctionInto(Category.valueOf("((S\\NP)/NP)/PP"))) {
                         return verb.permuteArgs(i -> i == 2 ? 3 : (i == 3 ? 2 : i)); // swap 2 and 3
@@ -507,7 +530,8 @@ public class QuestionGenerator {
                      // .withIndefinitePronouns(PredicationUtils // this seems to just make them confusing. include the arg!
             .flatMap(sequencedAdverb -> PredicationUtils.sequenceArgChoices(PredicationUtils.addPlaceholderArguments(answerArg.getPredication())).stream()
             .map(verb -> (Verb) verb)
-            .filter(verb -> !verb.isCopular() && verb.getVoice() != Verb.Voice.ADJECTIVE)
+            .filter(verb -> isVerbValid(verb, false))
+            .filter(verb -> verb.getVoice() != Verb.Voice.ADJECTIVE)
             .flatMap(verb -> {
                     OptionalInt dirObjectArgNumOpt = IntStream.range(1, verb.getPredicateCategory().getNumberOfArguments() + 1)
                     .filter(i -> i > 1 && Category.NP.matches(verb.getPredicateCategory().getArgument(i)))
@@ -747,17 +771,17 @@ public class QuestionGenerator {
      * Run this to print all the generated QA pairs to stdout.
      */
     public static void main(String[] args) {
-        // compareCoreArgQueries();
-        // System.exit(0);
         // what kind of questions we generate
         final QuestionGenerationPipeline qgPipeline = QuestionGenerationPipeline.newCoreArgQGPipeline;
 
         final ParseData devData = getDevData();
-        if(args.length == 0 || (!args[0].equalsIgnoreCase("gold") && !args[0].equalsIgnoreCase("tricky") &&
+        if(args.length == 0 || (!args[0].equalsIgnoreCase("gold") && !args[0].equalsIgnoreCase("compare") &&
                                 !args[0].equalsIgnoreCase("queries"))) {
-            System.err.println("requires argument: \"gold\" or \"queries\"");
+            System.err.println("requires argument: \"gold\" or \"compare\" or \"queries\"");
         } else if(args[0].equalsIgnoreCase("gold")) {
             printGoldQAPairs(devData, qgPipeline);
+        } else if(args[0].equalsIgnoreCase("compare")) {
+            compareCoreArgQueries();
         } else if (args[0].equalsIgnoreCase("queries")) {
             ImmutableList<Integer> testSentences = new ImmutableList.Builder<Integer>()
                 // .add(42).add(1489).add(36)

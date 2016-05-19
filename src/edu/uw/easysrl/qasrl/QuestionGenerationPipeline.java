@@ -83,9 +83,8 @@ public abstract class QuestionGenerationPipeline {
                             final boolean isAdj = query.getQAPairSurfaceForms().stream()
                             .flatMap(sf -> sf.getQuestionStructures().stream())
                             .allMatch(qStr -> qStr.category.isFunctionInto(Category.valueOf("S[adj]")));
-                            return !Prepositions.prepositionWords.contains(words.get(predIndex).toLowerCase()) &&
-                            query.getPromptScore() > getQueryPruningParameters().minPromptConfidence &&
-                            query.getOptionEntropy() > getQueryPruningParameters().minOptionEntropy &&
+                            return query.getPromptScore() >= getQueryPruningParameters().minPromptConfidence &&
+                            query.getOptionEntropy() >= getQueryPruningParameters().minOptionEntropy &&
                             (!getQueryPruningParameters().skipSAdjQuestions || !isAdj) &&
                             (!getQueryPruningParameters().skipBinaryQueries || query.getQAPairSurfaceForms().size() > 1);
                         })
@@ -103,14 +102,14 @@ public abstract class QuestionGenerationPipeline {
                     queryPruningParameters.minPromptConfidence = 0.00;
                     queryPruningParameters.minOptionEntropy = 0.00;
                     queryPruningParameters.skipSAdjQuestions = false;
-                    queryPruningParameters.skipBinaryQueries = false;
-                    // not using the rest
+                    queryPruningParameters.skipBinaryQueries = true;
+                    // not using the rest right now
                     // queryPruningParameters.minOptionConfidence = 0.05;
                     // queryPruningParameters.maxNumOptionsPerQuery = 6;
                     // queryPruningParameters.skipPPQuestions = false;
                     // queryPruningParameters.skipQueriesWithPronounOptions = false;
                 }
-                return new QueryPruningParameters();
+                return queryPruningParameters;
             }
 
             @Override
