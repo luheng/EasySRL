@@ -68,9 +68,9 @@ public class ReparsingExperiment {
         reparsingParameters.negativeConstraintMaxAgreement = 1;
         reparsingParameters.skipPronounEvidence = false;
         reparsingParameters.jeopardyQuestionWeight = 1.0;
-        reparsingParameters.oraclePenaltyWeight = 2.0;
-        reparsingParameters.attachmentPenaltyWeight = 2.0;
-        reparsingParameters.supertagPenaltyWeight = 2.0;
+        reparsingParameters.oraclePenaltyWeight = 5.0;
+        reparsingParameters.attachmentPenaltyWeight = 5.0;
+        reparsingParameters.supertagPenaltyWeight = 5.0;
     }
 
     public static void main(String[] args) {
