@@ -34,10 +34,11 @@ public class QuestionStructure {
         this.predicateIndex = predId;
         this.category = category;
         this.targetArgNum = argNum;
-        final boolean isPPArg = category.getArgument(argNum) == Category.PP;
+        final boolean isAdverbArg = targetArgNum == -1;
+        final boolean isPPArg = !isAdverbArg && category.getArgument(targetArgNum) == Category.PP;
         this.otherDependencies = otherDeps.stream()
                 .filter(dep -> dep.getHead() == predId)
-                .filter(dep -> isPPArg || dep.getArgNumber() != argNum)
+                .filter(dep -> isAdverbArg || isPPArg || dep.getArgNumber() != argNum)
                 .collect(Collectors.groupingBy(ResolvedDependency::getArgNumber))
                 .entrySet().stream()
                 .collect(GuavaCollectors.toImmutableMap(
@@ -46,8 +47,13 @@ public class QuestionStructure {
                                 .map(ResolvedDependency::getArgumentIndex)
                                 .distinct().sorted()
                                 .collect(GuavaCollectors.toImmutableList())));
-        targetPrepositionIndex = isPPArg && otherDependencies.containsKey(targetArgNum) ?
-                otherDependencies.get(targetArgNum).get(0) : -1;
+        if(isAdverbArg) {
+            targetPrepositionIndex = otherDependencies.get(2).get(0);
+        } else if(isPPArg && otherDependencies.containsKey(targetArgNum)) {
+            targetPrepositionIndex = otherDependencies.get(targetArgNum).get(0);
+        } else {
+            targetPrepositionIndex = -1;
+        }
         hashString = predicateIndex + "\t" + category + "\t" + targetArgNum + "\t("
                         + otherDependencies.entrySet().stream()
                             .sorted(Comparator.comparing(Map.Entry::getKey))
@@ -65,10 +71,11 @@ public class QuestionStructure {
         this.predicateIndex = qa.getPredicateIndex();
         this.category = qa.getPredicateCategory();
         this.targetArgNum = qa.getArgumentNumber();
-        final boolean isPPArg = category.getArgument(targetArgNum) == Category.PP;
+        final boolean isAdverbArg = targetArgNum == -1;
+        final boolean isPPArg = !isAdverbArg && category.getArgument(targetArgNum) == Category.PP;
         this.otherDependencies = qaList.get(0).getQuestionDependencies().stream()
                 .filter(dep -> dep.getHead() == predicateIndex)
-                .filter(dep -> isPPArg || dep.getArgNumber() != targetArgNum)
+                .filter(dep -> isAdverbArg || isPPArg || dep.getArgNumber() != targetArgNum)
                 .collect(Collectors.groupingBy(ResolvedDependency::getArgNumber))
                 .entrySet().stream()
                 .collect(GuavaCollectors.toImmutableMap(
@@ -77,8 +84,13 @@ public class QuestionStructure {
                                 .map(ResolvedDependency::getArgumentIndex)
                                 .distinct().sorted()
                                 .collect(GuavaCollectors.toImmutableList())));
-        targetPrepositionIndex = isPPArg && otherDependencies.containsKey(targetArgNum) ?
-                otherDependencies.get(targetArgNum).get(0) : -1;
+        if(isAdverbArg) {
+            targetPrepositionIndex = qa.getTargetDependency().getHead();
+        } else if(isPPArg && otherDependencies.containsKey(targetArgNum)) {
+            targetPrepositionIndex = otherDependencies.get(targetArgNum).get(0);
+        } else {
+            targetPrepositionIndex = -1;
+        }
         hashString = predicateIndex + "\t" + category + "\t" + targetArgNum + "\t("
                 + otherDependencies.entrySet().stream()
                 .sorted(Comparator.comparing(Map.Entry::getKey))
