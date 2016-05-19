@@ -73,7 +73,11 @@ public final class ParseData {
         return loadFromPropBank(false);
     }
 
+    private static Optional<ParseData> devData = null;
     private static Optional<ParseData> loadFromPropBank(boolean readDev) {
+        if(readDev && devData != null) {
+            return devData;
+        }
         List<List<InputReader.InputWord>> sentenceInputWords = new ArrayList<>();
         List<Parse> goldParses = new ArrayList<>();
         Iterator<Sentence> sentenceIterator;
@@ -81,7 +85,8 @@ public final class ParseData {
             sentenceIterator = ParallelCorpusReader.READER.readCcgCorpus(readDev);
         } catch (IOException e) {
             System.out.println(String.format("Failed to read %d sentences.", sentenceInputWords.size()));
-            return Optional.empty();
+            devData = Optional.empty();
+            return devData;
         }
         while (sentenceIterator.hasNext()) {
             Sentence sentence = sentenceIterator.next();
@@ -91,7 +96,11 @@ public final class ParseData {
             goldParses.add(new Parse(sentence.getCcgbankParse(), sentence.getLexicalCategories(), goldDependencies));
         }
         System.out.println(String.format("Read %d sentences.", sentenceInputWords.size()));
-        return Optional.of(makeParseData(sentenceInputWords, goldParses));
+        Optional<ParseData> data = Optional.of(makeParseData(sentenceInputWords, goldParses));
+        if(readDev) {
+            devData = data;
+        }
+        return data;
     }
 
     private ParseData(ImmutableList<ImmutableList<InputReader.InputWord>> sentenceInputWords,

@@ -8,6 +8,7 @@ import edu.uw.easysrl.qasrl.annotation.AnnotationUtils;
 import edu.uw.easysrl.qasrl.annotation.CrowdFlowerDataUtils;
 import edu.uw.easysrl.qasrl.evaluation.Accuracy;
 import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
+import edu.uw.easysrl.qasrl.evaluation.TicToc;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils.*;
 import edu.uw.easysrl.qasrl.model.Constraint;
 import edu.uw.easysrl.qasrl.model.HITLParser;
@@ -18,9 +19,11 @@ import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.util.Prepositions;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
+import edu.uw.easysrl.qasrl.ui.Colors;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.parser.ParserAStar;
 import edu.uw.easysrl.util.GuavaCollectors;
+import scala.tools.nsc.doc.base.comment.Title;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -38,8 +41,8 @@ public class ReparsingExperiment {
     private static Map<Integer, List<AlignedAnnotation>> annotations;
 
     private static final String[] annotationFiles = {
-          //  "./Crowdflower_data/f878213.csv",                // Round1: radio-button, core + pp
-          //  "./Crowdflower_data/f882410.csv",                // Round2: radio-button, core only
+            "./Crowdflower_data/f878213.csv",                // Round1: radio-button, core + pp
+            "./Crowdflower_data/f882410.csv",                // Round2: radio-button, core only
           //  "./Crowdflower_data/all-checkbox-responses.csv", // Round3: checkbox, core + pp
           //  "./Crowdflower_data/f891522.csv",                // Round4: jeopardy checkbox, pp only
             "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
@@ -68,7 +71,7 @@ public class ReparsingExperiment {
         reparsingParameters.negativeConstraintMaxAgreement = 1;
         reparsingParameters.skipPronounEvidence = false;
         reparsingParameters.jeopardyQuestionWeight = 1.0;
-        reparsingParameters.oraclePenaltyWeight = 2.0;
+        reparsingParameters.oraclePenaltyWeight = 5.0;
         reparsingParameters.attachmentPenaltyWeight = 2.0;
         reparsingParameters.supertagPenaltyWeight = 2.0;
     }
@@ -84,11 +87,12 @@ public class ReparsingExperiment {
     }
 
     private static void runExperiment() {
-        final Collection<Integer> round1And2Ids = CrowdFlowerDataUtils.getRound1And2SentenceIds();
-        List<Integer> sentenceIds = // annotations.keySet().stream().sorted().collect(Collectors.toList());
-                myHTILParser.getAllSentenceIds().stream()
+        // final Collection<Integer> round1And2Ids = CrowdFlowerDataUtils.getRound1And2SentenceIds();
+        List<Integer> sentenceIds = myHTILParser.getAllSentenceIds();
+                //annotations.keySet().stream().sorted().collect(Collectors.toList());
+                /*myHTILParser.getAllSentenceIds().stream()
                         .filter(id -> !round1And2Ids.contains(id))
-                        .collect(Collectors.toList());
+                        .collect(Collectors.toList());*/
         System.out.println(sentenceIds.stream().map(String::valueOf).collect(Collectors.joining(", ")));
         System.out.println("Queried " + sentenceIds.size() + " sentences. Total number of questions:\t" +
             annotations.entrySet().stream().mapToInt(e -> e.getValue().size()).sum());
@@ -119,17 +123,26 @@ public class ReparsingExperiment {
                 avgUnlabeledReranked = new Results(),
                 avgUnlabeledReparsed = new Results();
 
-        BaseCcgParser baseParser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, 1);
+        BaseCcgParser baseParser = null; // new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, 1);
 
+        int counter = 0;
+        TicToc.tic();
         for (int sentenceId : sentenceIds) {
             myHistory.addSentence(sentenceId);
-            System.out.println(sentenceId);
+            if (++counter % 100 == 0) {
+                System.out.println(String.format("Processed %d sentences ... in %d seconds", counter, TicToc.toc()));
+                TicToc.tic();
+            }
 
             final ImmutableList<String> sentence = myHTILParser.getSentence(sentenceId);
             final NBestList nBestList = myHTILParser.getNBestList(sentenceId);
             final int numParses = nBestList.getN();
             final Parse goldParse = myHTILParser.getGoldParse(sentenceId);
-            final Parse baselineParse = baseParser.parse(sentenceId, myHTILParser.getInputSentence(sentenceId));
+            final Parse baselineParse = baseParser == null ?
+                    myHTILParser.getParse(sentenceId, 0) :
+                    baseParser.parse(sentenceId, myHTILParser.getInputSentence(sentenceId));
+            Parse reparse = baselineParse, oracleReparse = baselineParse;
+
             final Results baselineF1 = CcgEvaluation.evaluate(baselineParse.dependencies, goldParse.dependencies);
             final Results unlabeledBaselineF1 = CcgEvaluation.evaluateUnlabeled(baselineParse.dependencies,
                     goldParse.dependencies);
@@ -144,9 +157,16 @@ public class ReparsingExperiment {
                 avgUnlabeledReparsed.add(unlabeledBaselineF1);
                 continue;
             }
+            boolean isCheckboxStyle = !annotated.stream()
+                    .anyMatch(annot -> annot.answerOptions.stream()
+                            .anyMatch(op -> op.contains(QAPairAggregatorUtils.answerDelimiter)));
 
             List<ScoredQuery<QAStructureSurfaceForm>> queryList = new ArrayList<>();
-            queryList.addAll(myHTILParser.getPronounCoreArgQueriesForSentence(sentenceId));
+            if (!isCheckboxStyle) {
+                queryList.addAll(myHTILParser.getCoreArgumentQueriesForSentence(sentenceId, false /* radiobutton version*/));
+            } else {
+                queryList.addAll(myHTILParser.getPronounCoreArgQueriesForSentence(sentenceId));
+            }
             queryList.addAll(myHTILParser.getCleftedQuestionsForSentence(sentenceId));
 
             Results currentF1 = baselineF1,
@@ -163,7 +183,14 @@ public class ReparsingExperiment {
 
             for (ScoredQuery<QAStructureSurfaceForm> query : queryList) {
                 AlignedAnnotation annotation = ExperimentUtils.getAlignedAnnotation(query, annotations.get(sentenceId));
+                ImmutableList<Integer> goldOptions    = myHTILParser.getGoldOptions(query),
+                                       oneBestOptions = myHTILParser.getOneBestOptions(query),
+                                       oracleOptions  = myHTILParser.getOracleOptions(query);
                 if (annotation == null) {
+                    /*
+                    System.out.println(Colors.ANSI_GREEN + "======New question======\n"
+                            + query.toString(sentence, 'G', goldOptions, 'B', oneBestOptions, 'O', oracleOptions)
+                            + "\n" + Colors.ANSI_RESET); */
                     continue;
                 }
                 int[] optionDist = AnnotationUtils.getUserResponseDistribution(query, annotation);
@@ -172,10 +199,7 @@ public class ReparsingExperiment {
                 int[] newOptionDist = new int[optionDist.length];
                 newResponses.stream().forEach(resp -> resp.stream().forEach(op -> newOptionDist[op]++));
 
-                ImmutableList<Integer> goldOptions    = myHTILParser.getGoldOptions(query),
-                                       oneBestOptions = myHTILParser.getOneBestOptions(query),
-                                       oracleOptions  = myHTILParser.getOracleOptions(query),
-                                       userOptions    = myHTILParser.getUserOptions(query, annotation),
+                ImmutableList<Integer> userOptions    = myHTILParser.getUserOptions(query, annotation),
                                        userOptions2   = myHTILParser.getUserOptions(query, newOptionDist);
 
                 // Update stats.
@@ -211,8 +235,12 @@ public class ReparsingExperiment {
                 allOracleConstraints.addAll(oracleConstraints);
 
                 int rerankedId = myHTILParser.getRerankedParseId(sentenceId, allConstraints);
-                Parse reparse = myHTILParser.getReparsed(sentenceId, allConstraints),
-                      oracleReparse = myHTILParser.getReparsed(sentenceId, allOracleConstraints);
+                if (constraints.size() > 0) {
+                    // Reparse only when there're new constraints.
+                    reparse = myHTILParser.getReparsed(sentenceId, allConstraints);
+                }
+                oracleReparse = myHTILParser.getNBestList(sentenceId)
+                        .getParse(myHTILParser.getRerankedParseId(sentenceId, allOracleConstraints));
                 rerankedF1 = nBestList.getResults(rerankedId);
                 unlabeledRerankedF1 = CcgEvaluation.evaluateUnlabeled(nBestList.getParse(rerankedId).dependencies,
                                                                       goldParse.dependencies);

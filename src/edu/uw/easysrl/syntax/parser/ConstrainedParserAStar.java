@@ -243,13 +243,15 @@ public class ConstrainedParserAStar extends AbstractParser {
 
         @Override
         public ConstrainedParserAStar build() {
+            /*
             try {
-                final Tagger tagger = Tagger.make(modelFolder, super.getSupertaggerBeam(), 50, super.getCutoffs());
+                final Tagger tagger = Tagger.make(super.getModelFolder(), super.getSupertaggerBeam(), 50, super.getCutoffs());
                 modelFactory = new ConstrainedParsingModel.ConstrainedParsingModelFactory(tagger, super.getLexicalCategories());
-                return build2();
             } catch (final IOException e) {
                 throw new UncheckedIOException(e);
-            }
+            }*/
+            modelFactory = new ConstrainedParsingModel.ConstrainedParsingModelFactory(null, super.getLexicalCategories());
+            return build2();
         }
 
         @Override

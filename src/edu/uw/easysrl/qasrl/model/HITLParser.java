@@ -67,11 +67,12 @@ public class HITLParser {
         goldParses = parseData.getGoldParses();
         System.out.println(String.format("Read %d sentences from the dev set.", sentences.size()));
 
-        String preparsedFile = getTestSet ? "parses.test.100best.out" : "parses.100best.out";
+        String preparsedFile = getTestSet ? "parses.test.100best.out" : "parses.dev.100best.out";
         nbestLists = NBestList.loadNBestListsFromFile(preparsedFile, nBest).get();
         System.out.println(String.format("Load pre-parsed %d-best lists for %d sentences.", nBest, nbestLists.size()));
 
         reparser = new BaseCcgParser.ConstrainedCcgParser(BaseCcgParser.modelFolder, 1 /* nbest */);
+        reparser.cacheSupertags(parseData);
         goldSimulator = new ResponseSimulatorGold(parseData);
 
         // Cache results.
@@ -155,6 +156,10 @@ public class HITLParser {
         final QueryPruningParameters queryPruningParams = new QueryPruningParameters(queryPruningParameters);
         queryPruningParams.skipPPQuestions = true;
         final ImmutableList<String> sentence = sentences.get(sentenceId);
+
+        if(nbestLists.get(sentenceId) == null) {
+            return ImmutableList.of();
+        }
 
         ImmutableList<ScoredQuery<QAStructureSurfaceForm>> copulaQueries = ExperimentUtils.generateAllQueries(
                     sentenceId, sentence, nbestLists.get(sentenceId),
@@ -264,7 +269,7 @@ public class HITLParser {
         if (constraintSet == null || constraintSet.isEmpty()) {
             return nbestLists.get(sentenceId).getParse(0);
         }
-        final Parse reparsed = reparser.parseWithConstraint(inputSentences.get(sentenceId), constraintSet);
+        final Parse reparsed = reparser.parseWithConstraint(sentenceId, inputSentences.get(sentenceId), constraintSet);
         if (reparsed == null) {
             System.err.println(String.format("Unable to parse sentence %d with constraints: %s", sentenceId,
                     constraintSet.stream()

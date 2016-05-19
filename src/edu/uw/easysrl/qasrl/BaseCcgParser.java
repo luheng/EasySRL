@@ -1,5 +1,6 @@
 package edu.uw.easysrl.qasrl;
 
+import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.dependencies.*;
 import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.model.Constraint;
@@ -9,6 +10,8 @@ import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.Preposition;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.syntax.parser.*;
+import edu.uw.easysrl.syntax.tagger.Tagger;
+import edu.uw.easysrl.util.GuavaCollectors;
 import edu.uw.easysrl.util.Util;
 import edu.uw.easysrl.util.Util.Scored;
 
@@ -92,7 +95,7 @@ public abstract class BaseCcgParser {
                     .maxChartSize(maxChartSize)
                     .maximumSentenceLength(maxSentenceLength)
                     .nBest(nBest)
-                    .nBestBeam(nbestBeam)
+                    .nbestBeam(nbestBeam)
                     .build();
             try {
                 dependencyGenerator = new DependencyGenerator(modelFolder);
@@ -126,6 +129,8 @@ public abstract class BaseCcgParser {
     public static class ConstrainedCcgParser extends BaseCcgParser {
         private DependencyGenerator dependencyGenerator;
         private ConstrainedParserAStar parser;
+        private Tagger batchTagger = null;
+        private ImmutableList<List<List<Tagger.ScoredCategory>>> taggedSentences = null;
         private final double supertaggerBeam = 0.000001;
         private final int maxChartSize = 1000000;
         private final int maxSentenceLength = 70;
@@ -148,37 +153,68 @@ public abstract class BaseCcgParser {
                 System.err.println("Parser initialization failed.");
                 e.printStackTrace();
             }
+
+            try {
+                batchTagger = Tagger.make(modelFolder, supertaggerBeam, 50, null);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
 
+        public void cacheSupertags(ParseData corpus) {
+            if (batchTagger != null) {
+                System.err.println("Batch tagging " + corpus.getSentences().size() + " sentences ...");
+                taggedSentences = batchTagger.tagBatch(corpus.getSentenceInputWords().parallelStream()
+                        .map(s -> s.stream().collect(Collectors.toList())))
+                        .collect(GuavaCollectors.toImmutableList());
+            }
+        }
+
+        // TODO: change this.
         @Override
         public Parse parse(List<InputReader.InputWord> sentence) {
-            return parseWithConstraint(sentence, new HashSet<>());
+            return null;
         }
 
         @Override
         public List<Parse> parseNBest(List<InputReader.InputWord> sentence) {
-            return parseNBestWithConstraint(sentence, new HashSet<>());
+            return null;
         }
 
-        public Parse parseWithConstraint(List<InputReader.InputWord> sentence, Set<Constraint> constraintSet) {
+        @Override
+        public Parse parse(int sentenceId, List<InputReader.InputWord> sentence) {
+            return parseWithConstraint(sentenceId, sentence, new HashSet<>());
+        }
+
+        @Override
+        public List<Parse> parseNBest(int sentenceId, List<InputReader.InputWord> sentence) {
+            return parseNBestWithConstraint(sentenceId, sentence, new HashSet<>());
+        }
+
+        public Parse parseWithConstraint(int sentenceId, List<InputReader.InputWord> sentence,
+                                         Set<Constraint> constraintSet) {
             if (sentence.size() > maxSentenceLength) {
                 System.err.println("Skipping sentence of length " + sentence.size());
                 return null;
             }
-            List<Scored<SyntaxTreeNode>> parses = parser.parseWithConstraints(
-                    new InputReader.InputToParser(sentence, null, null, false), constraintSet);
+            final InputReader.InputToParser input = taggedSentences == null ?
+                    new InputReader.InputToParser(sentence, null, null, false) :
+                    new InputReader.InputToParser(sentence, null, taggedSentences.get(sentenceId), true);
+            List<Scored<SyntaxTreeNode>> parses = parser.parseWithConstraints(input, constraintSet);
             return (parses == null || parses.size() == 0) ? null :
                     getParse(sentence, parses.get(0), dependencyGenerator);
         }
 
-        public List<Parse> parseNBestWithConstraint(List<InputReader.InputWord> sentence,
+        public List<Parse> parseNBestWithConstraint(int sentenceId, List<InputReader.InputWord> sentence,
                                                     Set<Constraint> constraintSet) {
             if (sentence.size() > maxSentenceLength) {
                 System.err.println("Skipping sentence of length " + sentence.size());
                 return null;
             }
-            List<Scored<SyntaxTreeNode>> parses = parser.parseWithConstraints(
-                    new InputReader.InputToParser(sentence, null, null, false), constraintSet);
+            final InputReader.InputToParser input = taggedSentences == null ?
+                    new InputReader.InputToParser(sentence, null, null, false) :
+                    new InputReader.InputToParser(sentence, null, taggedSentences.get(sentenceId), true);
+            List<Scored<SyntaxTreeNode>> parses = parser.parseWithConstraints(input, constraintSet);
             return (parses == null || parses.size() == 0) ? null :
                     parses.stream().map(p -> getParse(sentence, p, dependencyGenerator)).collect(Collectors.toList());
 

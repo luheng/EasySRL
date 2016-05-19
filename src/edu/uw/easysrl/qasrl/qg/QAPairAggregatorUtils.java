@@ -67,6 +67,14 @@ public class QAPairAggregatorUtils {
                 .collect(Collectors.joining("\t"));
     }
 
+    // strings will be equivalent for dependency sets that are equivalent by directed unlabeled matching.
+    static String getStringForDependencySetUniqueUnlabeled(final ImmutableSet<ResolvedDependency> deps) {
+        return deps.stream()
+            .map(dep -> dep.getHead() + "->" + dep.getArgument())
+            .sorted()
+            .collect(Collectors.joining("\t"));
+    }
+
     static QAStructureSurfaceForm getQAStructureSurfaceForm(final List<QuestionSurfaceFormToStructure> qs2sEntries,
                                                             final List<AnswerSurfaceFormToStructure> as2sEntries) {
         final ImmutableList<QuestionAnswerPair> qaPairs = as2sEntries.stream()
@@ -204,6 +212,18 @@ public class QAPairAggregatorUtils {
         */
     }
 
+    // we want dependencies from the verb, from PP attached to the verb, or to the verb.
+    // assumes the head of the target dependency is a verb.
+    public static boolean isAnswerVPAttachmentDependency(ResolvedDependency dep, QuestionAnswerPair qaPair) {
+        int verbIndex = qaPair.getTargetDependency().getHead();
+        return dep.getHead() == verbIndex ||
+        (dep.getCategory().isFunctionInto(Category.valueOf("(S\\NP)\\(S\\NP)")) &&
+         qaPair.getParse().dependencies.stream().anyMatch(d -> d.getHead() == dep.getHead() && d.getArgument() == verbIndex)) ||
+        (dep.getCategory().isFunctionInto(Category.valueOf("PP")) &&
+         qaPair.getParse().dependencies.stream().anyMatch(d -> d.getHead() == verbIndex && d.getArgument() == dep.getHead()));
+    }
+
+
     /**
      * Tells us whether we want to group based on a dependency.
      */
@@ -226,7 +246,7 @@ public class QAPairAggregatorUtils {
         // (Category.valueOf("(NP\\NP)/NP").matches(cat) && dep.getArgNumber() == 1 && !words.get(index).equalsIgnoreCase("of"));
     }
 
-    private static List<QuestionAnswerPair> getQAListWithBestQuestionSurfaceForm(Collection<QuestionAnswerPair> qaList) {
+    static List<QuestionAnswerPair> getQAListWithBestQuestionSurfaceForm(Collection<QuestionAnswerPair> qaList) {
         return qaList.stream()
                 .collect(groupingBy(QuestionAnswerPair::getQuestion))
                 .entrySet().stream()
@@ -234,7 +254,7 @@ public class QAPairAggregatorUtils {
                 .get().getValue();
     }
 
-    private static List<QuestionAnswerPair> getQAListWithBestAnswerSurfaceForm(Collection<QuestionAnswerPair> qaList) {
+    static List<QuestionAnswerPair> getQAListWithBestAnswerSurfaceForm(Collection<QuestionAnswerPair> qaList) {
         return qaList.stream()
                 .collect(groupingBy(QuestionAnswerPair::getAnswer))
                 .entrySet().stream()
