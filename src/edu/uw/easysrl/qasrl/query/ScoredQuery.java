@@ -2,8 +2,9 @@ package edu.uw.easysrl.qasrl.query;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import edu.uw.easysrl.qasrl.experiments.DebugPrinter;
+import edu.uw.easysrl.qasrl.TextGenerationHelper;
 import edu.uw.easysrl.qasrl.NBestList;
+import edu.uw.easysrl.qasrl.experiments.DebugPrinter;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.GuavaCollectors;
@@ -171,7 +172,7 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
      * @return
      */
     public String toString(final ImmutableList<String> sentence, Object ... optionLegends) {
-        String result = String.format("SID=%d\t%s\n", sentenceId, sentence.stream().collect(Collectors.joining(" ")));
+        String result = String.format("SID=%d\t%s\n", sentenceId, TextGenerationHelper.renderString(sentence) + ".");
 
         // Prompt structure.
         String promptStructStr = isJeopardyStyle() ?

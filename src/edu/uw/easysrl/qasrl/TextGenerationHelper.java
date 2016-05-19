@@ -7,9 +7,14 @@ import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeLeaf;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeBinary;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.function.Predicate;
+
 import static java.util.stream.Collectors.*;
 import static edu.uw.easysrl.util.GuavaCollectors.*;
 
@@ -24,9 +29,6 @@ public class TextGenerationHelper {
 
     private static final boolean useShorterNPs = false;
 
-    // here is the punctuation we want to avoid spaces before,
-    // and that we don't want at the end of the queryPrompt or answer.
-    // For now, those are the same.
     // Reference: https://www.cis.upenn.edu/~treebank/tokenization.html
     private static final String trimPunctuation = " ,.:;!?-";
     private static final String vowels = "aeiou";
@@ -60,26 +62,16 @@ public class TextGenerationHelper {
         noSpaceAfter.add("{");
     }
 
-    // the result here is ALL POSSIBLE EXPANSIONS
-    public static List<String> expandContraction(String contraction) {
-        List<String> res = new LinkedList<>();
-        if(contraction.equals("'s")) {
-            res.add("has"); res.add("is");
-        } else if(contraction.equals("'ve")) {
-            res.add("have");
-        } else if(contraction.equals("n't")) {
-            res.add("not");
-        } else if(contraction.equals("'re")) {
-            res.add("are");
-        } else if(contraction.equals("'ll")) {
-            res.add("will");
-        } else if(contraction.equals("'m")) {
-            res.add("am");
-        } else if(contraction.equals("'d")) {
-            res.add("would"); res.add("had");
-        }
-        return res;
-    }
+    // the result here is all possible expansions
+    public static final ImmutableMap<String, ImmutableList<String>> contractionExpansions = new ImmutableMap.Builder<String, ImmutableList<String>>()
+        .put("'s", ImmutableList.of("has", "is"))
+        .put("'ve", ImmutableList.of("have"))
+        .put("n't", ImmutableList.of("not"))
+        .put("'re", ImmutableList.of("are"))
+        .put("'ll", ImmutableList.of("will"))
+        .put("'m", ImmutableList.of("am"))
+        .put("'d", ImmutableList.of("would", "had"))
+        .build();
 
     public static boolean startsWithVowel(String word) {
         if(word.length() == 0) return false;
@@ -254,17 +246,50 @@ public class TextGenerationHelper {
         return lastCandidate;
     }
 
+    public static Optional<SyntaxTreeNode> getLowestAncestorOfNodes(SyntaxTreeNode one, SyntaxTreeNode two, SyntaxTreeNode wholeTree) {
+        final int start = Math.min(one.getStartIndex(), two.getStartIndex());
+        final int end = Math.max(one.getEndIndex(), two.getEndIndex());
+        Optional<SyntaxTreeNode> cur = Optional.of(one);
+        while(cur.isPresent() && (cur.get().getStartIndex() > start || cur.get().getEndIndex() < end)) {
+            cur = getParent(cur.get(), wholeTree);
+        }
+        return cur;
+    }
+
     /**
      * Climbs up the tree, starting at the given node,
      * until we reach a node whose category is a function into (i.e., ends on the left with)
      * the given category. If none is found before getting to the root, returns empty.
      */
+    // XXX replace body with call to utility method below
     public static Optional<SyntaxTreeNode> getLowestAncestorFunctionIntoCategory(SyntaxTreeNode node, Category category, SyntaxTreeNode wholeTree) {
         Optional<SyntaxTreeNode> curNode = Optional.of(node);
         Optional<Category> curCat = curNode.map(SyntaxTreeNode::getCategory);
         while(curNode.isPresent() && !curCat.get().isFunctionInto(category)) {
             curNode = getParent(curNode.get(), wholeTree);
             curCat = curNode.map(SyntaxTreeNode::getCategory);
+        }
+        return curNode;
+    }
+
+    public static Optional<SyntaxTreeNode> getHighestAncestorStillSatisfyingPredicate(SyntaxTreeNode node, Predicate<SyntaxTreeNode> pred, SyntaxTreeNode wholeTree) {
+        if(!pred.test(node)) {
+            return Optional.empty();
+        } else {
+            SyntaxTreeNode curNode = node;
+            Optional<SyntaxTreeNode> nextNode = getParent(curNode, wholeTree);
+            while(nextNode.isPresent() && pred.test(nextNode.get())) {
+                curNode = nextNode.get();
+                nextNode = getParent(curNode, wholeTree);
+            }
+            return Optional.of(curNode);
+        }
+    }
+
+    public static Optional<SyntaxTreeNode> getLowestAncestorSatisfyingPredicate(SyntaxTreeNode node, Predicate<SyntaxTreeNode> pred, SyntaxTreeNode wholeTree) {
+        Optional<SyntaxTreeNode> curNode = Optional.of(node);
+        while(curNode.isPresent() && !pred.test(curNode.get())) {
+            curNode = getParent(curNode.get(), wholeTree);
         }
         return curNode;
     }
@@ -292,6 +317,10 @@ public class TextGenerationHelper {
             words.add("were");
             words.add("the");
             words.add("case");
+        } else if(category.matches(Category.valueOf("S[dcl]/NP"))) {
+            words.add("would");
+            words.add("do");
+            words.add("something");
         } else {
             System.err.println("need unrealized phrase for category " + category);
         }
@@ -510,6 +539,10 @@ public class TextGenerationHelper {
 
     }
 
+    public static List<String> getNodeWords(SyntaxTreeNode node) {
+        return getNodeWords(node, Optional.empty(), Optional.empty());
+    }
+
     // helper method to make sure we decapitalize the first letter of the sentence
     // and replace a word if necessary.
     public static List<String> getNodeWords(SyntaxTreeNode node, Optional<Integer> replaceIndexOpt, Optional<String> replacementWord) {
@@ -545,17 +578,13 @@ public class TextGenerationHelper {
     /**
      * Gets all of the dependencies that start and end inside the syntax tree rooted at the given node
      */
-    private static Set<ResolvedDependency> getContainedDependencies(SyntaxTreeNode node, Parse parse) {
-        final Set<ResolvedDependency> deps = new HashSet<>();
+    public static ImmutableSet<ResolvedDependency> getContainedDependencies(SyntaxTreeNode node, Parse parse) {
         final int minIndex = node.getStartIndex();
         final int maxIndex = node.getEndIndex();
-        for (ResolvedDependency dep : parse.dependencies) {
-            if (dep.getHead() >= minIndex && dep.getHead() < maxIndex &&
-                dep.getArgument() >= minIndex && dep.getArgument() < maxIndex) {
-                deps.add(dep);
-            }
-        }
-        return deps;
+        return parse.dependencies.stream()
+            .filter(dep -> dep.getHead() >= minIndex && dep.getHead() < maxIndex &&
+                    dep.getArgument() >= minIndex && dep.getArgument() <= maxIndex)
+            .collect(toImmutableSet());
     }
 
     public static List<Map<Integer, Optional<ResolvedDependency>>>
@@ -632,6 +661,12 @@ public class TextGenerationHelper {
             pastPaths = currentPaths;
         }
         return pastPaths;
+    }
+
+    public static String dependencyString(ImmutableList<String> words, ResolvedDependency dep) {
+        return words.get(dep.getHead()) + "\t-"
+            + dep.getArgNumber() + "->\t"
+            + words.get(dep.getArgument());
     }
 
     /**

@@ -4,11 +4,15 @@ import com.google.common.collect.*;
 import edu.uw.easysrl.qasrl.qg.surfaceform.*;
 
 import static edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils.*;
+import edu.uw.easysrl.qasrl.qg.syntax.AnswerStructure;
+import edu.uw.easysrl.dependencies.ResolvedDependency;
+import edu.uw.easysrl.syntax.grammar.Category;
 
 import static edu.uw.easysrl.util.GuavaCollectors.*;
 import static java.util.stream.Collectors.*;
 
 import java.util.*;
+import java.util.function.BiFunction;
 
 /**
  * Helper class where we put all of our useful QAPairAggregator instances
@@ -99,6 +103,43 @@ public final class QAPairAggregators {
                                     .map(as2sEntries -> getQAStructureSurfaceForm(qs2sEntries, as2sEntries));
                         })
                 ).collect(toImmutableList());
+    }
+
+    // ONLY FOR USE with the new VP attachment QA pairs!
+    public static QAPairAggregator<QAStructureSurfaceForm> aggregateWithAnswerAdverbAndPPArgDependencies() {
+        return qaPairs ->  qaPairs
+            .stream()
+            .collect(groupingBy(QuestionAnswerPair::getTargetDependency))
+            .values().stream()
+            .map(QAPairAggregatorUtils::getQuestionSurfaceFormToStructure)
+            .collect(groupingBy(qs2s -> qs2s.question))
+            .values().stream()
+            .flatMap(qs2sEntries -> {
+                    final ImmutableList<QuestionAnswerPair> questionQAPairs = qs2sEntries.stream()
+                        .flatMap(qs -> qs.qaList.stream())
+                        .collect(toImmutableList());
+                    return questionQAPairs.stream()
+                        .collect(groupingBy(qaPair -> {
+                                    final ImmutableSet<ResolvedDependency> relevantAnswerDeps = qaPair.getAnswerDependencies().stream()
+                                        .filter(dep -> isAnswerVPAttachmentDependency(dep, qaPair))
+                                        .collect(toImmutableSet());
+                                    return getStringForDependencySetUniqueUnlabeled(relevantAnswerDeps);
+                                }))
+            .values().stream()
+            .map(qaList -> {
+                    final QuestionAnswerPair qa = qaList.get(0);
+                    final ImmutableSet<ResolvedDependency> relevantAnswerDeps = qa.getAnswerDependencies().stream()
+                        .filter(dep -> isAnswerVPAttachmentDependency(dep, qa))
+                        .collect(toImmutableSet());
+                    final int answerHead = qa.getTargetDependency().getHead(); // here the answer head is the verb
+                    return new AnswerSurfaceFormToStructure(getQAListWithBestAnswerSurfaceForm(qaList).get(0).getAnswer(),
+                                                            new AnswerStructure(ImmutableList.of(answerHead), relevantAnswerDeps, true),
+                                                            qaList);
+                })
+            .collect(groupingBy(as2s -> as2s.answer))
+            .values().stream()
+            .map(as2sEntries -> getQAStructureSurfaceForm(qs2sEntries, as2sEntries));})
+        .collect(toImmutableList());
     }
 
     /**

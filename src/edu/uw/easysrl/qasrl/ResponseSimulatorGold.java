@@ -26,7 +26,7 @@ import java.util.stream.IntStream;
  * knowledge of gold dependencies.
  * Created by luheng on 1/5/16.
  */
-public class ResponseSimulatorGold {
+public class ResponseSimulatorGold implements ResponseSimulator {
     private final ParseData parseData;
 
     public ResponseSimulatorGold(ParseData parseData) {
