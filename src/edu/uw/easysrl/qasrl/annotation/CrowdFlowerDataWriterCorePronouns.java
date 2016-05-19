@@ -30,21 +30,29 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class CrowdFlowerDataWriterCorePronouns {
 
     static final int nBest = 100;
-    static final int maxNumQueriesPerFile = 100;
-    static final int numSentences = 500;
+    static final int maxNumQueriesPerFile = 200;
+    static final int numSentences = 2000;
     static final int randomSeed = 12345;
 
     private final static HITLParser hitlParser = new HITLParser(nBest);
     private final static ReparsingHistory history = new ReparsingHistory(hitlParser);
 
     private static final String csvOutputFilePrefix =
-            "./Crowdflower_unannotated/pronoun_core_r4_100best";
+           // "./Crowdflower_unannotated/pronoun_core_r4_100best";
+          //  "./Crowdflower_unannotated/pronoun_core_r5_100best";
+            "./Crowdflower_temp/pronoun_core_r6_100best";
+
+    private static final String[] inputSentenceIdsFiles = new String[] {
+            "./Crowdflower_unannotated/pronoun_core_r4_100best.sent_ids.txt"
+    };
 
     private static final String outputSentenceIdsFile =
-            "./Crowdflower_unannotated/pronoun_core_r4_100best.sent_ids.txt";
+          //  "./Crowdflower_unannotated/pronoun_core_r5_100best.sent_ids.txt";
+            "./Crowdflower_temp/pronoun_core_r6_100best.sent_ids.txt";
 
     private static final String[] reviewedTestQuestionFiles = new String[] {
-            "./Crowdflower_unannotated/test_questions/test_question_core_pronoun_r0123.tsv",
+            "./Crowdflower_unannotated/test_questions/test_question_core_pronoun_r04.tsv",
+         //   "./Crowdflower_temp/test_questions/test_question_core_pronoun_r04.tsv",
     };
 
     private static ImmutableList<Integer> testSentenceIds;
@@ -52,17 +60,17 @@ public class CrowdFlowerDataWriterCorePronouns {
     private static QueryPruningParameters queryPruningParameters;
     static {
         queryPruningParameters = new QueryPruningParameters();
-        queryPruningParameters.skipSAdjQuestions = true;
+        queryPruningParameters.skipSAdjQuestions = true;  // R5: false // R4: true.
         queryPruningParameters.minOptionConfidence = 0.05;
-        //queryPruningParameters.minOptionEntropy = 0.1;
+        queryPruningParameters.minOptionEntropy = 0.05;   // R4: unspecified.
         queryPruningParameters.minPromptConfidence = 0.1;
     }
 
     private static HITLParsingParameters reparsingParameters;
     static {
         reparsingParameters = new HITLParsingParameters();
-        reparsingParameters.attachmentPenaltyWeight = 10.0;
-        reparsingParameters.supertagPenaltyWeight = 10.0;
+        reparsingParameters.attachmentPenaltyWeight = 5.0;
+        reparsingParameters.supertagPenaltyWeight = 5.0;
     }
 
     private static void printTestQuestions() throws IOException {
@@ -77,16 +85,13 @@ public class CrowdFlowerDataWriterCorePronouns {
                         annotations.get(annot.sentenceId).add(annot);
                     });
         }
-
         testSentenceIds = annotations.keySet().stream().sorted().collect(GuavaCollectors.toImmutableList());
         final String testQuestionsFile = String.format("%s_test.csv", csvOutputFilePrefix);
         CSVPrinter csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter(testQuestionsFile)),
                 CSVFormat.EXCEL.withRecordSeparator("\n"));
         csvPrinter.printRecord((Object[]) CrowdFlowerDataUtils.csvHeaderNew);
-
         AtomicInteger lineCounter = new AtomicInteger(0);
         for (int sid : annotations.keySet()) {
-            //if (sid > 2000) {
             annotations.get(sid).stream().forEach(annot -> {
                 try {
                     System.out.println(annot);
@@ -160,7 +165,6 @@ public class CrowdFlowerDataWriterCorePronouns {
     }
 
     public static void main(String[] args) throws IOException {
-        //final ImmutableList<Integer> testSentenceIds = CrowdFlowerDataUtils.getTestSentenceIds();
         printTestQuestions();
         printQuestionsToAnnotate();
     }

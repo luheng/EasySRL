@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.PriorityQueue;
 import java.util.stream.Collectors;
 
 import edu.uw.easysrl.dependencies.DependencyStructure;
@@ -16,7 +15,6 @@ import edu.uw.easysrl.syntax.grammar.Combinator;
 import edu.uw.easysrl.syntax.grammar.Combinator.RuleClass;
 import edu.uw.easysrl.syntax.grammar.Combinator.RuleProduction;
 import edu.uw.easysrl.syntax.grammar.Combinator.RuleType;
-import edu.uw.easysrl.syntax.grammar.NormalForm;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeBinary;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeUnary;
@@ -28,19 +26,26 @@ import edu.uw.easysrl.util.Util.Scored;
 
 public class ParserCKY extends AbstractParser {
 
+	@Deprecated
 	public ParserCKY(final ModelFactory modelFactory, final int maxSentenceLength, final int nbest,
 			final List<Category> validRootCategories, final File modelFolder, final int maxChartSize)
-					throws IOException {
+			throws IOException {
 		super(modelFactory.getLexicalCategories(), maxSentenceLength, nbest, validRootCategories, modelFolder);
 		this.maxChartSize = maxChartSize;
 		this.modelFactory = modelFactory;
+	}
+
+	protected ParserCKY(final Builder builder) {
+		super(builder);
+		this.maxChartSize = builder.getMaxChartSize();
+		this.modelFactory = builder.getModelFactory();
 	}
 
 	private final int maxChartSize;
 	private final ModelFactory modelFactory;
 
 	@Override
-	List<Scored<SyntaxTreeNode>> parseAstar(final InputToParser input) {
+	protected List<Scored<SyntaxTreeNode>> parse(final InputToParser input) {
 
 		final int numWords = input.length();
 		if (input.length() > maxLength) {
@@ -51,9 +56,9 @@ public class ParserCKY extends AbstractParser {
 		final Model model = modelFactory.make(input);
 
 		// Add lexical categories
-		final PriorityQueue<AgendaItem> queue = new PriorityQueue<>();
-		model.buildAgenda(queue, input.getInputWords());
-		for (final AgendaItem item : queue) {
+		final Agenda agenda = model.makeAgenda();
+		model.buildAgenda(agenda, input.getInputWords());
+		for (final AgendaItem item : agenda) {
 			ChartCell cell = chart[item.getStartOfSpan()][item.getSpanLength() - 1];
 			if (cell == null) {
 				cell = new Cell1BestCKY();
@@ -111,7 +116,7 @@ public class ParserCKY extends AbstractParser {
 		for (final AgendaItem l : left.getEntries()) {
 			for (final AgendaItem r : right.getEntries()) {
 
-				if (!seenRules.isSeen(l.getParse().getCategory(), r.getParse().getCategory())) {
+				if (!allowUnseenRules && !seenRules.isSeen(l.getParse().getCategory(), r.getParse().getCategory())) {
 					continue;
 				}
 
@@ -122,7 +127,7 @@ public class ParserCKY extends AbstractParser {
 					final RuleType ruleType = rule.getRuleType();
 					final RuleClass rightRuleClass = r.getParse().getRuleType().getNormalFormClassForRule();
 
-					if (!NormalForm.isOk(leftRuleClass, rightRuleClass, ruleType, l.getParse().getCategory(), r
+					if (!normalForm.isOk(leftRuleClass, rightRuleClass, ruleType, l.getParse().getCategory(), r
 							.getParse().getCategory(), rule.getCategory(), l.getStartOfSpan() == 0)) {
 						continue;
 					}
@@ -175,4 +180,16 @@ public class ParserCKY extends AbstractParser {
 		}
 	}
 
+	public static class Builder extends ParserBuilder<Builder> {
+
+		public Builder(final File modelFolder) {
+			super(modelFolder);
+			super.maxChartSize(300000);
+		}
+
+		@Override
+		protected ParserCKY build2() {
+			return new ParserCKY(this);
+		}
+	}
 }

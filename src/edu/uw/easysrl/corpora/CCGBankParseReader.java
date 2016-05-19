@@ -66,23 +66,19 @@ public class CCGBankParseReader {
 					while (autoLines.hasNext() && line.startsWith("ID=")) {
 						line = autoLines.next();
 					}
-
 					if (!line.startsWith("ID=")) {
 						final SyntaxTreeNode result = parse(line);
 						return result;
 					} else {
 						return next();
 					}
-
 				} else {
-
 					final File autoFile = autoFiles.next();
 					try {
 						autoLines = Util.readFileLineByLine(autoFile);
 					} catch (final IOException e) {
 						throw new RuntimeException(e);
 					}
-
 					return next();
 				}
 			}

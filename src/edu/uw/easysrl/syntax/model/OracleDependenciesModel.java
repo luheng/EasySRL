@@ -1,5 +1,8 @@
 package edu.uw.easysrl.syntax.model;
 
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Multiset;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -7,12 +10,8 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
-import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Multiset;
 
 import edu.uw.easysrl.corpora.CCGBankDependencies;
 import edu.uw.easysrl.corpora.CCGBankDependencies.CCGBankDependency;
@@ -30,6 +29,7 @@ import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeLeaf;
 import edu.uw.easysrl.syntax.parser.AbstractParser.UnaryRule;
+import edu.uw.easysrl.syntax.parser.Agenda;
 import edu.uw.easysrl.syntax.parser.ParserAStar;
 import edu.uw.easysrl.syntax.tagger.Tagger;
 import edu.uw.easysrl.syntax.tagger.Tagger.ScoredCategory;
@@ -182,13 +182,13 @@ public class OracleDependenciesModel extends Model {
 	}
 
 	@Override
-	double getUpperBoundForWord(final int index) {
+	public double getUpperBoundForWord(final int index) {
 		final Collection<CCGBankDependency> deps = goldDeps.getDependencies(index);
 		return catScore + (deps == null ? 0 : deps.size());
 	}
 
 	@Override
-	public void buildAgenda(final PriorityQueue<AgendaItem> queue, final List<InputWord> words) {
+	public void buildAgenda(final Agenda queue, final List<InputWord> words) {
 		int i = 0;
 		for (final InputWord w : words) {
 

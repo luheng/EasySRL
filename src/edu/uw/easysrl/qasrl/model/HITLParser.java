@@ -6,11 +6,14 @@ import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
 import edu.uw.easysrl.qasrl.annotation.AnnotationUtils;
+import edu.uw.easysrl.qasrl.classification.DependencyInstanceHelper;
+import edu.uw.easysrl.qasrl.classification.DependencyInstanceType;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.util.VerbHelper;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
+import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.*;
@@ -34,36 +37,59 @@ public class HITLParser {
     public void setQueryPruningParameters(QueryPruningParameters queryPruningParameters) {
         this.queryPruningParameters = queryPruningParameters;
     }
+    public QueryPruningParameters getQueryPruningParameters() {
+        return queryPruningParameters;
+    }
 
     private HITLParsingParameters reparsingParameters = new HITLParsingParameters();
     public void setReparsingParameters(HITLParsingParameters reparsingParameters) {
         this.reparsingParameters = reparsingParameters;
     }
+    public HITLParsingParameters getReparsingParameters() {
+        return reparsingParameters;
+    }
 
-    private BaseCcgParser.ConstrainedCcgParser2 reparser;
+    private BaseCcgParser.ConstrainedCcgParser reparser;
     private ResponseSimulatorGold goldSimulator;
 
     /**
      * Initialize data and re-parser.
      */
     public HITLParser(int nBest) {
+        this(nBest, false /* load from test */);
+    }
+
+    public HITLParser(int nBest, boolean getTestSet) {
         this.nBest = nBest;
-        parseData = ParseData.loadFromDevPool().get();
+        parseData = getTestSet ? ParseData.loadFromTestPool().get() : ParseData.loadFromDevPool().get();
         sentences = parseData.getSentences();
         inputSentences = parseData.getSentenceInputWords();
         goldParses = parseData.getGoldParses();
         System.out.println(String.format("Read %d sentences from the dev set.", sentences.size()));
 
-        String preparsedFile = "parses.100best.out";
+        String preparsedFile = getTestSet ? "parses.test.100best.out" : "parses.dev.100best.out";
         nbestLists = NBestList.loadNBestListsFromFile(preparsedFile, nBest).get();
         System.out.println(String.format("Load pre-parsed %d-best lists for %d sentences.", nBest, nbestLists.size()));
 
-        reparser = new BaseCcgParser.ConstrainedCcgParser2(BaseCcgParser.modelFolder, BaseCcgParser.rootCategories,
-                reparsingParameters.maxTagsPerWord, 1 /* nbest */);
+        reparser = new BaseCcgParser.ConstrainedCcgParser(BaseCcgParser.modelFolder, 1 /* nbest */);
+        reparser.cacheSupertags(parseData);
         goldSimulator = new ResponseSimulatorGold(parseData);
 
         // Cache results.
         nbestLists.entrySet().forEach(e -> e.getValue().cacheResults(goldParses.get(e.getKey())));
+
+        // Print nbest stats
+        /* Print stats */
+        System.out.println(String.format("Read nBest lists for %d sentences", nbestLists.size()));
+        System.out.println(String.format("Average-N:\t%.3f", nbestLists.values().stream()
+                .mapToDouble(NBestList::getN).sum() / nbestLists.size()));
+        Results baseline = new Results(), oracle = new Results();
+        nbestLists.values().forEach(nb -> {
+            baseline.add(nb.getResults(0));
+            oracle.add(nb.getResults(nb.getOracleId()));
+        });
+        System.out.println(String.format("Baseline F1:\t%.5f%%\tOracle F1:\t%.5f%%", 100.0 * baseline.getF1(),
+                100.0 * oracle.getF1()));
     }
 
     public ImmutableList<Integer> getAllSentenceIds() {
@@ -240,10 +266,10 @@ public class HITLParser {
 
     // FIXME: A bug where reparsing with empty constraint set makes results worse.
     public Parse getReparsed(int sentenceId, Set<Constraint> constraintSet) {
-        if (constraintSet.isEmpty()) {
-            nbestLists.get(sentenceId).getParse(0);
+        if (constraintSet == null || constraintSet.isEmpty()) {
+            return nbestLists.get(sentenceId).getParse(0);
         }
-        final Parse reparsed = reparser.parseWithConstraint(inputSentences.get(sentenceId), constraintSet);
+        final Parse reparsed = reparser.parseWithConstraint(sentenceId, inputSentences.get(sentenceId), constraintSet);
         if (reparsed == null) {
             System.err.println(String.format("Unable to parse sentence %d with constraints: %s", sentenceId,
                     constraintSet.stream()
@@ -294,11 +320,16 @@ public class HITLParser {
     public ImmutableList<Integer> getUserOptions(final ScoredQuery<QAStructureSurfaceForm> query,
                                                  final AlignedAnnotation annotation) {
         final int[] optionDist = AnnotationUtils.getUserResponseDistribution(query, annotation);
+        return getUserOptions(query, optionDist);
+    }
+
+    public ImmutableList<Integer> getUserOptions(final ScoredQuery<QAStructureSurfaceForm> query,
+                                                 final int[] optionDist) {
         return IntStream.range(0, query.getOptions().size())
                 .filter(i -> (!query.isJeopardyStyle()
-                                    && optionDist[i] > reparsingParameters.negativeConstraintMaxAgreement) ||
-                             (query.isJeopardyStyle()
-                                     && optionDist[i] >= reparsingParameters.jeopardyQuestionMinAgreement))
+                        && optionDist[i] > reparsingParameters.negativeConstraintMaxAgreement) ||
+                        (query.isJeopardyStyle()
+                                && optionDist[i] >= reparsingParameters.jeopardyQuestionMinAgreement))
                 .boxed()
                 .collect(GuavaCollectors.toImmutableList());
     }
@@ -312,16 +343,21 @@ public class HITLParser {
     public ImmutableSet<Constraint> getConstraints(final ScoredQuery<QAStructureSurfaceForm> query,
                                                    final AlignedAnnotation annotation) {
         final int[] optionDist = AnnotationUtils.getUserResponseDistribution(query, annotation);
+        return getConstraints(query, optionDist);
+    }
+
+    public ImmutableSet<Constraint> getConstraints(final ScoredQuery<QAStructureSurfaceForm> query,
+                                                   final int[] optionDist) {
         final Set<Constraint> constraints = new HashSet<>();
         final Set<Integer> hitOptions = IntStream.range(0, optionDist.length).boxed()
                 .filter(i -> optionDist[i] >= reparsingParameters.positiveConstraintMinAgreement)
                 .collect(Collectors.toSet());
-        final Set<Integer> skipOptions = IntStream.range(0, optionDist.length).boxed()
+        final Set<Integer> chosenOptions = IntStream.range(0, optionDist.length).boxed()
                 .filter(i -> optionDist[i] > reparsingParameters.negativeConstraintMaxAgreement)
                 .collect(Collectors.toSet());
         ConstraintExtractor.extractPositiveConstraints(query, hitOptions)
                 .forEach(constraints::add);
-        ConstraintExtractor.extractNegativeConstraints(query, skipOptions, reparsingParameters.skipPronounEvidence)
+        ConstraintExtractor.extractNegativeConstraints(query, chosenOptions, reparsingParameters.skipPronounEvidence)
                 .forEach(constraints::add);
         constraints.forEach(c -> c.setStrength(
                 (Constraint.SupertagConstraint.class.isInstance(c) ?
@@ -359,4 +395,28 @@ public class HITLParser {
                 .collect(GuavaCollectors.toImmutableSet());
     }
 
+    public ImmutableSet<Constraint> getOracleConstraints(final ScoredQuery<QAStructureSurfaceForm> query) {
+        final Set<Constraint> constraints = new HashSet<>();
+        final Parse gold = getGoldParse(query.getSentenceId());
+        final ImmutableList<String> sentence = sentences.get(query.getSentenceId());
+
+        for (int i = 0; i < sentence.size(); i++) {
+            final int headId = i;
+            for (int j = 0; j < sentence.size(); j++) {
+                final int argId = j;
+                if (headId == argId || DependencyInstanceHelper.getDependencyType(query, headId, argId) == DependencyInstanceType.NONE) {
+                    continue;
+                }
+                //final DependencyInstanceType dtype = DependencyInstanceHelper.getDependencyType(query, headId, argId);
+                final boolean inGold = gold.dependencies.stream()
+                        .anyMatch(dep -> dep.getHead() == headId && dep.getArgument() == argId);
+                constraints.add(inGold ?
+                        new Constraint.AttachmentConstraint(headId, argId, true, reparsingParameters.oraclePenaltyWeight) :
+                        new Constraint.AttachmentConstraint(headId, argId, false, reparsingParameters.oraclePenaltyWeight));
+            }
+        }
+        return constraints.stream()
+                .distinct()
+                .collect(GuavaCollectors.toImmutableSet());
+    }
 }

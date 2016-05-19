@@ -9,6 +9,7 @@ import edu.uw.easysrl.qasrl.model.Constraint;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.syntax.parser.AbstractParser;
+import edu.uw.easysrl.syntax.parser.Agenda;
 import edu.uw.easysrl.syntax.tagger.Tagger;
 import edu.uw.easysrl.util.GuavaCollectors;
 
@@ -22,6 +23,7 @@ import java.util.stream.IntStream;
  */
 public class ConstrainedParsingModel extends SupertagFactoredModel {
     private static final boolean kIncludeDependencies = true;
+    private static final boolean kNormalizeConstraints = false;
     private final List<List<Tagger.ScoredCategory>> tagsForWords;
     private Table<Integer, Integer, Double> mustLinks, cannotLinks;
     private Table<Integer, Category, Double> mustSupertags, cannotSupertags;
@@ -56,33 +58,43 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                 .filter(c -> !c.isPositive())
                 .filter(Constraint.AttachmentConstraint.class::isInstance)
                 .map(c -> (Constraint.AttachmentConstraint) c)
-                .filter(c -> !mustLinks.contains(c.getHeadId(), c.getArgId()) &&
-                             !mustLinks.contains(c.getArgId(), c.getHeadId()))
+                .filter(c -> !mustLinks.contains(c.getHeadId(), c.getArgId()))
+                        //&& !mustLinks.contains(c.getArgId(), c.getHeadId()))
                 .forEach(c -> cannotLinks.put(c.getHeadId(), c.getArgId(), c.getStrength()));
 
         constraints.stream()
                 .filter(c -> !c.isPositive())
                 .filter(Constraint.SupertagConstraint.class::isInstance)
-                .map(c -> (Constraint.SupertagConstraint) c)
+                 .map(c -> (Constraint.SupertagConstraint) c)
                 .filter(c -> !mustSupertags.contains(c.getPredId(), c.getCategory()))
                 .forEach(c -> cannotSupertags.put(c.getPredId(), c.getCategory(), c.getStrength()));
 
-        //TODO: Normalize supertag and attachment evidence.
-        /*
-        mustLinks.rowKeySet().stream().forEach(head -> {
-            int numArgs = mustLinks.row(head).size();
-            double norm = 1.0 * numArgs;
-            ImmutableSet<Integer> args = mustLinks.row(head).keySet().stream()
-                    .collect(GuavaCollectors.toImmutableSet());
-            args.forEach(arg -> {
-                double weight = mustLinks.get(head, arg);
-                mustLinks.put(head, arg, weight / norm);
+        if (kNormalizeConstraints) {
+            mustLinks.rowKeySet().stream().forEach(head -> {
+                int numArgs = mustLinks.row(head).size();
+                double norm = 1.0 * numArgs;
+                ImmutableSet<Integer> args = mustLinks.row(head).keySet().stream()
+                        .collect(GuavaCollectors.toImmutableSet());
+                args.forEach(arg -> {
+                    double weight = mustLinks.get(head, arg);
+                    mustLinks.put(head, arg, weight / norm);
+                });
             });
-        }); */
+            cannotLinks.rowKeySet().stream().forEach(head -> {
+                int numArgs = cannotLinks.row(head).size();
+                double norm = 1.0 * numArgs;
+                ImmutableSet<Integer> args = cannotLinks.row(head).keySet().stream()
+                        .collect(GuavaCollectors.toImmutableSet());
+                args.forEach(arg -> {
+                    double weight = cannotLinks.get(head, arg);
+                    cannotLinks.put(head, arg, weight / norm);
+                });
+            });
+        }
     }
 
     @Override
-    public void buildAgenda(final PriorityQueue<AgendaItem> agenda, final List<InputReader.InputWord> words) {
+    public void buildAgenda(final Agenda agenda, final List<InputReader.InputWord> words) {
         for (int i = 0; i < words.size(); i++) {
             final InputReader.InputWord word = words.get(i);
             for (final Tagger.ScoredCategory cat : tagsForWords.get(i)) {
@@ -119,11 +131,11 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
             lengthPenalty = lengthPenalty * 10;
         }
 
-        double evidencePenalty = 0.0;
+        double constraintsPenalty = 0.0;
         final List<UnlabelledDependency> dependencies = node.getResolvedUnlabelledDependencies();
 
         // Penalize cannot-links.
-        evidencePenalty += dependencies.stream()
+        constraintsPenalty += dependencies.stream()
                 .mapToDouble(dep -> dep.getArguments().stream()
                         // Directed match.
                         .filter(argId -> cannotLinks.contains(dep.getHead(), argId))
@@ -132,7 +144,7 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                 .sum();
 
         // Penalize missed must-links.
-        evidencePenalty += mustLinks.cellSet().stream()
+        constraintsPenalty += mustLinks.cellSet().stream()
                 .filter(c -> {
                     final int cHead = c.getRowKey(), cArg = c.getColumnKey();
                     return (indexInSpan(cHead, leftChild) && indexInSpan(cArg, rightChild)) ||
@@ -142,14 +154,14 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                     final int cHead = c.getRowKey(), cArg = c.getColumnKey();
                     return !dependencies.stream()
                             // Undirected match.
-                            .anyMatch(dep -> (dep.getHead() == cHead && dep.getArguments().contains(cArg) ||
-                                             (dep.getHead() == cArg && dep.getArguments().contains(cHead))));
+                            .anyMatch(dep -> (dep.getHead() == cHead && dep.getArguments().contains(cArg)));
+                                    //|| (dep.getHead() == cArg && dep.getArguments().contains(cHead))));
                 })
                 .mapToDouble(Table.Cell::getValue)
                 .sum();
 
         return new AgendaItem(node,
-            leftChild.getInsideScore() + rightChild.getInsideScore() - lengthPenalty - evidencePenalty, /* inside */
+            leftChild.getInsideScore() + rightChild.getInsideScore() - lengthPenalty - constraintsPenalty, /* inside */
             getOutsideUpperBound(leftChild.startOfSpan, leftChild.startOfSpan + length),                /* outside */
             leftChild.startOfSpan,
             length,
@@ -162,20 +174,18 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
 
     @Override
     public AgendaItem unary(final AgendaItem child, final SyntaxTreeNode result, final AbstractParser.UnaryRule rule) {
-        return new AgendaItem(result,
-                child.getInsideScore(),
-                child.outsideScoreUpperbound,
-                child.startOfSpan,
-                child.spanLength,
-                kIncludeDependencies);
+        return new AgendaItem(result, child.getInsideScore() - 0.1, child.outsideScoreUpperbound, child.startOfSpan,
+                child.spanLength, kIncludeDependencies);
     }
 
     public static class ConstrainedParsingModelFactory extends Model.ModelFactory {
         private final Tagger tagger;
+        private final Collection<Category> lexicalCategories;
 
-        public ConstrainedParsingModelFactory(final Tagger tagger) {
+        public ConstrainedParsingModelFactory(final Tagger tagger, final Collection<Category> lexicalCategories) {
             super();
             this.tagger = tagger;
+            this.lexicalCategories = lexicalCategories;
         }
 
         @Override
@@ -193,7 +203,7 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
 
         @Override
         public Collection<Category> getLexicalCategories() {
-            return tagger.getLexicalCategories();
+            return lexicalCategories;
         }
 
         @Override

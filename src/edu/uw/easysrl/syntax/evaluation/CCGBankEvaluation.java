@@ -11,11 +11,12 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Multiset;
@@ -33,17 +34,13 @@ import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.dependencies.SRLFrame;
 import edu.uw.easysrl.dependencies.SRLFrame.SRLLabel;
 import edu.uw.easysrl.dependencies.UnlabelledDependency;
-import edu.uw.easysrl.main.EasySRL;
-import edu.uw.easysrl.main.EasySRL.ParsingAlgorithm;
 import edu.uw.easysrl.main.InputReader.InputWord;
 import edu.uw.easysrl.main.ParsePrinter;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
+import edu.uw.easysrl.syntax.parser.ParserAStar;
 import edu.uw.easysrl.syntax.parser.SRLParser;
 import edu.uw.easysrl.syntax.parser.SRLParser.CCGandSRLparse;
-import edu.uw.easysrl.syntax.parser.SRLParser.PipelineSRLParser;
-import edu.uw.easysrl.syntax.tagger.POSTagger;
-import edu.uw.easysrl.syntax.tagger.TaggerEmbeddings;
 import edu.uw.easysrl.syntax.training.PipelineTrainer.LabelClassifier;
 import edu.uw.easysrl.util.Util;
 
@@ -79,37 +76,13 @@ public class CCGBankEvaluation {
 	};
 
 	public static void main(final String[] args) throws IOException {
-		final int maxLength = 70;// FIXME
-		// final String pipelineFolder = Util.getHomeFolder() + "/Downloads/cnn/models/model_ccgbank";
-		final String pipelineFolder = "/Users/luheng/Workspace/EasySRL/model_tritrain_big/";
-		// final String pipelineFolder = Util.getHomeFolder() + "/Downloads/cnn/models/ensemble";
-		// final String modelFolder = "~/Documents/workspace/ccg_srl_models/model_tritrain/";
-		// final String modelFolder = "~/Documents/workspace/ccg_srl_models/big_model/";
-		// final List<Category> categories = TaggerEmbeddings.loadCategories(new File(pipelineFolder, "categories"));
-		final POSTagger postagger = new POSTagger() {
-
-			@Override
-			public List<InputWord> tag(final List<InputWord> words) {
-				return words;
-			}
-		};
-		final PipelineSRLParser pipeline = new PipelineSRLParser(EasySRL.makeParser(pipelineFolder, 0.000001,
-				ParsingAlgorithm.ASTAR, 250000, false, Optional.empty(), 1, maxLength), dummyLabelClassifier, postagger);
-
-		// POSTagger.getStanfordTagger(Util.getFile(modelFolder + "/pipeline/" + "posTagger"));
-		// final SRLParser parser = new BackoffSRLParser(new PipelineSRLParser(EasySRL.makeParser(pipelineFolder,
-		// 0.00001,
-		// ParsingAlgorithm.ASTAR, 50000, false, Optional.empty(), 1, maxLength), dummyLabelClassifier, postagger),
-		// pipeline);
-
-		// final SRLParser parser2 = new BackoffSRLParser(new JointSRLParser(EasySRL.makeParser(modelFolder, 0.001,
-		// ParsingAlgorithm.ASTAR, 50000
-		// , true, Optional.of(1.8), 1, maxLength), postagger), pipeline);
-
-		// final Parser pipeline = EasySRL.makeParser(pipelineFolder, 0.000001,// 0.00001
-		// ParsingAlgorithm.ASTAR, 2500000, false, Optional.empty(), 1, maxLength);
+		//final String pipelineFolder = Util.getHomeFolder() + "/Downloads/cnn/models/model_tritrain_big";
+		final String pipelineFolder = Util.getHomeFolder() + "/Workspace/EasySRL/model_tritrain_finetune/";
+		final SRLParser pipeline = SRLParser.wrapperOf(new ParserAStar.Builder(new File(pipelineFolder))
+				.supertaggerBeam(0.000001).maxChartSize(250000).build());
 
 		System.out.println(evaluate(pipeline, Partition.DEV));
+		System.out.println(evaluate(pipeline, Partition.TEST));
 	}
 
 	private static void compareParses(final DependencyParse bestParse, final SyntaxTreeNode syntaxTreeNode) {
@@ -123,7 +96,6 @@ public class CCGBankEvaluation {
 			if (!predictedTags.get(i).equals(goldTags.get(i))) {
 				System.out.print("|" + goldTags.get(i) + "|" + predictedTags.get(i));
 			}
-
 			System.out.print(" ");
 		}
 		System.out.println();
@@ -149,10 +121,10 @@ public class CCGBankEvaluation {
 		final ErrorAnalysis errorAnalysisUnlabelled = new ErrorAnalysis();
 		final Table<Category, Category, Integer> goldToPredictedToCount = HashBasedTable.create();
 
-		final ErrorAnalysis errorAnalysisWithGoldCats = new ErrorAnalysis();
+		final 	ErrorAnalysis errorAnalysisWithGoldCats = new ErrorAnalysis();
 
 		final DependencyGenerator dependencyGenerator = new DependencyGenerator(
-				Util.getFile("/Users/luheng/Workspace/EasySRL/model_tritrain_big/"));
+				Util.getFile(Util.getHomeFolder() + "/Workspace/EasySRL/model_tritrain_finetune"));
 
 		final Multiset<String> validDeps = getValidDeps();
 
@@ -162,7 +134,9 @@ public class CCGBankEvaluation {
 		int allCorrect = 0;
 		int numParsed = 0;
 
-		for (final DependencyParse gold : CCGBankDependencies.loadCorpus(ParallelCorpusReader.CCGREBANK, partition)) {
+		final List<DependencyParse> corpus = CCGBankDependencies.loadCorpus(ParallelCorpusReader.CCGBANK, partition);
+		final Stopwatch watch = Stopwatch.createStarted();
+		for (final DependencyParse gold : corpus) {
 
 			final Set<ResolvedDependency> expectedForParse = null; // isDev ? expected.get(id) : Collections.emptySet();
 			id++;
@@ -215,6 +189,8 @@ public class CCGBankEvaluation {
 							r = resultsForParse;
 							bestParse = parse.getCcgParse();
 						}
+
+						break; // FIXME
 					}
 
 					if (r.getF1() == 1.0) {
@@ -275,6 +251,8 @@ public class CCGBankEvaluation {
 			}
 		}
 
+		watch.stop();
+
 		System.err.println();
 		for (final java.util.Map.Entry<String, Results> relation : errorAnalysis.perRelationResults.entrySet().stream()
 				.sorted((e1, e2) -> e2.getValue().getFrequency() - e1.getValue().getFrequency())
@@ -311,14 +289,14 @@ public class CCGBankEvaluation {
 		System.out.println("Labelled");
 		System.out.println(results);
 		// fout.close();
+		System.out.println(watch.elapsed(TimeUnit.SECONDS) + "s");
 		return results;
 
 	}
 
 	public static Multiset<String> getValidDeps() throws IOException {
 		final Multiset<String> validDeps = HashMultiset.create();
-		for (final DependencyParse gold : CCGBankDependencies.loadCorpus(ParallelCorpusReader.CCGREBANK,
-				Partition.TRAIN)) {
+		for (final DependencyParse gold : CCGBankDependencies.loadCorpus(ParallelCorpusReader.CCGBANK, Partition.TRAIN)) {
 			for (final ResolvedDependency dep : asResolvedDependencies(gold.getDependencies())) {
 				validDeps.add(dep.getCategory().toString() + dep.getArgNumber());
 			}

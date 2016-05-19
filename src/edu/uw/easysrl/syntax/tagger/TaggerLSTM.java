@@ -1,56 +1,40 @@
 package edu.uw.easysrl.syntax.tagger;
 
+import com.google.common.collect.Ordering;
+
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import com.google.common.collect.Ordering;
-
 import edu.uw.deeptagger.DeepTagger;
 import edu.uw.easysrl.main.InputReader.InputWord;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.model.CutoffsDictionaryInterface;
+import edu.uw.easysrl.util.LibraryUtil;
 
 public class TaggerLSTM extends Tagger {
 	private final DeepTagger tagger;
 
-	TaggerLSTM(final File modelFolder, final double beta, final int maxTagsPerWord, final CutoffsDictionaryInterface cutoffs)
-			throws IOException {
+	TaggerLSTM(final File modelFolder, final double beta, final int maxTagsPerWord,
+			final CutoffsDictionaryInterface cutoffs) throws IOException {
 
 		this(makeDeepTagger(modelFolder), beta, maxTagsPerWord, cutoffs);
 	}
 
 	private static DeepTagger makeDeepTagger(final File modelFolder) throws IOException {
-		// Apparently this is the easiest way to set the library path in code...
-		System.setProperty("java.library.path", "lib");
-		Field fieldSysPath;
-		try {
-			fieldSysPath = ClassLoader.class.getDeclaredField("sys_paths");
-			fieldSysPath.setAccessible(true);
-			fieldSysPath.set(null, null);
-		} catch (NoSuchFieldException | SecurityException | IllegalArgumentException | IllegalAccessException e) {
-			throw new RuntimeException(e);
-		}
+		LibraryUtil.setLibraryPath("lib");
 		return DeepTagger.make(modelFolder);
 	}
-
-	private final List<Integer> possibleCategories = new ArrayList<>();
 
 	public TaggerLSTM(final DeepTagger tagger, final double beta, final int maxTagsPerWord,
 			final CutoffsDictionaryInterface cutoffs) throws IOException {
 		super(cutoffs, beta, tagger.getTags().stream().map(Category::valueOf).collect(Collectors.toList()),
 				maxTagsPerWord);
 		this.tagger = tagger;
-
-		for (int i = 0; i < super.lexicalCategories.size(); i++) {
-			possibleCategories.add(i);
-		}
-
 	}
 
 	@Override

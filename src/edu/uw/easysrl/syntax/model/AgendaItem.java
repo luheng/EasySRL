@@ -19,9 +19,9 @@ public class AgendaItem implements Comparable<AgendaItem> {
 	final int startOfSpan;
 	final int spanLength;
 
-	private final boolean includeDeps;
+	protected final boolean includeDeps;
 
-	AgendaItem(final SyntaxTreeNode node, final double insideScore, final double outsideScoreUpperbound,
+	public AgendaItem(final SyntaxTreeNode node, final double insideScore, final double outsideScoreUpperbound,
 			final int startIndex, final int length, final boolean includeDeps) {
 		super();
 		this.parse = node;
@@ -61,6 +61,8 @@ public class AgendaItem implements Comparable<AgendaItem> {
 	public double getInsideScore() {
 		return insideScore;
 	}
+
+	public double getOutsideScoreUpperbound() { return outsideScoreUpperbound; }
 
 	public int getSpanLength() {
 		return spanLength;

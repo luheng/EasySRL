@@ -4,7 +4,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.PriorityQueue;
 
 import edu.uw.easysrl.dependencies.DependencyStructure;
 import edu.uw.easysrl.dependencies.UnlabelledDependency;
@@ -13,7 +12,6 @@ import edu.uw.easysrl.main.InputReader.InputWord;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.Combinator.RuleProduction;
 import edu.uw.easysrl.syntax.grammar.Combinator.RuleType;
-import edu.uw.easysrl.syntax.grammar.NormalForm;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeBinary;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeUnary;
@@ -22,6 +20,7 @@ import edu.uw.easysrl.syntax.model.Model;
 import edu.uw.easysrl.syntax.model.Model.ModelFactory;
 import edu.uw.easysrl.syntax.parser.ChartCell.Cell1Best;
 import edu.uw.easysrl.syntax.parser.ChartCell.Cell1BestTreeBased;
+import edu.uw.easysrl.syntax.parser.ChartCell.CellNoDynamicProgram;
 import edu.uw.easysrl.syntax.parser.ChartCell.ChartCellFactory;
 import edu.uw.easysrl.syntax.parser.ChartCell.ChartCellNbestFactory;
 import edu.uw.easysrl.syntax.tagger.TaggerEmbeddings;
@@ -29,34 +28,66 @@ import edu.uw.easysrl.util.Util.Scored;
 
 public class ParserAStar extends AbstractParser {
 
-	private final ModelFactory modelFactory;
+	protected final ModelFactory modelFactory;
 
-	private final int maxChartSize;
-	private final ChartCellFactory cellFactory;
-	private final boolean usingDependencies;
+	protected final int maxChartSize;
+	protected final int maxAgendaSize;
+	protected final ChartCellFactory cellFactory;
+	protected final boolean usingDependencies;
+	protected final List<ParserListener> listeners;
 
+	@Deprecated
 	public ParserAStar(final ModelFactory modelFactory, final int maxSentenceLength, final int nbest,
 			final List<Category> validRootCategories, final File modelFolder, final int maxChartSize)
 			throws IOException {
-		/*super(TaggerEmbeddings.loadCategories(new File(modelFolder, "categories")), maxSentenceLength, nbest,
-				validRootCategories, modelFolder);*/
-		super(modelFactory.getLexicalCategories(), maxSentenceLength, nbest, validRootCategories, modelFolder);
+		super(TaggerEmbeddings.loadCategories(new File(modelFolder, "categories")), maxSentenceLength, nbest,
+				validRootCategories, modelFolder);
 		this.modelFactory = modelFactory;
 		this.maxChartSize = maxChartSize;
 		this.usingDependencies = modelFactory.isUsingDependencies();
-		this.cellFactory = nbest > 1 ? new ChartCellNbestFactory(nbest, nbestBeam, maxSentenceLength,
-				super.lexicalCategories) : modelFactory.isUsingDependencies() ? Cell1Best.factory()
-						: Cell1BestTreeBased.factory();
+		this.cellFactory = chooseCellFactory(modelFactory, nbest);
+
+		// Get default arguments for newer parameters.
+		final ParserBuilder builder = new Builder(modelFolder);
+		this.maxAgendaSize = builder.getMaxAgendaSize();
+		this.listeners = builder.getListeners();
+	}
+
+	protected ChartCellFactory chooseCellFactory(final ModelFactory modelFactory, final int nbest) {
+		final ChartCellFactory cellFactory;
+		if (!this.modelFactory.isUsingDynamicProgram()) {
+			cellFactory = CellNoDynamicProgram.factory();
+		} else if (nbest > 1) {
+			cellFactory = new ChartCellNbestFactory(this.nbest, this.nbestBeam, super.maxLength,
+					super.lexicalCategories);
+		} else if (modelFactory.isUsingDependencies()) {
+			cellFactory = Cell1Best.factory();
+		} else {
+			cellFactory = Cell1BestTreeBased.factory();
+		}
+		return cellFactory;
+	}
+
+	protected ParserAStar(final Builder builder) {
+		super(builder);
+		this.modelFactory = builder.getModelFactory();
+		this.maxChartSize = builder.getMaxChartSize();
+		this.maxAgendaSize = builder.getMaxAgendaSize();
+		this.listeners = builder.getListeners();
+		this.usingDependencies = modelFactory.isUsingDependencies();
+		this.cellFactory = chooseCellFactory(modelFactory, nbest);
 	}
 
 	@Override
-	List<Scored<SyntaxTreeNode>> parseAstar(final InputToParser input) {
-
-		cellFactory.newSentence();
+	protected List<Scored<SyntaxTreeNode>> parse(final InputToParser input) {
+		final ChartCellFactory sentenceCellFactory = cellFactory.forNewSentence();
 		final List<InputWord> sentence = input.getInputWords();
+		for (final ParserListener listener : listeners) {
+			listener.handleNewSentence(sentence);
+		}
 		final Model model = modelFactory.make(input);
 		final int sentenceLength = sentence.size();
-		final PriorityQueue<AgendaItem> agenda = new PriorityQueue<>(1000);
+		final Agenda agenda = model.makeAgenda();
 		model.buildAgenda(agenda, sentence);
 		final ChartCell[][] chart = new ChartCell[sentenceLength][sentenceLength];
 
@@ -73,39 +104,48 @@ public class ParserAStar extends AbstractParser {
 		}
 
 		// Dummy final cell that the complete parses are stored in.
-		final ChartCell finalCell = cellFactory.make();
+		final ChartCell finalCell = sentenceCellFactory.make();
 
 		while (chartSize < maxChartSize
-				&& (result.isEmpty() || (result.size() < nbest && !agenda.isEmpty() && agenda.peek().getCost() > nbestBeam
-						* result.get(0).getScore()))) {
+				&& !agenda.isEmpty()
+				&& agenda.size() < maxAgendaSize
+				&& (result.isEmpty() || (result.size() < nbest &&	
+					agenda.peek().getCost() > result.get(0).getScore() + Math.log(nbestBeam)))) {
 			// Add items from the agenda, until we have enough parses.
-
-			final AgendaItem agendaItem = agenda.poll();
-			if (agendaItem == null) {
+			final AgendaItem agendaItem = agenda.peek();
+			if (agendaItem.getInsideScore() <= Double.NEGATIVE_INFINITY) {
 				break;
 			}
 
 			// Try to put an entry in the chart.
 			ChartCell cell = chart[agendaItem.getStartOfSpan()][agendaItem.getSpanLength() - 1];
 			if (cell == null) {
-				cell = cellFactory.make();
+				cell = sentenceCellFactory.make();
 				chart[agendaItem.getStartOfSpan()][agendaItem.getSpanLength() - 1] = cell;
 				cellsStartingAt.get(agendaItem.getStartOfSpan()).add(cell);
 				cellsEndingAt.get(agendaItem.getStartOfSpan() + agendaItem.getSpanLength()).add(cell);
 			}
 
 			if (cell.add(agendaItem)) {
+				boolean keepParsing = true;
+				for (final ParserListener listener : listeners) {
+					keepParsing = keepParsing && listener.handleChartInsertion(agenda);
+				}
+				if (!keepParsing) {
+					break;
+				}
+
 				chartSize++;
+				agenda.poll();
 				// If a new entry was added, update the agenda.
 
 				// Is the new entry an acceptable complete parse?
 				if (agendaItem.getSpanLength() == sentenceLength
-						&& agendaItem.getInsideScore() > Double.NEGATIVE_INFINITY
 						&& (possibleRootCategories.isEmpty() || possibleRootCategories.contains(agendaItem.getParse()
 								.getCategory())) &&
-						// For N-best parsing, the final cell checks if that the final parse is unique. e.g. if it's
+								// For N-best parsing, the final cell checks if that the final parse is unique. e.g. if it's
 								// dependencies are unique, ignoring the category
-						finalCell.add("", agendaItem)) {
+								finalCell.add("", agendaItem)) {
 					result.add(new Scored<>(agendaItem.getParse(), agendaItem.getInsideScore()));
 				}
 
@@ -127,7 +167,13 @@ public class ParserAStar extends AbstractParser {
 						updateAgenda(agenda, leftEntry, agendaItem, model);
 					}
 				}
+			} else {
+				agenda.poll();
 			}
+		}
+
+		for (final ParserListener listener : listeners) {
+			listener.handleSearchCompletion(result, agenda, chartSize);
 		}
 
 		if (result.size() == 0) {
@@ -142,7 +188,7 @@ public class ParserAStar extends AbstractParser {
 	/**
 	 * Updates the agenda with of any unary rules that can be applied.
 	 */
-	private void updateAgendaUnary(final Model model, final AgendaItem newItem, final PriorityQueue<AgendaItem> agenda) {
+	protected void updateAgendaUnary(final Model model, final AgendaItem newItem, final Agenda agenda) {
 		final SyntaxTreeNode parse = newItem.getParse();
 		final List<UnaryRule> ruleProductions = unaryRules.get(parse.getCategory());
 		final int size = ruleProductions.size();
@@ -159,9 +205,7 @@ public class ParserAStar extends AbstractParser {
 				// The reason for allowing type-raising is to simplify Eisner Normal Form contraints (a
 				// punctuation rule would mask the fact that a rule is the output of type-raising).
 				// TODO should probably refactor the constraint into NormalForm.
-
 				SyntaxTreeNodeUnary newNode;
-
 				if (usingDependencies) {
 					final List<UnlabelledDependency> resolvedDependencies = new ArrayList<>();
 					newNode = new SyntaxTreeNodeUnary(unaryRule.getResult(), parse, unaryRule
@@ -170,7 +214,6 @@ public class ParserAStar extends AbstractParser {
 				} else {
 					newNode = new SyntaxTreeNodeUnary(unaryRule.getResult(), parse, null, unaryRule, null);
 				}
-
 				agenda.add(model.unary(newItem, newNode, unaryRule));
 			}
 		}
@@ -179,13 +222,12 @@ public class ParserAStar extends AbstractParser {
 	/**
 	 * Updates the agenda with the result of all combinators that can be applied to leftChild and rightChild.
 	 */
-	private void updateAgenda(final PriorityQueue<AgendaItem> agenda, final AgendaItem left, final AgendaItem right,
-			final Model model) {
+	protected void updateAgenda(final Agenda agenda, final AgendaItem left, final AgendaItem right, final Model model) {
 
 		final SyntaxTreeNode leftChild = left.getParse();
 		final SyntaxTreeNode rightChild = right.getParse();
 
-		if (!seenRules.isSeen(leftChild.getCategory(), rightChild.getCategory())) {
+		if (!allowUnseenRules && !seenRules.isSeen(leftChild.getCategory(), rightChild.getCategory())) {
 			return;
 		}
 		final List<RuleProduction> rules = getRules(leftChild.getCategory(), rightChild.getCategory());
@@ -194,10 +236,9 @@ public class ParserAStar extends AbstractParser {
 		for (int i = 0; i < size; i++) {
 			final RuleProduction production = rules.get(i);
 			// Check if normal-form constraints let us add this rule.
-			if (NormalForm.isOk(leftChild.getRuleClass(), rightChild.getRuleClass(), production.getRuleType(),
+			if (normalForm.isOk(leftChild.getRuleClass(), rightChild.getRuleClass(), production.getRuleType(),
 					leftChild.getCategory(), rightChild.getCategory(), production.getCategory(),
 					left.getStartOfSpan() == 0)) {
-
 				final SyntaxTreeNodeBinary newNode;
 				if (usingDependencies) {
 					// Update all the information for tracking dependencies.
@@ -205,13 +246,8 @@ public class ParserAStar extends AbstractParser {
 					final DependencyStructure newDependencies = production.getCombinator().apply(
 							leftChild.getDependencyStructure(), rightChild.getDependencyStructure(),
 							resolvedDependencies);
-
-					final boolean headIsLeft = newDependencies.getArbitraryHead() == leftChild.getDependencyStructure()
-							.getArbitraryHead();
-
 					newNode = new SyntaxTreeNodeBinary(production.getCategory(), leftChild, rightChild,
-							production.getRuleType(), headIsLeft, newDependencies, resolvedDependencies);
-
+							production.getRuleType(), production.isHeadIsLeft(), newDependencies, resolvedDependencies);
 				} else {
 					// If we're not modeling dependencies, we can save a lot of work.
 					newNode = new SyntaxTreeNodeBinary(production.getCategory(), leftChild, rightChild,
@@ -221,5 +257,23 @@ public class ParserAStar extends AbstractParser {
 				agenda.add(model.combineNodes(left, right, newNode));
 			}
 		}
+	}
+
+	public Parser make(final File modelFolder) {
+		return new Builder(modelFolder).build();
+	}
+
+	public static class Builder extends ParserBuilder<Builder> {
+
+		public Builder(final File modelFolder) {
+			super(modelFolder);
+			super.maxChartSize(20000);
+		}
+
+		@Override
+		protected ParserAStar build2() {
+			return new ParserAStar(this);
+		}
+
 	}
 }

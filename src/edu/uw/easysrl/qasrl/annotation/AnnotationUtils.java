@@ -9,11 +9,14 @@ import edu.uw.easysrl.qasrl.query.QueryGeneratorUtils;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.GuavaCollectors;
+import scala.Int;
 
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * Filtering stuff.
@@ -96,6 +99,29 @@ public class AnnotationUtils {
             }
         }
         return optionDist;
+    }
+
+    public static ImmutableList<ImmutableList<Integer>> getAllUserResponses(Query query, AlignedAnnotation annotation) {
+        int numOptions = query.getOptions().size();
+        return annotation.annotatorToAnswerIds.values().stream()
+                .map(ops -> ops.stream()
+                        .map(i -> {
+                            final String annotatedStr = annotation.optionStrings.get(i);
+                            return IntStream.range(0, numOptions)
+                                    .filter(j -> {
+                                        final String optionStr = (String) query.getOptions().get(j);
+                                        return optionStr.equals(annotatedStr) ||
+                                                (badQuestionStrings.contains(optionStr) &&
+                                                        badQuestionStrings.contains(annotatedStr));
+                                    })
+                                    .findFirst()
+                                    .orElse(-1);
+                        })
+                        .filter(i -> i > -1)
+                        .collect(GuavaCollectors.toImmutableList())
+                )
+                .filter(ops -> !ops.isEmpty())
+                .collect(GuavaCollectors.toImmutableList());
     }
 
     public static ImmutableList<Integer> getSingleUserResponse(Query query, RecordedAnnotation annotation) {

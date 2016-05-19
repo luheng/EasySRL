@@ -1,5 +1,13 @@
 package edu.uw.easysrl.syntax.parser;
 
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableListMultimap;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ListMultimap;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Table.Cell;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
@@ -9,14 +17,6 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableListMultimap;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.ListMultimap;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Table.Cell;
 
 import edu.uw.easysrl.dependencies.Coindexation;
 import edu.uw.easysrl.dependencies.DependencyStructure;
@@ -29,6 +29,7 @@ import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.Category.Slash;
 import edu.uw.easysrl.syntax.grammar.Combinator;
 import edu.uw.easysrl.syntax.grammar.Combinator.RuleProduction;
+import edu.uw.easysrl.syntax.grammar.NormalForm;
 import edu.uw.easysrl.syntax.grammar.SeenRules;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.util.Util;
@@ -36,8 +37,12 @@ import edu.uw.easysrl.util.Util.Scored;
 
 public abstract class AbstractParser implements Parser {
 
-	final Collection<Category> lexicalCategories;
+	protected final Collection<Category> lexicalCategories;
+	protected final boolean allowUnseenRules;
+	protected final NormalForm normalForm;
+	protected final double nbestBeam;
 
+	@Deprecated
 	public AbstractParser(final Collection<Category> lexicalCategories, final int maxSentenceLength, final int nbest,
 			final List<Category> validRootCategories, final File modelFolder) throws IOException {
 		this(lexicalCategories, maxSentenceLength, nbest, validRootCategories, new File(modelFolder, "unaryRules"),
@@ -45,14 +50,14 @@ public abstract class AbstractParser implements Parser {
 						"seenRules"));
 	}
 
+	@Deprecated
 	private AbstractParser(final Collection<Category> lexicalCategories, final int maxSentenceLength, final int nbest,
 			final List<Category> validRootCategories, final File unaryRulesFile, final File extraCombinatorsFile,
 			final File markedupFile, final File seenRulesFile) throws IOException {
 		this.maxLength = maxSentenceLength;
 		this.nbest = nbest;
-		this.unaryRules = loadUnaryRules(unaryRulesFile);
-		this.seenRules = new SeenRules(seenRulesFile, lexicalCategories);
 		this.lexicalCategories = lexicalCategories;
+		this.unaryRules = loadUnaryRules(unaryRulesFile);
 		Coindexation.parseMarkedUpFile(markedupFile);
 
 		final List<Combinator> combinators = new ArrayList<>(Combinator.STANDARD_COMBINATORS);
@@ -63,6 +68,33 @@ public abstract class AbstractParser implements Parser {
 		this.binaryRules = ImmutableList.copyOf(combinators);
 
 		possibleRootCategories = ImmutableSet.copyOf(validRootCategories);
+		this.seenRules = new SeenRules(seenRulesFile, lexicalCategories);
+		for (final Cell<Category, Category, List<RuleProduction>> entry : seenRules.ruleTable().cellSet()) {
+			// Cache out all the rules in advance.
+			getRules(entry.getRowKey(), entry.getColumnKey());
+		}
+
+		// Get default arguments for newer parameters.
+		final ParserBuilder builder = new ParserBuilder() {
+			@Override
+			public AbstractParser build2() { return null; }
+		};
+		this.nbestBeam = builder.getNbestBeam();
+		this.allowUnseenRules = builder.getAllowUnseenRules();
+		this.normalForm = builder.getNormalForm();
+	}
+
+	public AbstractParser(final ParserBuilder<?> builder) {
+		this.unaryRules = builder.getUnaryRules();
+		this.seenRules = builder.getSeenRules();
+		this.lexicalCategories = builder.getLexicalCategories();
+		this.possibleRootCategories = ImmutableSet.copyOf(builder.getValidRootCategories());
+		this.nbest = builder.getNbest();
+		this.maxLength = builder.getMaxSentenceLength();
+		this.binaryRules = builder.getCombinators();
+		this.allowUnseenRules = builder.getAllowUnseenRules();
+		this.normalForm = builder.getNormalForm();
+		this.nbestBeam = builder.getNbestBeam();
 
 		for (final Cell<Category, Category, List<RuleProduction>> entry : seenRules.ruleTable().cellSet()) {
 			// Cache out all the rules in advance.
@@ -72,7 +104,6 @@ public abstract class AbstractParser implements Parser {
 
 	protected final int maxLength;
 
-	protected double nbestBeam = 0.001;
 	protected final Collection<Combinator> binaryRules;
 	protected final ListMultimap<Category, UnaryRule> unaryRules;
 	protected final int nbest;
@@ -199,7 +230,7 @@ public abstract class AbstractParser implements Parser {
 			return null;
 		}
 
-		return parseAstar(input);
+		return parse(input);
 	}
 
 	/**
@@ -207,7 +238,7 @@ public abstract class AbstractParser implements Parser {
 	 *
 	 * Returns null if the parse fails.
 	 */
-	abstract List<Scored<SyntaxTreeNode>> parseAstar(InputToParser sentence);
+	protected abstract List<Scored<SyntaxTreeNode>> parse(InputToParser sentence);
 
 	private final Map<Category, Map<Category, List<RuleProduction>>> ruleCache = new IdentityHashMap<>();
 

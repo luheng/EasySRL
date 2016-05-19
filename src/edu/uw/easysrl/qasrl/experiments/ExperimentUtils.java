@@ -20,7 +20,7 @@ import java.util.*;
 public class ExperimentUtils {
 
     static class DebugBlock {
-        double deltaF1;
+        double deltaF1, oracleDeltaF1;
         String block;
         DebugBlock(double deltaF1, String block) {
             this.deltaF1 = deltaF1;
@@ -114,11 +114,21 @@ public class ExperimentUtils {
             final QueryPruningParameters queryPruningParameters) {
         QuestionGenerator.setAskPPAttachmentQuestions(false);
         QuestionGenerator.setIndefinitesOnly(usePronouns);
+        try {
+            return queryFilter.filter(
+                    queryGenerator.generate(
+                            qaPairAggregator.aggregate(
+                                    QuestionGenerator.generateAllQAPairs(sentenceId, sentence, nBestList))),
+                    nBestList, queryPruningParameters);
+        } catch (NoSuchElementException e) {
+            return ImmutableList.of();
+        }
+        /*
         return queryFilter.filter(
                     queryGenerator.generate(
                             qaPairAggregator.aggregate(
                                     QuestionGenerator.generateAllQAPairs(sentenceId, sentence, nBestList))),
-                nBestList, queryPruningParameters);
+                nBestList, queryPruningParameters);*/
     }
 
     public static Map<Integer, List<AlignedAnnotation>> loadCrowdflowerAnnotation(String[] fileNames) {
