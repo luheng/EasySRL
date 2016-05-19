@@ -21,7 +21,11 @@ public class BasicNoun extends Noun {
     @Override
     public ImmutableList<String> getPhrase(Category desiredCategory) {
         // TODO verify that we want an NP out of it.
-        return words;
+        if(isElided()) {
+            return ImmutableList.of();
+        } else {
+            return words;
+        }
     }
 
     @Override
@@ -44,7 +48,7 @@ public class BasicNoun extends Noun {
     @Override
     public BasicNoun withCase(Optional<Case> caseMarking) {
         return new BasicNoun(getPredicate(), getPredicateCategory(), getArgs(),
-                             getCase(), getNumber(), getGender(), getPerson(), getDefiniteness(), words, deps);
+                             getCase(), getNumber(), getGender(), getPerson(), getDefiniteness(), words, deps, isElided());
     }
 
     @Override
@@ -55,7 +59,7 @@ public class BasicNoun extends Noun {
     @Override
     public BasicNoun withNumber(Optional<Number> number) {
         return new BasicNoun(getPredicate(), getPredicateCategory(), getArgs(),
-                             getCase(), getNumber(), getGender(), getPerson(), getDefiniteness(), words, deps);
+                             getCase(), number, getGender(), getPerson(), getDefiniteness(), words, deps, isElided());
     }
 
     @Override
@@ -66,19 +70,19 @@ public class BasicNoun extends Noun {
     @Override
     public BasicNoun withGender(Optional<Gender> gender) {
         return new BasicNoun(getPredicate(), getPredicateCategory(), getArgs(),
-                             getCase(), getNumber(), getGender(), getPerson(), getDefiniteness(), words, deps);
+                             getCase(), getNumber(), gender, getPerson(), getDefiniteness(), words, deps, isElided());
     }
 
     @Override
     public BasicNoun withPerson(Person person) {
         return new BasicNoun(getPredicate(), getPredicateCategory(), getArgs(),
-                             getCase(), getNumber(), getGender(), getPerson(), getDefiniteness(), words, deps);
+                             getCase(), getNumber(), getGender(), person, getDefiniteness(), words, deps, isElided());
     }
 
     @Override
     public BasicNoun withDefiniteness(Definiteness definiteness) {
         return new BasicNoun(getPredicate(), getPredicateCategory(), getArgs(),
-                             getCase(), getNumber(), getGender(), getPerson(), getDefiniteness(), words, deps);
+                             getCase(), getNumber(), getGender(), getPerson(), definiteness, words, deps, isElided());
     }
 
     @Override
@@ -88,12 +92,18 @@ public class BasicNoun extends Noun {
 
     @Override
     public Pronoun getPronoun() {
-        return new Pronoun(getCase(), getNumber(), getGender(), getPerson(), getDefiniteness());
+        return new Pronoun(getCase(), getNumber(), getGender(), getPerson(), getDefiniteness(), isElided());
     }
 
     @Override
     public Noun getPronounOrExpletive() {
         return getPronoun();
+    }
+
+    @Override
+    public BasicNoun withElision(boolean shouldElide) {
+        return new BasicNoun(getPredicate(), getPredicateCategory(), getArgs(),
+                             getCase(), getNumber(), getGender(), getPerson(), getDefiniteness(), words, deps, shouldElide);
     }
 
     /* protected methods and fields */
@@ -107,8 +117,9 @@ public class BasicNoun extends Noun {
                         Person person,
                         Definiteness definiteness,
                         ImmutableList<String> words,
-                        ImmutableSet<ResolvedDependency> deps) {
-        super(predicate, predicateCategory, args, caseMarking, number, gender, person, definiteness);
+                        ImmutableSet<ResolvedDependency> deps,
+                        boolean isElided) {
+        super(predicate, predicateCategory, args, caseMarking, number, gender, person, definiteness, isElided);
         this.words = words;
         this.deps = deps;
     }

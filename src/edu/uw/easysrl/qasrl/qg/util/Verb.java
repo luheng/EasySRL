@@ -44,11 +44,26 @@ public final class Verb extends Predication {
 
     /* factory methods */
 
-    public static Verb getFromParse(Integer headIndex, PredicateCache preds, Parse parse) {
+    public static Verb getFromParse(Integer possiblyAuxHeadIndex, PredicateCache preds, Parse parse) {
         final SyntaxTreeNode tree = parse.syntaxTree;
         final ImmutableList<String> words = tree.getLeaves().stream()
             .map(leaf -> leaf.getWord())
             .collect(toImmutableList());
+        int shiftForwardIndex = possiblyAuxHeadIndex;
+        if(VerbHelper.isAuxiliaryVerb(words.get(possiblyAuxHeadIndex), parse.categories.get(possiblyAuxHeadIndex))) {
+            while(VerbHelper.isAuxiliaryVerb(words.get(shiftForwardIndex), parse.categories.get(shiftForwardIndex)) ||
+                  parse.categories.get(shiftForwardIndex).isFunctionInto(Category.valueOf("(S\\NP)|(S\\NP)")) ||
+                  VerbHelper.isNegationWord(words.get(shiftForwardIndex))) {
+                shiftForwardIndex++;
+            }
+            while(((!parse.categories.get(shiftForwardIndex).isFunctionInto(Category.valueOf("S\\NP")) &&
+                    !Category.valueOf("(S[dcl]|S[dcl])|NP").matches(parse.categories.get(shiftForwardIndex))) ||
+                   parse.categories.get(shiftForwardIndex).isFunctionInto(Category.valueOf("(S\\NP)|(S\\NP)"))) &&
+                  shiftForwardIndex > possiblyAuxHeadIndex) {
+                shiftForwardIndex--;
+            }
+        }
+        final int headIndex = shiftForwardIndex;
         final SyntaxTreeNodeLeaf headLeaf = tree.getLeaves().get(headIndex);
         final Category initCategory = parse.categories.get(headIndex);
 
@@ -142,12 +157,12 @@ public final class Verb extends Predication {
                 if(VerbHelper.isModal(aux)) {
                     tense = Tense.MODAL;
                     modal = Optional.of(VerbHelper.getNormalizedModal(aux));
+                } else if(VerbHelper.isFutureTense(aux)) {
+                    tense = Tense.FUTURE;
                 } else if(VerbHelper.isPastTense(aux)) {
                     tense = Tense.PAST;
                 } else if(VerbHelper.isPresentTense(aux)) {
                     tense = Tense.PRESENT;
-                } else if(VerbHelper.isFutureTense(aux)) {
-                    tense = Tense.FUTURE;
                 } else {
                     // System.err.println("error getting info from S[dcl] for " + aux + "(" + cat + ")");
                     break;
@@ -286,38 +301,33 @@ public final class Verb extends Predication {
             : "can only get question words for predication with exactly one arg in each slot";
         ImmutableMap<Integer, Argument> args = getArgs().entrySet().stream()
             .collect(toImmutableMap(e -> e.getKey(), e -> e.getValue().get(0)));
-        // TODO: I think this causes problems when the word "what" appears in the wild, oops.
-        // assert args.entrySet().stream()
-        //     .filter(e -> (e.getValue().getPredication() instanceof Noun) && ((Noun) e.getValue().getPredication()).isFocal())
-        //     .collect(counting()) <= 1
-        //     : "can't have more than one noun argument in focus";
-        // TODO: PP args, VP args, etc. and others might also hypothetically be in focus, if we had supersense questions
-        Optional<Integer> focalArgNumOpt = args.keySet().stream()
-            .filter(argNum -> (args.get(argNum).getPredication() instanceof Noun) && ((Noun) args.get(argNum).getPredication()).isFocal())
-            .findFirst();
 
         ImmutableList<String> leftInternalArgs = ImmutableList.of();
         ImmutableList<String> rightInternalArgs = ImmutableList.of();
         Category done = Category.valueOf("(S\\NP)");
         Category curCat = getPredicateCategory();
+
+        // add the particle now if we're never going to drop into the while loop below.
+        if(done.matches(curCat) && particle.isPresent()) {
+            rightInternalArgs = ImmutableList.of(particle.get());
+        }
+
         while(!done.matches(curCat)) { // we're not including the subject
             Predication curArg = args.get(curCat.getNumberOfArguments()).getPredication();
-            if(!focalArgNumOpt.isPresent() || focalArgNumOpt.get() != curCat.getNumberOfArguments()) {
-                Category curArgCat = curCat.getArgument(curCat.getNumberOfArguments());
-                Slash slash = curCat.getSlash();
-                switch(slash) {
-                case BWD: leftInternalArgs = new ImmutableList.Builder<String>()
-                        .addAll(curArg.getPhrase(curArgCat))
-                        .addAll(leftInternalArgs)
-                        .build();
-                    break;
-                case FWD: rightInternalArgs = new ImmutableList.Builder<String>()
-                        .addAll(rightInternalArgs)
-                        .addAll(curArg.getPhrase(curArgCat))
-                        .build();
-                    break;
-                default: assert false;
-                }
+            Category curArgCat = curCat.getArgument(curCat.getNumberOfArguments());
+            Slash slash = curCat.getSlash();
+            switch(slash) {
+            case BWD: leftInternalArgs = new ImmutableList.Builder<String>()
+                    .addAll(curArg.getPhrase(curArgCat))
+                    .addAll(leftInternalArgs)
+                    .build();
+                break;
+            case FWD: rightInternalArgs = new ImmutableList.Builder<String>()
+                    .addAll(rightInternalArgs)
+                    .addAll(curArg.getPhrase(curArgCat))
+                    .build();
+                break;
+            default: assert false;
             }
 
             if(particle.isPresent()) {
@@ -339,45 +349,28 @@ public final class Verb extends Predication {
                     }
                 }
             }
-
-
             curCat = curCat.getLeft();
         }
 
         Noun subject = (Noun) args.get(1).getPredication();
         ImmutableList<String> subjWords = subject.getPhrase(getPredicateCategory().getArgument(1));
 
-        // we're going to flip the auxiliary only if the subject is not focal and the subject's string form is nonempty
-        boolean flipAuxiliary = (!focalArgNumOpt.isPresent() || focalArgNumOpt.get() != 1) && subjWords.size() > 0;
+        // we're going to flip the auxiliary only if the subject's string form is nonempty
+        boolean flipAuxiliary = subjWords.size() > 0;
 
         ImmutableList<String> questionPrefix;
         ImmutableList<String> verbWords;
-        if(focalArgNumOpt.isPresent() && focalArgNumOpt.get() == 1) { // if we're asking about the subject
+        if(!flipAuxiliary) { // if subject is not present
             ImmutableList<String> allVerbWords = getVerbWithoutSplit();
-            ImmutableList<String> auxChain;
-            auxChain = allVerbWords.subList(0, allVerbWords.size() - 1);
+            ImmutableList<String> auxChain = allVerbWords.subList(0, allVerbWords.size() - 1);
             verbWords = allVerbWords.subList(allVerbWords.size() - 1, allVerbWords.size());
             questionPrefix = new ImmutableList.Builder<String>()
-                .addAll(subjWords) // wh-subject
                 .addAll(auxChain)
                 .build();
-        } else if(focalArgNumOpt.isPresent()) { // if we're asking about a non-subject
+        } else { // if we have a subject and need to flip the auxiliary
             ImmutableList<String> wordsForFlip = getVerbWithSplit();
             ImmutableList<String> flippedAux = wordsForFlip.subList(0, 1);
-            ImmutableList<String> remainingAuxChain;
-            remainingAuxChain = wordsForFlip.subList(1, wordsForFlip.size() - 1);
-            verbWords = wordsForFlip.subList(wordsForFlip.size() - 1, wordsForFlip.size());
-            questionPrefix = new ImmutableList.Builder<String>()
-                .addAll(args.get(focalArgNumOpt.get()).getPredication().getPhrase(Category.NP))
-                .addAll(flippedAux)
-                .addAll(subjWords)
-                .addAll(remainingAuxChain)
-                .build();
-        } else { // it's a yes/no question; no focal arg
-            ImmutableList<String> wordsForFlip = getVerbWithSplit();
-            ImmutableList<String> flippedAux = wordsForFlip.subList(0, 1);
-            ImmutableList<String> remainingAuxChain;
-            remainingAuxChain = wordsForFlip.subList(1, wordsForFlip.size() - 1);
+            ImmutableList<String> remainingAuxChain = wordsForFlip.subList(1, wordsForFlip.size() - 1);
             verbWords = wordsForFlip.subList(wordsForFlip.size() - 1, wordsForFlip.size());
             questionPrefix = new ImmutableList.Builder<String>()
                 .addAll(flippedAux)
@@ -392,11 +385,7 @@ public final class Verb extends Predication {
             .addAll(verbWords)
             .addAll(rightInternalArgs)
             .build();
-        if(args.entrySet().stream()
-           .filter(e -> (e.getValue().getPredication() instanceof Noun) && ((Noun) e.getValue().getPredication()).isFocal())
-           .collect(counting()) > 1) {
-            System.err.println("can't have more than one noun argument in focus:\n\t" + result);
-        }
+
         return result;
     }
 

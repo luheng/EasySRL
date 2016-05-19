@@ -317,6 +317,10 @@ public class TextGenerationHelper {
             words.add("were");
             words.add("the");
             words.add("case");
+        } else if(category.matches(Category.valueOf("S[dcl]/NP"))) {
+            words.add("would");
+            words.add("do");
+            words.add("something");
         } else {
             System.err.println("need unrealized phrase for category " + category);
         }

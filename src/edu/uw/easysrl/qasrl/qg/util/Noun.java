@@ -161,7 +161,8 @@ public abstract class Noun extends Predication {
         final ImmutableList<String> words;
         final ImmutableSet<ResolvedDependency> deps;
         if(phraseNode.getEndIndex() < tree.getEndIndex() &&
-           tree.getLeaves().get(phraseNode.getEndIndex()).getWord().equals("of")) {
+           tree.getLeaves().get(phraseNode.getEndIndex()).getWord().equals("of") &&
+           tree.getLeaves().get(phraseNode.getEndIndex()).getCategory().isFunctionInto(Category.valueOf("NP\\NP"))) {
             final SyntaxTreeNode ofNode = tree.getLeaves().get(phraseNode.getEndIndex());
             final Optional<SyntaxTreeNode> phraseNodeWithOfOpt = TextGenerationHelper.getLowestAncestorOfNodes(phraseNode, ofNode, tree);
             if(phraseNodeWithOfOpt.isPresent()) {
@@ -178,7 +179,7 @@ public abstract class Noun extends Predication {
         return new BasicNoun(predicate, Category.NP,
                              ImmutableMap.of(),
                              caseMarking, number, gender, person, definiteness,
-                             words, deps);
+                             words, deps, false);
     }
 
     /* public API */
@@ -224,6 +225,10 @@ public abstract class Noun extends Predication {
         return definiteness == Definiteness.FOCAL;
     }
 
+    public final boolean isElided() {
+        return isElided;
+    }
+
     // transformers -- subclasses need to override
 
     public abstract Noun withCase(Case caseMarking);
@@ -243,6 +248,7 @@ public abstract class Noun extends Predication {
     public abstract Pronoun getPronoun();
 
     public abstract Noun getPronounOrExpletive();
+    public abstract Noun withElision(boolean shouldElide);
 
     /* protected methods and fields */
 
@@ -253,13 +259,15 @@ public abstract class Noun extends Predication {
                    Optional<Number> number,
                    Optional<Gender> gender,
                    Person person,
-                   Definiteness definiteness) {
+                   Definiteness definiteness,
+                   boolean isElided) {
         super(predicate, predicateCategory, args);
         this.caseMarking = caseMarking;
         this.number = number;
         this.gender = gender;
         this.person = person;
         this.definiteness = definiteness;
+        this.isElided = isElided;
     }
 
     /* private fields */
@@ -269,4 +277,6 @@ public abstract class Noun extends Predication {
     private final Optional<Gender> gender;
     private final Person person;
     private final Definiteness definiteness;
+
+    private boolean isElided;
 }

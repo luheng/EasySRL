@@ -6,16 +6,29 @@ import static edu.uw.easysrl.util.GuavaCollectors.*;
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.ImmutableList;
 
+// these objects are totes not thread-safe.
 public final class PredicateCache {
+
+    private enum Sentinel {
+        INSTANCE;
+    }
+    private Sentinel sentinel = Sentinel.INSTANCE;
+    private HashBasedTable<Integer, Predication.Type, Sentinel> currentlyConstructing = HashBasedTable.create();
 
     public Predication getPredication(int index, Predication.Type predType) {
         if(preds.contains(index, predType)) {
             return preds.get(index, predType);
         } else {
+            if(currentlyConstructing.contains(index, predType)) {
+                // System.err.println(String.format("Circular dependency at index %d, pred type %s; bailing out",
+                //                                  index, predType.name()));
+                return new Gap(predType.getTypicalCategory());
+            }
+            currentlyConstructing.put(index, predType, sentinel);
             final Predication result;
             switch(predType) {
             case VERB:
-                // one day, I hope to fix the issues with auxiliaries... :(
+                // issues with auxiliaries... :(
                 // final ImmutableList<String> words = parse.syntaxTree.getLeaves().stream()
                 //     .map(leaf -> leaf.getWord())
                 //     .collect(toImmutableList());
@@ -50,12 +63,13 @@ public final class PredicateCache {
             case CLAUSE: result = Clause.getFromParse(index, this, parse); break;
             default: assert false; result = null;
             }
+            currentlyConstructing.remove(index, predType);
             // nulls for debugging purposes
             if(result == null) {
                 System.err.println("got null result for predication type " + predType.name());
-                Predication pronoun = Pronoun.fromString("something").get();
-                preds.put(index, predType, pronoun);
-                return pronoun;
+                Predication gap = new Gap(predType.getTypicalCategory());
+                preds.put(index, predType, gap);
+                return gap;
             } else {
                 preds.put(index, predType, result);
                 return result;

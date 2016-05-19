@@ -28,11 +28,20 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.function.Function;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * Created by luheng on 12/8/15.
  */
 public class QuestionGenerator {
+
+    private static ParseData devData = null;
+    private static ParseData getDevData() {
+        if(devData == null) {
+            devData = ParseData.loadFromDevPool().get();
+        }
+        return devData;
+    }
 
     private static boolean indefinitesOnly = true; // if true: only ask questions with indefinite noun args
     public static void setIndefinitesOnly(boolean flag) {
@@ -97,7 +106,11 @@ public class QuestionGenerator {
                         .collect(toImmutableList());
     }
 
-    public static ImmutableList<QuestionAnswerPair> newCoreNPArgPronounQuestions(int sentenceId, int parseId, Parse parse) {
+    private static Verb withTenseForQuestion(Verb verb) {
+        return verb.withModal("would").withProgressive(false);
+    }
+
+    public static ImmutableList<QuestionAnswerPair> newCoreNPArgQuestions(int sentenceId, int parseId, Parse parse) {
         final PredicateCache preds = new PredicateCache(parse);
         final ImmutableList<QuestionAnswerPair> qaPairs = IntStream
             .range(0, parse.categories.size())
@@ -125,14 +138,20 @@ public class QuestionGenerator {
                      .withIndefinitePronouns(PredicationUtils
                      .addPlaceholderArguments(verb))).stream()
             .map(sequencedVerb -> {
-                    Verb questionPred = sequencedVerb.transformArgs((argNum, args) -> argNum == askingArgNum
-                                   ? ImmutableList.of(Argument.withNoDependency(((Noun) args.get(0).getPredication()).withDefiniteness(Noun.Definiteness.FOCAL)))
-                                   : args)
-                    .withModal("would");
+                    Noun whNoun = ((Noun) answerArg.getPredication())
+                    .getPronoun()
+                    .withPerson(Noun.Person.THIRD)
+                    .withDefiniteness(Noun.Definiteness.FOCAL);
+                    ImmutableList<String> whWord = whNoun.getPhrase(Category.NP);
+                    Verb questionPred = withTenseForQuestion(sequencedVerb.transformArgs((argNum, args) -> argNum == askingArgNum
+                                    ? ImmutableList.of(Argument.withNoDependency(whNoun.withElision(true)))
+                                    : args));
+                    ImmutableList<String> questionWords = Stream.concat(whWord.stream(), questionPred.getQuestionWords().stream())
+                    .collect(toImmutableList());
                     return new BasicQuestionAnswerPair(sentenceId, parseId, parse,
                                                        predicateIndex, verb.getPredicateCategory(), askingArgNum,
                                                        predicateIndex, null,
-                                                       questionPred.getAllDependencies(), questionPred.getQuestionWords(),
+                                                       questionPred.getAllDependencies(), questionWords,
                                                        answerArg.getDependency().get(),
                                                        new TextWithDependencies(answerArg.getPredication().getPhrase(Category.NP),
                                                                                 answerArg.getPredication().getAllDependencies()));
@@ -141,7 +160,154 @@ public class QuestionGenerator {
         return qaPairs;
     }
 
-    /* THESE ARE UNNECESSARY. don't bother with them. We have very few errors on these. */
+    public static ImmutableList<QuestionAnswerPair> newPPObjPronounQuestions(int sentenceId, int parseId, Parse parse) {
+        class QATemplate {
+            final int predicateIndex;
+            final Verb verb;
+            final ResolvedDependency ppObjDep;
+            final Noun ppObj;
+            final Optional<TextWithDependencies> attachedPreposition;
+            QATemplate(int predicateIndex, Verb verb, ResolvedDependency ppObjDep, Noun ppObj,
+                       Optional<TextWithDependencies> attachedPreposition) {
+                this.predicateIndex = predicateIndex; // index of verb or adverb, whichever
+                this.verb = verb; // sequenced; missing obj of pp if pp is present inside the verb
+                this.ppObjDep = ppObjDep;
+                this.ppObj = ppObj;
+                this.attachedPreposition = attachedPreposition;
+            }
+        }
+
+        final PredicateCache preds = new PredicateCache(parse);
+        final ImmutableList<String> words = parse.syntaxTree.getLeaves().stream().map(l -> l.getWord()).collect(toImmutableList());
+
+        final Stream<QATemplate> verbTemplates = IntStream
+            .range(0, parse.categories.size())
+            .boxed()
+            .filter(index -> parse.categories.get(index).isFunctionInto(Category.valueOf("((S\\NP)/NP)/PP")) ||
+                    parse.categories.get(index).isFunctionInto(Category.valueOf("((S\\NP)/PP)/NP")) ||
+                    parse.categories.get(index).isFunctionInto(Category.valueOf("(S\\NP)/PP")))
+            .flatMap(predicateIndex -> {
+                    Verb v = null;
+                    try {
+                        v = Verb.getFromParse(predicateIndex, preds, parse);
+                    } catch(IllegalArgumentException e) {
+                        // System.err.println(e.getMessage());
+                        v = null;
+                    }
+                    return Stream.of(v)
+            .filter(verb -> verb != null && !verb.isCopular())
+            .map(verb -> {
+                    // after this, the PP is guaranteed to be arg 2.
+                    if(parse.categories.get(predicateIndex).isFunctionInto(Category.valueOf("((S\\NP)/NP)/PP"))) {
+                        return verb.permuteArgs(i -> i == 2 ? 3 : (i == 3 ? 2 : i)); // swap 2 and 3
+                    } else {
+                        return verb;
+                    }
+                })
+            .flatMap(verb -> PredicationUtils.sequenceArgChoices(PredicationUtils.addPlaceholderArguments(verb)).stream()
+            .filter(sequencedVerb -> sequencedVerb.getArgs().get(2).get(0).getDependency().isPresent() &&
+                    sequencedVerb.getArgs().get(2).get(0).getPredication().getPredicateCategory().matches(Category.valueOf("PP/NP")) &&
+                    sequencedVerb.getArgs().get(2).get(0).getPredication().getArgs().get(1).get(0).getDependency().isPresent())
+            .map(sequencedVerb -> {
+                    Argument ppArg = sequencedVerb.getArgs().get(2).get(0);
+                    Argument ppObjArg = ppArg.getPredication().getArgs().get(1).get(0);
+                    ResolvedDependency targetDep = ppObjArg.getDependency().get();
+                    Noun ppObj = (Noun) ppObjArg.getPredication();
+                    Predication gappedPP = ppArg.getPredication()
+                    .transformArgs((argNum, args) -> ImmutableList.of(Argument.withNoDependency(ppObj.withElision(true))));
+                    Verb gappedVerb = sequencedVerb.transformArgs((argNum, args) -> {
+                            if(argNum != 2) {
+                                return args;
+                            } else {
+                                return ImmutableList.of(new Argument(ppArg.getDependency(), gappedPP));
+                            }
+                        });
+                    Verb gappedVerbWithPronouns = PredicationUtils.withIndefinitePronouns(gappedVerb);
+                    return new QATemplate(predicateIndex, gappedVerbWithPronouns, targetDep, ppObj, Optional.empty());
+                }));});
+
+        final Stream<QATemplate> adverbTemplates = IntStream
+            .range(0, parse.categories.size())
+            .boxed()
+            .filter(index -> parse.categories.get(index).isFunctionInto(Category.valueOf("((S\\NP)\\(S\\NP))/NP")) &&
+                    !words.get(index).equalsIgnoreCase("--"))
+            .flatMap(predicateIndex -> {
+                    Adverb adv = null;
+                    try {
+                        adv = Adverb.getFromParse(predicateIndex, preds, parse);
+                    } catch(IllegalArgumentException e) {
+                        // System.err.println(e.getMessage());
+                        adv = null;
+                    }
+                    return Stream.of(adv)
+            .filter(adverb -> adverb != null)
+            // .filter(adverb -> !(Prepositions.prepositionWords.contains(adverb.getPredicate()) &&
+            //                     parse.categories.get(predicateIndex).matches(Category.valueOf("(S\\NP)\\(S\\NP)"))))
+            .flatMap(adverb -> adverb.getArgs().get(3).stream()
+            .filter(ppObjArg -> ppObjArg.getDependency().isPresent())
+            .flatMap(ppObjArg -> PredicationUtils
+                     .sequenceArgChoices(PredicationUtils
+                     .addPlaceholderArguments(adverb.transformArgs((argNum, args) -> argNum == 3
+                                                                   ? ImmutableList.of(Argument.withNoDependency(((Noun) ppObjArg.getPredication()).withElision(true)))
+                                                                   : args))).stream()
+            .flatMap(sequencedAdverb -> sequencedAdverb.getArgs().get(2).stream()
+            .filter(verbArg -> verbArg.getDependency().isPresent())
+            .flatMap(verbArg -> PredicationUtils
+                     .sequenceArgChoices(PredicationUtils.withIndefinitePronouns(PredicationUtils.addPlaceholderArguments(verbArg.getPredication()))).stream()
+            .map(verb -> (Verb) verb)
+            .filter(verb -> !verb.isCopular())
+            .map(verb -> {
+                    ResolvedDependency vpAttachmentDep = verbArg.getDependency().get();
+                    ResolvedDependency ppObjDep = ppObjArg.getDependency().get();
+                    TextWithDependencies attachedPreposition = new TextWithDependencies(sequencedAdverb.getPhrase(Category.ADVERB),
+                                                                                        ImmutableSet.of(vpAttachmentDep));
+                    // System.err.println("got a template: " + verb.getQuestionWords());
+                    return new QATemplate(vpAttachmentDep.getArgument(), verb, ppObjDep, (Noun) ppObjArg.getPredication(), Optional.of(attachedPreposition));
+                })))));});
+
+        final Stream<QATemplate> templates = Stream.concat(verbTemplates, adverbTemplates);
+
+        return templates.map(template -> {
+
+                ImmutableList<String> whWords = template.ppObj.getPronoun()
+                    .withPerson(Noun.Person.THIRD)
+                    .withDefiniteness(Noun.Definiteness.FOCAL)
+                    .getPhrase(Category.NP);
+
+                final Verb questionVerb = withTenseForQuestion(template.verb);
+
+                final TextWithDependencies answerTWD = new TextWithDependencies(template.ppObj.getPhrase(Category.NP),
+                                                                                template.ppObj.getAllDependencies());
+                final ImmutableList<String> questionWords;
+                final ImmutableSet<ResolvedDependency> questionDeps;
+                if(template.attachedPreposition.isPresent()) {
+                    questionWords = new ImmutableList.Builder<String>()
+                        .addAll(whWords)
+                        .addAll(questionVerb.getQuestionWords())
+                        .addAll(template.attachedPreposition.get().tokens)
+                        .build();
+                    questionDeps = new ImmutableSet.Builder<ResolvedDependency>()
+                        .addAll(questionVerb.getAllDependencies())
+                        .addAll(template.attachedPreposition.get().dependencies)
+                        .build();
+                } else {
+                    questionWords = new ImmutableList.Builder<String>()
+                        .addAll(whWords)
+                        .addAll(questionVerb.getQuestionWords())
+                        .build();
+                    questionDeps = questionVerb.getAllDependencies();
+                }
+
+                return new BasicQuestionAnswerPair(sentenceId, parseId, parse,
+                                            template.predicateIndex, parse.categories.get(template.predicateIndex), 2,
+                                            template.predicateIndex, null,
+                                            questionDeps, questionWords,
+                                            template.ppObjDep, answerTWD);
+            })
+            .collect(toImmutableList());
+    }
+
+    /* THESE ARE UNNECESSARY. don't bother with them. We have very few errors on these. XXX broke now */
     public static ImmutableList<QuestionAnswerPair> newCoreXCompArgQuestions(int sentenceId, int parseId, Parse parse) {
         final PredicateCache preds = new PredicateCache(parse);
         final ImmutableList<QuestionAnswerPair> qaPairs = IntStream
@@ -213,8 +379,16 @@ public class QuestionGenerator {
             .boxed()
             .filter(index -> parse.categories.get(index).isFunctionInto(Category.valueOf("S\\NP"))
                     && !parse.categories.get(index).isFunctionInto(Category.valueOf("(S\\NP)|(S\\NP)")))
-            .flatMap(predicateIndex -> Stream.of(Verb.getFromParse(predicateIndex, preds, parse))
-            .filter(verb -> verb.isCopular())
+            .flatMap(predicateIndex -> {
+                    Verb v = null;
+                    try {
+                        v = Verb.getFromParse(predicateIndex, preds, parse);
+                    } catch(IllegalArgumentException e) {
+                        // System.err.println(e.getMessage());
+                        v = null;
+                    }
+                    return Stream.of(v)
+            .filter(verb -> verb != null && verb.isCopular())
             .flatMap(verb -> IntStream.range(1, verb.getPredicateCategory().getNumberOfArguments() + 1)
             .boxed()
             .filter(argNum -> Category.NP.matches(verb.getPredicateCategory().getArgument(argNum)))
@@ -223,35 +397,36 @@ public class QuestionGenerator {
             .filter(answerArg -> answerArg.getDependency().isPresent())
             .flatMap(answerArg -> PredicationUtils.sequenceArgChoices(PredicationUtils.addPlaceholderArguments(verb)).stream()
             .map(reducedVerb -> {
-                    Verb whPred = reducedVerb.withModal("would").transformArgs((argNum, args) -> {
-                            if(argNum == askingArgNum) {
-                                // args is not empty; was filled in before.
-                                return ImmutableList.of(Argument.withNoDependency(((Noun) args.get(0).getPredication())
-                                                                                  .getPronoun()
-                                                                                  .withPerson(Noun.Person.THIRD)
-                                                                                  .withDefiniteness(Noun.Definiteness.FOCAL)));
-                            } else {
-                                Category argCat = verb.getPredicateCategory().getArgument(argNum);
-                                if(!Category.NP.matches(argCat)) {
-                                    System.err.println("gapping arg category: " + argCat);
-                                    System.err.println("gapping preds:\n" + args.stream()
-                                                       .map(arg -> "\t" + arg.getPredication().getPredicate())
-                                                       // .map(arg -> "\t" + PredicationUtils.addPlaceholderArgumentsIfVerb(arg.getPredication()).getPhrase())
-                                                       .collect(joining("\n")));
-                                    return ImmutableList.of(Argument.withNoDependency(new Gap(argCat)));
+                    // args is not empty; was filled in before.
+                    Noun whNoun = ((Noun) answerArg.getPredication())
+                    .getPronoun()
+                    .withPerson(Noun.Person.THIRD)
+                    .withDefiniteness(Noun.Definiteness.FOCAL);
+                    ImmutableList<String> whWords = whNoun.getPhrase(Category.NP);
+                    // these may be necessary now since we didn't auto-pronoun everything
+                    Verb questionPred = withTenseForQuestion(reducedVerb.transformArgs((argNum, args) -> {
+                                if(argNum == askingArgNum) {
+                                    return ImmutableList.of(Argument.withNoDependency(whNoun.withElision(true)));
                                 } else {
-                                    return args;
+                                    Category argCat = verb.getPredicateCategory().getArgument(argNum);
+                                    if(!Category.NP.matches(argCat)) {
+                                        // since we sequenced the verb, there should be exactly 1 arg
+                                        return ImmutableList.of(Argument.withNoDependency(PredicationUtils.withIndefinitePronouns(args.get(0).getPredication())));
+                                    } else {
+                                        return args;
+                                    }
                                 }
-                            }
-                        });
+                            }));
+                    ImmutableList<String> questionWords = Stream.concat(whWords.stream(), questionPred.getQuestionWords().stream())
+                    .collect(toImmutableList());
                     return new BasicQuestionAnswerPair(sentenceId, parseId, parse,
                                                        predicateIndex, verb.getPredicateCategory(), askingArgNum,
                                                        predicateIndex, null,
-                                                       whPred.getAllDependencies(), whPred.getQuestionWords(),
+                                                       questionPred.getAllDependencies(), questionWords,
                                                        answerArg.getDependency().get(),
                                                        new TextWithDependencies(answerArg.getPredication().getPhrase(Category.NP),
                                                                                 answerArg.getPredication().getAllDependencies()));
-                })))))
+                }))));})
             .collect(toImmutableList());
         return qaPairs;
     }
@@ -354,12 +529,15 @@ public class QuestionGenerator {
                 final Noun dirObject = (Noun) dirObjectArgument.getPredication();
                 final ResolvedDependency dirObjectDep = dirObjectArgument.getDependency().get();
                 final Noun subject = template.verb.getSubject();
+
+                ImmutableList<String> whWords = ImmutableList.of("what");
+
                 Verb questionProVerb = new Verb("do", Category.valueOf("((S[dcl]\\" + subject.getPredicateCategory() + ")/NP)/PP"),
                                                 new ImmutableMap.Builder<Integer, ImmutableList<Argument>>()
                                                 .put(1, ImmutableList.of(Argument.withNoDependency(subject.isExpletive()
                                                         ? subject
                                                         : subject.getPronoun().withDefiniteness(Noun.Definiteness.INDEFINITE))))
-                                                .put(2, ImmutableList.of(Argument.withNoDependency(Pronoun.fromString("what").get())))
+                                                .put(2, ImmutableList.of(Argument.withNoDependency(dirObject.withElision(true))))
                                                 .put(3, ImmutableList.of(Argument.withNoDependency(Preposition.makeSimplePP("to", dirObject))))
                                                 .build(),
                                                 Verb.Tense.MODAL, Optional.of("would"),
@@ -382,10 +560,13 @@ public class QuestionGenerator {
                     TextWithDependencies answerTWD = new TextWithDependencies(answerVerb.getPhrase(Category.valueOf("S\\NP")),
                                                                              answerVerb.getAllDependencies());
 
+                    ImmutableList<String> questionWords = Stream.concat(whWords.stream(), questionProVerb.getQuestionWords().stream())
+                        .collect(toImmutableList());
+
                     QuestionAnswerPair withoutPPqaPair = new BasicQuestionAnswerPair(sentenceId, parseId, parse,
                                                                                      template.predicateIndex, parse.categories.get(template.predicateIndex), 2,
                                                                                      template.predicateIndex, null,
-                                                                                     ImmutableSet.of(), questionProVerb.getQuestionWords(),
+                                                                                     ImmutableSet.of(), questionWords,
                                                                                      dirObjectDep, answerTWD);
                     if(template.attachedPP.isPresent()) {
                         answerTWD = answerTWD.concatWithDep(template.attachedPP.get(), template.vpAttachmentDep);
@@ -393,7 +574,7 @@ public class QuestionGenerator {
                                          new BasicQuestionAnswerPair(sentenceId, parseId, parse,
                                                                      template.predicateIndex, parse.categories.get(template.predicateIndex), 2,
                                                                      template.predicateIndex, null,
-                                                                     ImmutableSet.of(), questionProVerb.getQuestionWords(),
+                                                                     ImmutableSet.of(), questionWords,
                                                                      dirObjectDep, answerTWD));
                     } else {
                         return Stream.of(withoutPPqaPair);
@@ -402,7 +583,7 @@ public class QuestionGenerator {
             .collect(toImmutableList());
     }
 
-    /* We aren't using these, don't bother with them. */
+    /* We aren't using these, don't bother with them. XXX probably broken now */
     public static ImmutableList<QuestionAnswerPair> newAdverbialQuestions(int sentenceId, int parseId, Parse parse) {
         final PredicateCache preds = new PredicateCache(parse);
         final ImmutableList<QuestionAnswerPair> qaPairs = IntStream
@@ -469,91 +650,8 @@ public class QuestionGenerator {
         return queries;
     }
 
-    private static abstract class QuestionGenerationPipeline {
-        abstract ImmutableList<QuestionAnswerPair> generateQAPairs(int sentenceId, int parseId, Parse parse);
-
-        ImmutableList<QuestionAnswerPair> generateAllQAPairs(int sentenceId, NBestList nBestList) {
-            return IntStream.range(0, nBestList.getN()).boxed()
-                .flatMap(parseId -> generateQAPairs(sentenceId, parseId, nBestList.getParse(parseId)).stream())
-                .collect(toImmutableList());
-        }
-
-        abstract QAPairAggregator<QAStructureSurfaceForm> getQAPairAggregator();
-        abstract QueryGenerator<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> getQueryGenerator();
-        Optional<QueryFilter<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>>> getQueryFilter() {
-            return Optional.empty();
-        }
-        QueryPruningParameters getQueryPruningParameters() {
-            return new QueryPruningParameters();
-        }
-
-        ImmutableList<ScoredQuery<QAStructureSurfaceForm>> generateAllQueries(int sentenceId, NBestList nBestList) {
-            final ImmutableList<QuestionAnswerPair> allQAPairs = IntStream.range(0, nBestList.getN()).boxed()
-                .flatMap(parseId -> this.generateQAPairs(sentenceId, parseId, nBestList.getParse(parseId)).stream())
-                .collect(toImmutableList());
-
-            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries =
-                getQueryGenerator().generate(getQAPairAggregator().aggregate(allQAPairs));
-            for(ScoredQuery<QAStructureSurfaceForm> query : queries) {
-                query.computeScores(nBestList);
-            }
-            if(getQueryFilter().isPresent()) {
-                return getQueryFilter().get().filter(queries, nBestList, getQueryPruningParameters());
-            } else {
-                return queries;
-            }
-        }
-
-        abstract ResponseSimulator getResponseSimulator(ImmutableMap<Integer, Parse> parses);
-    }
-
-    private static QuestionGenerationPipeline vpAttachmentQGPipeline = new QuestionGenerationPipeline() {
-            @Override
-            ImmutableList<QuestionAnswerPair> generateQAPairs(int sentenceId, int parseId, Parse parse) {
-                return newVPAttachmentQuestions(sentenceId, parseId, parse);
-            }
-
-            @Override
-            QAPairAggregator<QAStructureSurfaceForm> getQAPairAggregator() {
-                return QAPairAggregators.aggregateWithAnswerAdverbAndPPArgDependencies();
-            }
-
-            @Override
-            QueryGenerator<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> getQueryGenerator() {
-                return QueryGenerators.checkboxQueryGenerator();
-            }
-
-            @Override
-            ResponseSimulator getResponseSimulator(ImmutableMap<Integer, Parse> parses) {
-                return new VPAttachmentResponseSimulator(parses);
-            }
-        };
-
-    private static QuestionGenerationPipeline newCoreArgQGPipeline = new QuestionGenerationPipeline() {
-
-            @Override
-            ImmutableList<QuestionAnswerPair> generateQAPairs(int sentenceId, int parseId, Parse parse) {
-                return newCoreNPArgPronounQuestions(sentenceId, parseId, parse);
-            }
-
-            @Override
-            QAPairAggregator<QAStructureSurfaceForm> getQAPairAggregator() {
-                return QAPairAggregators.aggregateForMultipleChoiceQA();
-            }
-
-            @Override
-            QueryGenerator<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> getQueryGenerator() {
-                return QueryGenerators.checkboxQueryGenerator();
-            }
-
-            @Override
-            ResponseSimulator getResponseSimulator(ImmutableMap<Integer, Parse> parses) {
-                throw new UnsupportedOperationException("must use one-best or gold simulator manually");
-            }
-        };
-
     public static void compareCoreArgQueries() {
-        final ParseData parseData = ParseData.loadFromDevPool().get();
+        final ParseData parseData = getDevData();
         ImmutableMap<Integer, NBestList> nBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 100).get();
         HITLParser hitlParser = new HITLParser(100);
         long predsCoveredBoth = 0, predsCoveredOldOnly = 0, predsCoveredNewOnly = 0, totalPredsCovered = 0;
@@ -568,10 +666,18 @@ public class QuestionGenerator {
             }
 
             ImmutableList<ScoredQuery<QAStructureSurfaceForm>> oldQueries = hitlParser.getPronounCoreArgQueriesForSentence(sentenceId);
-            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> newQueries = newCoreArgQGPipeline.generateAllQueries(sentenceId, nBestList);
+            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> newQueries = QuestionGenerationPipeline.newCoreArgQGPipeline.generateAllQueries(sentenceId, nBestList);
 
             final ResponseSimulator oneBestResponseSimulator = new OneBestResponseSimulator();
             final ResponseSimulator goldResponseSimulator = new ResponseSimulatorGold(parseData);
+
+            // final ImmutableSet<ResolvedDependency> targetDeps = ImmutableSet.Builder<ResolvedDependency>()
+            //     .addAll(oldQueries.stream())
+
+            // Map<Integer, List<ScoredQuery<QAStructureSurfaceForm>>> oldQueriesByPredId = oldQueries.stream()
+            //     .collect(groupingBy(query -> query.getPredicateId().getAsInt()));
+            // Map<Integer, List<ScoredQuery<QAStructureSurfaceForm>>> newQueriesByPredId = newQueries.stream()
+            //     .collect(groupingBy(query -> query.getPredicateId().getAsInt()));
 
             Map<Integer, List<ScoredQuery<QAStructureSurfaceForm>>> oldQueriesByPredId = oldQueries.stream()
                 .collect(groupingBy(query -> query.getPredicateId().getAsInt()));
@@ -630,24 +736,23 @@ public class QuestionGenerator {
         }
 
         System.out.println(String.format("Total predicates covered by both methods: %d (%.2f%%)",
-                                         predsCoveredBoth, ((double) predsCoveredBoth) / totalPredsCovered));
+                                         predsCoveredBoth, (100.0 * predsCoveredBoth) / totalPredsCovered));
         System.out.println(String.format("Predicates covered by old method only: %d (%.2f%%)",
-                                         predsCoveredOldOnly, ((double) predsCoveredOldOnly) / totalPredsCovered));
+                                         predsCoveredOldOnly, (100.0 * predsCoveredOldOnly) / totalPredsCovered));
         System.out.println(String.format("Predicates covered by new method only: %d (%.2f%%)",
-                                         predsCoveredNewOnly, ((double) predsCoveredNewOnly) / totalPredsCovered));
+                                         predsCoveredNewOnly, (100.0 * predsCoveredNewOnly) / totalPredsCovered));
     }
-
 
     /**
      * Run this to print all the generated QA pairs to stdout.
      */
     public static void main(String[] args) {
-        compareCoreArgQueries();
-        System.exit(0);
+        // compareCoreArgQueries();
+        // System.exit(0);
         // what kind of questions we generate
-        final QuestionGenerationPipeline qgPipeline = vpAttachmentQGPipeline;
+        final QuestionGenerationPipeline qgPipeline = QuestionGenerationPipeline.newCoreArgQGPipeline;
 
-        final ParseData devData = ParseData.loadFromDevPool().get();
+        final ParseData devData = getDevData();
         if(args.length == 0 || (!args[0].equalsIgnoreCase("gold") && !args[0].equalsIgnoreCase("tricky") &&
                                 !args[0].equalsIgnoreCase("queries"))) {
             System.err.println("requires argument: \"gold\" or \"queries\"");
@@ -661,7 +766,9 @@ public class QuestionGenerator {
                 .add(268, 1016, 1232, 1695, 444, 1495, 1516, 1304, 1564, 397, 217, 90, 224, 563, 1489, 199, 1105, 1124, 1199, 294,
                      1305, 705, 762)
                 .build();
-            printQueries(devData, testSentences, qgPipeline);
+            ImmutableList<Integer> allSentences = IntStream.range(0, devData.getSentences().size()).boxed().collect(toImmutableList());
+            printQueries(devData, allSentences, qgPipeline);
+            // printStringAggregatedQueries(devData, allSentences, qgPipeline);
         }
     }
 
@@ -699,6 +806,9 @@ public class QuestionGenerator {
         System.out.println("\nQA Pairs for specific sentences:\n");
         ImmutableMap<Integer, NBestList> nBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 100).get();
         for(int sentenceId : sentenceIds) {
+            if(nBestLists.get(sentenceId) == null) {
+                continue;
+            }
             System.out.println(String.format("========== SID = %04d ==========", sentenceId));
             ImmutableList<String> words = parseData.getSentences().get(sentenceId);
             System.out.println(TextGenerationHelper.renderString(words));
@@ -710,11 +820,11 @@ public class QuestionGenerator {
             System.out.println("------- All Structured Queries -------");
             final ImmutableMap<Integer, Parse> oneBestParses = nBestLists.entrySet().stream()
                 .collect(toImmutableMap(e -> e.getKey(), e -> e.getValue().getParse(0)));
-            final ResponseSimulator oneBestResponseSimulator = qgPipeline.getResponseSimulator(oneBestParses);
+            final ResponseSimulator oneBestResponseSimulator = qgPipeline.getOneBestResponseSimulator(oneBestParses);
             final ImmutableMap<Integer, Parse> goldParses = IntStream.range(0, parseData.getGoldParses().size())
                 .boxed()
                 .collect(toImmutableMap(i -> i, i -> parseData.getGoldParses().get(i)));
-            final ResponseSimulator goldResponseSimulator = qgPipeline.getResponseSimulator(goldParses);
+            final ResponseSimulator goldResponseSimulator = qgPipeline.getGoldResponseSimulator(goldParses);
             for(ScoredQuery<QAStructureSurfaceForm> query : qgPipeline.generateAllQueries(sentenceId, nBestLists.get(sentenceId))) {
                 final ImmutableList<Integer> goldOptions = goldResponseSimulator.respondToQuery(query);
                 final ImmutableList<Integer> oneBestOptions = oneBestResponseSimulator.respondToQuery(query);
@@ -730,6 +840,10 @@ public class QuestionGenerator {
         System.out.println("\nQA Pairs for specific sentences:\n");
         ImmutableMap<Integer, NBestList> nBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 100).get();
         for(int sentenceId : sentenceIds) {
+            NBestList nBestList = nBestLists.get(sentenceId);
+            if(nBestList == null) {
+                continue;
+            }
             System.out.println(String.format("========== SID = %04d ==========", sentenceId));
             ImmutableList<String> words = parseData.getSentences().get(sentenceId);
             System.out.println(TextGenerationHelper.renderString(words));
@@ -738,7 +852,6 @@ public class QuestionGenerator {
             for(QuestionAnswerPair qaPair : qgPipeline.generateQAPairs(sentenceId, -1, goldParse)) {
                 printQAPair(words, qaPair);
             }
-            NBestList nBestList = nBestLists.get(sentenceId);
             ImmutableList<QuestionAnswerPair> qaPairs = qgPipeline.generateAllQAPairs(sentenceId, nBestList);
             System.out.println("------- All String-aggregated Queries -------");
             System.out.println(TextGenerationHelper.renderString(words));

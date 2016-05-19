@@ -151,11 +151,16 @@ public final class Clause extends Predication {
                     Category.valueOf("S[dcl]").matches(desiredCategory))
                 : "embedded clauses can only make S[em] phrases... " +
                 "except S[dcl] is ok because of CERTAIN not-so-nice coordinations...";
+            desiredCategory = Category.valueOf("S[em]"); // but we don't want to mess things up in those cases.
             break;
         default:
-            assert type.getHeadCategory().matches(desiredCategory)
-                : "desired category " + desiredCategory +
-                " needs to match clause category " + type.getHeadCategory();
+            // assert type.getHeadCategory().matches(desiredCategory)
+            //     : "desired category " + desiredCategory +
+            //     " needs to match clause category " + type.getHeadCategory();
+            // if(!type.getHeadCategory().matches(desiredCategory)) {
+            //     System.err.println("desired category " + desiredCategory +
+            //         " needs to match clause category " + type.getHeadCategory());
+            // }
             break;
         }
 
@@ -167,9 +172,17 @@ public final class Clause extends Predication {
         ImmutableList<String> leftArgs = ImmutableList.of();
         ImmutableList<String> rightArgs = ImmutableList.of();
         Category curCat = getPredicateCategory();
-        while(!desiredCategory.matches(curCat)) {
-            Predication curArg = args.get(curCat.getNumberOfArguments()).getPredication();
+        while(!(curCat.matches(desiredCategory) || desiredCategory.matches(curCat))) {
             Category curArgCat = curCat.getArgument(curCat.getNumberOfArguments());
+            final Predication curArg;
+            if(args.get(curCat.getNumberOfArguments()) == null) {
+                System.err.println("null argument " + curCat.getNumberOfArguments() + " in clause for " +
+                                   getPredicate() + " (" + getPredicateCategory() + ")" +
+                                   "where type is " + type.name() + " and desired category is " + desiredCategory);
+                curArg = args.get(curCat.getNumberOfArguments()).getPredication();
+            } else {
+                curArg = new Gap(curArgCat);
+            }
             Slash slash = curCat.getSlash();
             switch(slash) {
             case BWD: leftArgs = new ImmutableList.Builder<String>()

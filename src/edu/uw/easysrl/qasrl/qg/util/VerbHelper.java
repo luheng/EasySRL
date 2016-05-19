@@ -103,7 +103,7 @@ public class VerbHelper {
     }
 
     public static boolean isNegationWord(String word) {
-        return word.equalsIgnoreCase("n\'t") || word.equalsIgnoreCase("not");
+        return word.equalsIgnoreCase("n\'t") || word.equalsIgnoreCase("not") || word.equalsIgnoreCase("no");
     }
 
     public boolean isModifierWord(List<String> words, List<Category> categories, int index) {

@@ -25,6 +25,15 @@ import com.google.common.collect.ImmutableSet;
 
 public final class Preposition extends Predication {
 
+    public static final ImmutableSet<String> prepositionWords =
+        ImmutableSet.of("aboard", "about", "above", "across", "afore", "after", "against", "ahead", "along", "alongside", "amid",
+                        "amidst", "among", "amongst", "around", "as", "aside", "astride", "at", "atop", "before", "behind",
+                        "below", "beneath", "beside", "besides", "between", "beyond", "by", "despite", "down", "during", "except",
+                        "for", "from", "given", "in", "inside", "into", "near", "next", "of", "off", "on", "onto", "opposite",
+                        "out", "outside", "over", "pace", "per", "round", "since", "than", "through", "throughout", "till", "times",
+                        "to", "toward", "towards", "under", "underneath", "until", "unto", "up", "upon", "versus", "via", "with",
+                        "within", "without");
+
     private static Set<Category> prepositionCategories = new HashSet<>();
 
     public static Preposition makeSimplePP(String predicate, Noun object) {
@@ -60,19 +69,29 @@ public final class Preposition extends Predication {
 
     @Override
     public ImmutableList<String> getPhrase(Category desiredCategory) {
-        // assert getArgs().entrySet().stream().allMatch(e -> e.getValue().size() == 1)
-        //     : "can only get phrase for preposition with exactly one arg in each slot";
-        assert getPredicateCategory().isFunctionInto(desiredCategory)
-            : "can only make prepositional phrases or functions into them with preposition";
+        // assert getPredicateCategory().isFunctionInto(desiredCategory)
+        //     : "can only make prepositional phrases or functions into them with preposition. " +
+        //     "predicate: " + getPredicate() + " (" + getPredicateCategory() + "); " +
+        //     "desired category: " + desiredCategory;
+
         assert getArgs().entrySet().stream().allMatch(e -> e.getValue().size() >= 1)
             : "can only get phrase for preposition with at least one arg in each slot";
         ImmutableMap<Integer, Argument> args = getArgs().entrySet().stream()
             .collect(toImmutableMap(e -> e.getKey(), e -> e.getValue().get(0)));
 
+        if(!getPredicateCategory().isFunctionInto(desiredCategory)) {
+            // System.err.println("can only make prepositional phrases or functions into them with preposition. " +
+            //                    "predicate: " + getPredicate() + " (" + getPredicateCategory() + "); " +
+            //                    "desired category: " + desiredCategory);
+            // System.err.println(args.get(1).getPredication().getPhrase(getPredicateCategory().getArgument(1)));
+        }
+
         ImmutableList<String> leftArgs = ImmutableList.of();
         ImmutableList<String> rightArgs = ImmutableList.of();
         Category curCat = getPredicateCategory();
-        while(!desiredCategory.matches(curCat)) {
+        // sadness
+        // while(!desiredCategory.matches(curCat)) {
+        while(curCat.getNumberOfArguments() > desiredCategory.getNumberOfArguments()) {
             Predication curArg = args.get(curCat.getNumberOfArguments()).getPredication();
             Category curArgCat = curCat.getArgument(curCat.getNumberOfArguments());
             Slash slash = curCat.getSlash();

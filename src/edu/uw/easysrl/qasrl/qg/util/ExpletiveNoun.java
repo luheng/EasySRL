@@ -112,6 +112,12 @@ public class ExpletiveNoun extends Noun {
         return this;
     }
 
+    @Override
+    public ExpletiveNoun withElision(boolean shouldElide) {
+        assert !shouldElide : "can't elide expletive nouns";
+        return this;
+    }
+
     /* private methods and fields */
 
     private ExpletiveNoun(Category predicateCategory,
@@ -121,7 +127,7 @@ public class ExpletiveNoun extends Noun {
                           Person person,
                           Definiteness definiteness,
                           String word) {
-        super(PRED, predicateCategory, ImmutableMap.of(), caseMarking, number, gender, person, definiteness);
+        super(PRED, predicateCategory, ImmutableMap.of(), caseMarking, number, gender, person, definiteness, false);
         this.word = word;
     }
 

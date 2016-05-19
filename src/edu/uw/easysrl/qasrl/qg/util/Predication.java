@@ -23,7 +23,15 @@ import com.google.common.collect.ImmutableSet;
 public abstract class Predication {
 
     public static enum Type {
-        CLAUSE, VERB, NOUN, PREPOSITION, ADVERB;
+        CLAUSE(Category.S),
+        VERB(Category.valueOf("S\\NP")),
+        NOUN(Category.NP),
+        PREPOSITION(Category.PP),
+        ADVERB(Category.ADVERB);
+
+        public Category getTypicalCategory() {
+            return typicalCategory;
+        }
 
         public static Optional<Type> getTypeForArgCategory(Category category) {
             if(Category.valueOf("S\\NP").matches(category)) {
@@ -42,6 +50,13 @@ public abstract class Predication {
                 return Optional.empty();
             }
         }
+
+        private final Category typicalCategory;
+
+        private Type(Category typicalCategory) {
+            this.typicalCategory = typicalCategory;
+        }
+
     }
 
     /* public API */
