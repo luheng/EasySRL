@@ -102,7 +102,7 @@ public abstract class QuestionGenerationPipeline {
                     queryPruningParameters.minPromptConfidence = 0.00;
                     queryPruningParameters.minOptionEntropy = 0.00;
                     queryPruningParameters.skipSAdjQuestions = false;
-                    queryPruningParameters.skipBinaryQueries = true;
+                    queryPruningParameters.skipBinaryQueries = false;
                     // not using the rest right now
                     // queryPruningParameters.minOptionConfidence = 0.05;
                     // queryPruningParameters.maxNumOptionsPerQuery = 6;

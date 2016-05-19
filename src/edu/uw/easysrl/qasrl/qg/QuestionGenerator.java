@@ -767,6 +767,102 @@ public class QuestionGenerator {
                                          predsCoveredNewOnly, (100.0 * predsCoveredNewOnly) / totalPredsCovered));
     }
 
+    public static void compareNBestListCoreArgQueries() {
+        final ParseData parseData = getDevData();
+        ImmutableMap<Integer, NBestList> oldNBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 100).get();
+        ImmutableMap<Integer, NBestList> newNBestLists = NBestList.loadNBestListsFromFile("parses.dev.100best.out", 100).get();
+        long predsCoveredBoth = 0, predsCoveredOldOnly = 0, predsCoveredNewOnly = 0, totalPredsCovered = 0;
+        for(int sentenceId = 0; sentenceId < parseData.getSentences().size(); sentenceId++) {
+            System.out.println(String.format("========== SID = %04d ==========", sentenceId));
+            ImmutableList<String> words = parseData.getSentences().get(sentenceId);
+            System.out.println(TextGenerationHelper.renderString(words));
+            NBestList oldNBestList = oldNBestLists.get(sentenceId);
+            NBestList newNBestList = newNBestLists.get(sentenceId);
+
+            if(oldNBestList == null || newNBestList == null) {
+                continue;
+            }
+
+            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> oldQueries = QuestionGenerationPipeline
+                .newCoreArgQGPipeline.generateAllQueries(sentenceId, oldNBestList);
+            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> newQueries = QuestionGenerationPipeline
+                .newCoreArgQGPipeline.generateAllQueries(sentenceId, newNBestList);
+
+            final ResponseSimulator oneBestResponseSimulator = new OneBestResponseSimulator();
+            final ResponseSimulator goldResponseSimulator = new ResponseSimulatorGold(parseData);
+
+            // final ImmutableSet<ResolvedDependency> targetDeps = ImmutableSet.Builder<ResolvedDependency>()
+            //     .addAll(oldQueries.stream())
+
+            // Map<Integer, List<ScoredQuery<QAStructureSurfaceForm>>> oldQueriesByPredId = oldQueries.stream()
+            //     .collect(groupingBy(query -> query.getPredicateId().getAsInt()));
+            // Map<Integer, List<ScoredQuery<QAStructureSurfaceForm>>> newQueriesByPredId = newQueries.stream()
+            //     .collect(groupingBy(query -> query.getPredicateId().getAsInt()));
+
+            Map<Integer, List<ScoredQuery<QAStructureSurfaceForm>>> oldQueriesByPredId = oldQueries.stream()
+                .collect(groupingBy(query -> query.getPredicateId().getAsInt()));
+            Map<Integer, List<ScoredQuery<QAStructureSurfaceForm>>> newQueriesByPredId = newQueries.stream()
+                .collect(groupingBy(query -> query.getPredicateId().getAsInt()));
+
+            ImmutableSet<Integer> overlap = oldQueriesByPredId.keySet().stream()
+                .filter(newQueriesByPredId.keySet()::contains)
+                .collect(toImmutableSet());
+            ImmutableSet<Integer> oldOnly = oldQueriesByPredId.keySet().stream()
+                .filter(id -> !newQueriesByPredId.keySet().contains(id))
+                .collect(toImmutableSet());
+            ImmutableSet<Integer> newOnly = newQueriesByPredId.keySet().stream()
+                .filter(id -> !oldQueriesByPredId.keySet().contains(id))
+                .collect(toImmutableSet());
+            long totalPredIdsCovered = overlap.size() + oldOnly.size() + newOnly.size();
+
+            predsCoveredBoth += overlap.size();
+            predsCoveredOldOnly += oldOnly.size();
+            predsCoveredNewOnly += newOnly.size();
+            totalPredsCovered += totalPredIdsCovered;
+
+            Consumer<List<ScoredQuery<QAStructureSurfaceForm>>> printQueries = queries -> {
+                for(ScoredQuery<QAStructureSurfaceForm> query : queries) {
+                    final ImmutableList<Integer> goldOptions = goldResponseSimulator.respondToQuery(query);
+                    final ImmutableList<Integer> oneBestOptions = oneBestResponseSimulator.respondToQuery(query);
+                    System.out.println();
+                    System.out.println(query.toString(words,
+                                                      'G', goldOptions,
+                                                      'B', oneBestOptions));
+                }
+            };
+
+            Consumer<ImmutableSet<Integer>> printQueriesOfBothMethods = ids -> {
+                for(int predicateIndex : ids) {
+                    System.out.println("Predicate: " + predicateIndex + ": " + words.get(predicateIndex));
+                    if(oldQueriesByPredId.get(predicateIndex) != null) {
+                        System.out.println("- Old -");
+                        printQueries.accept(oldQueriesByPredId.get(predicateIndex));
+                    }
+                    if(newQueriesByPredId.get(predicateIndex) != null) {
+                        System.out.println("- New -");
+                        printQueries.accept(newQueriesByPredId.get(predicateIndex));
+                    }
+                }
+            };
+
+            System.out.println("------- Overlap Queries  ------");
+            printQueriesOfBothMethods.accept(overlap);
+
+            System.out.println("------- Old Only Queries -------");
+            printQueriesOfBothMethods.accept(oldOnly);
+
+            System.out.println("------- New Only Queries -------");
+            printQueriesOfBothMethods.accept(newOnly);
+        }
+
+        System.out.println(String.format("Total predicates covered by both methods: %d (%.2f%%)",
+                                         predsCoveredBoth, (100.0 * predsCoveredBoth) / totalPredsCovered));
+        System.out.println(String.format("Predicates covered by old method only: %d (%.2f%%)",
+                                         predsCoveredOldOnly, (100.0 * predsCoveredOldOnly) / totalPredsCovered));
+        System.out.println(String.format("Predicates covered by new method only: %d (%.2f%%)",
+                                         predsCoveredNewOnly, (100.0 * predsCoveredNewOnly) / totalPredsCovered));
+    }
+
     /**
      * Run this to print all the generated QA pairs to stdout.
      */
@@ -829,6 +925,7 @@ public class QuestionGenerator {
     private static void printQueries(ParseData parseData, ImmutableList<Integer> sentenceIds, QuestionGenerationPipeline qgPipeline) {
         System.out.println("\nQA Pairs for specific sentences:\n");
         ImmutableMap<Integer, NBestList> nBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 100).get();
+        int numberOfQueries = 0;
         for(int sentenceId : sentenceIds) {
             if(nBestLists.get(sentenceId) == null) {
                 continue;
@@ -856,8 +953,12 @@ public class QuestionGenerator {
                 System.out.println(query.toString(words,
                                                   'G', goldOptions,
                                                   'B', oneBestOptions));
+                numberOfQueries++;
             }
         }
+        System.out.println("\nTotal number of sentences: " + sentenceIds.size());
+        System.out.println(String.format("Total number of queries generated: %d (%.2f per sentence)",
+                                         numberOfQueries, ((double) numberOfQueries) / sentenceIds.size()));
     }
 
     private static void printStringAggregatedQueries(ParseData parseData, ImmutableList<Integer> sentenceIds, QuestionGenerationPipeline qgPipeline) {
