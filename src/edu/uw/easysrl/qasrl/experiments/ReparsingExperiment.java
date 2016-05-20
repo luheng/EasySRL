@@ -41,14 +41,14 @@ public class ReparsingExperiment {
     private static Map<Integer, List<AlignedAnnotation>> annotations;
 
     private static final String[] annotationFiles = {
-            "./Crowdflower_data/f878213.csv",                // Round1: radio-button, core + pp
-            "./Crowdflower_data/f882410.csv",                // Round2: radio-button, core only
+          //  "./Crowdflower_data/f878213.csv",                // Round1: radio-button, core + pp
+          //  "./Crowdflower_data/f882410.csv",                // Round2: radio-button, core only
           //  "./Crowdflower_data/all-checkbox-responses.csv", // Round3: checkbox, core + pp
           //  "./Crowdflower_data/f891522.csv",                // Round4: jeopardy checkbox, pp only
             "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
-            "./Crowdflower_data/f897179.csv",                 // Round2-3: NP clefting questions.
+        //    "./Crowdflower_data/f897179.csv",                 // Round2-3: NP clefting questions.
             "./Crowdflower_data/f902142.csv",                   // Round4: checkbox, pronouns, core only, 300 sentences.
-            "./Crowdflower_data/f903842.csv",                   // Round4: np-clefting prnouns
+         //   "./Crowdflower_data/f903842.csv",                   // Round4: np-clefting prnouns
             "./Crowdflower_data/f909211.csv",                   // Round5: checkbox, pronouns, core only, 300+ sentences.
     };
 
@@ -58,9 +58,14 @@ public class ReparsingExperiment {
         queryPruningParameters.maxNumOptionsPerQuery = 6;
         queryPruningParameters.skipPPQuestions = true;
         queryPruningParameters.skipSAdjQuestions = true;
+        /*
         queryPruningParameters.minOptionConfidence = 0.05;
         queryPruningParameters.minOptionEntropy = 0.05;
         queryPruningParameters.minPromptConfidence = 0.1;
+        */
+        queryPruningParameters.minOptionConfidence = -1;
+        queryPruningParameters.minOptionEntropy = -1;
+        queryPruningParameters.minPromptConfidence = -1;
     }
 
     private static HITLParsingParameters reparsingParameters;
@@ -160,14 +165,19 @@ public class ReparsingExperiment {
             boolean isCheckboxStyle = !annotated.stream()
                     .anyMatch(annot -> annot.answerOptions.stream()
                             .anyMatch(op -> op.contains(QAPairAggregatorUtils.answerDelimiter)));
+            boolean isClefting = annotated.stream()
+                    .anyMatch(annot -> annot.queryPrompt.startsWith("What is it"));
 
             List<ScoredQuery<QAStructureSurfaceForm>> queryList = new ArrayList<>();
-            if (!isCheckboxStyle) {
-                queryList.addAll(myHTILParser.getCoreArgumentQueriesForSentence(sentenceId, false /* radiobutton version*/));
+            if (!isClefting) {
+                if (!isCheckboxStyle) {
+                    queryList.addAll(myHTILParser.getCoreArgumentQueriesForSentence(sentenceId, false /* radiobutton version*/));
+                } else {
+                    queryList.addAll(myHTILParser.getPronounCoreArgQueriesForSentence(sentenceId));
+                }
             } else {
-                queryList.addAll(myHTILParser.getPronounCoreArgQueriesForSentence(sentenceId));
+                queryList.addAll(myHTILParser.getCleftedQuestionsForSentence(sentenceId));
             }
-            queryList.addAll(myHTILParser.getCleftedQuestionsForSentence(sentenceId));
 
             Results currentF1 = baselineF1,
                     oracleF1 = baselineF1,
@@ -187,10 +197,9 @@ public class ReparsingExperiment {
                                        oneBestOptions = myHTILParser.getOneBestOptions(query),
                                        oracleOptions  = myHTILParser.getOracleOptions(query);
                 if (annotation == null) {
-                    /*
                     System.out.println(Colors.ANSI_GREEN + "======New question======\n"
                             + query.toString(sentence, 'G', goldOptions, 'B', oneBestOptions, 'O', oracleOptions)
-                            + "\n" + Colors.ANSI_RESET); */
+                            + "\n" + Colors.ANSI_RESET);
                     continue;
                 }
                 int[] optionDist = AnnotationUtils.getUserResponseDistribution(query, annotation);
