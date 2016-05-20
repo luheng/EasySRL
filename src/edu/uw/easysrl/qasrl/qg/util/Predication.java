@@ -5,10 +5,14 @@ import java.util.HashMap;
 import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.function.BiFunction;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
+import static java.util.stream.Collectors.*;
 
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.qasrl.Parse;
+import edu.uw.easysrl.qasrl.TextGenerationHelper;
 import static edu.uw.easysrl.util.GuavaCollectors.*;
 
 import com.google.common.collect.ImmutableList;
@@ -100,6 +104,44 @@ public abstract class Predication {
     public abstract ImmutableList<String> getPhrase(Category desiredCategory);
 
     /* protected methods and fields */
+
+    protected static ImmutableMap<Integer, ImmutableList<Argument>> extractArgs(int headIndex, Category headCategory, Parse parse, PredicateCache preds) {
+        return IntStream
+            .range(1, headCategory.getNumberOfArguments() + 1)
+            .boxed()
+            .collect(toImmutableMap(argNum -> argNum, argNum -> {
+                        ImmutableSet<ResolvedDependency> outgoingDeps = parse.dependencies.stream()
+                            .filter(dep -> dep.getHead() == headIndex && dep.getArgument() != headIndex && argNum == dep.getArgNumber())
+                            .collect(toImmutableSet());
+                        if(headCategory.getArgument(argNum).matches(Category.NP)) {
+                            return outgoingDeps.stream().collect(groupingBy(dep -> {
+                                        return TextGenerationHelper.getLowestAncestorSatisfyingPredicate(parse.syntaxTree.getLeaves().get(dep.getArgument()),
+                                                                                                         node -> node.getCategory().matches(Category.NP),
+                                                                                                         parse.syntaxTree);})
+                                ).entrySet().stream()
+                                .flatMap(e -> {
+                                        if(e.getValue().size() > 1) {
+                                            ResolvedDependency lastDep = e.getValue().stream()
+                                                .collect(maxBy((dep1, dep2) -> Integer.compare(dep1.getArgument(), dep2.getArgument())))
+                                                .get();
+                                            return Stream.of(new Argument(Optional.of(lastDep), Noun.getFromParse(lastDep.getArgument(), parse, e.getKey())));
+                                        } else {
+                                            ResolvedDependency argDep = e.getValue().get(0);
+                                            return Stream.of(Predication.Type.getTypeForArgCategory(headCategory.getArgument(argDep.getArgNumber())))
+                                                .filter(Optional::isPresent).map(Optional::get)
+                                                .map(predType -> new Argument(Optional.of(argDep), preds.getPredication(argDep.getArgument(), predType)));
+                                        }
+                                    })
+                            .collect(toImmutableList());
+                        } else {
+                            return outgoingDeps.stream()
+                                .flatMap(argDep -> Stream.of(Predication.Type.getTypeForArgCategory(headCategory.getArgument(argDep.getArgNumber())))
+                                         .filter(Optional::isPresent).map(Optional::get)
+                                         .map(predType -> new Argument(Optional.of(argDep), preds.getPredication(argDep.getArgument(), predType))))
+                                .collect(toImmutableList());
+                        }
+                    }));
+    }
 
     protected final ImmutableMap<Integer, ImmutableList<Argument>>
         transformArgsAux(BiFunction<Integer, ImmutableList<Argument>, ImmutableList<Argument>> transform) {
