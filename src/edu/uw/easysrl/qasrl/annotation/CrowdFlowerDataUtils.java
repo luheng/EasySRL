@@ -16,10 +16,7 @@ import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -167,6 +164,33 @@ public class CrowdFlowerDataUtils {
         }
         reader.close();
         return sentenceIds.stream().distinct().sorted().collect(GuavaCollectors.toImmutableList());
+    }
+
+    public static Map<Integer, List<AlignedAnnotation>> loadAnnotation(ImmutableList<String> fileNames) {
+        Map<Integer, List<AlignedAnnotation>> sentenceToAnnotations;
+        List<AlignedAnnotation> annotationList = new ArrayList<>();
+        try {
+            for (String fileName : fileNames) {
+                annotationList.addAll(CrowdFlowerDataReader.readAggregatedAnnotationFromFile(fileName));
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+        sentenceToAnnotations = new HashMap<>();
+        annotationList.forEach(annotation -> {
+            int sentId = annotation.sentenceId;
+            if (!sentenceToAnnotations.containsKey(sentId)) {
+                sentenceToAnnotations.put(sentId, new ArrayList<>());
+            }
+            sentenceToAnnotations.get(sentId).add(annotation);
+        });
+        return sentenceToAnnotations;
+    }
+
+    public static Map<Integer, List<AlignedAnnotation>> loadCorePronounAnnotations() {
+        return loadAnnotation(ImmutableList.of(cfRound3PrnonounAnnotationFile,
+                cfRound4CoreArgsAnnotationFile, cfRound5CoreArgsAnnotationFile));
     }
 
     public static void printQueryToCSVFile(final ScoredQuery<QAStructureSurfaceForm> query,
