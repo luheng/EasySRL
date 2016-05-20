@@ -123,7 +123,8 @@ public final class Verb extends Predication {
         final Optional<String> particle;
         if(headIndex + 1 < parse.categories.size() &&
            Category.valueOf("(S\\NP)\\(S\\NP)").matches(parse.categories.get(headIndex + 1)) &&
-           !VerbHelper.isNegationWord(words.get(headIndex + 1))) {
+           !VerbHelper.isNegationWord(words.get(headIndex + 1)) &&
+           Preposition.prepositionWords.contains(words.get(headIndex + 1))) {
             particle = Optional.of(words.get(headIndex + 1));
         } else {
             particle = Optional.empty();
