@@ -154,7 +154,7 @@ public class HITLParser {
 
     public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getPronounCoreArgQueriesForSentence(int sentenceId) {
         final QueryPruningParameters queryPruningParams = new QueryPruningParameters(queryPruningParameters);
-        queryPruningParams.skipPPQuestions = true;
+       queryPruningParams.skipPPQuestions = true;
         final ImmutableList<String> sentence = sentences.get(sentenceId);
 
         if(nbestLists.get(sentenceId) == null) {
@@ -163,9 +163,9 @@ public class HITLParser {
 
         ImmutableList<ScoredQuery<QAStructureSurfaceForm>> copulaQueries = ExperimentUtils.generateAllQueries(
                     sentenceId, sentence, nbestLists.get(sentenceId),
-                    false /* isJeopardyStyle */,
-                    true  /* checkbox style */,
-                    false /* usePronouns */,
+                    false,  // isJeopardyStyle
+                    true,   // isCheckboxStyle
+                    false,  // usePronouns
                     queryPruningParams)
                 .stream().filter(query -> {
                     final int predicateId = query.getPredicateId().getAsInt();
@@ -174,9 +174,9 @@ public class HITLParser {
 
         List<ScoredQuery<QAStructureSurfaceForm>> queryList = ExperimentUtils.generateAllQueries(
                         sentenceId, sentence, nbestLists.get(sentenceId),
-                        false /* isJeopardyStyle */,
-                        true  /* checkbox style */,
-                        true /* usePronouns */,
+                        false, // isJeopardyStyle,
+                        true,  // isCheckboxStyle,
+                        true,  // usePronouns,
                         queryPruningParams)
                 .stream().filter(query -> {
                     final int predicateId = query.getPredicateId().getAsInt();
@@ -185,6 +185,27 @@ public class HITLParser {
 
         queryList.addAll(copulaQueries);
 
+        /*
+        if(nbestLists.get(sentenceId) == null) {
+            return ImmutableList.of();
+        }
+        List<ScoredQuery<QAStructureSurfaceForm>> queryList = QuestionGenerationPipeline.coreArgQGPipeline
+                .generateAllQueries(sentenceId, nbestLists.get(sentenceId));
+                */
+
+        // Assign query ids.
+        IntStream.range(0, queryList.size()).forEach(i -> queryList.get(i).setQueryId(i));
+        return ImmutableList.copyOf(queryList);
+    }
+
+    public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getNewCoreArgQueriesForSentence(int sentenceId) {
+        if(nbestLists.get(sentenceId) == null) {
+            return ImmutableList.of();
+        }
+        // Without verb-adjunct questions yet.
+        List<ScoredQuery<QAStructureSurfaceForm>> queryList = QuestionGenerationPipeline.coreArgQGPipeline
+                .setQueryPruningParameters(queryPruningParameters)
+                .generateAllQueries(sentenceId, nbestLists.get(sentenceId));
         // Assign query ids.
         IntStream.range(0, queryList.size()).forEach(i -> queryList.get(i).setQueryId(i));
         return ImmutableList.copyOf(queryList);
