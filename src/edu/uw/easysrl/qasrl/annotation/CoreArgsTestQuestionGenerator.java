@@ -38,13 +38,32 @@ public class CoreArgsTestQuestionGenerator {
 
     final static String checkboxTestQuestionFilePath = "./Crowdflower_data/reviewed_test_questions_checkbox_r01.csv";
 
-    public static void convertTestQuestions() throws IOException {
+    public static void generateTestQuestions() throws IOException {
         hitlParser.setQueryPruningParameters(queryPruningParameters);
-        Map<Integer, List<AlignedAnnotation>> annotations = CrowdFlowerDataUtils.loadCorePronounAnnotations();
+        Map<Integer, List<AlignedAnnotation>> allAnnotations = CrowdFlowerDataUtils.loadCorePronounAnnotations();
 
-        for (int sid : annotations.keySet()) {
-            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList =
-                    hitlParser.getCoreArgumentQueriesForSentence()
+        for (int sid : allAnnotations.keySet()) {
+            final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList =
+                    hitlParser.getNewCoreArgQueriesForSentence(sid);
+            final List<AlignedAnnotation> annotations = allAnnotations.get(sid);
+            queryList.forEach(query -> {
+                // Match annotation: 5 overlapping annotations, same predicate.
+                final int predId = query.getPredicateId().getAsInt();
+                annotations.stream()
+                        .filter(annot -> annot.predicateId == predId)
+                        .filter(annot -> {
+                            // TODO: 5 annotaiton match
+                            int numAnnotations = IntStream.range(0, annot.answerOptions.size())
+                                    .filter(op -> query.getOptions().contains(annot.answerOptions.get(op)))
+                                    .map(op -> annot.answerDist[op])
+                                    .sum();
+                            return numAnnotations == 5;
+                        })
+                        .forEach(annot ->  {
+                            System.out.println(query.getPrompt() + "\n" + annot.queryPrompt);
+                            System.out.println(annot + "\n");
+                        });
+            });
         /*
         for (RecordedAnnotation testQuestion : testQuestions) {
             final int sentId = testQuestion.sentenceId;
@@ -87,6 +106,6 @@ public class CoreArgsTestQuestionGenerator {
                 .readTestQuestionsFromFile(checkboxTestQuestionFilePath);
 
         //testQuestions.forEach(System.out::println);
-        convertTestQuestionsToPronounQuestions(testQuestions);
+        generateTestQuestions();
     }
 }
