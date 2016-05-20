@@ -99,7 +99,7 @@ public abstract class QuestionGenerationPipeline {
             public QueryPruningParameters getQueryPruningParameters() {
                 if(queryPruningParameters == null) {
                     queryPruningParameters = new QueryPruningParameters();
-                    queryPruningParameters.minPromptConfidence = 0.00;
+                    queryPruningParameters.minPromptConfidence = 0.10;
                     queryPruningParameters.minOptionEntropy = 0.00;
                     queryPruningParameters.skipSAdjQuestions = false;
                     queryPruningParameters.skipBinaryQueries = false;

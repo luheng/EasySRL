@@ -44,8 +44,11 @@ public abstract class Noun extends Predication {
     }
 
     /* factory methods */
-
     public static Noun getFromParse(Integer headIndex, Parse parse) {
+        return getFromParse(headIndex, parse, Optional.empty());
+    }
+
+    public static Noun getFromParse(Integer headIndex, Parse parse, Optional<SyntaxTreeNode> presetNPNodeOpt) {
         final SyntaxTreeNode tree = parse.syntaxTree;
         final SyntaxTreeNodeLeaf headLeaf = tree.getLeaves().get(headIndex);
 
@@ -53,7 +56,9 @@ public abstract class Noun extends Predication {
         final Optional<SyntaxTreeNode> npNodeOpt = TextGenerationHelper
             .getLowestAncestorSatisfyingPredicate(headLeaf, node -> Category.NP.matches(node.getCategory()), tree);
         final SyntaxTreeNode phraseNode;
-        if(!npNodeOpt.isPresent() || npNodeOpt.get().getHeadIndex() != headIndex) {
+        if(presetNPNodeOpt.isPresent()) {
+            phraseNode = presetNPNodeOpt.get();
+        } else if(!npNodeOpt.isPresent() || npNodeOpt.get().getHeadIndex() != headIndex) {
             // should always be present because leaf's head index is its own
             final SyntaxTreeNode candidatePhraseNode = TextGenerationHelper
                 .getHighestAncestorStillSatisfyingPredicate(headLeaf, node -> node.getHeadIndex() == headIndex, tree).get();

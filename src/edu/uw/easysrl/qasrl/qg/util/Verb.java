@@ -67,6 +67,7 @@ public final class Verb extends Predication {
         final SyntaxTreeNodeLeaf headLeaf = tree.getLeaves().get(headIndex);
         final Category initCategory = parse.categories.get(headIndex);
 
+        // final ImmutableMap<Integer, ImmutableList<Argument>> initArgs = Predication.extractArgs(headIndex, initCategory, parse, preds);
         final ImmutableMap<Integer, ImmutableList<Argument>> initArgs = IntStream
             .range(1, initCategory.getNumberOfArguments() + 1)
             .boxed()

@@ -144,6 +144,7 @@ public class QuestionGenerator {
             .filter(argNum -> Category.NP.matches(verb.getPredicateCategory().getArgument(argNum)))
             .flatMap(askingArgNum -> verb.getArgs().get(askingArgNum).stream()
             .filter(answerArg -> !((Noun) answerArg.getPredication()).isExpletive()) // this should always be true when arg cat is NP
+            .filter(answerArg -> !answerArg.getPredication().getPredicate().matches("[0-9]*"))
             .filter(answerArg -> answerArg.getDependency().isPresent())
             .flatMap(answerArg -> PredicationUtils
                      .sequenceArgChoices(PredicationUtils
@@ -453,7 +454,7 @@ public class QuestionGenerator {
         return qaPairs;
     }
 
-    // TODO filter out punctuation predicates
+    // TODO filter out punctuation predicates. also, probably broken now
     public static ImmutableList<QuestionAnswerPair> newVPAttachmentQuestions(int sentenceId, int parseId, Parse parse) {
         class QATemplate {
             final int predicateIndex;
@@ -877,14 +878,15 @@ public class QuestionGenerator {
         } else if(args[0].equalsIgnoreCase("gold")) {
             printGoldQAPairs(devData, qgPipeline);
         } else if(args[0].equalsIgnoreCase("compare")) {
-            compareCoreArgQueries();
+            compareNBestListCoreArgQueries();
         } else if (args[0].equalsIgnoreCase("queries")) {
             ImmutableList<Integer> testSentences = new ImmutableList.Builder<Integer>()
                 // .add(42).add(1489).add(36)
                 // .add(90)
                 // .add(3)
-                .add(268, 1016, 1232, 1695, 444, 1495, 1516, 1304, 1564, 397, 217, 90, 224, 563, 1489, 199, 1105, 1124, 1199, 294,
-                     1305, 705, 762)
+                .add(971)
+                // .add(268, 1016, 1232, 1695, 444, 1495, 1516, 1304, 1564, 397, 217, 90, 224, 563, 1489, 199, 1105, 1124, 1199, 294,
+                //      1305, 705, 762)
                 .build();
             ImmutableList<Integer> allSentences = IntStream.range(0, devData.getSentences().size()).boxed().collect(toImmutableList());
             printQueries(devData, allSentences, qgPipeline);
