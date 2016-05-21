@@ -133,10 +133,16 @@ public final class Verb extends Predication {
         for(int curAuxIndex = headIndex; curAuxIndex >= 0; curAuxIndex--) {
             String aux = words.get(curAuxIndex).toLowerCase();
             Category cat = parse.categories.get(curAuxIndex);
-            // adverbs might be between auxiliaries. including (S\NP)/(S\NP) maybe.
             if(!VerbHelper.isAuxiliaryVerb(aux, cat) && !VerbHelper.isNegationWord(aux) &&
                cat.isFunctionInto(Category.valueOf("(S\\NP)|(S\\NP)"))) {
+                // adverbs might be between auxiliaries. including (S\NP)/(S\NP) maybe.
                 continue;
+            } else if(cat.isFunctionInto(Category.valueOf("S\\NP")) &&
+                      !cat.isFunctionInto(Category.valueOf("(S\\NP)|(S\\NP)")) &&
+                      !VerbHelper.isAuxiliaryVerb(aux, cat) && !VerbHelper.isNegationWord(aux) &&
+                      curAuxIndex != headIndex) {
+                // stop at another verb, e.g., "possible to win"
+                break;
             } else if(VerbHelper.isNegationWord(aux)) {
                 isNegated = true;
             } else if(cat.isFunctionInto(Category.valueOf("S[adj]\\NP"))) {
