@@ -11,6 +11,7 @@ import edu.uw.easysrl.util.GuavaCollectors;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -42,28 +43,47 @@ public class CoreArgsTestQuestionGenerator {
         hitlParser.setQueryPruningParameters(queryPruningParameters);
         Map<Integer, List<AlignedAnnotation>> allAnnotations = CrowdFlowerDataUtils.loadCorePronounAnnotations();
 
+        AtomicInteger numAnnotations = new AtomicInteger(0),
+                      numMatchedAnnotations = new AtomicInteger(0),
+                      numPredMatchedAnnotations = new AtomicInteger(0);
+
         for (int sid : allAnnotations.keySet()) {
             final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList =
                     hitlParser.getNewCoreArgQueriesForSentence(sid);
             final List<AlignedAnnotation> annotations = allAnnotations.get(sid);
+            numAnnotations.addAndGet(annotations.size());
             queryList.forEach(query -> {
                 // Match annotation: 5 overlapping annotations, same predicate.
                 final int predId = query.getPredicateId().getAsInt();
                 annotations.stream()
-                        .filter(annot -> annot.predicateId == predId)
+                        .filter(annot -> annot.predicateId == predId
+                                && query.getPredicateCategory().get() == annot.predicateCategory
+                                && query.getArgumentNumber().getAsInt() == annot.argumentNumber)
+                        .map(annot -> {
+                            numPredMatchedAnnotations.getAndAdd(1);
+                            return annot;
+                        })
                         .filter(annot -> {
                             // TODO: 5 annotaiton match
-                            int numAnnotations = IntStream.range(0, annot.answerOptions.size())
+                            int nmatch = IntStream.range(0, annot.answerOptions.size())
                                     .filter(op -> query.getOptions().contains(annot.answerOptions.get(op)))
                                     .map(op -> annot.answerDist[op])
                                     .sum();
-                            return numAnnotations == 5;
+                            return nmatch >= 5;
                         })
-                        .forEach(annot ->  {
-                            System.out.println(query.getPrompt() + "\n" + annot.queryPrompt);
-                            System.out.println(annot + "\n");
+                        .forEach(annot -> {
+                            if (!query.getPrompt().equals(annot.queryPrompt)) {
+                                System.out.println(query.getPrompt() + "\n" + annot.queryPrompt);
+                                System.out.println(annot);
+                            }
+                            numMatchedAnnotations.addAndGet(1);
                         });
             });
+        }
+
+        System.out.println("Num annotations:\t" + numAnnotations);
+        System.out.println("Num predicate matched annotations:\t" + numPredMatchedAnnotations);
+        System.out.println("Num matched annotations:\t" + numMatchedAnnotations);
         /*
         for (RecordedAnnotation testQuestion : testQuestions) {
             final int sentId = testQuestion.sentenceId;
@@ -98,7 +118,6 @@ public class CoreArgsTestQuestionGenerator {
             //if (queryList.size() == 0) {
             //    System.out.println("------\n" + testQuestion);
             //}
-        }
     }
 
     public static void main(String[] args) throws IOException {
