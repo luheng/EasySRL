@@ -217,6 +217,14 @@ public final class Verb extends Predication {
             rightArgs = ImmutableList.of(particle.get());
         }
 
+        // also, add the auxiliaries if we're never going to drop into the while loop below.
+        if(Category.valueOf("(S\\NP)").matches(curCat)) {
+            leftArgs = new ImmutableList.Builder<String>()
+                .addAll(auxChain)
+                .addAll(leftArgs)
+                .build();
+        }
+
         while(!desiredCategory.dropFeatures().matches(curCat)) { // in case there are disagreeing features (we want to ignore them)
             Predication curArg = args.get(curCat.getNumberOfArguments()).getPredication();
             Category curArgCat = curCat.getArgument(curCat.getNumberOfArguments());
