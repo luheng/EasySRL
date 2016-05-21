@@ -27,6 +27,7 @@ import java.util.stream.Stream;
 import java.util.function.Supplier;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.NoSuchElementException;
 
 public final class Verb extends Predication {
 
@@ -376,12 +377,17 @@ public final class Verb extends Predication {
                 .addAll(auxChain)
                 .build();
         } else { // if we have a subject and need to flip the auxiliary
-            ImmutableList<String> wordsForFlip = getVerbWithSplit();
-            ImmutableList<String> flippedAux = wordsForFlip.subList(0, 1);
-            ImmutableList<String> remainingAuxChain = wordsForFlip.subList(1, wordsForFlip.size() - 1);
-            verbWords = wordsForFlip.subList(wordsForFlip.size() - 1, wordsForFlip.size());
+            // ImmutableList<String> wordsForFlip = getVerbWithSplit();
+            Deque<String> wordsForFlip = new LinkedList<>(getVerbWithSplit());
+            String flippedAux = wordsForFlip.removeFirst();
+            try {
+                verbWords = ImmutableList.of(wordsForFlip.removeLast());
+            } catch(NoSuchElementException e) {
+                verbWords = ImmutableList.of(); // no verb words if we flipped a copula
+            }
+            ImmutableList<String> remainingAuxChain = wordsForFlip.stream().collect(toImmutableList());
             questionPrefix = new ImmutableList.Builder<String>()
-                .addAll(flippedAux)
+                .add(flippedAux)
                 .addAll(subjWords)
                 .addAll(remainingAuxChain)
                 .build();
@@ -536,7 +542,8 @@ public final class Verb extends Predication {
             assert !isNegated : "aux flip should not cause changes when negated";
             splitVerb(verbStack);
         }
-        assert verbStack.size() >= 2; // should be splittable
+        assert verbStack.size() >= 2 || VerbHelper.isCopulaVerb(verbStack.getFirst())
+            : "Verb words need to be allow for auxiliary flip";
         return ImmutableList.copyOf(verbStack);
     }
 
@@ -616,12 +623,17 @@ public final class Verb extends Predication {
         //     !isProgressive && !isPerfect &&
         //     (tense == Tense.PAST || tense == Tense.PRESENT)
         //     : "verb should only be split in very specific circumstances";
-        verbStack.addFirst(VerbHelper.getStem(verbStack.removeFirst()));
-        switch(tense) {
-        case PAST: verbStack.addFirst(VerbHelper.getPastTense("do", getSubject())); break;
-        case PRESENT: verbStack.addFirst(VerbHelper.getPresentTense("do", getSubject())); break;
-        default: assert false;
+        if(verbStack.size() == 1 && VerbHelper.isCopulaVerb(verbStack.getFirst())) {
+            // if all we are is a copula, we flip the whole thing to the front without splitting.
+            return;
+        } else {
+            verbStack.addFirst(VerbHelper.getStem(verbStack.removeFirst()));
+            switch(tense) {
+            case PAST: verbStack.addFirst(VerbHelper.getPastTense("do", getSubject())); break;
+            case PRESENT: verbStack.addFirst(VerbHelper.getPresentTense("do", getSubject())); break;
+            default: assert false;
+            }
+            assert verbStack.size() > 1; // should have at least two words at the end in this case
         }
-        assert verbStack.size() > 1; // always should have at least two words at the end
     }
 }

@@ -25,7 +25,11 @@ public final class PredicationUtils {
             if(nounPred.isExpletive()) {
                 return (T) nounPred;
             } else {
-                return (T) nounPred.getPronoun().withDefiniteness(Noun.Definiteness.INDEFINITE);
+                return (T) nounPred.getPronoun()
+                    .withNumber(Noun.Number.SINGULAR)
+                    .withPerson(Noun.Person.THIRD)
+                    .withGender(Noun.Gender.INANIMATE)
+                    .withDefiniteness(Noun.Definiteness.INDEFINITE);
             }
         } else {
             return (T) pred.transformArgs((argNum, args) -> {
@@ -41,7 +45,11 @@ public final class PredicationUtils {
                                     replacement = noun;
                                 }
                                 else {
-                                    replacement = noun.getPronoun().withDefiniteness(Noun.Definiteness.INDEFINITE);
+                                    replacement = noun.getPronoun()
+                                        .withNumber(Noun.Number.SINGULAR)
+                                        .withPerson(Noun.Person.THIRD)
+                                        .withGender(Noun.Gender.INANIMATE)
+                                        .withDefiniteness(Noun.Definiteness.INDEFINITE);
                                 }
                             } else {
                                 assert predToReplace instanceof Gap;
