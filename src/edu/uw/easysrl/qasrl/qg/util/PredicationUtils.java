@@ -40,11 +40,8 @@ public final class PredicationUtils {
                                 if(noun.isExpletive()) {
                                     replacement = noun;
                                 }
-                                else if(noun.isPronoun()) {
-                                    replacement = noun;
-                                } else {
-                                    replacement = noun.getPronoun()
-                                        .withDefiniteness(Noun.Definiteness.INDEFINITE);
+                                else {
+                                    replacement = noun.getPronoun().withDefiniteness(Noun.Definiteness.INDEFINITE);
                                 }
                             } else {
                                 assert predToReplace instanceof Gap;

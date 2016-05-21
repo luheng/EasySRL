@@ -107,7 +107,14 @@ public class QuestionGenerator {
     }
 
     private static Verb withTenseForQuestion(Verb verb) {
-        return verb.withModal("would").withProgressive(false);
+        if(verb.getTense() == Verb.Tense.FUTURE ||
+           verb.getTense() == Verb.Tense.PRESENT ||
+           verb.getTense() == Verb.Tense.PAST) {
+            return verb;
+        } else {
+            return verb.withModal("would").withProgressive(false);
+        }
+
     }
 
     private static boolean isVerbValid(Verb verb, boolean shouldBeCopula) {
