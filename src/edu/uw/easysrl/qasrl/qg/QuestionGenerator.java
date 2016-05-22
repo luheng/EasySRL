@@ -146,6 +146,7 @@ public class QuestionGenerator {
                     }
                     return Stream.of(v)
             .filter(verb -> isVerbValid(verb, false))
+            .map(verb -> PredicationUtils.elideInnerPPs(verb))
             .flatMap(verb -> IntStream.range(1, verb.getPredicateCategory().getNumberOfArguments() + 1)
             .boxed()
             .filter(argNum -> Category.NP.matches(verb.getPredicateCategory().getArgument(argNum)))
@@ -280,7 +281,7 @@ public class QuestionGenerator {
             .filter(verbArg -> !VerbHelper.isAuxiliaryVerb(words.get(verbArg.getDependency().get().getArgument()),
                                                            parse.categories.get(verbArg.getDependency().get().getArgument())))
             .flatMap(verbArg -> PredicationUtils
-                     .sequenceArgChoices(PredicationUtils.withIndefinitePronouns(PredicationUtils.addPlaceholderArguments(verbArg.getPredication()))).stream()
+                     .sequenceArgChoices(PredicationUtils.withIndefinitePronouns(PredicationUtils.addPlaceholderArguments(PredicationUtils.elideInnerPPs(verbArg.getPredication())))).stream()
             .map(verb -> (Verb) verb)
             .filter(verb -> isVerbValid(verb, false))
             .map(verb -> {
@@ -423,6 +424,7 @@ public class QuestionGenerator {
                     }
                     return Stream.of(v)
             .filter(verb -> isVerbValid(verb, true))
+            .map(verb -> PredicationUtils.elideInnerPPs(verb))
             .flatMap(verb -> IntStream.range(1, verb.getPredicateCategory().getNumberOfArguments() + 1)
             .boxed()
             .filter(argNum -> Category.NP.matches(verb.getPredicateCategory().getArgument(argNum)))
