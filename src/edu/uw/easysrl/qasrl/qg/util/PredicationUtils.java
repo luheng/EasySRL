@@ -66,6 +66,22 @@ public final class PredicationUtils {
         }
     }
 
+    public static <T extends Predication> T elideInnerPPs(T pred) {
+        if(pred instanceof Preposition) {
+            return pred;
+        } else {
+            return (T) pred.transformArgs((argNum, args) -> {
+                    if(pred.getPredicateCategory().getArgument(argNum).matches(Category.PP)) {
+                        return ImmutableList.of(Argument.withNoDependency(new Gap(Category.PP)));
+                    } else {
+                        return args.stream()
+                            .map(arg -> new Argument(arg.getDependency(), elideInnerPPs(arg.getPredication())))
+                            .collect(toImmutableList());
+                    }
+                });
+        }
+    }
+
     public static Noun fillerNoun(Category cat) {
         if(cat.matches(Category.NP)) {
             return Pronoun.fromString("something").get();
