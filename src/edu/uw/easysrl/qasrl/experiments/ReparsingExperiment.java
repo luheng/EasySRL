@@ -61,7 +61,7 @@ public class ReparsingExperiment {
         queryPruningParameters.minOptionEntropy = 0.05;
         queryPruningParameters.minPromptConfidence = 0.1;
         */
-        queryPruningParameters.minOptionConfidence = -1;
+        queryPruningParameters.minOptionConfidence = 0.05;
         queryPruningParameters.minOptionEntropy = -1;
         queryPruningParameters.minPromptConfidence = 0.1;
     }
@@ -116,7 +116,7 @@ public class ReparsingExperiment {
         ImmutableList<Accuracy> goldStrictMatch = IntStream.range(0, 5).boxed()
                 .map(ignore -> new Accuracy())
                 .collect(GuavaCollectors.toImmutableList());
-        int numMatchedAnnotations = 0;
+        int numMatchedAnnotations = 0, numNewQuestions = 0;
 
         List<DebugBlock> debugging = new ArrayList<>();
         Results avgBaseline = new Results(),
@@ -201,6 +201,7 @@ public class ReparsingExperiment {
                     sentenceDebuggingString += Colors.ANSI_BLUE
                             + query.toString(sentence, 'G', goldOptions, 'B', oneBestOptions, 'O', oracleOptions)
                             + "\n" + Colors.ANSI_RESET;
+                    numNewQuestions ++;
                     continue;
                 }
                 matchedAnnotationIds.add(annotation.iterationId);
@@ -213,6 +214,10 @@ public class ReparsingExperiment {
 
                 ImmutableList<Integer> userOptions    = myHTILParser.getUserOptions(query, annotation),
                                        userOptions2   = myHTILParser.getUserOptions(query, newOptionDist);
+
+                if (responses.size() != 5) {
+                    continue;
+                }
 
                 // Update stats.
                 for (int i = 0; i < 5; i++) {
@@ -338,6 +343,7 @@ public class ReparsingExperiment {
         //         .filter(b -> Math.abs(b.deltaF1) > 1e-3)
                 .forEach(b -> System.out.println(b.block));
 
+        System.out.println("Num. new questions:\t" + numNewQuestions);
         System.out.println("Num. matched annotations:\t" + numMatchedAnnotations);
         for (int i = 0; i < 5; i++) {
             System.out.println(String.format("Min agreement=%d\tCoverage=%.2f%%\t%s\t%s",

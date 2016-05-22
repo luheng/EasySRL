@@ -39,6 +39,9 @@ public class QueryFilters {
                                        final ImmutableList<String> allOptions) {
         for (int i = idx; i < allOptions.size(); i++) {
             final String op = allOptions.get(i).toLowerCase();
+            if (curr.isEmpty() && targ.startsWith(op) && !targ.equals(op)) {
+                return searchSplit(op, targ, i + 1, allOptions);
+            }
             for (String tok : splitTokens) {
                 final String str1 = curr + tok + op;
                 final String str2 = curr + "." + tok + op;
@@ -122,7 +125,11 @@ public class QueryFilters {
                 })
                 .filter(query -> {
                     query.computeScores(nBestList);
+                    final int numQAOptions = query.getQAPairSurfaceForms().size();
+                    //final int numConfidentOptions = (int) IntStream.range(0, numQAOptions)
+                    //        .filter(i -> query.getOptionScores().get(i) > 1 - 1e-3).count();
                     return query.getPromptScore() > queryPruningParameters.minPromptConfidence
+                            //&& numConfidentOptions < numQAOptions
                             && query.getOptionEntropy() > queryPruningParameters.minOptionEntropy
                             && query.getQAPairSurfaceForms().size() < queryPruningParameters.maxNumOptionsPerQuery
                             && (!queryPruningParameters.skipBinaryQueries || query.getQAPairSurfaceForms().size() > 1);

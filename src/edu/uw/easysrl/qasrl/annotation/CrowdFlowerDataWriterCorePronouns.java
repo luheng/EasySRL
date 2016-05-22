@@ -58,7 +58,7 @@ public class CrowdFlowerDataWriterCorePronouns {
         queryPruningParameters = new QueryPruningParameters();
         queryPruningParameters.skipSAdjQuestions = true;  // R5: false // R4: true.
         queryPruningParameters.minOptionConfidence = 0.05;
-        queryPruningParameters.minOptionEntropy = 0.05;   // R4: unspecified.
+        queryPruningParameters.minOptionEntropy = -1; //0.05;   // R4: unspecified.
         queryPruningParameters.minPromptConfidence = 0.1;
     }
 
