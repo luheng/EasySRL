@@ -40,17 +40,14 @@ public class CrowdFlowerDataWriterNewCore {
     private final static ReparsingHistory history = new ReparsingHistory(hitlParser);
 
     private static final String csvOutputFilePrefix =
-            // "./Crowdflower_unannotated/pronoun_core_r4_100best";
-            //  "./Crowdflower_unannotated/pronoun_core_r5_100best";
             "./Crowdflower_temp/pronoun_core_r6_100best";
 
     private static final String outputSentenceIdsFile =
-            //  "./Crowdflower_unannotated/pronoun_core_r5_100best.sent_ids.txt";
             "./Crowdflower_temp/pronoun_core_r6_100best.sent_ids.txt";
 
     private static final String[] reviewedTestQuestionFiles = new String[] {
             "./Crowdflower_unannotated/test_questions/test_question_core_pronoun_r04.tsv",
-            //   "./Crowdflower_temp/test_questions/test_question_core_pronoun_r04.tsv",
+            "./Crowdflower_unannotated/test_questions/auto_test_questions_r345.tsv",
     };
 
     private static ImmutableSet<Integer> otherSentencesToSkip = ImmutableSet.of(1695, 1244, 1839);
@@ -62,7 +59,7 @@ public class CrowdFlowerDataWriterNewCore {
         queryPruningParameters.skipPPQuestions = true;
         queryPruningParameters.skipSAdjQuestions = true;  // R5: false // R4: true.
         queryPruningParameters.minOptionConfidence = 0.05;
-        queryPruningParameters.minOptionEntropy = 0.05;   // R4: unspecified.
+        queryPruningParameters.minOptionEntropy = -1;   // R4: unspecified.
         queryPruningParameters.minPromptConfidence = 0.1;
     }
 
@@ -86,28 +83,39 @@ public class CrowdFlowerDataWriterNewCore {
                     });
         }
         testSentenceIds = annotations.keySet().stream().sorted().collect(GuavaCollectors.toImmutableList());
+        Set<String> testQuestionKeys = new HashSet<>();
         final String testQuestionsFile = String.format("%s_test.csv", csvOutputFilePrefix);
         CSVPrinter csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter(testQuestionsFile)),
                 CSVFormat.EXCEL.withRecordSeparator("\n"));
         csvPrinter.printRecord((Object[]) CrowdFlowerDataUtils.csvHeaderNew);
         AtomicInteger lineCounter = new AtomicInteger(0);
-        for (int sid : annotations.keySet()) {
-            annotations.get(sid).stream().forEach(annot -> {
-                try {
-                    System.out.println(annot);
-                    CrowdFlowerDataUtils.printRecordToCSVFile(
-                            annot,
-                            10000 + lineCounter.getAndAdd(1),
-                            true, // highlight predicate
-                            csvPrinter);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            });
-        }
+        testSentenceIds.forEach(sid ->
+                annotations.get(sid).stream()
+                        .filter(annot -> {
+                            final String qkey = String.format("%d\t%d\t%s", sid, annot.predicateId, annot.queryPrompt);
+                            if (!testQuestionKeys.contains(qkey)) {
+                                testQuestionKeys.add(qkey);
+                                return true;
+                            }
+                            return false;
+                        })
+                        .forEach(annot -> {
+                            try {
+                                System.out.println(annot);
+                                CrowdFlowerDataUtils.printRecordToCSVFile(
+                                        annot,
+                                        10000 + lineCounter.getAndAdd(1),
+                                        true, // highlight predicate
+                                        csvPrinter);
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        })
+        );
         csvPrinter.close();
         System.out.println(String.format("Wrote %d test questions to file %s.", lineCounter.get(), testQuestionsFile));
     }
+
 
     private static void printQuestionsToAnnotate() throws IOException {
         assert testSentenceIds != null;
@@ -162,6 +170,7 @@ public class CrowdFlowerDataWriterNewCore {
         csvPrinter.close();
         history.printSummary();
     }
+
 
     public static void main(String[] args) throws IOException {
         printTestQuestions();

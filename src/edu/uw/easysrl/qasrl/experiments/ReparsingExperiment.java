@@ -45,9 +45,10 @@ public class ReparsingExperiment {
           //  "./Crowdflower_data/f891522.csv",                // Round4: jeopardy checkbox, pp only
             "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
         //    "./Crowdflower_data/f897179.csv",                 // Round2-3: NP clefting questions.
-            "./Crowdflower_data/f902142.csv",                   // Round4: checkbox, pronouns, core only, 300 sentences.
+           "./Crowdflower_data/f902142.csv",                   // Round4: checkbox, pronouns, core only, 300 sentences.
          //   "./Crowdflower_data/f903842.csv",                   // Round4: np-clefting prnouns
             "./Crowdflower_data/f909211.csv",                   // Round5: checkbox, pronouns, core only, 300+ sentences.
+            "./Crowdflower_data/f912533.csv",                   // Round1-2: rerun, new question generator.
     };
 
     private static QueryPruningParameters queryPruningParameters;
@@ -91,11 +92,11 @@ public class ReparsingExperiment {
 
     private static void runExperiment() {
         final Collection<Integer> round1And2Ids = CrowdFlowerDataUtils.getRound1And2SentenceIds();
-        List<Integer> sentenceIds = // myHTILParser.getAllSentenceIds();
+        List<Integer> sentenceIds = myHTILParser.getAllSentenceIds();
                 //annotations.keySet().stream().sorted().collect(Collectors.toList());
-                myHTILParser.getAllSentenceIds().stream()
+                /*myHTILParser.getAllSentenceIds().stream()
                         .filter(id -> !round1And2Ids.contains(id))
-                        .collect(Collectors.toList());
+                        .collect(Collectors.toList()); */
         System.out.println(sentenceIds.stream().map(String::valueOf).collect(Collectors.joining(", ")));
         System.out.println("Queried " + sentenceIds.size() + " sentences. Total number of questions:\t" +
             annotations.entrySet().stream().mapToInt(e -> e.getValue().size()).sum());
