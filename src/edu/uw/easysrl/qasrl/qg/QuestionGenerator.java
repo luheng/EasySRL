@@ -161,6 +161,7 @@ public class QuestionGenerator {
                     Noun whNoun = ((Noun) answerArg.getPredication())
                     .getPronoun()
                     .withPerson(Noun.Person.THIRD)
+                    .withNumber(Noun.Number.SINGULAR)
                     .withGender(Noun.Gender.INANIMATE)
                     .withDefiniteness(Noun.Definiteness.FOCAL);
                     ImmutableList<String> whWord = whNoun.getPhrase(Category.NP);
@@ -299,6 +300,7 @@ public class QuestionGenerator {
 
                 ImmutableList<String> whWords = template.ppObj.getPronoun()
                     .withPerson(Noun.Person.THIRD)
+                    .withNumber(Noun.Number.SINGULAR)
                     .withGender(Noun.Gender.INANIMATE)
                     .withDefiniteness(Noun.Definiteness.FOCAL)
                     .getPhrase(Category.NP);
