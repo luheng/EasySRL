@@ -71,12 +71,7 @@ public abstract class Noun extends Predication {
             } else {
                 phraseNode = candidatePhraseNode;
             }
-            // System.err.println("new category: " + phraseNode.getCategory());
-            // System.err.println("new phrase: " + phraseNode.getWord());
-            // System.err.println("actual head: " + headLeaf.getWord());
-            // if(npNodeOpt.isPresent()) {
-            //     System.err.println("(mistaken phrase: " + npNodeOpt.get().getWord() + ")");
-            // }
+
         } else {
             final SyntaxTreeNode npNode = npNodeOpt.get();
             final Category npNodeCategory = npNode.getCategory();

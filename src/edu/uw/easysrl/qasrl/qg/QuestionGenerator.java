@@ -161,6 +161,7 @@ public class QuestionGenerator {
                     Noun whNoun = ((Noun) answerArg.getPredication())
                     .getPronoun()
                     .withPerson(Noun.Person.THIRD)
+                    .withGender(Noun.Gender.INANIMATE)
                     .withDefiniteness(Noun.Definiteness.FOCAL);
                     ImmutableList<String> whWord = whNoun.getPhrase(Category.NP);
                     Verb questionPred = withTenseForQuestion(sequencedVerb.transformArgs((argNum, args) -> argNum == askingArgNum
@@ -298,6 +299,7 @@ public class QuestionGenerator {
 
                 ImmutableList<String> whWords = template.ppObj.getPronoun()
                     .withPerson(Noun.Person.THIRD)
+                    .withGender(Noun.Gender.INANIMATE)
                     .withDefiniteness(Noun.Definiteness.FOCAL)
                     .getPhrase(Category.NP);
 
@@ -431,6 +433,7 @@ public class QuestionGenerator {
                     Noun whNoun = ((Noun) answerArg.getPredication())
                     .getPronoun()
                     .withPerson(Noun.Person.THIRD)
+                    .withGender(Noun.Gender.INANIMATE)
                     .withDefiniteness(Noun.Definiteness.FOCAL);
                     ImmutableList<String> whWords = whNoun.getPhrase(Category.NP);
                     // these may be necessary now since we didn't auto-pronoun everything
@@ -684,7 +687,7 @@ public class QuestionGenerator {
 
     public static void compareCoreArgQueries() {
         final ParseData parseData = getDevData();
-        ImmutableMap<Integer, NBestList> nBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 100).get();
+        ImmutableMap<Integer, NBestList> nBestLists = NBestList.loadNBestListsFromFile("parses.dev.100best.out", 100).get();
         HITLParser hitlParser = new HITLParser(100);
         long predsCoveredBoth = 0, predsCoveredOldOnly = 0, predsCoveredNewOnly = 0, totalPredsCovered = 0;
         for(int sentenceId = 0; sentenceId < parseData.getSentences().size(); sentenceId++) {
@@ -891,7 +894,10 @@ public class QuestionGenerator {
                 // .add(42).add(1489).add(36)
                 // .add(90)
                 // .add(3)
-                .add(971)
+                // .add(971)
+                .add(941)
+                .add(507)
+                // .add(804)
                 // .add(268, 1016, 1232, 1695, 444, 1495, 1516, 1304, 1564, 397, 217, 90, 224, 563, 1489, 199, 1105, 1124, 1199, 294,
                 //      1305, 705, 762)
                 .build();
@@ -933,7 +939,7 @@ public class QuestionGenerator {
 
     private static void printQueries(ParseData parseData, ImmutableList<Integer> sentenceIds, QuestionGenerationPipeline qgPipeline) {
         System.out.println("\nQA Pairs for specific sentences:\n");
-        ImmutableMap<Integer, NBestList> nBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 100).get();
+        ImmutableMap<Integer, NBestList> nBestLists = NBestList.loadNBestListsFromFile("parses.dev.100best.out", 100).get();
         int numberOfQueries = 0;
         for(int sentenceId : sentenceIds) {
             if(nBestLists.get(sentenceId) == null) {
@@ -972,7 +978,7 @@ public class QuestionGenerator {
 
     private static void printStringAggregatedQueries(ParseData parseData, ImmutableList<Integer> sentenceIds, QuestionGenerationPipeline qgPipeline) {
         System.out.println("\nQA Pairs for specific sentences:\n");
-        ImmutableMap<Integer, NBestList> nBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 100).get();
+        ImmutableMap<Integer, NBestList> nBestLists = NBestList.loadNBestListsFromFile("parses.dev.100best.out", 100).get();
         for(int sentenceId : sentenceIds) {
             NBestList nBestList = nBestLists.get(sentenceId);
             if(nBestList == null) {

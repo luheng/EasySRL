@@ -134,6 +134,16 @@ public final class Verb extends Predication {
         for(int curAuxIndex = headIndex; curAuxIndex >= 0; curAuxIndex--) {
             String aux = words.get(curAuxIndex).toLowerCase();
             Category cat = parse.categories.get(curAuxIndex);
+
+            // negation generally follows the copula; check for it if our main guy is a copula.
+            if(curAuxIndex == headIndex && VerbHelper.isCopulaVerb(aux)) {
+                String possibleNegation = words.get(curAuxIndex + 1);
+                // we need to exclude the case of a "no" because in this position it is probably the determiner of the object or something
+                if(VerbHelper.isNegationWord(possibleNegation) && !possibleNegation.equalsIgnoreCase("no")) {
+                    isNegated = true;
+                }
+            }
+
             if(!VerbHelper.isAuxiliaryVerb(aux, cat) && !VerbHelper.isNegationWord(aux) &&
                cat.isFunctionInto(Category.valueOf("(S\\NP)|(S\\NP)"))) {
                 // adverbs might be between auxiliaries. including (S\NP)/(S\NP) maybe.
@@ -217,7 +227,7 @@ public final class Verb extends Predication {
             rightArgs = ImmutableList.of(particle.get());
         }
 
-        // also, add the auxiliaries if we're never going to drop into the while loop below.
+        // also, add the auxiliaries if we're never going to hit that point in the while loop below.
         if(Category.valueOf("(S\\NP)").matches(curCat)) {
             leftArgs = new ImmutableList.Builder<String>()
                 .addAll(auxChain)
