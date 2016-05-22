@@ -1,14 +1,19 @@
 package edu.uw.easysrl.qasrl.annotation;
 
+import com.google.common.collect.ConcurrentHashMultiset;
+import com.google.common.collect.HashMultiset;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Multiset;
 import edu.uw.easysrl.qasrl.model.HITLParser;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.QueryGeneratorUtils;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
+import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -20,8 +25,7 @@ import java.util.stream.IntStream;
  * Created by luheng on 4/6/16.
  */
 public class CoreArgsTestQuestionGenerator {
-    static final int nBest = 100;
-    private final static HITLParser hitlParser = new HITLParser(nBest);
+    private final static HITLParser hitlParser = new HITLParser(100 /* nBest */);
 
     static QueryPruningParameters queryPruningParameters;
     static {
@@ -29,13 +33,10 @@ public class CoreArgsTestQuestionGenerator {
         queryPruningParameters.skipSAdjQuestions = true;
         queryPruningParameters.skipPPQuestions = true;
         queryPruningParameters.skipBinaryQueries = true;
-        queryPruningParameters.minOptionConfidence = 0;
+        queryPruningParameters.minOptionConfidence = 0.05;
         queryPruningParameters.minOptionEntropy = -1;
         queryPruningParameters.minPromptConfidence = -1;
     }
-
-    // TODO: read annotation files (match predicate & answers spans), find high agreement ones,
-
 
     final static String checkboxTestQuestionFilePath = "./Crowdflower_data/reviewed_test_questions_checkbox_r01.csv";
 
@@ -43,82 +44,61 @@ public class CoreArgsTestQuestionGenerator {
         hitlParser.setQueryPruningParameters(queryPruningParameters);
         Map<Integer, List<AlignedAnnotation>> allAnnotations = CrowdFlowerDataUtils.loadCorePronounAnnotations();
 
-        AtomicInteger numAnnotations = new AtomicInteger(0),
-                      numMatchedAnnotations = new AtomicInteger(0),
-                      numPredMatchedAnnotations = new AtomicInteger(0);
-
+        int numAnnotations = 0, numPredMatchedAnnotations = 0, numMatchedAnnotations = 0;
         for (int sid : allAnnotations.keySet()) {
+            HashSet<Integer> predicateMatchedAnnotations = new HashSet<>(),
+                             matchedAnnotations = new HashSet<>();
+
+            final ImmutableList<String> sentence = hitlParser.getSentence(sid);
             final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList =
                     hitlParser.getNewCoreArgQueriesForSentence(sid);
             final List<AlignedAnnotation> annotations = allAnnotations.get(sid);
-            numAnnotations.addAndGet(annotations.size());
-            queryList.forEach(query -> {
+
+            for (ScoredQuery<QAStructureSurfaceForm> query : queryList) {
                 // Match annotation: 5 overlapping annotations, same predicate.
                 final int predId = query.getPredicateId().getAsInt();
-                annotations.stream()
-                        .filter(annot -> annot.predicateId == predId
-                                && query.getPredicateCategory().get() == annot.predicateCategory
-                                && query.getArgumentNumber().getAsInt() == annot.argumentNumber)
-                        .map(annot -> {
-                            numPredMatchedAnnotations.getAndAdd(1);
-                            return annot;
-                        })
-                        .filter(annot -> {
-                            // TODO: 5 annotaiton match
-                            int nmatch = IntStream.range(0, annot.answerOptions.size())
-                                    .filter(op -> query.getOptions().contains(annot.answerOptions.get(op)))
-                                    .map(op -> annot.answerDist[op])
-                                    .sum();
-                            return nmatch >= 5;
-                        })
-                        .forEach(annot -> {
-                            if (!query.getPrompt().equals(annot.queryPrompt)) {
-                                System.out.println(query.getPrompt() + "\n" + annot.queryPrompt);
-                                System.out.println(annot);
-                            }
-                            numMatchedAnnotations.addAndGet(1);
-                        });
-            });
+                final Category category = query.getPredicateCategory().get();
+                final int argNum = query.getArgumentNumber().getAsInt();
+
+                for (int annotId = 0; annotId < annotations.size(); annotId++) {
+                    final AlignedAnnotation annot = annotations.get(annotId);
+                    if (annot.predicateId == predId
+                            && category == annot.predicateCategory
+                            && argNum == annot.argumentNumber) {
+                        predicateMatchedAnnotations.add(annotId);
+                        HashMultiset<ImmutableList<Integer>> responses =
+                                HashMultiset.create(AnnotationUtils.getAllUserResponses(query, annot));
+                        ImmutableList<Integer> goldResponse = hitlParser.getGoldOptions(query);
+
+                        if (responses.count(goldResponse) >= 5) {
+                            matchedAnnotations.add(annotId);
+                            //if (!query.getPrompt().equals(annot.queryPrompt)) {
+                            //System.out.println(query.getPrompt() + "\n" + annot.queryPrompt);
+                            /*
+                            System.out.println(annot);
+                            System.out.println(query.toString(sentence, 'G', goldResponse, '*',
+                                    AnnotationUtils.getUserResponseDistribution(query, annot))); */
+
+                            System.out.println(query.toString(sentence, 'G', goldResponse, 'T', goldResponse)
+                                    + String.format("[reason]:\t\t%s\n", "Based on high agreement (at least 5 out of 5) among annotators."));
+                            //}
+                        }
+                    }
+                }
+            }
+            numAnnotations += annotations.size();
+            numPredMatchedAnnotations += predicateMatchedAnnotations.size();
+            numMatchedAnnotations += matchedAnnotations.size();
         }
 
         System.out.println("Num annotations:\t" + numAnnotations);
         System.out.println("Num predicate matched annotations:\t" + numPredMatchedAnnotations);
         System.out.println("Num matched annotations:\t" + numMatchedAnnotations);
-        /*
-        for (RecordedAnnotation testQuestion : testQuestions) {
-            final int sentId = testQuestion.sentenceId;
-            if (sentId < 0) {
-                continue;
-            }
-            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList =
-                    hitlParser.getPronounCoreArgQueriesForSentence(sentId)
-                            //hitlParser.get(sentId)
-                            .stream()
-                            .filter(query -> query.getPredicateId().getAsInt() == testQuestion.predicateId
-                                    && query.getQAPairSurfaceForms().stream()
-                                    .flatMap(qa -> qa.getQuestionStructures().stream())
-                                    .anyMatch(q -> q.category == testQuestion.predicateCategory &&
-                                            q.targetArgNum == testQuestion.argumentNumber))
-                            .collect(GuavaCollectors.toImmutableList());
-
-            // TODO: re-align answer options.
-            queryList.forEach(query -> {
-                final ImmutableList<Integer> realignedOptionIds = AnnotationUtils.getSingleUserResponse(query, testQuestion);
-                System.out.println(query.toString(hitlParser.getSentence(sentId),
-                        'G', hitlParser.getGoldOptions(query),
-                        'T', realignedOptionIds) +
-                        String.format("[reason]:\t\t%s\n", testQuestion.comment));
-            });
-            */
-            //queryList.forEach(query -> {
-            //final ImmutableList<Integer> realignedOptionIds = AnnotationUtils.getSingleUserResponse(query, testQuestion);
-            //    System.out.println(query.toString(hitlParser.getSentence(sentId), 'G', hitlParser.getGoldOptions(query)));
-            //});
-
-            //if (queryList.size() == 0) {
-            //    System.out.println("------\n" + testQuestion);
-            //}
     }
+
+
+    // TODO: test question writer "GT" and "reason" fields.
+
 
     public static void main(String[] args) throws IOException {
         ImmutableList<RecordedAnnotation> testQuestions = CrowdFlowerDataReader
