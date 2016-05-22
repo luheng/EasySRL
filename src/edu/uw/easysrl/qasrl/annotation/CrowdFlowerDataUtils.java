@@ -1,5 +1,6 @@
 package edu.uw.easysrl.qasrl.annotation;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableTable;
@@ -292,7 +293,9 @@ public class CrowdFlowerDataUtils {
         int predicateIndex = annotation.predicateId;
         int sentenceId = annotation.sentenceId;
         ImmutableList<String> sentence = ImmutableList.copyOf(annotation.sentenceString.split("\\s+"));
-        assert  annotation.predicateId < 0 || sentence.get(annotation.predicateId).equalsIgnoreCase(annotation.predicateString);
+
+        Preconditions.checkArgument(annotation.predicateId < 0 || sentence.get(annotation.predicateId).equalsIgnoreCase(annotation.predicateString));
+
         final String sentenceStr = TextGenerationHelper.renderHTMLSentenceString(sentence, predicateIndex, highlightPredicate);
         final List<String> options = annotation.optionStrings;
         List<String> csvRow = new ArrayList<>();
