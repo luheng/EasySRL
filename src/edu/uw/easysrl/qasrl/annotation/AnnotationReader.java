@@ -50,6 +50,7 @@ public class AnnotationReader {
                 if (!qkey.isEmpty()) {
                     curr.predicateId = Integer.parseInt(qkey.split(":")[0]);
                     curr.predicateString = qkey.split("_")[0].split(":")[1];
+
                     //System.err.println(curr.sentenceString + "\n" + curr.queryPrompt + "\n" +
                     //       curr.sentenceString.split("\\s+")[curr.predicateId] + "\n" + curr.predicateString);
                 }

@@ -9,13 +9,16 @@ import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.QueryGeneratorUtils;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
+import edu.uw.easysrl.qasrl.ui.Colors;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.GuavaCollectors;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -38,9 +41,17 @@ public class CoreArgsTestQuestionGenerator {
         queryPruningParameters.minPromptConfidence = -1;
     }
 
-    final static String checkboxTestQuestionFilePath = "./Crowdflower_data/reviewed_test_questions_checkbox_r01.csv";
+    private static final int minAgreement = 5;
+    private static List<RecordedAnnotation> reviewedTestQuestions;
 
-    public static void generateTestQuestions() throws IOException {
+    private static final String reviewedTestQuestionsFile =
+            "./Crowdflower_unannotated/test_questions/test_question_core_pronoun_r04.tsv";
+    private static final String outputTestQuestionsFile =
+            "./Crowdflower_data/reviewed_test_questions_checkbox_r01.csv";
+
+    public static void generateAndMergeTestQuestions() throws IOException {
+        reviewedTestQuestions = AnnotationReader.readReviewedTestQuestionsFromTSV(reviewedTestQuestionsFile);
+
         hitlParser.setQueryPruningParameters(queryPruningParameters);
         Map<Integer, List<AlignedAnnotation>> allAnnotations = CrowdFlowerDataUtils.loadCorePronounAnnotations();
 
@@ -70,18 +81,28 @@ public class CoreArgsTestQuestionGenerator {
                                 HashMultiset.create(AnnotationUtils.getAllUserResponses(query, annot));
                         ImmutableList<Integer> goldResponse = hitlParser.getGoldOptions(query);
 
-                        if (responses.count(goldResponse) >= 5) {
+                        if (responses.count(goldResponse) >= minAgreement) {
                             matchedAnnotations.add(annotId);
-                            //if (!query.getPrompt().equals(annot.queryPrompt)) {
-                            //System.out.println(query.getPrompt() + "\n" + annot.queryPrompt);
-                            /*
-                            System.out.println(annot);
-                            System.out.println(query.toString(sentence, 'G', goldResponse, '*',
-                                    AnnotationUtils.getUserResponseDistribution(query, annot))); */
+                            String reason = String.format(
+                                    "Based on high agreement (at least %d out of 5) among annotators.", minAgreement);
 
-                            System.out.println(query.toString(sentence, 'G', goldResponse, 'T', goldResponse)
-                                    + String.format("[reason]:\t\t%s\n", "Based on high agreement (at least 5 out of 5) among annotators."));
-                            //}
+                            for (RecordedAnnotation testQuestion : reviewedTestQuestions) {
+                                if (testQuestion.sentenceId == sid && testQuestion.predicateId == predId
+                                        && testQuestion.queryPrompt.equals(query.getPrompt())) {
+                                    reason = testQuestion.comment;
+                                }
+                            }
+                            // Search for reason.
+
+                            //System.out.println(annot);
+                            //System.out.println(query.toString(sentence, 'G', goldResponse, '*',
+                            //        AnnotationUtils.getUserResponseDistribution(query, annot)));
+                            if (!query.getPrompt().equals(annot.queryPrompt)) {
+                                System.out.println(Colors.ANSI_RED + "New:\t" + query.getPrompt() + "\n"
+                                        + "Old:\t" + annot.queryPrompt + Colors.ANSI_RESET);
+                                System.out.println(query.toString(sentence, 'G', goldResponse, 'T', goldResponse)
+                                        + String.format("[reason]:\t%s\t\n", reason));
+                            }
                         }
                     }
                 }
@@ -96,15 +117,7 @@ public class CoreArgsTestQuestionGenerator {
         System.out.println("Num matched annotations:\t" + numMatchedAnnotations);
     }
 
-
-    // TODO: test question writer "GT" and "reason" fields.
-
-
     public static void main(String[] args) throws IOException {
-        ImmutableList<RecordedAnnotation> testQuestions = CrowdFlowerDataReader
-                .readTestQuestionsFromFile(checkboxTestQuestionFilePath);
-
-        //testQuestions.forEach(System.out::println);
-        generateTestQuestions();
+        generateAndMergeTestQuestions();
     }
 }

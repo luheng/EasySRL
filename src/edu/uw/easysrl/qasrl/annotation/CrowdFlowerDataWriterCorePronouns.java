@@ -40,15 +40,11 @@ public class CrowdFlowerDataWriterCorePronouns {
     private static final String csvOutputFilePrefix =
            // "./Crowdflower_unannotated/pronoun_core_r4_100best";
           //  "./Crowdflower_unannotated/pronoun_core_r5_100best";
-            "./Crowdflower_temp/pronoun_core_r6_100best";
-
-    private static final String[] inputSentenceIdsFiles = new String[] {
-            "./Crowdflower_unannotated/pronoun_core_r4_100best.sent_ids.txt"
-    };
+            "./Crowdflower_temp/pronoun_core_r12_100best";
 
     private static final String outputSentenceIdsFile =
           //  "./Crowdflower_unannotated/pronoun_core_r5_100best.sent_ids.txt";
-            "./Crowdflower_temp/pronoun_core_r6_100best.sent_ids.txt";
+            "./Crowdflower_temp/pronoun_core_r12_100best.sent_ids.txt";
 
     private static final String[] reviewedTestQuestionFiles = new String[] {
             "./Crowdflower_unannotated/test_questions/test_question_core_pronoun_r04.tsv",
@@ -111,13 +107,18 @@ public class CrowdFlowerDataWriterCorePronouns {
 
     private static void printQuestionsToAnnotate() throws IOException {
         assert testSentenceIds != null;
+        /*
         final ImmutableList<Integer> allSentenceIds = hitlParser.getAllSentenceIds().stream()
                 .filter(id -> !testSentenceIds.contains(id))
                 .collect(GuavaCollectors.toImmutableList());
+                */
         final ImmutableList<Integer> sentenceIds = CrowdFlowerDataUtils
-                .sampleNewSentenceIds(numSentences, randomSeed, allSentenceIds);
+                //.sampleNewSentenceIds(numSentences, randomSeed, allSentenceIds);
+                .getRound1And2SentenceIds();
         AtomicInteger lineCounter = new AtomicInteger(0),
-                fileCounter = new AtomicInteger(0);
+                      fileCounter = new AtomicInteger(0);
+
+        // TODO: sanity check: not overlapping with test sentence ids.
 
         System.out.println("Num. sentences:\t" + sentenceIds.size());
         BufferedWriter writer = new BufferedWriter(new FileWriter(new File(outputSentenceIdsFile)));
