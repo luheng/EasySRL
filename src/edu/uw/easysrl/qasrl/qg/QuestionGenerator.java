@@ -117,12 +117,22 @@ public class QuestionGenerator {
 
     }
 
+    private static int numberOfLeftNPArgs(Category cat) {
+        if(cat.getNumberOfArguments() > 0) {
+            boolean isLeftNPSlash = cat.getRight().matches(Category.NP) && cat.getSlash() == Category.Slash.BWD;
+            return (isLeftNPSlash ? 1 : 0) + numberOfLeftNPArgs(cat.getLeft());
+        } else {
+            return 0;
+        }
+    }
+
     private static boolean isVerbValid(Verb verb, boolean shouldBeCopula) {
         return verb != null &&
             (shouldBeCopula
              ? verb.isCopular()
              : !verb.isCopular() && !VerbHelper.isAuxiliaryVerb(verb.getPredicate(), verb.getPredicateCategory())) &&
-            !Preposition.prepositionWords.contains(verb.getPredicate());
+            !Preposition.prepositionWords.contains(verb.getPredicate()) &&
+            numberOfLeftNPArgs(verb.getPredicateCategory()) <= 1;
     }
 
     private static final ImmutableSet<String> bannedAdverbs = ImmutableSet.of("--", "and", "or");
@@ -230,7 +240,7 @@ public class QuestionGenerator {
                         return verb;
                     }
                 })
-            .flatMap(verb -> PredicationUtils.sequenceArgChoices(PredicationUtils.addPlaceholderArguments(verb)).stream()
+            .flatMap(verb -> PredicationUtils.sequenceArgChoices(PredicationUtils.addPlaceholderArguments(PredicationUtils.elideInnerPPs(verb))).stream()
             .filter(sequencedVerb -> sequencedVerb.getArgs().get(2).get(0).getDependency().isPresent() &&
                     sequencedVerb.getArgs().get(2).get(0).getPredication().getPredicateCategory().matches(Category.valueOf("PP/NP")) &&
                     sequencedVerb.getArgs().get(2).get(0).getPredication().getArgs().get(1).get(0).getDependency().isPresent())
