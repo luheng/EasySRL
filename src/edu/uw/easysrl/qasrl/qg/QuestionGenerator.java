@@ -240,13 +240,12 @@ public class QuestionGenerator {
                         return verb;
                     }
                 })
-            .flatMap(verb -> PredicationUtils.sequenceArgChoices(PredicationUtils.addPlaceholderArguments(PredicationUtils.elideInnerPPs(verb))).stream()
-            .filter(sequencedVerb -> sequencedVerb.getArgs().get(2).get(0).getDependency().isPresent() &&
-                    sequencedVerb.getArgs().get(2).get(0).getPredication().getPredicateCategory().matches(Category.valueOf("PP/NP")) &&
-                    sequencedVerb.getArgs().get(2).get(0).getPredication().getArgs().get(1).get(0).getDependency().isPresent())
+            .flatMap(verb -> verb.getArgs().get(2).stream()
+            .filter(ppArg -> ppArg.getPredication().getPredicateCategory().matches(Category.valueOf("PP/NP")))
+            .flatMap(ppArg -> ppArg.getPredication().getArgs().get(1).stream()
+            .filter(ppObjArg -> ppObjArg.getDependency().isPresent())
+            .flatMap(ppObjArg -> PredicationUtils.sequenceArgChoices(PredicationUtils.addPlaceholderArguments(PredicationUtils.elideInnerPPs(verb))).stream()
             .map(sequencedVerb -> {
-                    Argument ppArg = sequencedVerb.getArgs().get(2).get(0);
-                    Argument ppObjArg = ppArg.getPredication().getArgs().get(1).get(0);
                     ResolvedDependency targetDep = ppObjArg.getDependency().get();
                     Noun ppObj = (Noun) ppObjArg.getPredication();
                     Predication gappedPP = ppArg.getPredication()
@@ -260,7 +259,7 @@ public class QuestionGenerator {
                         });
                     Verb gappedVerbWithPronouns = PredicationUtils.withIndefinitePronouns(gappedVerb);
                     return new QATemplate(predicateIndex, gappedVerbWithPronouns, targetDep, 2, ppObj, Optional.empty());
-                }));});
+                }))));});
 
         final Stream<QATemplate> adverbTemplates = IntStream
             .range(0, parse.categories.size())
