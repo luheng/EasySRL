@@ -69,7 +69,15 @@ public abstract class Noun extends Predication {
                ((SyntaxTreeNode.SyntaxTreeNodeLeaf) candidatePhraseNode.getChild(0)).getPos().equals("CC")) {
                 phraseNode = candidatePhraseNode.getChild(1);
             } else {
-                phraseNode = candidatePhraseNode;
+                Optional<SyntaxTreeNode> parentOpt = TextGenerationHelper.getParent(candidatePhraseNode, tree);
+                if(parentOpt.isPresent() &&
+                   parentOpt.get().getChild(0) instanceof SyntaxTreeNode.SyntaxTreeNodeLeaf &&
+                   ((SyntaxTreeNode.SyntaxTreeNodeLeaf) parentOpt.get().getChild(0)).getPos().equals("DT")) {
+                    phraseNode = parentOpt.get();
+                }
+                else {
+                    phraseNode = candidatePhraseNode;
+                }
             }
 
         } else {
