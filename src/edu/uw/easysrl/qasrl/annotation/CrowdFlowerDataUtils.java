@@ -45,6 +45,7 @@ public class CrowdFlowerDataUtils {
     public static final String cfRound4CleftingAnnotationFile = "./Crowdflower_data/f903842.csv";
     public static final String cfRound5CoreArgsAnnotationFile = "./Crowdflower_data/f909211.csv";
     public static final String cfRound1And2CoreArgsRerun = "./Crowdflower_data/f912533.csv";
+    public static final String cfRound6CoreArgsAnnotationFile = "./Crowdflower_data/f912675.csv";
 
     public static final ImmutableList<String> allCfAnnotationFiles = ImmutableList.of(
             cfRound1AnnotationFile,
@@ -55,7 +56,8 @@ public class CrowdFlowerDataUtils {
             cfRound4CoreArgsAnnotationFile,
             cfRound4CleftingAnnotationFile,
             cfRound5CoreArgsAnnotationFile,
-            cfRound1And2CoreArgsRerun
+            cfRound1And2CoreArgsRerun,
+            cfRound6CoreArgsAnnotationFile
     );
 
     // Sentences that happened to appear in instructions ...
@@ -114,6 +116,18 @@ public class CrowdFlowerDataUtils {
         try {
             cfAnnotations.addAll(CrowdFlowerDataReader.readAggregatedAnnotationFromFile(cfRound2AnnotationFile));
             cfAnnotations.addAll(CrowdFlowerDataReader.readAggregatedAnnotationFromFile(cfRound3AnnotationFile));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return cfAnnotations.stream()
+                .map(annotation -> annotation.sentenceId).distinct().sorted()
+                .collect(GuavaCollectors.toImmutableList());
+    }
+
+    public static ImmutableList<Integer> getRound6SentenceIds() {
+        List<AlignedAnnotation> cfAnnotations = new ArrayList<>();
+        try {
+            cfAnnotations.addAll(CrowdFlowerDataReader.readAggregatedAnnotationFromFile(cfRound6CoreArgsAnnotationFile));
         } catch (IOException e) {
             e.printStackTrace();
         }

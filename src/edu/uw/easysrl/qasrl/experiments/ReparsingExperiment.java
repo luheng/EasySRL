@@ -49,6 +49,7 @@ public class ReparsingExperiment {
          //   "./Crowdflower_data/f903842.csv",                   // Round4: np-clefting prnouns
             "./Crowdflower_data/f909211.csv",                   // Round5: checkbox, pronouns, core only, 300+ sentences.
             "./Crowdflower_data/f912533.csv",                   // Round1-2: rerun, new question generator.
+            "./Crowdflower_data/f912675.csv",                   // Round6: Dev wrapup.
     };
 
     private static QueryPruningParameters queryPruningParameters;
@@ -91,7 +92,7 @@ public class ReparsingExperiment {
     }
 
     private static void runExperiment() {
-        final Collection<Integer> round1And2Ids = CrowdFlowerDataUtils.getRound1And2SentenceIds();
+        final Collection<Integer> round6Ids = CrowdFlowerDataUtils.getRound6SentenceIds();
         List<Integer> sentenceIds = myHTILParser.getAllSentenceIds();
                 //annotations.keySet().stream().sorted().collect(Collectors.toList());
                 /*myHTILParser.getAllSentenceIds().stream()
@@ -169,13 +170,18 @@ public class ReparsingExperiment {
                             .anyMatch(op -> op.contains(QAPairAggregatorUtils.answerDelimiter)));
             boolean isClefting = annotated.stream()
                     .anyMatch(annot -> annot.queryPrompt.startsWith("What is it"));
+            boolean useNewCoreArgsQuestions = round6Ids.contains(sentenceId);
 
             List<ScoredQuery<QAStructureSurfaceForm>> queryList = new ArrayList<>();
             if (!isClefting) {
                 if (!isCheckboxStyle) {
                     queryList.addAll(myHTILParser.getCoreArgumentQueriesForSentence(sentenceId, false /* radiobutton version*/));
                 } else {
-                    queryList.addAll(myHTILParser.getPronounCoreArgQueriesForSentence(sentenceId));
+                    if (useNewCoreArgsQuestions) {
+                        queryList.addAll(myHTILParser.getNewCoreArgQueriesForSentence(sentenceId));
+                    } else {
+                        queryList.addAll(myHTILParser.getPronounCoreArgQueriesForSentence(sentenceId));
+                    }
                 }
             } else {
                 queryList.addAll(myHTILParser.getCleftedQuestionsForSentence(sentenceId));
@@ -340,8 +346,8 @@ public class ReparsingExperiment {
 
         debugging.stream()
                 .sorted((b1, b2) -> Double.compare(b1.deltaF1, b2.deltaF1))
-        //                .filter(b -> b.oracleDeltaF1 > 1e-3)
-        //         .filter(b -> Math.abs(b.deltaF1) > 1e-3)
+                        //                .filter(b -> b.oracleDeltaF1 > 1e-3)
+                .filter(b -> Math.abs(b.deltaF1) > 1e-3)
                 .forEach(b -> System.out.println(b.block));
 
         System.out.println("Num. new questions:\t" + numNewQuestions);
