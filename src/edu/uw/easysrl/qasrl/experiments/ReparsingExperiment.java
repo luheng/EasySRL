@@ -49,7 +49,7 @@ public class ReparsingExperiment {
          //   "./Crowdflower_data/f903842.csv",                   // Round4: np-clefting prnouns
             "./Crowdflower_data/f909211.csv",                   // Round5: checkbox, pronouns, core only, 300+ sentences.
             "./Crowdflower_data/f912533.csv",                   // Round1-2: rerun, new question generator.
-            "./Crowdflower_data/f912675.csv",                   // Round6: Dev wrapup.
+            "./Crowdflower_data/f912675.csv",                   // Round6: Dev wrapup. 400+ sentneces.
     };
 
     private static QueryPruningParameters queryPruningParameters;
@@ -72,7 +72,7 @@ public class ReparsingExperiment {
     static {
         reparsingParameters = new HITLParsingParameters();
         reparsingParameters.jeopardyQuestionMinAgreement = 1;
-        reparsingParameters.positiveConstraintMinAgreement = 5;
+        reparsingParameters.positiveConstraintMinAgreement = 4;
         reparsingParameters.negativeConstraintMaxAgreement = 1;
         reparsingParameters.skipPronounEvidence = false;
         reparsingParameters.jeopardyQuestionWeight = 1.0;
@@ -205,9 +205,10 @@ public class ReparsingExperiment {
                                        oneBestOptions = myHTILParser.getOneBestOptions(query),
                                        oracleOptions  = myHTILParser.getOracleOptions(query);
                 if (annotation == null) {
+                    /*
                     sentenceDebuggingString += Colors.ANSI_BLUE
                             + query.toString(sentence, 'G', goldOptions, 'B', oneBestOptions, 'O', oracleOptions)
-                            + "\n" + Colors.ANSI_RESET;
+                            + "\n" + Colors.ANSI_RESET; */
                     numNewQuestions ++;
                     continue;
                 }
@@ -325,10 +326,11 @@ public class ReparsingExperiment {
                 sentenceDebuggingString += String.format("Final F1: %.3f%% over %.3f%% baseline.\t%s\n",
                         100.0 * lastReparsedResult.get().getF1(), 100.0 * baselineF1.getF1(), changeStr);
 
+                /*
                 sentenceDebuggingString += annotated.stream()
                         .filter(annot -> !matchedAnnotationIds.contains(annot.iterationId))
                         .map(annot -> Colors.ANSI_GREEN + annot + Colors.ANSI_RESET)
-                        .collect(Collectors.joining("\n"));
+                        .collect(Collectors.joining("\n")); */
 
                 DebugBlock debugBlock = new DebugBlock(deltaF1, sentenceDebuggingString);
                 debugBlock.oracleDeltaF1 = oracleF1.getF1() - lastReparsedResult.get().getF1();

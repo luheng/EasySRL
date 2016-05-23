@@ -121,11 +121,10 @@ public abstract class QuestionGenerationPipeline {
 
         @Override
         public ImmutableList<QuestionAnswerPair> generateQAPairs(int sentenceId, int parseId, Parse parse) {
-            QuestionGenerator.setAskPPAttachmentQuestions(false);
-            QuestionGenerator.setIndefinitesOnly(true);
             return new ImmutableList.Builder<QuestionAnswerPair>()
                     .addAll(QuestionGenerator.newCoreNPArgQuestions(sentenceId, parseId, parse))
                     .addAll(QuestionGenerator.newCopulaQuestions(sentenceId, parseId, parse))
+                    .addAll(QuestionGenerator.newPPObjPronounQuestions(sentenceId, parseId, parse))
                     .build();
         }
 

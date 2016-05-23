@@ -38,13 +38,10 @@ public class CrowdFlowerDataWriterCoreR1And2Rerun {
     private final static ReparsingHistory history = new ReparsingHistory(hitlParser);
 
     private static final String csvOutputFilePrefix =
-           // "./Crowdflower_unannotated/pronoun_core_r4_100best";
-          //  "./Crowdflower_unannotated/pronoun_core_r5_100best";
-            "./Crowdflower_unannotated/pronoun_core_r12_100best";
+            "./Crowdflower_temp/pronoun_core_r12_100best";
 
     private static final String outputSentenceIdsFile =
-          //  "./Crowdflower_unannotated/pronoun_core_r5_100best.sent_ids.txt";
-            "./Crowdflower_unannotated/pronoun_core_r12_100best.sent_ids.txt";
+            "./Crowdflower_temp/pronoun_core_r12_100best.sent_ids.txt";
 
     private static final String[] reviewedTestQuestionFiles = new String[] {
             "./Crowdflower_unannotated/test_questions/test_question_core_pronoun_r04.tsv",
@@ -153,6 +150,7 @@ public class CrowdFlowerDataWriterCoreR1And2Rerun {
         for (int sid : sentenceIds) {
             ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries =
                     hitlParser.getPronounCoreArgQueriesForSentence(sid);
+                    //hitlParser.getNewCoreArgQueriesForSentence(sid);
             history.addSentence(sid);
             for (ScoredQuery<QAStructureSurfaceForm> query : queries) {
                 final ImmutableList<String> sentence = hitlParser.getSentence(sid);

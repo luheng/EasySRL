@@ -56,8 +56,8 @@ public class CrowdFlowerDataUtils {
             cfRound4CoreArgsAnnotationFile,
             cfRound4CleftingAnnotationFile,
             cfRound5CoreArgsAnnotationFile,
-            cfRound1And2CoreArgsRerun,
-            cfRound6CoreArgsAnnotationFile
+            cfRound1And2CoreArgsRerun
+       //     cfRound6CoreArgsAnnotationFile
     );
 
     // Sentences that happened to appear in instructions ...

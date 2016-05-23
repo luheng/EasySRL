@@ -32,7 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class CrowdFlowerDataWriterNewCore {
 
     static final int nBest = 100;
-    static final int maxNumQueriesPerFile = 200;
+    static final int maxNumQueriesPerFile = 500;
     static final int numSentences = 2000;
     static final int randomSeed = 12345;
 

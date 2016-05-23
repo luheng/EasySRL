@@ -304,11 +304,10 @@ public class QuestionGenerator {
                     return new QATemplate(vpAttachmentDep.getArgument(), verb, ppObjDep, -1, (Noun) ppObjArg.getPredication(), Optional.of(attachedPreposition));
                 })))));});
 
-        final Stream<QATemplate> templates = Stream.concat(verbTemplates, adverbTemplates);
-        // final Stream<QATemplate> templates = verbTemplates;
+        //final Stream<QATemplate> templates = Stream.concat(verbTemplates, adverbTemplates);
+        final Stream<QATemplate> templates = verbTemplates;
 
         return templates.map(template -> {
-
                 ImmutableList<String> whWords = template.ppObj.getPronoun()
                     .withPerson(Noun.Person.THIRD)
                     .withNumber(Noun.Number.SINGULAR)
@@ -345,7 +344,8 @@ public class QuestionGenerator {
                                                    template.argNum,
                                                    template.predicateIndex, null,
                                                    questionDeps, questionWords,
-                                                   template.ppObjDep, answerTWD);
+                                                   template.ppObjDep,
+                                                   answerTWD);
             })
             .collect(toImmutableList());
     }

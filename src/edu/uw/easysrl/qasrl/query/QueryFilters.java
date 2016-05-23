@@ -81,8 +81,6 @@ public class QueryFilters {
                         !Prepositions.prepositionWords.contains(leaves.get(dep.getHead()).getWord().toLowerCase()));
     }
 
-    // TODO: filter answers that is a superspan of two non-overlapping answers. i.e.
-    //   Barack Obama, president vs. Obama vs. president
     public static QueryFilter<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> scoredQueryFilter() {
         return (queries, nBestList, queryPruningParameters) -> queries.stream()
                 .filter(query -> {
