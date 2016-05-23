@@ -67,7 +67,8 @@ public class HITLParser {
         goldParses = parseData.getGoldParses();
         System.out.println(String.format("Read %d sentences from the dev set.", sentences.size()));
 
-        String preparsedFile = getTestSet ? "parses.test.100best.out" : "parses.dev.100best.out";
+        // TODO: change back to dev.100best.out?
+        String preparsedFile = getTestSet ? "parses.test.100best.out" : "parses.dev.100best.new.out";
         nbestLists = NBestList.loadNBestListsFromFile(preparsedFile, nBest).get();
         System.out.println(String.format("Load pre-parsed %d-best lists for %d sentences.", nBest, nbestLists.size()));
 
