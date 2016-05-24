@@ -40,46 +40,43 @@ public class ParseFileGenerator {
         ImmutableList<Parse> goldParses =
                 generateDev ?  dev.getGoldParses() : test.getGoldParses();
 
-
         int numParsed = 0;
         double averageN = .0;
         Results oracleF1 = new Results(), baselineF1 = new Results();
         BaseCcgParser.AStarParser parser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, nBest,
-                              1e-6, 1e-6, 200000, 70);
+                              1e-6, 1e-6, 1000000, 70);
         BaseCcgParser.AStarParser backoffParser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, 1,
-                              1e-6, 1e-3, 200000, 70);
+                              1e-6, 1e-3, 1000000, 70);
         parser.cacheSupertags(generateDev ? dev : test);
 
         for (int sentIdx = 0; sentIdx < sentences.size(); sentIdx ++) {
             System.out.println(sentIdx + ", " + sentences.get(sentIdx).size());
-            List<Parse> parses = //generateDev && skipDevSentences.contains(sentIdx) ?
-                    //ImmutableList.of(backoffParser.parse(sentences.get(sentIdx))) :
-                    parser.parseNBest(sentIdx, sentences.get(sentIdx));
+            List<Parse> parses = parser.parseNBest(sentIdx, sentences.get(sentIdx));
             if (parses == null) {
                 System.err.println("Backing-off:\t" + sentIdx + "\t" + sentences.get(sentIdx).stream()
                         .map(w -> w.word).collect(Collectors.joining(" ")));
-                parses = //backoffParser.parseNBest(sentences.get(sentIdx));
-                        ImmutableList.of(backoffParser.parse(sentIdx, sentences.get(sentIdx)));
+                parses = ImmutableList.of(backoffParser.parse(sentIdx, sentences.get(sentIdx)));
             }
             averageN += parses.size();
             // Get results for every parse in the n-best list.
-            List<Results> results = CcgEvaluation.evaluateNBest(parses, goldParses.get(sentIdx).dependencies);
-            // Get oracle parse id.
-            int oracleK = 0;
-            for (int k = 1; k < parses.size(); k++) {
-                if (results.get(k).getF1() > results.get(oracleK).getF1()) {
-                    oracleK = k;
+            if (includeGoldInTest) {
+                List<Results> results = CcgEvaluation.evaluateNBest(parses, goldParses.get(sentIdx).dependencies);
+                int oracleK = 0;
+                for (int k = 1; k < parses.size(); k++) {
+                    if (results.get(k).getF1() > results.get(oracleK).getF1()) {
+                        oracleK = k;
+                    }
                 }
+                allParses.put(sentIdx, parses);
+                if (allParses.size() % 100 == 0) {
+                    System.out.println("Parsed:\t" + allParses.size() + " sentences ...");
+                    System.out.println("Baseline:\n" + baselineF1);
+                    System.out.println("Oracle:\n" + oracleF1);
+                    System.out.println("Average-N:\n" + averageN / allParses.size());
+                }
+                oracleF1.add(results.get(oracleK));
+                baselineF1.add(results.get(0));
             }
-            allParses.put(sentIdx, parses);
-            if (allParses.size() % 100 == 0) {
-                System.out.println("Parsed:\t" + allParses.size() + " sentences ...");
-                System.out.println("Baseline:\n" + baselineF1);
-                System.out.println("Oracle:\n" + oracleF1);
-                System.out.println("Average-N:\n" + averageN / allParses.size());
-            }
-            oracleF1.add(results.get(oracleK));
-            baselineF1.add(results.get(0));
             numParsed ++;
         }
 
