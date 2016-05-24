@@ -46,7 +46,7 @@ public class ParseFileGenerator {
         BaseCcgParser.AStarParser parser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, nBest,
                               1e-6, 1e-6, 1000000, 70);
         BaseCcgParser.AStarParser backoffParser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, 1,
-                              1e-6, 1e-3, 1000000, 70);
+                              1e-6, 1e-6, 1000000, 70);
         parser.cacheSupertags(generateDev ? dev : test);
 
         for (int sentIdx = 0; sentIdx < sentences.size(); sentIdx ++) {
