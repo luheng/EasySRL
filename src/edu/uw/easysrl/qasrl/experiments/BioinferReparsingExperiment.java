@@ -253,9 +253,9 @@ public class BioinferReparsingExperiment {
         }
 
         myHistory.printSummary();
-        System.out.println("Labeled baseline:\t" + avgBaseline.getF1());
-        System.out.println("Labeled reranked:\t" + avgReranked.getF1());
-        System.out.println("Labeled reparsed:\t" + avgReparsed.getF1());
+        System.out.println("Supertag baseline:\t" + avgBaseline.getF1());
+        System.out.println("Supertag reranked:\t" + avgReranked.getF1());
+        System.out.println("Supertag reparsed:\t" + avgReparsed.getF1());
         //System.out.println("Unlabeled baseline:\n" + avgUnlabeledBaseline);
         //System.out.println("Unlabeled reranked:\n" + avgUnlabeledReranked);
         //System.out.println("Unlabeled reparsed:\n" + avgUnlabeledReparsed);
