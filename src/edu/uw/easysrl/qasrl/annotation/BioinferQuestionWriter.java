@@ -68,7 +68,7 @@ public class BioinferQuestionWriter {
 
     private static void printQuestionsToAnnotate() throws IOException {
         BioinferCCGCorpus corpus = BioinferCCGCorpus.readDev().get();
-        Map<Integer, NBestList> nbestLists = NBestList.loadNBestListsFromFile("biomed.dev.100best.out", nBest).get();
+        Map<Integer, NBestList> nbestLists = NBestList.loadNBestListsFromFile("bioinfer.dev.100best.out", nBest).get();
         System.out.println(String.format("Load pre-parsed %d-best lists for %d sentences.", nBest, nbestLists.size()));
 
         AtomicInteger lineCounter = new AtomicInteger(0), fileCounter = new AtomicInteger(0);

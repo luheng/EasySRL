@@ -3,13 +3,16 @@ package edu.uw.easysrl.corpora;
 import java.io.*;
 import java.util.*;
 
+import com.esotericsoftware.kryo.io.Input;
 import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.BaseCcgParser;
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.syntax.tagger.POSTagger;
 import edu.uw.easysrl.util.GuavaCollectors;
+import edu.uw.easysrl.util.Util;
 
 import java.util.stream.Collectors;
 
@@ -20,12 +23,15 @@ import java.util.stream.Collectors;
 public class BioinferCCGCorpus {
     public static final String BioMedDevFile = "./testfiles/biomed/GENIA1000.staggedGold";
 
+    final ImmutableList<ImmutableList<InputReader.InputWord>> inputSentences;
     final ImmutableList<ImmutableList<String>> sentences, postags;
     final ImmutableList<ImmutableList<Category>> goldCategories;
 
-    private BioinferCCGCorpus(final ImmutableList<ImmutableList<String>> sentences,
+    private BioinferCCGCorpus(final ImmutableList<ImmutableList<InputReader.InputWord>> inputSentences,
+                              final ImmutableList<ImmutableList<String>> sentences,
                               final ImmutableList<ImmutableList<String>> postags,
                               final ImmutableList<ImmutableList<Category>> goldCategories) {
+        this.inputSentences = inputSentences;
         this.sentences = sentences;
         this.postags = postags;
         this.goldCategories = goldCategories;
@@ -36,6 +42,8 @@ public class BioinferCCGCorpus {
     }
 
     public static Optional<BioinferCCGCorpus> readDev() {
+        POSTagger postagger = POSTagger.getStanfordTagger(Util.getFile(BaseCcgParser.modelFolder + "/posTagger"));
+        List<ImmutableList<InputReader.InputWord>> inputSentences = new ArrayList<>();
         List<ImmutableList<String>> sentences = new ArrayList<>(), postags = new ArrayList<>();
         List<ImmutableList<Category>> goldCategories = new ArrayList<>();
         try {
@@ -46,6 +54,7 @@ public class BioinferCCGCorpus {
                     continue;
                 }
                 String[] segments = line.split("\\s+");
+                List<InputReader.InputWord> inputs = new ArrayList<>();
                 List<String> words = new ArrayList<>(), pos = new ArrayList<>();
                 List<Category> categories = new ArrayList<>();
                 for (String seg : segments) {
@@ -53,8 +62,12 @@ public class BioinferCCGCorpus {
                     words.add(info[0]);
                     pos.add(info[1]);
                     categories.add(Category.valueOf(info[2]));
+                    inputs.add(new InputReader.InputWord(info[0], "", ""));
+
                 }
                 if (words.size() > 0) {
+                    postagger.tag(inputs);
+                    inputSentences.add(ImmutableList.copyOf(inputs));
                     sentences.add(ImmutableList.copyOf(words));
                     postags.add(ImmutableList.copyOf(pos));
                     goldCategories.add(ImmutableList.copyOf(categories));
@@ -65,8 +78,8 @@ public class BioinferCCGCorpus {
             return Optional.empty();
         }
         System.out.println(String.format("Read %d sentences from %s.", sentences.size(), BioMedDevFile));
-        return Optional.of(new BioinferCCGCorpus(ImmutableList.copyOf(sentences), ImmutableList.copyOf(postags),
-                ImmutableList.copyOf(goldCategories)));
+        return Optional.of(new BioinferCCGCorpus(ImmutableList.copyOf(inputSentences), ImmutableList.copyOf(sentences),
+                ImmutableList.copyOf(postags), ImmutableList.copyOf(goldCategories)));
     }
 
     public static void main(String[] args) {
