@@ -46,14 +46,14 @@ public class ParseFileGenerator {
         Results oracleF1 = new Results(), baselineF1 = new Results();
         BaseCcgParser.AStarParser parser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, nBest,
                               1e-6, 1e-6, 1000000, 70);
-        BaseCcgParser.AStarParser backoffParser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, 10,
+        BaseCcgParser.AStarParser backoffParser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, 1,
                               1e-6, 1e-3, 1000000, 70);
         parser.cacheSupertags(generateDev ? dev : test);
 
         for (int sentIdx = 0; sentIdx < sentences.size(); sentIdx ++) {
             System.out.println(sentIdx + ", " + sentences.get(sentIdx).size());
-            List<Parse> parses = generateDev && skipDevSentences.contains(sentIdx) ?
-                    ImmutableList.of(backoffParser.parse(sentences.get(sentIdx))) :
+            List<Parse> parses = //generateDev && skipDevSentences.contains(sentIdx) ?
+                    //ImmutableList.of(backoffParser.parse(sentences.get(sentIdx))) :
                     parser.parseNBest(sentences.get(sentIdx));
             if (parses == null) {
                 System.err.println("Backing-off:\t" + sentIdx + "\t" + sentences.get(sentIdx).stream()
