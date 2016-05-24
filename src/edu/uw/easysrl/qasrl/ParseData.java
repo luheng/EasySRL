@@ -51,71 +51,8 @@ public final class ParseData {
         return goldParses;
     }
 
-    public static Optional<ParseData> loadFromDevPool() {
-        return loadFromPropBank(true);
-    }
 
-    public static Optional<ParseData> loadFromTestPool() {
-        POSTagger postagger = POSTagger.getStanfordTagger(Util.getFile(BaseCcgParser.modelFolder + "/posTagger"));
-        List<List<InputReader.InputWord>> sentenceInputWords = new ArrayList<>();
-        List<Parse> goldParses = new ArrayList<>();
-        Iterator<Sentence> sentenceIterator;
-        try {
-            sentenceIterator = ParallelCorpusReader.READER.readCcgTestSet();
-        } catch (IOException e) {
-            System.out.println(String.format("Failed to read %d sentences.", sentenceInputWords.size()));
-            return Optional.empty();
-        }
-        while (sentenceIterator.hasNext()) {
-            Sentence sentence = sentenceIterator.next();
-            List<InputReader.InputWord> taggedInput = postagger.tag(sentence.getInputWords());
-            sentenceInputWords.add(taggedInput);
-            Set<ResolvedDependency> goldDependencies = CCGBankEvaluation
-                    .asResolvedDependencies(sentence.getCCGBankDependencyParse().getDependencies());
-            goldParses.add(new Parse(sentence.getCcgbankParse(), sentence.getLexicalCategories(), goldDependencies));
-        }
-        System.out.println(String.format("Read %d sentences.", sentenceInputWords.size()));
-        return Optional.of(makeParseData(sentenceInputWords, goldParses));
-    }
-
-    public static Optional<ParseData> loadFromTrainingPool() {
-        return loadFromPropBank(false);
-    }
-
-    private static Optional<ParseData> devData = null;
-    private static Optional<ParseData> loadFromPropBank(final boolean readDev) {
-        if(readDev && devData != null) {
-            return devData;
-        }
-        POSTagger postagger = POSTagger.getStanfordTagger(Util.getFile(BaseCcgParser.modelFolder + "/posTagger"));
-        List<List<InputReader.InputWord>> sentenceInputWords = new ArrayList<>();
-        List<Parse> goldParses = new ArrayList<>();
-        Iterator<Sentence> sentenceIterator;
-        try {
-            sentenceIterator = ParallelCorpusReader.READER.readCcgCorpus(readDev);
-        } catch (IOException e) {
-            System.out.println(String.format("Failed to read %d sentences.", sentenceInputWords.size()));
-            devData = Optional.empty();
-            return devData;
-        }
-        while (sentenceIterator.hasNext()) {
-            Sentence sentence = sentenceIterator.next();
-            List<InputReader.InputWord> taggedInput = postagger.tag(sentence.getInputWords());
-            sentenceInputWords.add(taggedInput);
-            Set<ResolvedDependency> goldDependencies = CCGBankEvaluation
-                    .asResolvedDependencies(sentence.getCCGBankDependencyParse().getDependencies());
-            goldParses.add(new Parse(sentence.getCcgbankParse(), sentence.getLexicalCategories(), goldDependencies));
-        }
-        System.out.println(String.format("Read %d sentences.", sentenceInputWords.size()));
-        Optional<ParseData> data = Optional.of(makeParseData(sentenceInputWords, goldParses));
-        if(readDev) {
-            devData = data;
-        }
-        return data;
-    }
-
-    private ParseData(ImmutableList<ImmutableList<InputReader.InputWord>> sentenceInputWords,
-                     ImmutableList<Parse> goldParses) {
+    ParseData(ImmutableList<ImmutableList<InputReader.InputWord>> sentenceInputWords, ImmutableList<Parse> goldParses) {
         this.sentenceInputWords = sentenceInputWords;
         this.goldParses = goldParses;
         this.sentences = sentenceInputWords
@@ -125,17 +62,5 @@ public final class ParseData {
                  .map(iw -> iw.word)
                  .collect(toImmutableList()))
             .collect(toImmutableList());
-    }
-
-    static ParseData makeParseData(List<List<InputReader.InputWord>> sentenceInputWords,
-                                           List<Parse> goldParses) {
-        ImmutableList<ImmutableList<InputReader.InputWord>> thisSentences = sentenceInputWords
-            .stream()
-            .map(ImmutableList::copyOf)
-            .collect(toImmutableList());
-        ImmutableList<Parse> thisGoldParses = goldParses
-            .stream()
-            .collect(toImmutableList());
-        return new ParseData(thisSentences, thisGoldParses);
     }
 }

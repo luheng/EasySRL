@@ -2,10 +2,7 @@ package edu.uw.easysrl.qasrl.experiments;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import edu.uw.easysrl.qasrl.NBestList;
-import edu.uw.easysrl.qasrl.Parse;
-import edu.uw.easysrl.qasrl.ParseData;
-import edu.uw.easysrl.qasrl.TextGenerationHelper;
+import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregator;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregators;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
@@ -26,7 +23,7 @@ import java.util.stream.Collectors;
 public class CleftingQuestionExperiment {
 
     public static void main(String[] args) {
-        ParseData devData = ParseData.loadFromDevPool().get();
+        ParseData devData = ParseDataLoader.loadFromDevPool().get();
         QuestionGenerator.setAskPPAttachmentQuestions(true);
 
         ImmutableMap<Integer, NBestList> nBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 100).get();

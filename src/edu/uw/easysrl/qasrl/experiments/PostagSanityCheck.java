@@ -5,6 +5,7 @@ import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.NBestList;
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.ParseData;
+import edu.uw.easysrl.qasrl.ParseDataLoader;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 
 import java.util.Map;
@@ -16,7 +17,7 @@ public class PostagSanityCheck {
 
     public static void main(String[] args) {
         final int nBest = 100;
-        final ParseData parseData = ParseData.loadFromDevPool().get();
+        final ParseData parseData = ParseDataLoader.loadFromDevPool().get();
         final ImmutableList<ImmutableList<InputReader.InputWord>> inputSentences = parseData.getSentenceInputWords();
         final ImmutableList<Parse> goldParses = parseData.getGoldParses();
         System.out.println(String.format("Read %d sentences from the dev set.", inputSentences.size()));

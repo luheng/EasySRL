@@ -39,7 +39,7 @@ public abstract class BaseCcgParser {
 
     private static void initializeFilter() {
         final CountDictionary dependencyDict = new CountDictionary();
-        final ParseData parseData = ParseData.loadFromTrainingPool().get();
+        final ParseData parseData = ParseDataLoader.loadFromTrainingPool().get();
         parseData.getGoldParses()
                 .forEach(parse -> parse.dependencies
                         .forEach(dep -> dependencyDict.addString(dep.getCategory() + "." + dep.getArgNumber())));

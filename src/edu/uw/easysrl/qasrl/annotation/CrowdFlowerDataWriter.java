@@ -54,7 +54,7 @@ public class CrowdFlowerDataWriter {
 
     public static void main(String[] args) throws IOException {
         // Initialize data.
-        parseData = ParseData.loadFromDevPool().get();
+        parseData = ParseDataLoader.loadFromDevPool().get();
         parser = new BaseCcgParser.MockParser(preparsedFile, nBest);
         nbestLists = NBestList.getAllNBestLists(parser, parseData.getSentenceInputWords());
         goldSimulator = new ResponseSimulatorGold(parseData);

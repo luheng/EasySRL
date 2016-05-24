@@ -8,6 +8,7 @@ import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.BaseCcgParser;
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.ParseData;
+import edu.uw.easysrl.qasrl.ParseDataLoader;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import uk.co.flamingpenguin.jewel.cli.CliFactory;
 
@@ -176,7 +177,7 @@ public class TriTrainCCGBenchmark {
             return;
         }
         // Initialize corpora.
-        final ParseData dev = ParseData.loadFromDevPool().get();
+        final ParseData dev = ParseDataLoader.loadFromDevPool().get();
         sentences = dev.getSentenceInputWords();
         goldParses = dev.getGoldParses();
         parser = new BaseCcgParser.AStarParser(commandLineOptions.getModel(), nBest);

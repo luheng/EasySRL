@@ -2,7 +2,10 @@ package edu.uw.easysrl.qasrl;
 
 import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.corpora.BioinferCCGCorpus;
+import edu.uw.easysrl.corpora.ParallelCorpusReader;
+import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.main.InputReader;
+import edu.uw.easysrl.syntax.evaluation.CCGBankEvaluation;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.tagger.POSTagger;
 import edu.uw.easysrl.util.Util;
@@ -11,14 +14,89 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+
+import static edu.uw.easysrl.util.GuavaCollectors.toImmutableList;
 
 /**
  * Created by luheng on 5/24/16.
  */
 public class ParseDataLoader {
+
+    private static ParseData makeParseData(List<List<InputReader.InputWord>> sentenceInputWords,
+                                   List<Parse> goldParses) {
+        ImmutableList<ImmutableList<InputReader.InputWord>> thisSentences = sentenceInputWords
+                .stream()
+                .map(ImmutableList::copyOf)
+                .collect(toImmutableList());
+        ImmutableList<Parse> thisGoldParses = goldParses
+                .stream()
+                .collect(toImmutableList());
+        return new ParseData(thisSentences, thisGoldParses);
+    }
+
+    public static Optional<ParseData> loadFromDevPool() {
+        return loadFromPropBank(true);
+    }
+
+    public static Optional<ParseData> loadFromTestPool() {
+        POSTagger postagger = POSTagger.getStanfordTagger(Util.getFile(BaseCcgParser.modelFolder + "/posTagger"));
+        List<List<InputReader.InputWord>> sentenceInputWords = new ArrayList<>();
+        List<Parse> goldParses = new ArrayList<>();
+        Iterator<ParallelCorpusReader.Sentence> sentenceIterator;
+        try {
+            sentenceIterator = ParallelCorpusReader.READER.readCcgTestSet();
+        } catch (IOException e) {
+            System.out.println(String.format("Failed to read %d sentences.", sentenceInputWords.size()));
+            return Optional.empty();
+        }
+        while (sentenceIterator.hasNext()) {
+            ParallelCorpusReader.Sentence sentence = sentenceIterator.next();
+            List<InputReader.InputWord> taggedInput = postagger.tag(sentence.getInputWords());
+            sentenceInputWords.add(taggedInput);
+            Set<ResolvedDependency> goldDependencies = CCGBankEvaluation
+                    .asResolvedDependencies(sentence.getCCGBankDependencyParse().getDependencies());
+            goldParses.add(new Parse(sentence.getCcgbankParse(), sentence.getLexicalCategories(), goldDependencies));
+        }
+        System.out.println(String.format("Read %d sentences.", sentenceInputWords.size()));
+        return Optional.of(makeParseData(sentenceInputWords, goldParses));
+    }
+
+    public static Optional<ParseData> loadFromTrainingPool() {
+        return loadFromPropBank(false);
+    }
+
+    private static Optional<ParseData> devData = null;
+    private static Optional<ParseData> loadFromPropBank(final boolean readDev) {
+        if(readDev && devData != null) {
+            return devData;
+        }
+        POSTagger postagger = POSTagger.getStanfordTagger(Util.getFile(BaseCcgParser.modelFolder + "/posTagger"));
+        List<List<InputReader.InputWord>> sentenceInputWords = new ArrayList<>();
+        List<Parse> goldParses = new ArrayList<>();
+        Iterator<ParallelCorpusReader.Sentence> sentenceIterator;
+        try {
+            sentenceIterator = ParallelCorpusReader.READER.readCcgCorpus(readDev);
+        } catch (IOException e) {
+            System.out.println(String.format("Failed to read %d sentences.", sentenceInputWords.size()));
+            devData = Optional.empty();
+            return devData;
+        }
+        while (sentenceIterator.hasNext()) {
+            ParallelCorpusReader.Sentence sentence = sentenceIterator.next();
+            List<InputReader.InputWord> taggedInput = postagger.tag(sentence.getInputWords());
+            sentenceInputWords.add(taggedInput);
+            Set<ResolvedDependency> goldDependencies = CCGBankEvaluation
+                    .asResolvedDependencies(sentence.getCCGBankDependencyParse().getDependencies());
+            goldParses.add(new Parse(sentence.getCcgbankParse(), sentence.getLexicalCategories(), goldDependencies));
+        }
+        System.out.println(String.format("Read %d sentences.", sentenceInputWords.size()));
+        Optional<ParseData> data = Optional.of(makeParseData(sentenceInputWords, goldParses));
+        if(readDev) {
+            devData = data;
+        }
+        return data;
+    }
 
     public static Optional<ParseData> loadFromBioinferDev() {
         POSTagger postagger = POSTagger.getStanfordTagger(Util.getFile(BaseCcgParser.modelFolder + "/posTagger"));
@@ -55,7 +133,7 @@ public class ParseDataLoader {
 
         System.out.println(String.format("Read %d sentences from %s.", sentenceInputWords.size(),
                 BioinferCCGCorpus.BioinferDevFile));
-        return Optional.of(ParseData.makeParseData(sentenceInputWords, goldParses));
+        return Optional.of(makeParseData(sentenceInputWords, goldParses));
     }
 
 }

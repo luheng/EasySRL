@@ -61,7 +61,7 @@ public class HITLParser {
 
     public HITLParser(int nBest, boolean getTestSet) {
         this.nBest = nBest;
-        parseData = getTestSet ? ParseData.loadFromTestPool().get() : ParseData.loadFromDevPool().get();
+        parseData = getTestSet ? ParseDataLoader.loadFromTestPool().get() : ParseDataLoader.loadFromDevPool().get();
         sentences = parseData.getSentences();
         inputSentences = parseData.getSentenceInputWords();
         goldParses = parseData.getGoldParses();

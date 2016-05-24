@@ -47,10 +47,10 @@ public class ReparsingExperiment {
         //    "./Crowdflower_data/f897179.csv",                 // Round2-3: NP clefting questions.
          //  "./Crowdflower_data/f902142.csv",                   // Round4: checkbox, pronouns, core only, 300 sentences.
          //   "./Crowdflower_data/f903842.csv",                   // Round4: np-clefting pronouns
-            "./Crowdflower_data/f909211.csv",                   // Round5: checkbox, pronouns, core only, 300+ sentences.
+         //   "./Crowdflower_data/f909211.csv",                   // Round5: checkbox, pronouns, core only, 300+ sentences.
          //   "./Crowdflower_data/f912533.csv",                   // Round1-2: rerun, new question generator.
          //   "./Crowdflower_data/f912675.csv",                   // Round6: Dev wrap-up. 400+ sentences.
-         //   "./Crowdflower_data/f913098.csv",                   // Round5: Rerun 200+ sentences.
+            "./Crowdflower_data/f913098.csv",                   // Round5: Rerun 200+ sentences.
     };
 
     private static QueryPruningParameters queryPruningParameters;
@@ -171,7 +171,7 @@ public class ReparsingExperiment {
                             .anyMatch(op -> op.contains(QAPairAggregatorUtils.answerDelimiter)));
             boolean isClefting = annotated.stream()
                     .anyMatch(annot -> annot.queryPrompt.startsWith("What is it"));
-            boolean useNewCoreArgsQuestions = false;//  newCoreAgsSentenceIds.contains(sentenceId);
+            boolean useNewCoreArgsQuestions = newCoreAgsSentenceIds.contains(sentenceId);
 
             List<ScoredQuery<QAStructureSurfaceForm>> queryList = new ArrayList<>();
             if (!isClefting) {
