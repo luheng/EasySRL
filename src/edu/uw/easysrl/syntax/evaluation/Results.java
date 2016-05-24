@@ -45,9 +45,9 @@ public class Results {
 	@Override
 	public String toString() {
 		final StringBuilder result = new StringBuilder();
-		result.append("Precision = " + Util.twoDP(getPrecision() * 100));
+		result.append("Precision = " + Util.twoDP(getPrecision() * 100) + " (" + getPredictedFrequency() + ")");
 		result.append('\n');
-		result.append("Recall    = " + Util.twoDP(getRecall() * 100));
+		result.append("Recall    = " + Util.twoDP(getRecall() * 100)    + " (" + getFrequency() + ")");
 		result.append('\n');
 		result.append("F1        = " + Util.twoDP(getF1() * 100));
 		return result.toString();
@@ -55,5 +55,9 @@ public class Results {
 
 	public int getFrequency() {
 		return goldDependencies.get();
+	}
+
+	public int getPredictedFrequency() {
+		return parseDependencies.get();
 	}
 }

@@ -1,10 +1,11 @@
 package edu.uw.easysrl.qasrl.pomdp;
 
 import edu.uw.easysrl.qasrl.*;
-import edu.uw.easysrl.syntax.grammar.Category;
+import edu.uw.easysrl.qasrl.analysis.PPAttachment;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -22,8 +23,8 @@ public class ObservationModel {
     /**
      * Training an observation model from annotations.
      */
-    public ObservationModel(List<GroupedQuery> queries, List<Parse> goldParses, ResponseSimulator userModel,
-                            ResponseSimulator goldModel) {
+    public ObservationModel(List<GroupedQuery> queries, Map<Integer, List<Parse>> allParses,
+                            Map<Integer, Integer> oracleIds, ResponseSimulator userModel, double minResponseTrust) {
         // (0, 0, 0) adjunct questions, gold is NA and answer is "question not valid".
         // (0, 0, 1) adjunct questions, gold is NA and answer is "answer not listed".
         // (0, 0, 2) adjunct questions, gold is NA and answer is max. dependency overlap.
@@ -34,22 +35,31 @@ public class ObservationModel {
 
         for (GroupedQuery query : queries) {
             Response userResponse = userModel.answerQuestion(query);
-            if (userResponse.chosenOptions.size() == 0) {
+            if (userResponse.chosenOptions.size() == 0  || userResponse.trust < minResponseTrust) {
                 continue;
             }
             int user = userResponse.chosenOptions.get(0);
-            int gold = goldModel.answerQuestion(query).chosenOptions.get(0);
-            Parse goldParse = goldParses.get(query.getSentenceId());
-            boolean isAdjunct = query.getCategory().equals(Category.valueOf("((S\\NP)\\(S\\NP))/NP"))
-                    || query.getCategory().equals(Category.valueOf("(NP\\NP)/NP"));
-            boolean goldIsNA = GroupedQuery.BadQuestionOption.class.isInstance(query.getAnswerOptions().get(gold));
+            int sentenceId = query.getSentenceId();
+            int oracleParseId = oracleIds.get(sentenceId);
+            int oracleOption = -1;
+            for (int i = 0; i < query.getAnswerOptions().size(); i++) {
+                if (query.getAnswerOptions().get(i).getParseIds().contains(oracleParseId)) {
+                    oracleOption = i;
+                }
+            }
+            if (oracleOption < 0) {
+                continue;
+            }
+            boolean isAdjunct = (query.getCategory() == PPAttachment.verbAdjunct ||
+                                 query.getCategory() == PPAttachment.nounAdjunct);
+            boolean oracleIsNA = GroupedQuery.BadQuestionOption.class.isInstance(query.getAnswerOptions().get(oracleOption));
             GroupedQuery.AnswerOption userOption = query.getAnswerOptions().get(user);
             Set<Integer> maxOverlapOptions = new HashSet<>();
             int maxOverlap = -1;
             for (int i = 0; i < query.getAnswerOptions().size(); i++) {
                 GroupedQuery.AnswerOption option = query.getAnswerOptions().get(i);
                 if (!option.isNAOption()) {
-                    int depOverlap = computeDependencyOverlap(query, option, goldParse);
+                    int depOverlap = computeDependencyOverlap(query, option, allParses.get(sentenceId).get(oracleParseId));
                     if (depOverlap > maxOverlap) {
                         maxOverlapOptions = new HashSet<>();
                         maxOverlap = depOverlap;
@@ -60,21 +70,21 @@ public class ObservationModel {
                 }
             }
             int questionType = isAdjunct ? 0 : 1;
-            int goldType = goldIsNA ? 0 : 1;
+            int oracleType = oracleIsNA ? 0 : 1;
             int userResponseType;
             if (GroupedQuery.BadQuestionOption.class.isInstance(userOption)) {
                 userResponseType = 0;
             } else if (GroupedQuery.NoAnswerOption.class.isInstance(userOption)) {
                 userResponseType = 1;
-            } else if (user == gold) {
+            } else if (user == oracleOption) {
                 userResponseType = 2;
             } else if (maxOverlap > 0 && maxOverlapOptions.contains(user)){
                 userResponseType = 3;
             } else {
                 userResponseType = 4;
             }
-            observation[questionType][goldType][userResponseType] += userResponse.trust;
-            counts[questionType][goldType] ++;
+            observation[questionType][oracleType][userResponseType] += userResponse.trust;
+            counts[questionType][oracleType] ++;
         }
         // Normalize.
         for (int i = 0; i < 2; i++) {
@@ -100,6 +110,12 @@ public class ObservationModel {
         }
     }
 
+    public double getNoiselessObservationProbability(GroupedQuery query, boolean userCorrect) {
+        int K = query.getAnswerOptions().size() - 1;
+        return userCorrect ? 1.0 - fixedErrorRate : fixedErrorRate / K;
+
+    }
+
     /**
      * Compute p(observation | action, state)
      * @param query
@@ -108,16 +124,15 @@ public class ObservationModel {
      * @param parse
      * @return
      */
-    public double getObservationProbability(GroupedQuery query, Response response, int parseId, Parse parse) {
+    public double  getObservationProbability(GroupedQuery query, Response response, int parseId, Parse parse) {
         int user = response.chosenOptions.get(0);
         GroupedQuery.AnswerOption userOption = query.getAnswerOptions().get(user);
         if (observation == null) {
             boolean userCorrect = query.getAnswerOptions().get(user).getParseIds().contains(parseId);
-            int K = query.getAnswerOptions().size() - 1;
-            return userCorrect ? 1.0 - fixedErrorRate : fixedErrorRate / K;
+            return getNoiselessObservationProbability(query, userCorrect);
         } else {
-            boolean isAdjunct = query.getCategory().equals(Category.valueOf("((S\\NP)\\(S\\NP))/NP"))
-                    || query.getCategory().equals(Category.valueOf("(NP\\NP)/NP"));
+            boolean isAdjunct = (query.getCategory() == PPAttachment.verbAdjunct
+                    || query.getCategory() == PPAttachment.nounAdjunct);
             boolean parseIsNA = false;
             int maxOverlap = -1;
             Set<Integer> maxOverlapOptions = new HashSet<>();
@@ -140,11 +155,15 @@ public class ObservationModel {
             }
             int questionType = isAdjunct ? 0 : 1;
             int parseType = parseIsNA ? 0 : 1;
-            boolean perfectMatchHasMaxOverlap = false;
-            for (int i : maxOverlapOptions) {
-                if (query.getAnswerOptions().get(i).getParseIds().contains(parseId)) {
-                    perfectMatchHasMaxOverlap = true;
-                    break;
+            int perfectMatchOptions = 0;
+            int perfectMatchHasMaxOverlap = 0;
+            for (int i = 0; i < query.getAnswerOptions().size(); i++) {
+                GroupedQuery.AnswerOption option = query.getAnswerOptions().get(i);
+                if (!option.isNAOption() && option.getParseIds().contains(parseId)) {
+                    perfectMatchOptions ++;
+                    if (maxOverlapOptions.contains(i)) {
+                        perfectMatchHasMaxOverlap++;
+                    }
                 }
             }
             if (GroupedQuery.BadQuestionOption.class.isInstance(userOption)) {
@@ -152,17 +171,14 @@ public class ObservationModel {
             } else if (GroupedQuery.NoAnswerOption.class.isInstance(userOption)) {
                 return observation[questionType][parseType][1];
             } else if (userOption.getParseIds().contains(parseId)) {
-                return observation[questionType][parseType][2];
+                return observation[questionType][parseType][2] / perfectMatchOptions;
             } else if (maxOverlapOptions.contains(user)) {
-                int K = maxOverlapOptions.size() - (perfectMatchHasMaxOverlap ? 1 : 0);
+                int K = maxOverlapOptions.size() - perfectMatchHasMaxOverlap;
                 // System.out.println("Num. max overlap:\t" + K);
                 return observation[questionType][parseType][3] / K;
             } else {
-                int K = query.getAnswerOptions().size() - maxOverlapOptions.size() - (perfectMatchHasMaxOverlap ? 0 : 1) - 2;
-                // FIXME: why?
-                if (K <= 0) {
-                    K = 1;
-                }
+                int K = query.getAnswerOptions().size() - 2 - maxOverlapOptions.size() - perfectMatchOptions +
+                        perfectMatchHasMaxOverlap;
                 /* if (numOtherOptions > 2) {
                     System.out.println(query.getDebuggingInfo(response));
                 }

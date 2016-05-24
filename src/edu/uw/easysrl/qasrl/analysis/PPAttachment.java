@@ -105,6 +105,7 @@ public class PPAttachment {
         for (int sid : learner.allParses.keySet()) {
             final List<String> sentence = learner.getSentenceById(sid);
             final List<Parse> allParses = learner.allParses.get(sid);
+            final Parse goldParse = learner.goldParses.get(sid);
             if (allParses == null) {
                 continue;
             }

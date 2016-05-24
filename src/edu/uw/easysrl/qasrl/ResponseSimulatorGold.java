@@ -8,9 +8,7 @@ import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.lang.reflect.Array;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
@@ -21,25 +19,18 @@ import java.util.stream.Collectors;
  */
 public class ResponseSimulatorGold extends ResponseSimulator {
     private final List<Parse> goldParses;
-    private QuestionGenerator questionGenerator;
     private boolean allowLabelMatch = true;
-
-    // Evidence propagation switches
-    // TODO: debug this ..
-    public boolean propagateArgumentAdjunctEvidence = false;
 
     // TODO: simulate noise level.
     // TODO: partial reward for parses that got part of the answer heads right ..
-    public ResponseSimulatorGold(List<Parse> goldParses, QuestionGenerator questionGenerator) {
+    public ResponseSimulatorGold(List<Parse> goldParses) {
         this.goldParses = goldParses;
-        this.questionGenerator = questionGenerator;
     }
 
-    public ResponseSimulatorGold(List<Parse> goldParses, QuestionGenerator questionGenerator, boolean allowLabelMatch) {
-        this(goldParses, questionGenerator);
+    public ResponseSimulatorGold(List<Parse> goldParses, boolean allowLabelMatch) {
+        this(goldParses);
         this.allowLabelMatch = allowLabelMatch;
     }
-
 
     /**
      * If exists a gold dependency that generates the same question ...
@@ -50,7 +41,7 @@ public class ResponseSimulatorGold extends ResponseSimulator {
      public Response answerQuestion(GroupedQuery query) {
          Response response = new Response();
          int badQuestionOptionId = -1, noAnswerOptionId = -1;
-         String goldQuestion = "", goldAnswer = "";
+         String goldAnswer = "";
 
          final Parse goldParse = goldParses.get(query.sentenceId);
          final List<String> sentence = query.sentence;
@@ -67,41 +58,57 @@ public class ResponseSimulatorGold extends ResponseSimulator {
          }
 
          for (int argNum = 1; argNum <= goldCategory.getNumberOfArguments(); argNum++) {
-            List<QuestionAnswerPairReduced> qaList = QuestionGenerator
-                    .generateAllQAPairs(predId, argNum, sentence, goldParse).stream()
-                    .sorted((a1, a2) -> Integer.compare(a1.targetDep.getArgument(), a2.targetDep.getArgument()))
-                    .collect(Collectors.toList());
-            if (qaList == null || qaList.size() == 0) {
-                continue;
-            }
-            String questionStr = qaList.get(0).renderQuestion();
-            String answerStr = qaList.stream()
-                    .map(QuestionAnswerPairReduced::renderAnswer)
-                    .collect(Collectors.joining(QuestionAnswerPair.answerDelimiter));
-            boolean questionMatch = query.question.equalsIgnoreCase(questionStr);
-            boolean labelMatch = (goldCategory == query.category && argNum == query.argumentNumber);
-            if (!questionMatch && !(allowLabelMatch && labelMatch)) {
-                continue;
-            }
-            for (int i = 0; i < query.answerOptions.size(); i++) {
-                GroupedQuery.AnswerOption option = query.answerOptions.get(i);
-                if (!option.isNAOption() && option.getAnswer().equals(answerStr)) {
-                    response.add(i);
-                }
-            }
-            goldQuestion = questionStr;
-            goldAnswer = answerStr;
-            break;
+             List<QuestionAnswerPairReduced> qaList = QuestionGenerator
+                     .generateAllQAPairs(predId, argNum, sentence, goldParse);
+             if (qaList == null || qaList.size() == 0) {
+                 continue;
+             }
+             Set<String> questionStr = qaList.stream()
+                     .map(QuestionAnswerPairReduced::renderQuestion)
+                     .collect(Collectors.toSet());
+             Map<Integer, String> argIdToSpan = new HashMap<>();
+             qaList.forEach(qa -> argIdToSpan.put(qa.targetDep.getArgument(), qa.renderAnswer()));
+             List<Integer> goldArgIds = qaList.stream()
+                     .map(qa -> qa.targetDep.getArgument())
+                     .distinct().sorted()
+                     .collect(Collectors.toList());
+             String answerStr = goldArgIds.stream()
+                     .map(argIdToSpan::get)
+                     .collect(Collectors.joining(QuestionAnswerPair.answerDelimiter));
+             boolean questionMatch = questionStr.contains(query.question);
+             boolean labelMatch = (goldCategory == query.category && argNum == query.argumentNumber);
+             if (!questionMatch && !(allowLabelMatch && labelMatch)) {
+                 continue;
+             }
+             for (int i = 0; i < query.answerOptions.size(); i++) {
+                 GroupedQuery.AnswerOption option = query.answerOptions.get(i);
+                 if (!query.allowsMultiple()) {
+                     // Radio button version.
+                     if (!option.isNAOption() && option.getArgumentIds().containsAll(goldArgIds) &&
+                             goldArgIds.containsAll(option.getArgumentIds())) {
+                         response.add(i);
+                     }
+                 } else {
+                     // Checkbox version.
+                     if (!option.isNAOption() && goldArgIds.containsAll(option.getArgumentIds())) {
+                         response.add(i);
+                     }
+                 }
+             }
+             goldAnswer = answerStr;
+             break;
          }
 
          if (response.chosenOptions.size() == 0) {
-            if (!goldAnswer.isEmpty()) {
-                response.add(noAnswerOptionId);
-                response.debugInfo = "[gold]:\t" + goldAnswer;
-            } else {
-                response.add(badQuestionOptionId);
+             if (!goldAnswer.isEmpty()) {
+                 if (noAnswerOptionId >= 0) {
+                     response.add(noAnswerOptionId);
+                 }
+             } else {
+                 response.add(badQuestionOptionId);
             }
          }
-        return response;
+         response.debugInfo = "[gold]:\t" + goldAnswer;
+         return response;
     }
 }

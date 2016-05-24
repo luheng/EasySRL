@@ -5,6 +5,7 @@ import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.*;
+import java.util.Map.Entry;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -31,6 +32,10 @@ public class GroupedQuery {
 
         public String getAnswer() { return answer; }
 
+        public void setProbability(double probability) {
+            this.probability = probability;
+        }
+
         public double getProbability() { return probability; }
 
         public ImmutableList<Integer> getArgumentIds() { return argumentIds; }
@@ -48,7 +53,11 @@ public class GroupedQuery {
         }
 
         public ImmutableList<Integer> getArgumentIds() { return null; }
-        public String getAnswer() { return "Question is not valid."; }
+        public String getAnswer() {
+            //return "Question is not valid.";
+            return "Bad question.";
+        }
+
         public boolean isNAOption() {
             return true;
         }
@@ -68,7 +77,7 @@ public class GroupedQuery {
     int sentenceId, totalNumParses, queryId;
     final List<String> sentence;
     final List<Parse> parses;
-    Set<Query> queries;
+    Set<AtomicQuery> queries;
 
     // Information specified only after collapsing;
     int predicateIndex;
@@ -77,12 +86,14 @@ public class GroupedQuery {
     String question;
     List<AnswerOption> answerOptions;
 
+    // Extension: checkboxes and jeopardy styles.
+    private boolean allowsMultiple = false;
+    private boolean isJeopardyStyle = false;
+
     // The probability mass of non-NA options.
     public double questionConfidence, attachmentUncertainty;
     public double answerMargin, answerEntropy, normalizedAnswerEntropy;
 
-    public static double rankDiscountFactor = 0.0;
-    public static boolean estimateWithParseScores = true;
     // Not counting "question invalid" and "answer not listed" options.
     public static int maxNumNonNAOptionsPerQuery = 8;
 
@@ -100,13 +111,13 @@ public class GroupedQuery {
         answerDependencies = new ArrayList<>();
     }
 
-    public GroupedQuery(int sentenceId, final List<String> sentence, final List<Parse> parses, Query query) {
+    public GroupedQuery(int sentenceId, final List<String> sentence, final List<Parse> parses, AtomicQuery query) {
         this(sentenceId, sentence, parses);
         queries.add(query);
     }
 
-    public boolean canMerge(final Query queryToMerge) {
-        for (Query query : queries) {
+    public boolean canMerge(final AtomicQuery queryToMerge) {
+        for (AtomicQuery query : queries) {
             if (canMerge(queryToMerge, query)) {
                 return true;
             }
@@ -114,11 +125,11 @@ public class GroupedQuery {
         return false;
     }
 
-    public void addQuery(final Query query) {
+    public void addQuery(final AtomicQuery query) {
         this.queries.add(query);
     }
 
-    private static boolean canMerge(Query q1, Query q2) {
+    private static boolean canMerge(AtomicQuery q1, AtomicQuery q2) {
         if (q1.predicateIndex == q2.predicateIndex) {
             // Doing exact match.
             if (q1.question.equals(q2.question) && !q1.question.equalsIgnoreCase("-NOQ-")) {
@@ -127,14 +138,6 @@ public class GroupedQuery {
             if (q1.category == q2.category && q1.argumentNumber == q2.argumentNumber) {
                 return true;
             }
-            // Fuzzy match.
-            /*
-            int argNum1 = q1.argumentNumber == 1 ? 1 : q1.argumentNumber - q1.category.getNumberOfArguments();
-            int argNum2 = q2.argumentNumber == 1 ? 1 : q2.argumentNumber - q2.category.getNumberOfArguments();
-            if (argNum1 == argNum2 && q1.argumentIds.stream().filter(q2.argumentIds::contains).count() > 0) {
-                return true;
-            }
-            */
         }
         return false;
     }
@@ -155,9 +158,14 @@ public class GroupedQuery {
                 .collect(Collectors.toList());
         double minOptionScore = (optionScores.size() <= maxNumNonNAOptionsPerQuery) ? -1e-6 :
                 optionScores.get(optionScores.size() - maxNumNonNAOptionsPerQuery) - 1e-6;
-
-        spanToParses.forEach((span, parseIds) -> {
-            ImmutableList<Integer> argList = spanToArgList.get(span);
+        List<String> spans = allowsMultiple ?
+                spanToArgList.entrySet().stream()
+                        .sorted((e1, e2) -> Integer.compare(e1.getValue().get(0), e2.getValue().get(0)))
+                        .map(Entry::getKey).collect(Collectors.toList()) :
+                new ArrayList<>(spanToArgList.keySet());
+        spans.forEach(span -> {
+            final Set<Integer> parseIds = spanToParses.get(span);
+            final ImmutableList<Integer> argList = spanToArgList.get(span);
             AnswerOption newOption = new AnswerOption(argList, span, parseIds);
             double optionScore = parseIds.stream().mapToDouble(id -> parses.get(id).score).sum();
             if (optionScore > minOptionScore) {
@@ -167,12 +175,35 @@ public class GroupedQuery {
             }
             invalidQuestionParseIds.removeAll(parseIds);
         });
-        answerOptions.add(new NoAnswerOption(unlistedAnswerParseIds));
+        if (!allowsMultiple && !isJeopardyStyle) {
+            answerOptions.add(new NoAnswerOption(unlistedAnswerParseIds));
+        }
         answerOptions.add(new BadQuestionOption(invalidQuestionParseIds));
     }
 
     public void setQueryId(int id) {
         this.queryId = id;
+    }
+
+
+    public static GroupedQuery makeQuery(int sentenceId, List<String> sentence, List<Parse> parses,
+                                         int predicateIndex, Category category, int argumentNumber, String question,
+                                         final Map<String, ImmutableList<Integer>> spanToArgList,
+                                         final Map<String, Set<Integer>> spanToParses,
+                                         boolean allowsMultiple, boolean isJeopardyStyle) {
+        GroupedQuery query = new GroupedQuery(sentenceId, sentence, parses);
+        query.allowsMultiple = allowsMultiple;
+        query.isJeopardyStyle = isJeopardyStyle;
+        query.collapse(predicateIndex, category, argumentNumber, question, spanToArgList, spanToParses);
+        return query;
+    }
+
+    public boolean allowsMultiple() {
+        return allowsMultiple;
+    }
+
+    public boolean isJeopardyStyle() {
+        return isJeopardyStyle;
     }
 
     public int getQueryId() {
@@ -190,6 +221,8 @@ public class GroupedQuery {
     public int getPredicateIndex() { return predicateIndex; }
 
     public Category getCategory() { return category; }
+
+    public int getArgNum() { return argumentNumber; }
 
     public String getQuestionKey() {
         return predicateIndex + "." + category + "." + argumentNumber;
@@ -247,7 +280,7 @@ public class GroupedQuery {
                     ao.argumentIds.stream().map(String::valueOf).collect(Collectors.joining(","));
             String argHeadsStr = ao.isNAOption() ? "N/A" :
                     ao.argumentIds.stream().map(words::get).collect(Collectors.joining(","));
-            String parseIdsStr = DebugPrinter.getShortListString(ao.parseIds);
+            String parseIdsStr = DebugHelper.getShortListString(ao.parseIds);
             System.out.println(String.format("%.2f\t%s%d\t(%s:%s)\t\t\t%s\t%s", ao.probability, match, i, argIdsStr,
                     argHeadsStr, ao.getAnswer(), parseIdsStr));
         }
@@ -267,7 +300,7 @@ public class GroupedQuery {
                     ao.argumentIds.stream().map(String::valueOf).collect(Collectors.joining(","));
             String argHeadsStr = ao.isNAOption() ? "N/A" :
                     ao.argumentIds.stream().map(sentence::get).collect(Collectors.joining(","));
-            String parseIdsStr = DebugPrinter.getShortListString(ao.parseIds);
+            String parseIdsStr = DebugHelper.getShortListString(ao.parseIds);
             result += String.format("%d\t%s\tprob=%.2f\t%s\t(%s:%s)\t%s\n", i, match, ao.probability, ao.getAnswer(),
                     argIdsStr, argHeadsStr, parseIdsStr);
         }
@@ -286,7 +319,7 @@ public class GroupedQuery {
                     ao.argumentIds.stream().map(String::valueOf).collect(Collectors.joining(","));
             String argHeadsStr = ao.isNAOption() ? "N/A" :
                     ao.argumentIds.stream().map(sentence::get).collect(Collectors.joining(","));
-            String parseIdsStr = DebugPrinter.getShortListString(ao.parseIds);
+            String parseIdsStr = DebugHelper.getShortListString(ao.parseIds);
             result += String.format("%d\t%s\tprob=%.2f\t%s\t(%s:%s)\t%s\n", i, match, ao.probability, ao.getAnswer(),
                     argIdsStr, argHeadsStr, parseIdsStr);
         }
@@ -312,7 +345,7 @@ public class GroupedQuery {
             String argIdsStr = ao.argumentIds.stream().map(String::valueOf).collect(Collectors.joining(","));
             String argHeadsStr = ao.argumentIds.get(0) == -1 ? "N/A" :
                     ao.argumentIds.stream().map(words::get).collect(Collectors.joining(","));
-            String parseIdsStr = DebugPrinter.getShortListString(ao.parseIds);
+            String parseIdsStr = DebugHelper.getShortListString(ao.parseIds);
             System.out.println(String.format("%.2f\t%s[%d]\t%s\t%s:%s\t%s",
                     ao.probability,
                     match, i,

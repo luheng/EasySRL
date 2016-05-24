@@ -4,6 +4,7 @@ import edu.uw.easysrl.qasrl.GroupedQuery;
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.Response;
 
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -13,9 +14,9 @@ public class BeliefModel {
     // Distribution over parses.
     List<Parse> parses;
     public double[] belief;
-    private double[] prior;
+    public double[] prior;
     public static final double epsilon = 1e-6;
-    public static final double smoothing = 1e-3;
+    public static final double smoothing = 1e-5 ;
 
     public BeliefModel(List<Parse> parses) {
         this.parses = parses;
@@ -29,8 +30,13 @@ public class BeliefModel {
     }
 
     public void resetToPrior() {
+        resetTo(prior);
+        normalize();
+    }
+
+    public void resetTo(final double[] dist) {
         for (int i = 0; i < parses.size(); i++) {
-            belief[i] = prior[i];
+            belief[i] = dist[i];
         }
         normalize();
     }
@@ -43,6 +49,10 @@ public class BeliefModel {
         for (int i = 0; i < belief.length; i++) {
             belief[i] /= sum;
         }
+    }
+
+    public double[] getClone() {
+        return Arrays.copyOf(belief, belief.length);
     }
 
     public void update(ObservationModel obs, GroupedQuery query, Response response) {

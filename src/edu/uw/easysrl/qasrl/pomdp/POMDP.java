@@ -1,11 +1,14 @@
 package edu.uw.easysrl.qasrl.pomdp;
 
+import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
+import edu.uw.easysrl.qasrl.qg.QuestionAnswerPairReduced;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
+import jdk.nashorn.internal.ir.annotations.Immutable;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -35,11 +38,9 @@ public class POMDP {
     private Map<Integer, Integer> oracleParseIds;
 
     String preparsedFile = "";
-    final static String modelFolder = "./model_tritrain_big/";
-    final static List<Category> rootCategories =  Arrays.asList(
-            Category.valueOf("S[dcl]"), Category.valueOf("S[wq]"), Category.valueOf("S[q]"),
-            Category.valueOf("S[b]\\NP"), Category.valueOf("NP"));
 
+    // Query pruning.
+    QueryPruningParameters queryPruningParams = new QueryPruningParameters();
     // Other parameters.
     int nBest;
     int horizon;
@@ -63,7 +64,7 @@ public class POMDP {
             preparsedFile = "parses.1000best.out";
         }
         parser = preparsedFile.isEmpty() ?
-                new BaseCcgParser.AStarParser(modelFolder, rootCategories, nBest) :
+                new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, BaseCcgParser.rootCategories, nBest) :
                 new BaseCcgParser.MockParser(preparsedFile, nBest);
         System.err.println("Parse initialized.");
         initializeParses();
@@ -79,6 +80,10 @@ public class POMDP {
         this.allParses = other.allParses;
         this.allResults = other.allResults;
         this.oracleParseIds = other.oracleParseIds;
+    }
+
+    public void setQueryPruningParameters(QueryPruningParameters queryPruningParams) {
+        this.queryPruningParams = queryPruningParams;
     }
 
     public void setBaseObservationModel(ObservationModel baseObservationModel) {
@@ -121,7 +126,7 @@ public class POMDP {
         timeStep = 0;
         List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
         List<Parse> parses = allParses.get(sentIdx);
-        List<GroupedQuery> queries = QueryGeneratorByKey.generateQueries(sentIdx, words, parses);
+        List<GroupedQuery> queries = QueryGenerator.getAllGroupedQueries(sentIdx, words, parses, queryPruningParams);
         queries.stream().forEach(query -> {
             query.computeProbabilities(beliefModel.belief);
             query.setQueryId(queryPool.size());
@@ -136,6 +141,10 @@ public class POMDP {
      * @param annotations
      */
     public void initializeForSentence(int sentIdx, List<AlignedAnnotation> annotations) {
+        this.initializeForSentence(sentIdx, annotations, false);
+    }
+
+    public void initializeForSentence(int sentIdx, List<AlignedAnnotation> annotations, boolean isCheckbox) {
         queryPool = new ArrayList<>();
         beliefModel = new BeliefModel(allParses.get(sentIdx));
         observationModel = baseObservationModel == null ? new ObservationModel() :
@@ -146,7 +155,9 @@ public class POMDP {
         timeStep = 0;
         List<String> words = sentences.get(sentIdx).stream().map(w -> w.word).collect(Collectors.toList());
         List<Parse> parses = allParses.get(sentIdx);
-        List<GroupedQuery> queries = QueryGeneratorSurfaceForm.generateQueries(sentIdx, words, parses);
+        List<GroupedQuery> queries = isCheckbox ?
+                QueryGenerator.getAllGroupedQueriesCheckbox(sentIdx, words, parses, new QueryPruningParameters()) :
+                QueryGenerator.getAllGroupedQueries(sentIdx, words, parses, new QueryPruningParameters());
         queries.stream().forEach(query -> {
             query.computeProbabilities(beliefModel.belief);
             if (annotations.stream().anyMatch(annotation -> annotation.sentenceId == sentIdx
@@ -165,8 +176,8 @@ public class POMDP {
         }
         timeStep ++;
         double reward = rewardFunction.getReward(action, beliefModel, history);
-        System.out.println("Receiving reward:\t" + reward + " at time:\t" + timeStep + "\tbelief entropy:\t" +
-                beliefModel.getEntropy() + "\tmargin:\t" + beliefModel.getMargin());
+        //System.out.println("Receiving reward:\t" + reward + " at time:\t" + timeStep + "\tbelief entropy:\t" +
+        //        beliefModel.getEntropy() + "\tmargin:\t" + beliefModel.getMargin());
         return action;
     }
 
@@ -185,6 +196,62 @@ public class POMDP {
 
     public void receiveObservationForQuery(GroupedQuery query, Response response) {
         beliefModel.update(observationModel, query, response);
+    }
+
+    /**
+     * Hacky method before trying out new soft re-ranker.
+     */
+    public void receiveObservationForQueryNoNA(GroupedQuery query, Response response) {
+        int optionId = response.chosenOptions.get(0);
+        GroupedQuery.AnswerOption option = query.getAnswerOptions().get(optionId);
+        // Do normal update.
+        if (GroupedQuery.BadQuestionOption.class.isInstance(option)) {
+            beliefModel.update(observationModel, query, response);
+            return;
+        }
+        Set<Integer> parsesToReward = new HashSet<>(option.getParseIds());
+        // Redistributed the NA parseIds.
+        GroupedQuery.AnswerOption badQuestionOption = query.getAnswerOptions().stream()
+                .filter(GroupedQuery.BadQuestionOption.class::isInstance)
+                .findAny().get();
+        final int sentId = query.getSentenceId();
+        final int predHead = query.getPredicateIndex();
+        final Category category0 = query.getCategory();
+        final int argNum0 = query.getArgNum();
+        for (int parseId : badQuestionOption.getParseIds()) {
+            int mappedOption = -1;
+            final Parse parse = allParses.get(sentId).get(parseId);
+            final Category category = parse.categories.get(predHead);
+            for (int i = 1; i <= category.getNumberOfArguments(); i++) {
+                final int argNum = i; // for lambda.
+                Set<ResolvedDependency> deps = parse.dependencies.stream()
+                        .filter(dep -> dep.getHead() == predHead && dep.getArgNumber() == argNum)
+                        .collect(Collectors.toSet());
+                List<Integer> argList = deps.stream()
+                        .map(ResolvedDependency::getArgument)
+                        .distinct().sorted().collect(Collectors.toList());
+                for (int opId = 0; opId < query.getAnswerOptions().size(); opId++) {
+                    GroupedQuery.AnswerOption op = query.getAnswerOptions().get(opId);
+                    List<Integer> argList0 = op.getArgumentIds();
+                    if (argList0 != null && argList0.containsAll(argList) && argList.containsAll(argList0)) {
+                        mappedOption = opId;
+                        if (argNum > 1) {
+                            //System.err.println(category0 + "." + argNum0 + "\t" + category + "." + argNum + "\t"
+                            //        + query.getAnswerOptions().get(opId).getAnswer());
+                            //System.err.println(query.getDebuggingInfo(new Response(-1)));
+                        }
+                    }
+                }
+            }
+            if (mappedOption == optionId) {
+                parsesToReward.add(parseId);
+            }
+        }
+        for (int i = 0; i < beliefModel.belief.length; i++) {
+            double p = observationModel.getNoiselessObservationProbability(query, parsesToReward.contains(i));
+            beliefModel.belief[i] = beliefModel.belief[i] * p + beliefModel.prior[i] * BeliefModel.smoothing;
+        }
+        beliefModel.normalize();
     }
 
     public List<String> getSentenceById(int sentenceId) {
@@ -209,5 +276,17 @@ public class POMDP {
 
     public int getOracleParseId(int sid) {
         return oracleParseIds.get(sid);
+    }
+
+    public List<Integer> getOracleTopK(int sid) {
+        return null;
+    }
+
+    public List<Integer> getOriginalTopK(int sid) {
+        return null;
+    }
+
+    public List<Integer> getRerankTopK(int sid) {
+        return null;
     }
 }

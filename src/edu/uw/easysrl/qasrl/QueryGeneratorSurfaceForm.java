@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
  *
  * Created by luheng on 2/18/16.
  */
+@Deprecated
 public class QueryGeneratorSurfaceForm {
 
     /**

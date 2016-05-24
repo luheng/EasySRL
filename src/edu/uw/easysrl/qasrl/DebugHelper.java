@@ -10,7 +10,7 @@ import java.util.stream.Collectors;
  * A printer for debugging information, what else do you expect?
  * Created by luheng on 1/17/16.
  */
-public class DebugPrinter {
+public class DebugHelper {
     public static void printQueryInfo(List<String> words, GroupedQuery query, int response, final Parse goldParse) {
         System.out.println(String.format("S[%d]:\t", query.sentenceId) + words.stream()
                 .collect(Collectors.joining(" ")));

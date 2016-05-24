@@ -14,6 +14,7 @@ import java.util.*;
  * Query generator.
  * Created by luheng on 1/17/16.
  */
+@Deprecated
 public class QueryGeneratorNew {
 
     /**
@@ -71,7 +72,7 @@ public class QueryGeneratorNew {
                         questionScores.adjustOrPutValue(question, parse.score, parse.score);
                         answerScores.adjustOrPutValue(answer, parse.score, parse.score);
                         // Legacy.
-                        Query query = new Query(qa, parseId);
+                        AtomicQuery query = new AtomicQuery(qa, parseId);
                         groupedQuery.addQuery(query);
                     }
                     // Debugging
@@ -82,7 +83,7 @@ public class QueryGeneratorNew {
                     Map<ImmutableList<Integer>, String> argListToSpan = new HashMap<>();
                     Map<String, ImmutableList<Integer>> spanToArgList = new HashMap<>();
                     Map<String, Set<Integer>> spanToParseIds = new HashMap<>();
-                    for (Query query : groupedQuery.queries) {
+                    for (AtomicQuery query : groupedQuery.queries) {
                         String answer = query.answer;
                         ImmutableList<Integer> argList = ImmutableList.copyOf(query.argumentIds);
                         if (!argListToSpan.containsKey(argList) ||
@@ -91,7 +92,7 @@ public class QueryGeneratorNew {
                             spanToArgList.put(answer, argList);
                         }
                     }
-                    for (Query query : groupedQuery.queries) {
+                    for (AtomicQuery query : groupedQuery.queries) {
                         ImmutableList<Integer> argList = ImmutableList.copyOf(query.argumentIds);
                         String answer = argListToSpan.get(argList);
                         if (!spanToParseIds.containsKey(answer)) {
@@ -110,7 +111,7 @@ public class QueryGeneratorNew {
                     }
                     assert !bestQuestion.isEmpty();
                     groupedQuery.collapse(predId, category, argNum, bestQuestion, spanToArgList, spanToParseIds);
-                    for (Query query : groupedQuery.queries) {
+                    for (AtomicQuery query : groupedQuery.queries) {
                         if (query.question.equals(bestQuestion)) {
                             groupedQuery.questionDependencies = new HashSet<>();
                             groupedQuery.questionDependencies.addAll(query.qaPair.questionDeps);

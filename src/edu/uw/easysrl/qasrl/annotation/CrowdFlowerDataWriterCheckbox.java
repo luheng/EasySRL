@@ -308,8 +308,7 @@ public class CrowdFlowerDataWriterCheckbox {
                 rerankF1 = new ArrayList<>(),
                 oracleF1 = new ArrayList<>(),
                 gainF1 = new ArrayList<>();
-        ResponseSimulator responseSimulator = new ResponseSimulatorGold(baseLearner.goldParses, new QuestionGenerator(),
-                true /* Allow label match */);
+        ResponseSimulator responseSimulator = new ResponseSimulatorGold(baseLearner.goldParses, true /* Allow label match */);
         Random random = new Random(randomSeed);
         List<Integer> sentenceIds = baseLearner.getAllSentenceIds().stream()
                 .filter(sid -> !heldOutSentences.contains(sid))
@@ -352,7 +351,7 @@ public class CrowdFlowerDataWriterCheckbox {
                 int numTestQuestions = 0;
                 for (AlignedAnnotation test : agreedAnnotations) {
                     int sentenceId = test.sentenceId;
-                    String goldAnswer = test.answerStrings.get(test.goldAnswerId).replace(" # ", " _AND_ ");
+                    String goldAnswer = test.optionStrings.get(test.goldAnswerId).replace(" # ", " _AND_ ");
                     List<GroupedQuery> queries = learner.getQueriesBySentenceId(sentenceId);
                     for (GroupedQuery query : queries) {
                         // TODO: remove later
