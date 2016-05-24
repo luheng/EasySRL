@@ -43,13 +43,14 @@ public class ReparsingExperiment {
           //  "./Crowdflower_data/f882410.csv",                // Round2: radio-button, core only
           //  "./Crowdflower_data/all-checkbox-responses.csv", // Round3: checkbox, core + pp
           //  "./Crowdflower_data/f891522.csv",                // Round4: jeopardy checkbox, pp only
-            "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
+         //   "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
         //    "./Crowdflower_data/f897179.csv",                 // Round2-3: NP clefting questions.
-           "./Crowdflower_data/f902142.csv",                   // Round4: checkbox, pronouns, core only, 300 sentences.
-         //   "./Crowdflower_data/f903842.csv",                   // Round4: np-clefting prnouns
+         //  "./Crowdflower_data/f902142.csv",                   // Round4: checkbox, pronouns, core only, 300 sentences.
+         //   "./Crowdflower_data/f903842.csv",                   // Round4: np-clefting pronouns
             "./Crowdflower_data/f909211.csv",                   // Round5: checkbox, pronouns, core only, 300+ sentences.
-            "./Crowdflower_data/f912533.csv",                   // Round1-2: rerun, new question generator.
-            "./Crowdflower_data/f912675.csv",                   // Round6: Dev wrapup. 400+ sentneces.
+         //   "./Crowdflower_data/f912533.csv",                   // Round1-2: rerun, new question generator.
+         //   "./Crowdflower_data/f912675.csv",                   // Round6: Dev wrap-up. 400+ sentences.
+         //   "./Crowdflower_data/f913098.csv",                   // Round5: Rerun 200+ sentences.
     };
 
     private static QueryPruningParameters queryPruningParameters;
@@ -92,7 +93,7 @@ public class ReparsingExperiment {
     }
 
     private static void runExperiment() {
-        final Collection<Integer> round6Ids = CrowdFlowerDataUtils.getRound6SentenceIds();
+        final Collection<Integer> newCoreAgsSentenceIds = CrowdFlowerDataUtils.getNewCoreArgAnnotatedSentenceIds();
         List<Integer> sentenceIds = myHTILParser.getAllSentenceIds();
                 //annotations.keySet().stream().sorted().collect(Collectors.toList());
                 /*myHTILParser.getAllSentenceIds().stream()
@@ -170,7 +171,7 @@ public class ReparsingExperiment {
                             .anyMatch(op -> op.contains(QAPairAggregatorUtils.answerDelimiter)));
             boolean isClefting = annotated.stream()
                     .anyMatch(annot -> annot.queryPrompt.startsWith("What is it"));
-            boolean useNewCoreArgsQuestions = round6Ids.contains(sentenceId);
+            boolean useNewCoreArgsQuestions = false;//  newCoreAgsSentenceIds.contains(sentenceId);
 
             List<ScoredQuery<QAStructureSurfaceForm>> queryList = new ArrayList<>();
             if (!isClefting) {
@@ -250,10 +251,10 @@ public class ReparsingExperiment {
                 if (query.isJeopardyStyle() && userOptions.contains(query.getBadQuestionOptionId().getAsInt())) {
                     continue;
                 }
-                ImmutableSet<Constraint> constraints = myHTILParser.getConstraints(query, optionDist), //myHTILParser.getConstraints(query, newOptionDist),
+                ImmutableSet<Constraint> constraints = myHTILParser.getConstraints(query, newOptionDist),
                                          oracleConstraints = myHTILParser.getOracleConstraints(query); //, goldOptions);
 
-                // Set constraint strength proportional to sentence length.
+                //` Set constraint strength proportional to sentence length.
                 //constraints.stream().forEach(c -> c.setStrength(0.2 * sentence.size()));
 
                 allConstraints.addAll(constraints);
