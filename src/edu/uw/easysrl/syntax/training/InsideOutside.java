@@ -19,7 +19,6 @@ import edu.uw.easysrl.util.Util.Scored;
  *
  */
 class InsideOutside {
-
 	private final FeatureSet featureSet;
 	private final double[] featureWeights;
 
@@ -38,12 +37,10 @@ class InsideOutside {
 	private final Map<FeatureKey, Integer> featureToIndexMap;
 
 	void updateFeatureExpectations(final double[] result) {
-
 		for (final ConjunctiveNode node : parses.getConjunctiveNodes()) {
 			final double nodeScore = marginalProbability(node);
 			node.updateExpectations(words, nodeScore, result, featureSet, featureToIndexMap);
 		}
-
 	}
 
 	double updateFeatureExpectationsViterbi(final double[] result) {
@@ -52,13 +49,11 @@ class InsideOutside {
 			final double nodeScore = 1.0;
 			node.updateExpectations(words, nodeScore, result, featureSet, featureToIndexMap);
 		}
-
 		return viterbiParse.getScore();
 	}
 
 	double marginalProbability(final ConjunctiveNode node) {
 		double nodeScore = logInsideScoreConjunctive(node) + logOutsideScoreConjunctive(node) - logNormalizingConstant;
-
 		nodeScore = Math.exp(nodeScore);
 		return nodeScore;
 	}
@@ -70,53 +65,41 @@ class InsideOutside {
 		if (b == null) {
 			return a;
 		}
-
 		final double max = Math.max(a, b);
 		final double min = Math.min(a, b);
 		final double result = max + Math.log(1 + Math.exp(min - max));
-
 		return result;
 	}
 
 	InsideOutside(final FeatureForest featureForest, final FeatureSet featureSet, final List<InputWord> words,
-			final Map<FeatureKey, Integer> featureToIndexMap,
-
-			final double[] featureWeights) {
+			final Map<FeatureKey, Integer> featureToIndexMap, final double[] featureWeights) {
 		this.words = words;
 		this.featureSet = featureSet;
-
 		this.parses = featureForest;
 		this.featureWeights = featureWeights;
 		this.featureToIndexMap = featureToIndexMap;
-
 		Double logZ = null;
-
 		for (final DisjunctiveNode root : parses.getRoots()) {
 			final double rootScore = logInsideScoreDisjunctive(root);
 			logZ = logSum(rootScore, logZ);
 		}
-
 		this.logNormalizingConstant = logZ;
 	}
 
 	private final double logInsideScoreDisjunctive(final DisjunctiveNode disjunctiveNode) {
-
 		Double result = insideScoreDisjunctiveCache.get(disjunctiveNode);
 		if (result == null) {
 			if (disjunctiveNode.getChildren().size() == 0) {
 				throw new RuntimeException();
 			}
-
 			for (final ConjunctiveNode conjunctiveNode : disjunctiveNode.getChildren()) {
 				result = logSum(result, logInsideScoreConjunctive(conjunctiveNode));
 			}
-
 			if (result == null) {
 				result = Double.NEGATIVE_INFINITY;
 			}
 			insideScoreDisjunctiveCache.put(disjunctiveNode, result);
 		}
-
 		return result;
 	}
 
@@ -145,9 +128,7 @@ class InsideOutside {
 					final double logOutsideScoreForParent = logOutsideScoreConjunctive(parent);
 					final double logScoreOfFeaturesAtParent = parent.getLogScore(words, featureSet, featureToIndexMap,
 							featureWeights);
-
 					double resultForParent = logOutsideScoreForParent + logScoreOfFeaturesAtParent;
-
 					for (final DisjunctiveNode sister : parent.getChildren()) {
 						if (sister == disjunctiveNode) {
 							continue;
@@ -156,7 +137,6 @@ class InsideOutside {
 					}
 					result = logSum(result, resultForParent);
 				}
-
 			}
 			outsideScoreDisjunctiveCache.put(disjunctiveNode, result);
 		}
@@ -193,26 +173,21 @@ class InsideOutside {
 
 	private final double logViterbiInsideScoreDisjunctive(final DisjunctiveNode disjunctiveNode,
 			final Map<DisjunctiveNode, Double> disjunctiveCache, final Map<ConjunctiveNode, Double> conjunctiveCache) {
-
 		Double result = disjunctiveCache.get(disjunctiveNode);
 		if (result == null) {
 			if (disjunctiveNode.getChildren().size() == 0) {
 				throw new RuntimeException();
 			}
-
 			result = Double.NEGATIVE_INFINITY;
-
 			for (final ConjunctiveNode conjunctiveNode : disjunctiveNode.getChildren()) {
 				result = Math.max(result,
 						logViterbiInsideScoreConjunctive(conjunctiveNode, disjunctiveCache, conjunctiveCache));
 			}
-
 			if (result == null) {
 				result = Double.NEGATIVE_INFINITY;
 			}
 			disjunctiveCache.put(disjunctiveNode, result);
 		}
-
 		return result;
 	}
 
@@ -220,19 +195,15 @@ class InsideOutside {
 			final Map<DisjunctiveNode, Double> disjunctiveCache, final Map<ConjunctiveNode, Double> conjunctiveCache) {
 		Double result = conjunctiveCache.get(conjunctiveNode);
 		if (result == null) {
-
 			final Collection<DisjunctiveNode> children = conjunctiveNode.getChildren();
 			final double logScoreOfFeaturesAtNode = conjunctiveNode.getLogScore(words, featureSet, featureToIndexMap,
 					featureWeights);
-
 			result = logScoreOfFeaturesAtNode;
 			for (final DisjunctiveNode daughter : children) {
 				result = result + logViterbiInsideScoreDisjunctive(daughter, disjunctiveCache, conjunctiveCache);
 			}
-
 			conjunctiveCache.put(conjunctiveNode, result);
 		}
-
 		return result;
 	}
 
@@ -240,53 +211,40 @@ class InsideOutside {
 			final Map<DisjunctiveNode, Scored<Collection<ConjunctiveNode>>> disjunctiveCache,
 			final Map<ConjunctiveNode, Scored<Collection<ConjunctiveNode>>> conjunctiveCache) {
 		Scored<Collection<ConjunctiveNode>> result = conjunctiveCache.get(conjunctiveNode);
-
 		if (result == null) {
 			final Collection<ConjunctiveNode> nodes = new ArrayList<>();
-
 			final Collection<DisjunctiveNode> children = conjunctiveNode.getChildren();
 			final double logScoreOfFeaturesAtNode = conjunctiveNode.getLogScore(words, featureSet, featureToIndexMap,
 					featureWeights);
-
 			double score = logScoreOfFeaturesAtNode;
 			nodes.add(conjunctiveNode);
-
 			for (final DisjunctiveNode daughter : children) {
 				final Scored<Collection<ConjunctiveNode>> child = getViterbiParseDisjuctive(daughter, disjunctiveCache,
 						conjunctiveCache);
 				score += child.getScore();
 				nodes.addAll(child.getObject());
 			}
-
 			result = new Scored<>(nodes, score);
 			conjunctiveCache.put(conjunctiveNode, result);
 		}
-
 		return result;
 	}
 
 	private Scored<Collection<ConjunctiveNode>> getViterbiParseDisjuctive(final DisjunctiveNode disjunctiveNode,
 			final Map<DisjunctiveNode, Scored<Collection<ConjunctiveNode>>> disjunctiveCache,
 			final Map<ConjunctiveNode, Scored<Collection<ConjunctiveNode>>> conjunctiveCache) {
-
 		Scored<Collection<ConjunctiveNode>> result = disjunctiveCache.get(disjunctiveNode);
 		if (result == null) {
-
 			result = new Scored<>(Collections.emptyList(), Double.NEGATIVE_INFINITY);
-
 			for (final ConjunctiveNode conjunctiveNode : disjunctiveNode.getChildren()) {
-
 				final Scored<Collection<ConjunctiveNode>> child = getViterbiParseConjuctive(conjunctiveNode,
 						disjunctiveCache, conjunctiveCache);
-
 				if (child.getScore() > result.getScore()) {
 					result = child;
 				}
 			}
-
 			disjunctiveCache.put(disjunctiveNode, result);
 		}
-
 		return result;
 	}
 }

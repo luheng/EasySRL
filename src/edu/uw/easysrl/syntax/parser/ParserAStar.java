@@ -20,6 +20,7 @@ import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeUnary;
 import edu.uw.easysrl.syntax.model.AgendaItem;
 import edu.uw.easysrl.syntax.model.Model;
 import edu.uw.easysrl.syntax.model.Model.ModelFactory;
+import edu.uw.easysrl.syntax.tagger.Tagger;
 import edu.uw.easysrl.util.Util.Scored;
 
 public class ParserAStar extends AbstractParser {
@@ -38,52 +39,52 @@ public class ParserAStar extends AbstractParser {
 	}
 
 	@Override
+	List<Scored<SyntaxTreeNode>> parseAstar(final List<InputWord> sentence,
+											final List<List<Tagger.ScoredCategory>> scoredCategories) {
+		return parse(sentence, modelFactory.make(sentence, scoredCategories));
+	}
+
+	@Override
 	List<Scored<SyntaxTreeNode>> parseAstar(final List<InputWord> sentence) {
-		final Model model = modelFactory.make(sentence);
+		return parse(sentence, modelFactory.make(sentence));
+	}
+
+	private List<Scored<SyntaxTreeNode>> parse(List<InputWord> sentence, Model model) {
 		final int sentenceLength = sentence.size();
 		final PriorityQueue<AgendaItem> agenda = new PriorityQueue<>();
 		model.buildAgenda(agenda, sentence);
 		final ChartCell[][] chart = new ChartCell[sentenceLength][sentenceLength];
-
 		final List<Scored<SyntaxTreeNode>> result = new ArrayList<>();
 		int chartSize = 0;
-
 		while (chartSize < maxChartSize && (result.isEmpty() || (result.size() < nbest))) {
 			// Add items from the agenda, until we have enough parses.
-
 			final AgendaItem agendaItem = agenda.poll();
 			if (agendaItem == null) {
 				break;
 			}
-
 			// Try to put an entry in the chart.
 			ChartCell cell = chart[agendaItem.getStartOfSpan()][agendaItem.getSpanLength() - 1];
 			if (cell == null) {
 				cell = nbest > 1 ? new CellNBest() : new Cell1Best();
 				chart[agendaItem.getStartOfSpan()][agendaItem.getSpanLength() - 1] = cell;
 			}
-
 			if (cell.add(agendaItem)) {
 				chartSize++;
 				// If a new entry was added, update the agenda.
-
 				if (agendaItem.getStartOfSpan() == 0 && agendaItem.getSpanLength() == sentenceLength
 						&& agendaItem.getInsideScore() > Double.NEGATIVE_INFINITY
 						&& possibleRootCategories.contains(agendaItem.getParse().getCategory())) {
 					result.add(new Scored<>(agendaItem.getParse(), agendaItem.getInsideScore()));
 				}
-
 				// See if any Unary Rules can be applied to the new entry.
-
 				for (final UnaryRule unaryRule : unaryRules.get(agendaItem.getParse().getCategory())) {
-					if ((agendaItem.getParse().getRuleType() != RuleType.LP && agendaItem.getParse().getRuleType() != RuleType.RP)
-							|| unaryRule.isTypeRaising()) {
+					if ((agendaItem.getParse().getRuleType() != RuleType.LP &&
+							agendaItem.getParse().getRuleType() != RuleType.RP) || unaryRule.isTypeRaising()) {
 						// Don't allow unary rules to apply to the output of non-type-raising rules.
 						// i.e. don't allow both (NP (N ,))
 						// The reason for allowing type-raising is to simplify Eisner Normal Form contraints (a
 						// punctuation rule would mask the fact that a rule is the output of type-raising).
 						// TODO should probably refactor the constraint into NormalForm.
-
 						final List<UnlabelledDependency> resolvedDependencies = new ArrayList<>();
 						agenda.add(model.unary(
 								agendaItem,
@@ -93,32 +94,23 @@ public class ParserAStar extends AbstractParser {
 										unaryRule, resolvedDependencies), unaryRule));
 					}
 				}
-
-				// See if the new entry can be the left argument of any binary
-				// rules.
-				for (int spanLength = agendaItem.getSpanLength() + 1; spanLength < 1 + sentenceLength
-						- agendaItem.getStartOfSpan(); spanLength++) {
-
-					final ChartCell rightCell = chart[agendaItem.getStartOfSpan() + agendaItem.getSpanLength()][spanLength
-					                                                                                            - agendaItem.getSpanLength() - 1];
+				// See if the new entry can be the left argument of any binary rules.
+				for (int spanLength = agendaItem.getSpanLength() + 1;
+					 	spanLength < 1 + sentenceLength - agendaItem.getStartOfSpan(); spanLength++) {
+					final ChartCell rightCell = chart[agendaItem.getStartOfSpan() + agendaItem.getSpanLength()]
+													 [spanLength - agendaItem.getSpanLength() - 1];
 					if (rightCell == null) {
 						continue;
 					}
-
 					for (final AgendaItem rightEntry : rightCell.getEntries()) {
 						// if (rightEntry.getParse().getResolvedUnlabelledDependencies().isEmpty()) {
 						updateAgenda(agenda, agendaItem, rightEntry, sentenceLength, model);
-
 						// }
-
 					}
 				}
-
-				// See if the new entry can be the right argument of any binary
-				// rules.
+				// See if the new entry can be the right argument of any binary rules.
 				for (int startOfSpan = 0; startOfSpan < agendaItem.getStartOfSpan(); startOfSpan++) {
 					final int spanLength = agendaItem.getStartOfSpan() + agendaItem.getSpanLength() - startOfSpan;
-
 					final ChartCell leftCell = chart[startOfSpan][spanLength - agendaItem.getSpanLength() - 1];
 					if (leftCell == null) {
 						continue;
@@ -129,10 +121,8 @@ public class ParserAStar extends AbstractParser {
 						// }
 					}
 				}
-
 			}
 		}
-
 		if (chart[0][sentenceLength - 1] == null) {
 			// Parse failure.
 			return null;
@@ -145,34 +135,30 @@ public class ParserAStar extends AbstractParser {
 	 */
 	private void updateAgenda(final PriorityQueue<AgendaItem> agenda, final AgendaItem left, final AgendaItem right,
 			final int sentenceLength, final Model model) {
-
 		final SyntaxTreeNode leftChild = left.getParse();
 		final SyntaxTreeNode rightChild = right.getParse();
-
 		if (!seenRules.isSeen(leftChild.getCategory(), rightChild.getCategory())) {
 			return;
 		}
 		final int spanLength = left.getSpanLength() + right.getSpanLength();
-
 		for (final RuleProduction production : getRules(leftChild.getCategory(), rightChild.getCategory())) {
 			if (!NormalForm.isOk(leftChild.getRuleClass(), rightChild.getRuleClass(), production.getRuleType(),
 					leftChild.getCategory(), rightChild.getCategory(), production.getCategory(),
 					left.getStartOfSpan() == 0)) {
 				continue;
-			} else if (spanLength == sentenceLength && !possibleRootCategories.contains(production.getCategory())) {
-				// Enforce the root node has a prespecified category. Doesn't
-				// allow unary rules in spanning cell.
-				continue;
-			} else {
-				final List<UnlabelledDependency> resolvedDependencies = new ArrayList<>();
-				final DependencyStructure newDependencies = production.getCombinator().apply(
-						leftChild.getDependencyStructure(), rightChild.getDependencyStructure(), resolvedDependencies);
-				final boolean headIsLeft = newDependencies.getArbitraryHead() == leftChild.getDependencyStructure()
-						.getArbitraryHead();
-				final SyntaxTreeNodeBinary newNode = new SyntaxTreeNodeBinary(production.getCategory(), leftChild,
-						rightChild, production.getRuleType(), headIsLeft, newDependencies, resolvedDependencies);
-				agenda.add(model.combineNodes(left, right, newNode));
 			}
+			if (spanLength == sentenceLength && !possibleRootCategories.contains(production.getCategory())) {
+				// Enforce the root node has a pre-specified category. Doesn't allow unary rules in spanning cell.
+				continue;
+			}
+			final List<UnlabelledDependency> resolvedDependencies = new ArrayList<>();
+			final DependencyStructure newDependencies = production.getCombinator().apply(
+					leftChild.getDependencyStructure(), rightChild.getDependencyStructure(), resolvedDependencies);
+			final boolean headIsLeft = newDependencies.getArbitraryHead() == leftChild.getDependencyStructure()
+					.getArbitraryHead();
+			final SyntaxTreeNodeBinary newNode = new SyntaxTreeNodeBinary(production.getCategory(), leftChild,
+					rightChild, production.getRuleType(), headIsLeft, newDependencies, resolvedDependencies);
+			agenda.add(model.combineNodes(left, right, newNode));
 		}
 	}
 }

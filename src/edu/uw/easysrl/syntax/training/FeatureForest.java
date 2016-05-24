@@ -7,10 +7,12 @@ import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Ints;
 
+import com.sun.tools.doclets.internal.toolkit.util.DocFinder;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.dependencies.SRLFrame;
 import edu.uw.easysrl.dependencies.SRLFrame.SRLLabel;
@@ -23,6 +25,7 @@ import edu.uw.easysrl.syntax.model.feature.*;
 import edu.uw.easysrl.syntax.model.feature.Feature.FeatureKey;
 import edu.uw.easysrl.syntax.training.CompressedChart.Key;
 import edu.uw.easysrl.syntax.training.CompressedChart.Value;
+import edu.uw.easysrl.util.Util;
 
 class FeatureForest {
 	private final Collection<ConjunctiveNode> conjunctiveNodes = new ArrayList<>();
@@ -31,55 +34,40 @@ class FeatureForest {
 	private final List<InputWord> words;
 
 	FeatureForest(final List<InputWord> words, final CompressedChart allParses,
-			final CutoffsDictionary cutoffsDictionary) {
-		final Collection<DisjunctiveNode> result = new ArrayList<>();
+				  final CutoffsDictionary cutoffsDictionary) {
 		this.words = words;
 		this.cutoffsDictionary = cutoffsDictionary;
-		final Map<Key, DisjunctiveNode> cache1 = new HashMap<>();
+		final Map<Key, DisjunctiveNode> disjunctiveNodeCache = new HashMap<>();
 		final Map<ResolvedDependency, DisjunctiveNode> dependencyNodeCache = new HashMap<>();
 		final Map<Value, ConjunctiveNode> conjuctiveNodeCache = new IdentityHashMap<>();
-		for (final Key key : allParses.getRoots()) {
-			result.add(parseDisjunctive(key, cache1, dependencyNodeCache, conjuctiveNodeCache));
-		}
-		this.roots = result;
+		this.roots = allParses.getRoots().stream()
+				.map(key -> parseDisjunctive(key, disjunctiveNodeCache, dependencyNodeCache, conjuctiveNodeCache))
+				.collect(Collectors.toList());
 	}
 
-	private ConjunctiveNode parseConjunctive(final Value value, final Map<Key, DisjunctiveNode> disjuctiveNodeCache,
-			final Map<Value, ConjunctiveNode> conjuctiveNodeCache,
-			final Map<ResolvedDependency, DisjunctiveNode> dependencyNodeCache, final DisjunctiveTreeNode parent) {
-
-		if (conjuctiveNodeCache.containsKey(value)) {
-			return conjuctiveNodeCache.get(value);
+	private ConjunctiveNode parseConjunctive(final Value value, final Map<Key, DisjunctiveNode> disjunctiveNodeCache,
+											 final Map<Value, ConjunctiveNode> conjunctiveNodeCache,
+											 final Map<ResolvedDependency, DisjunctiveNode> dependencyNodeCache,
+											 final DisjunctiveTreeNode parent) {
+		if (conjunctiveNodeCache.containsKey(value)) {
+			return conjunctiveNodeCache.get(value);
 		}
-
 		final ConjunctiveNode result;
-
-		final List<DisjunctiveNode> children = new ArrayList<>(value.getChildren().size()
-				+ value.getDependencies().size());
-
-		for (final Key child : value.getChildren()) {
-			final DisjunctiveNode newChild = parseDisjunctive(child, disjuctiveNodeCache, dependencyNodeCache,
-					new IdentityHashMap<>());
-			children.add(newChild);
-		}
-
+		final List<DisjunctiveNode> children =
+				new ArrayList<>(value.getChildren().size() + value.getDependencies().size());
+		value.getChildren().forEach(child -> children.add(
+				parseDisjunctive(child, disjunctiveNodeCache, dependencyNodeCache, new IdentityHashMap<>())));
 		final int numberOfNonDependencyChildren = children.size();
-
 		for (final ResolvedDependency dep : value.getDependencies()) {
-
 			DisjunctiveNode possibleLabelsForDep = dependencyNodeCache.get(dep);
-
 			if (possibleLabelsForDep == null) {
 				possibleLabelsForDep = parseDependency(dep);
 				dependencyNodeCache.put(dep, possibleLabelsForDep);
 			}
-
 			if (possibleLabelsForDep.getChildren().size() > 0) {
 				children.add(possibleLabelsForDep);
 			}
-
 		}
-
 		if (numberOfNonDependencyChildren == 0) {
 			Preconditions.checkState(children.size() == 0);
 			result = new ConjunctiveLexicalNode(value.getCategory(), value.getIndex(), parent);
@@ -88,47 +76,41 @@ class FeatureForest {
 			result = new ConjunctiveUnaryNode(parent, children, value.getRuleID());
 			conjunctiveNodes.add(result);
 		} else if (numberOfNonDependencyChildren == 2) {
-
 			result = new ConjunctiveBinaryNode(parent, children);
 			conjunctiveNodes.add(result);
 		} else {
 			throw new RuntimeException();
 		}
-
-		conjuctiveNodeCache.put(value, result);
+		conjunctiveNodeCache.put(value, result);
 		return result;
 	}
 
 	private DisjunctiveNode parseDependency(final ResolvedDependency dep) {
 		final DisjunctiveNode parent = new DisjunctiveNode();
 		final Collection<ConjunctiveDependencyNode> possibleLabels = new ArrayList<>();
-
-		if (dep.getOffset() == 0 || // Unrealized arguments. Make the labels latent.
-				// Unlabelled arguments are those which are under-specified from
-				// the training charts
-				dep.getSemanticRole() == SRLFrame.UNLABELLED_ARGUMENT) {
-			// Underspecified labels.
-			for (final SRLLabel label : cutoffsDictionary.getRoles(words.get(dep.getHead()).word, dep.getCategory(),
-					dep.getPreposition(), dep.getArgNumber())) {
-				if (cutoffsDictionary.isFrequent(dep.getCategory(), dep.getArgNumber(), label)) {
-					final ResolvedDependency labelledDep = dep.overwriteLabel(label);
-					possibleLabels.add(new ConjunctiveDependencyNode(labelledDep, parent, cutoffsDictionary.isFrequent(
-							label, dep.getOffset())));
-				}
-			}
+		Category category = dep.getCategory();
+		Preposition preposition = dep.getPreposition();
+		String headWord = words.get(dep.getHead()).word;
+		int offset = dep.getOffset();
+		int argNum = dep.getArgNumber();
+		SRLLabel depLabel = dep.getSemanticRole();
+		Collection<SRLLabel> frequentRoles = cutoffsDictionary.getRoles(headWord, category, preposition, argNum);
+		if (offset == 0 || depLabel == SRLFrame.UNLABELLED_ARGUMENT) {
+			frequentRoles.stream()
+					.filter(label -> cutoffsDictionary.isFrequent(category, argNum, label))
+					.forEach(label2 -> {
+						possibleLabels.add(new ConjunctiveDependencyNode(dep.overwriteLabel(label2), parent,
+								cutoffsDictionary.isFrequent(label2, offset)));
+					});
 		} else {
-			// Gold labels.
-			if (!cutoffsDictionary.getRoles(words.get(dep.getHead()).word, dep.getCategory(), dep.getPreposition(),
-					dep.getArgNumber()).contains(dep.getSemanticRole())) {
-				throw new RuntimeException("Role " + dep.getSemanticRole() + " should have been pruned:"
-						+ words.get(dep.getHead()).word + " " + dep.getCategory() + " " + dep.getPreposition() + " "
-						+ dep.getArgNumber());
+			if (!frequentRoles.contains(depLabel)) {
+				throw new RuntimeException("Role " + depLabel + " should have been pruned:" + headWord + " " +
+						category + " " + preposition + " " + argNum);
 			}
-			Preconditions.checkState(cutoffsDictionary.isFrequent(dep.getCategory(), dep.getArgNumber(), dep.getSemanticRole()));
-			possibleLabels.add(new ConjunctiveDependencyNode(dep, parent, cutoffsDictionary.isFrequent(
-					dep.getSemanticRole(), dep.getOffset())));
+			Preconditions.checkState(cutoffsDictionary.isFrequent(category, argNum, depLabel));
+			possibleLabels.add(new ConjunctiveDependencyNode(dep, parent,
+					cutoffsDictionary.isFrequent(depLabel, offset)));
 		}
-
 		for (final ConjunctiveDependencyNode depNode : possibleLabels) {
 			parent.addChild(depNode);
 			conjunctiveNodes.add(depNode);
@@ -136,21 +118,18 @@ class FeatureForest {
 		return parent;
 	}
 
-	private DisjunctiveNode parseDisjunctive(final Key key, final Map<Key, DisjunctiveNode> disjuctiveNodeCache,
-			final Map<ResolvedDependency, DisjunctiveNode> dependencyNodeCache,
-			final Map<Value, ConjunctiveNode> conjuctiveNodeCache) {
-		DisjunctiveTreeNode result = (DisjunctiveTreeNode) disjuctiveNodeCache.get(key);
-
+	private DisjunctiveNode parseDisjunctive(final Key key, final Map<Key, DisjunctiveNode> disjunctiveNodeCache,
+											 final Map<ResolvedDependency, DisjunctiveNode> dependencyNodeCache,
+											 final Map<Value, ConjunctiveNode> conjunctiveNodeCache) {
+		DisjunctiveTreeNode result = (DisjunctiveTreeNode) disjunctiveNodeCache.get(key);
 		if (result == null) {
 			result = new DisjunctiveTreeNode(key.category, key.startIndex, key.lastIndex, key.ruleClass);
-
 			for (final Value child : key.getChildren()) {
-				result.addChild(parseConjunctive(child, disjuctiveNodeCache, conjuctiveNodeCache, dependencyNodeCache,
+				result.addChild(parseConjunctive(child, disjunctiveNodeCache, conjunctiveNodeCache, dependencyNodeCache,
 						result));
 			}
-			disjuctiveNodeCache.put(key, result);
+			disjunctiveNodeCache.put(key, result);
 		}
-
 		return result;
 	}
 
@@ -177,7 +156,6 @@ class FeatureForest {
 			for (final DisjunctiveNode child : children) {
 				child.addParent(this);
 			}
-
 		}
 
 		public abstract Category getCategory();
@@ -342,7 +320,7 @@ class FeatureForest {
 		Collection<Integer> getFeatureIndices(final List<InputWord> words, final FeatureSet featureSet,
 				final Map<FeatureKey, Integer> featureToIndexMap) {
 			final Collection<Integer> result = new ArrayList<>(featureSet.unaryRuleFeatures.size());
-			for (final UnaryRuleFeature feature : featureSet.unaryRuleFeatures) {
+			for (final Feature.UnaryRuleFeature feature : featureSet.unaryRuleFeatures) {
 				final int index = feature.getFeatureIndex(getUnaryRuleID(), words, child.startIndex,
 						child.lastIndex + 1, featureToIndexMap);
 				if (index >= featureToIndexMap.size()) {
@@ -396,7 +374,7 @@ class FeatureForest {
 		Collection<Integer> getFeatureIndices(final List<InputWord> words, final FeatureSet featureSet,
 				final Map<FeatureKey, Integer> featureToIndexMap) {
 			final List<Integer> result = new ArrayList<>(featureSet.binaryFeatures.size());
-			for (final BinaryFeature feature : featureSet.binaryFeatures) {
+			for (final Feature.BinaryFeature feature : featureSet.binaryFeatures) {
 				final int index = feature.getFeatureIndex(parent.category, parent.ruleClass, left.category,
 						left.ruleClass.getNormalFormClassForRule(), left.lastIndex - left.startIndex + 1,
 						right.category, right.ruleClass.getNormalFormClassForRule(),
@@ -409,7 +387,7 @@ class FeatureForest {
 			}
 
 			if (parent.lastIndex - parent.startIndex == words.size() - 1) {
-				for (final RootCategoryFeature feature : featureSet.rootFeatures) {
+				for (final Feature.RootCategoryFeature feature : featureSet.rootFeatures) {
 					final int index = feature.getFeatureIndex(words, parent.category, featureToIndexMap);
 					if (index >= featureToIndexMap.size()) {
 						System.err.println("RootCategoryFeature Error: index out of bound.");

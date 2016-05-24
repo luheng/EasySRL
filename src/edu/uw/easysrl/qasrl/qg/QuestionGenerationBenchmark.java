@@ -19,12 +19,14 @@ import java.util.*;
  * Now able to generate 3541 (76.20% of 4647 dependencies, 74.72% of 3979 aligned dependencies) questions.
  * 615 (17.37%) exact matches among all generated.
  *
- * Now able to generate 4600 (98.99% of 4647 dependencies, 89.32% of 3979 aligned dependencies) questions.
- * 653 (14.20%) exact matches among all generated.
+ * Now able to generate 3895 (98.81% of 3942 dependencies, 85.45% of 3979 aligned dependencies) questions.
+ * 657 (16.87%) exact matches among all generated.
+ *
+ *
  *
  * Created by luheng on 12/8/15.
  */
-public class QuestionGenerationSandbox {
+public class QuestionGenerationBenchmark {
     private static QuestionGenerator questionGenerator;
 
     /**

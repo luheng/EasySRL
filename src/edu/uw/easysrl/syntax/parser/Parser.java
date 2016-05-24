@@ -17,6 +17,8 @@ public interface Parser {
 
 	List<Scored<SyntaxTreeNode>> parseSentence(SuperTaggingResults results, InputToParser input);
 
+	List<Scored<SyntaxTreeNode>> parseSupertaggedSentence(InputToParser input);
+
 	List<Scored<SyntaxTreeNode>> doParsing(InputToParser input);
 
 	List<Scored<SyntaxTreeNode>> parse(SuperTaggingResults results, String line);

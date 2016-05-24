@@ -76,14 +76,21 @@ public class EasySRL {
 		@Option(shortName = "r", defaultValue = { "S[dcl]", "S[wq]", "S[q]", "S[b]\\NP", "NP" }, description = "(Optional) List of valid categories for the root node of the parse. Defaults to: S[dcl] S[wq] S[q] NP S[b]\\NP")
 		List<Category> getRootCategories();
 
-		@Option(shortName = "p", defaultValue = { "false" }, description = "(Optional) Use the pipeline parser instead of joint.")
-		boolean getUsePipeline();
-
 		@Option(defaultValue = "0.01", description = "(Optional) Prunes lexical categories whose probability is less than this ratio of the best category. Decreasing this value will slightly improve accuracy, and give more varied n-best output, but decrease speed. Defaults to 0.01.")
 		double getSupertaggerbeam();
 
 		@Option(helpRequest = true, description = "Display this message", shortName = "h")
 		boolean getHelp();
+
+		// New stuff
+		@Option(shortName = "p", defaultValue = { "false" }, description = "(Optional) Use the pipeline parser instead of joint.")
+		boolean getUsePipeline();
+
+		//@Option(shortName = "t", defaultValue = { "toy.txt.stagged" }, description = "Tagged input file because supertagger does not work on server ...")
+		//String getTaggedInput();
+
+		@Option(shortName = "b", defaultValue = "", description = "(Optional) Path to the input text file by Bharat parser.")
+		String getBharatInputFile();
 	}
 
 	// Set of supported InputFormats

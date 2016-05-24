@@ -8,10 +8,12 @@ import edu.uw.easysrl.main.InputReader.InputWord;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.syntax.parser.AbstractParser.UnaryRule;
+import edu.uw.easysrl.syntax.tagger.Tagger;
 
 public abstract class Model {
 	public static abstract class ModelFactory {
 		public abstract Model make(List<InputWord> sentence);
+		public abstract Model make(List<InputWord> sentence, List<List<Tagger.ScoredCategory>> scoredCategories);
 		public abstract Collection<Category> getLexicalCategories();
 	}
 

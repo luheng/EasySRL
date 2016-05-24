@@ -21,8 +21,8 @@ public class TaggerLSTM extends Tagger {
 
 	TaggerLSTM(final File modelFolder, final double beta, final int maxTagsPerWord, final CutoffsDictionary cutoffs)
 			throws IOException {
-
 		this(makeDeepTagger(modelFolder), beta, maxTagsPerWord, cutoffs);
+		System.err.println("Using LSTM tagger :)");
 	}
 
 	private static DeepTagger makeDeepTagger(final File modelFolder) throws IOException {
@@ -46,11 +46,9 @@ public class TaggerLSTM extends Tagger {
 		super(cutoffs, beta, tagger.getTags().stream().map(Category::valueOf).collect(Collectors.toList()),
 				maxTagsPerWord);
 		this.tagger = tagger;
-
 		for (int i = 0; i < super.lexicalCategories.size(); i++) {
 			possibleCategories.add(i);
 		}
-
 	}
 
 	@Override
@@ -62,22 +60,18 @@ public class TaggerLSTM extends Tagger {
 			final List<ScoredCategory> tagsForWord = getTagsForWord(scores[i]);
 			result.add(tagsForWord);
 		}
-
 		return result;
 	}
 
 	private List<ScoredCategory> getTagsForWord(final float[] scores) {
 		final int size = maxTagsPerWord;
 		float bestScore = Float.NEGATIVE_INFINITY;
-
 		List<ScoredCategory> result = new ArrayList<>(scores.length);
 		for (int i = 0; i < scores.length; i++) {
 			result.add(new ScoredCategory(super.lexicalCategories.get(i), scores[i]));
 			bestScore = Math.max(bestScore, scores[i]);
 		}
-
 		result = Ordering.natural().leastOf(result, size);
-
 		final double threshold = beta * Math.exp(bestScore);
 		for (int i = 1; i < result.size(); i++) {
 			if (Math.exp(result.get(i).getScore()) < threshold) {
@@ -85,7 +79,6 @@ public class TaggerLSTM extends Tagger {
 				break;
 			}
 		}
-
 		return result;
 	}
 

@@ -9,6 +9,7 @@ import java.util.PriorityQueue;
 import java.util.stream.Collectors;
 
 import edu.uw.easysrl.dependencies.DependencyStructure;
+import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.dependencies.UnlabelledDependency;
 import edu.uw.easysrl.main.EasySRL.InputFormat;
 import edu.uw.easysrl.main.InputReader.InputWord;
@@ -24,6 +25,7 @@ import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeUnary;
 import edu.uw.easysrl.syntax.model.AgendaItem;
 import edu.uw.easysrl.syntax.model.Model;
 import edu.uw.easysrl.syntax.model.Model.ModelFactory;
+import edu.uw.easysrl.syntax.tagger.Tagger;
 import edu.uw.easysrl.util.Util.Scored;
 
 public class ParserCKY extends AbstractParser {
@@ -41,13 +43,22 @@ public class ParserCKY extends AbstractParser {
 	private final ModelFactory modelFactory;
 
 	@Override
-	List<Scored<SyntaxTreeNode>> parseAstar(final List<InputWord> input) {
+	List<Scored<SyntaxTreeNode>> parseAstar(final List<InputWord> sentence,
+											final List<List<Tagger.ScoredCategory>> scoredCategories) {
+		return parse(sentence, modelFactory.make(sentence, scoredCategories));
+	}
+
+	@Override
+	List<Scored<SyntaxTreeNode>> parseAstar(final List<InputWord> sentence) {
+		return parse(sentence, modelFactory.make(sentence));
+	}
+
+	private List<Scored<SyntaxTreeNode>> parse(final List<InputWord> input, Model model) {
 		final int numWords = input.size();
 		if (input.size() > maxLength) {
 			return null;
 		}
 		final ChartCell[][] chart = new ChartCell[numWords][numWords];
-		final Model model = modelFactory.make(input);
 
 		// Add lexical categories
 		final PriorityQueue<AgendaItem> queue = new PriorityQueue<>();
@@ -116,10 +127,18 @@ public class ParserCKY extends AbstractParser {
 						continue;
 					}
 					final List<UnlabelledDependency> resolvedDependencies = new ArrayList<>();
-					final DependencyStructure deps = rule.getCombinator().apply(l.getParse().getDependencyStructure(),
-							r.getParse().getDependencyStructure(), resolvedDependencies);
-					final SyntaxTreeNode newNode = new SyntaxTreeNodeBinary(rule.getCategory(), l.getParse(),
-							r.getParse(), ruleType, rule.isHeadIsLeft(), deps, resolvedDependencies);
+					final DependencyStructure deps = rule.getCombinator().apply(
+							l.getParse().getDependencyStructure(),
+							r.getParse().getDependencyStructure(),
+							resolvedDependencies);
+					final SyntaxTreeNode newNode = new SyntaxTreeNodeBinary(
+							rule.getCategory(),
+							l.getParse(),
+							r.getParse(),
+							ruleType,
+							rule.isHeadIsLeft(),
+							deps,
+							resolvedDependencies);
 					final AgendaItem newItem = model.combineNodes(l, r, newNode);
 					addEntry(result, newItem, model);
 				}

@@ -17,19 +17,22 @@ import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeLabelling;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeLeaf;
 import edu.uw.easysrl.syntax.model.ExtendedLexicalEntry.ConjunctiveCategoryNode;
 import edu.uw.easysrl.syntax.model.ExtendedLexicalEntry.Forest;
-import edu.uw.easysrl.syntax.model.feature.BinaryFeature;
+import edu.uw.easysrl.syntax.model.feature.Feature.BinaryFeature;
 import edu.uw.easysrl.syntax.model.feature.Feature.FeatureKey;
-import edu.uw.easysrl.syntax.model.feature.RootCategoryFeature;
-import edu.uw.easysrl.syntax.model.feature.UnaryRuleFeature;
+import edu.uw.easysrl.syntax.model.feature.Feature.RootCategoryFeature;
+import edu.uw.easysrl.syntax.model.feature.Feature.UnaryRuleFeature;
 import edu.uw.easysrl.syntax.model.feature.FeatureCache;
 import edu.uw.easysrl.syntax.model.feature.FeatureCache.SlotFeatureCache;
 import edu.uw.easysrl.syntax.model.feature.FeatureSet;
 import edu.uw.easysrl.syntax.parser.AbstractParser.UnaryRule;
+import edu.uw.easysrl.syntax.tagger.Tagger;
 import edu.uw.easysrl.util.Util.Scored;
 
 public class SRLFactoredModel extends Model {
 	private final List<ExtendedLexicalEntry> forests;
 	private final Collection<UnaryRuleFeature> unaryRuleFeatures;
+
+	boolean hasDeps = true;
 
 	private SRLFactoredModel(
 			final List<ExtendedLexicalEntry> forests,
@@ -72,7 +75,7 @@ public class SRLFactoredModel extends Model {
 				final double score = forest.scoreNode(node);
 				final double dependenciesUpperBound = getInsideDependenciesUpperBound(forest, category, score);
 				queue.add(new AgendaItem(new SyntaxTreeNodeLeaf(word.word, word.pos, word.ner, category, i), score,
-						dependenciesUpperBound + outsideScoreUpperBound, i, 1, true));
+						dependenciesUpperBound + outsideScoreUpperBound, i, 1, hasDeps));
 			}
 		}
 	}
@@ -112,7 +115,7 @@ public class SRLFactoredModel extends Model {
 				+ rootScore;
 
 		final AgendaItem result = new AgendaItem(node, newInsideScore, leftChild.outsideScoreUpperbound
-				+ rightChild.outsideScoreUpperbound - globalUpperBound, leftChild.getStartOfSpan(), length, true);
+				+ rightChild.outsideScoreUpperbound - globalUpperBound, leftChild.getStartOfSpan(), length, hasDeps);
 
 		return labelDependencies(result, node);
 	}
@@ -133,7 +136,7 @@ public class SRLFactoredModel extends Model {
 
 			result = new AgendaItem(labelling, newInsideScore, result.outsideScoreUpperbound
 					- forest.getLogUnnormalizedViterbiScore(dep.getCategory(), dep.getArgNumber()),
-					result.getStartOfSpan(), result.getSpanLength(), true);
+					result.getStartOfSpan(), result.getSpanLength(), hasDeps);
 			i++;
 
 		}
@@ -155,7 +158,7 @@ public class SRLFactoredModel extends Model {
 					+ child.spanLength, featureToScore);
 		}
 		AgendaItem agendaItem = new AgendaItem(result, insideScore, child.outsideScoreUpperbound, child.startOfSpan,
-				child.spanLength, true);
+				child.spanLength, hasDeps);
 		agendaItem = labelDependencies(agendaItem, agendaItem.parse);
 		return agendaItem;
 	}
@@ -206,6 +209,11 @@ public class SRLFactoredModel extends Model {
 
 			return new SRLFactoredModel(forests, featureSet.unaryRuleFeatures, featureToScore,
 					featureSet.binaryFeatures, featureSet.rootFeatures, sentence);
+		}
+
+		@Override
+		public Model make(List<InputWord> sentence, List<List<Tagger.ScoredCategory>> scoredCategories) {
+			throw new RuntimeException("unimplemented");
 		}
 
 		@Override

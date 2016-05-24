@@ -1,8 +1,6 @@
 package edu.uw.easysrl.main;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.Serializable;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.InputMismatchException;
@@ -13,6 +11,7 @@ import java.util.Objects;
 import edu.uw.easysrl.main.EasySRL.InputFormat;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode.SyntaxTreeNodeLeaf;
+import edu.uw.easysrl.syntax.tagger.Tagger;
 import edu.uw.easysrl.util.Util;
 
 public abstract class InputReader {
@@ -133,6 +132,9 @@ public abstract class InputReader {
 
 	public static class InputToParser {
 		private final List<InputWord> words;
+		private final List<Category> goldCategories;
+		private final List<List<SyntaxTreeNodeLeaf>> inputSupertags;
+		private final List<List<Tagger.ScoredCategory>> scoredCategories;
 		private final boolean isAlreadyTagged;
 
 		public InputToParser(final List<InputWord> words,
@@ -142,11 +144,21 @@ public abstract class InputReader {
 			this.words = words;
 			this.goldCategories = goldCategories;
 			this.inputSupertags = inputSupertags;
+			this.scoredCategories = null;
 			this.isAlreadyTagged = isAlreadyTagged;
 		}
 
-		private final List<Category> goldCategories;
-		private final List<List<SyntaxTreeNodeLeaf>> inputSupertags;
+		public InputToParser(final List<InputWord> words,
+							 final List<Category> goldCategories,
+							 final List<List<SyntaxTreeNodeLeaf>> inputSupertags,
+							 final List<List<Tagger.ScoredCategory>> scoredCategories,
+							 final boolean isAlreadyTagged) {
+			this.words = words;
+			this.goldCategories = goldCategories;
+			this.inputSupertags = inputSupertags;
+			this.scoredCategories = scoredCategories;
+			this.isAlreadyTagged = isAlreadyTagged;
+		}
 
 		public int length() {
 			return words.size();
@@ -182,7 +194,10 @@ public abstract class InputReader {
 
 		public List<InputWord> getInputWords() {
 			return words;
+		}
 
+		public List<List<Tagger.ScoredCategory>> getScoredCategories() {
+			return scoredCategories;
 		}
 
 		public String getWordsAsString() {
@@ -232,25 +247,21 @@ public abstract class InputReader {
 			final String[] goldEntries = line.split(" ");
 			final List<InputWord> words = new ArrayList<>(goldEntries.length);
 			final List<List<SyntaxTreeNodeLeaf>> supertags = new ArrayList<>();
+			final List<List<Tagger.ScoredCategory>> scoredCategories = new ArrayList<>();
 			for (final String entry : goldEntries) {
 				final String[] goldFields = entry.split("\\|");
-
 				if (goldFields[0].equals("\"")) {
 					continue; // TODO quotes
 				}
 				if (goldFields.length < 3) {
-					throw new InputMismatchException(
-							"Invalid input: expected \"word|POS|SUPERTAG\" but was: "
-									+ entry);
+					throw new InputMismatchException("Invalid input: expected \"word|POS|SUPERTAG\" but was: " + entry);
 				}
-
 				final String word = goldFields[0];
 				final String pos = goldFields[1];
 				final Category category = Category.valueOf(goldFields[2]);
 				words.add(new InputWord(word));
 				result.add(category);
-				supertags.add(Arrays.asList(new SyntaxTreeNodeLeaf(word, pos,
-						null, category, supertags.size())));
+				supertags.add(Arrays.asList(new SyntaxTreeNodeLeaf(word, pos, null, category, supertags.size())));
 			}
 			return new InputToParser(words, result, supertags, false);
 		}
@@ -258,6 +269,41 @@ public abstract class InputReader {
 		private GoldInputReader() {
 		}
 	}
+
+	// Information for each word are separated by newline.
+	private static class SupertaggedInputReader extends InputReader {
+		@Override
+		public InputToParser readInput(final String inputStr) {
+			final List<Category> result = new ArrayList<>();
+			final List<InputWord> words = new ArrayList<>();
+			final List<List<SyntaxTreeNodeLeaf>> supertags = new ArrayList<>();
+			final List<List<Tagger.ScoredCategory>> scoredCategories = new ArrayList<>();
+
+			final String[] lines = inputStr.trim().split("\n");
+			for (String line : lines) {
+				String[] info = line.trim().split("\\s+");
+				final String word = info[0];
+				final String pos = info[1];
+				final int numCategories = Integer.parseInt(info[2]);
+				final Category category = Category.valueOf(info[3]);
+
+				words.add(new InputWord(word));
+				scoredCategories.add(new ArrayList<>());
+				for (int i = 0; i < numCategories; i++) {
+					int j = i * 2 + 3;
+					scoredCategories.get(words.size() - 1).add(new Tagger.ScoredCategory(
+							Category.valueOf(info[j]), Double.parseDouble(info[j + 1])));
+				}
+				result.add(category);
+				supertags.add(Arrays.asList(new SyntaxTreeNodeLeaf(word, pos, null, category, supertags.size())));
+			}
+			return new InputToParser(words, result, supertags, scoredCategories, false);
+		}
+
+		private SupertaggedInputReader() {
+		}
+	}
+
 
 	private static class POSTaggedInputReader extends InputReader {
 
@@ -320,6 +366,8 @@ public abstract class InputReader {
 			return new POSTaggedInputReader();
 		case POSANDNERTAGGED:
 			return new POSandNERTaggedInputReader();
+		case SUPERTAGGED:
+			return new SupertaggedInputReader();
 		default:
 			throw new Error("Unknown input format: " + inputFormat);
 		}

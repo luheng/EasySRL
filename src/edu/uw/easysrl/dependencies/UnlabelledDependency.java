@@ -58,7 +58,6 @@ public class UnlabelledDependency extends Dependency {
 	}
 
 	public Collection<ResolvedDependency> setLabel(final SRLLabel label) {
-
 		List<ResolvedDependency> result;
 		// Handle the inconsistent annotation of
 		// "I cooked and ate fish and chips"
@@ -72,7 +71,6 @@ public class UnlabelledDependency extends Dependency {
 						super.getPreposition()));
 			}
 		}
-
 		return result;
 	}
 

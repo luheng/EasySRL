@@ -33,6 +33,8 @@ public abstract class SRLParser {
 
 	protected abstract List<CCGandSRLparse> parseTokens2(List<InputWord> tokens);
 
+	public abstract List<CCGandSRLparse> parseSupertaggedSentence(final InputToParser inputToParser);
+
 	public static class BackoffSRLParser extends SRLParser {
 		private final SRLParser[] parsers;
 		private final AtomicInteger backoffs = new AtomicInteger();
@@ -52,7 +54,19 @@ public abstract class SRLParser {
 					backoffs.getAndIncrement();
 				}
 			}
+			return null;
+		}
 
+		@Override
+		public List<CCGandSRLparse> parseSupertaggedSentence(final InputToParser inputToParser) {
+			for (final SRLParser parser : parsers) {
+				final List<CCGandSRLparse> parses = parser.parseSupertaggedSentence(inputToParser);
+				if (parses != null) {
+					return parses;
+				} else {
+					backoffs.getAndIncrement();
+				}
+			}
 			return null;
 		}
 
@@ -60,7 +74,6 @@ public abstract class SRLParser {
 		public int getMaxSentenceLength() {
 			return parsers[parsers.length - 1].getMaxSentenceLength();
 		}
-
 	}
 
 	public abstract int getMaxSentenceLength();
@@ -82,6 +95,11 @@ public abstract class SRLParser {
 				parse = parse.stream().map(x -> x.addSemantics(lexicon)).collect(Collectors.toList());
 			}
 			return parse;
+		}
+
+		@Override
+		public List<CCGandSRLparse> parseSupertaggedSentence(final InputToParser inputToParser) {
+			throw new RuntimeException("unimplemented");
 		}
 
 		@Override
@@ -113,6 +131,20 @@ public abstract class SRLParser {
 		@Override
 		public int getMaxSentenceLength() {
 			return parser.getMaxSentenceLength();
+		}
+
+
+		@Override
+		public List<CCGandSRLparse> parseSupertaggedSentence(final InputToParser inputToParser) {
+			List<InputWord> tokens = inputToParser.getInputWords();
+			final List<Scored<SyntaxTreeNode>> parses = parser.parseSupertaggedSentence(inputToParser);
+			if (parses == null) {
+				return null;
+			} else {
+				return parses.stream()
+						.map(x -> new CCGandSRLparse(x.getObject(), x.getObject().getAllLabelledDependencies(), tokens))
+						.collect(Collectors.toList());
+			}
 		}
 	}
 
@@ -177,19 +209,19 @@ public abstract class SRLParser {
 				return null;
 			}
 			return parses.stream().map(x -> addDependencies(tokens, x)).collect(Collectors.toList());
-			/*
-			final List<Scored<SyntaxTreeNode>> parses = super.parser.doParsing(new InputToParser(tokens, null, null, false));
+		}
+
+		@Override
+		public List<CCGandSRLparse> parseSupertaggedSentence(final InputToParser inputToParser) {
+			final List<CCGandSRLparse> parses = super.parseSupertaggedSentence(inputToParser);
 			if (parses == null) {
 				return null;
 			}
-			SyntaxTreeNode parse = parses.get(0).getObject();
-			List<String> words = tokens.stream().map(t -> t.word).collect(Collectors.toList());
-			parse.getAllLabelledDependencies().forEach(d -> System.out.println(d.toString(words)));
-			return parses.stream()
-						.map(x -> new CCGandSRLparse(x.getObject(), x.getObject().getAllLabelledDependencies(), tokens))
-						.map(x2 -> addDependencies(tokens, x2))
-						.collect(Collectors.toList());
-			*/
+			return parses.stream().map(parse -> new CCGandSRLparse(
+					parse.getCcgParse(),
+					parse.getDependencyParse().stream()
+							.filter(dep -> (dep.getArgumentIndex() != dep.getHead())).collect(Collectors.toList()),
+					inputToParser.getInputWords())).collect(Collectors.toList());
 		}
 
 		private CCGandSRLparse addDependencies(final List<InputWord> tokens, final CCGandSRLparse parse) {
@@ -201,6 +233,29 @@ public abstract class SRLParser {
 			}
 			return new CCGandSRLparse(parse.getCcgParse(), result, tokens);
 		}
+	}
 
+	public static class CcgParser extends JointSRLParser {
+		public CcgParser(final Parser parser, final POSTagger tagger) {
+			super(parser, tagger);
+		}
+
+		@Override
+		public List<CCGandSRLparse> parseTokens2(final List<InputWord> tokens) {
+			return super.parseTokens2(tokens);
+		}
+
+		@Override
+		public List<CCGandSRLparse> parseSupertaggedSentence(final InputToParser inputToParser) {
+			final List<CCGandSRLparse> parses = super.parseSupertaggedSentence(inputToParser);
+			if (parses == null) {
+				return null;
+			}
+			return parses.stream().map(parse -> new CCGandSRLparse(
+					parse.getCcgParse(),
+					parse.getDependencyParse().stream()
+							.filter(dep -> (dep.getArgumentIndex() != dep.getHead())).collect(Collectors.toList()),
+					inputToParser.getInputWords())).collect(Collectors.toList());
+		}
 	}
 }

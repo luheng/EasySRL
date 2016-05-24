@@ -146,7 +146,7 @@ public class ALTraining {
                 new DenseLexicalFeature(pipeline, 0.0),
                 BilexicalFeature.getBilexicalFeatures(clusterings, 3),
                 ArgumentSlotFeature.argumentSlotFeatures,
-                UnaryRuleFeature.unaryRules,
+                Feature.UnaryRuleFeature.unaryRules,
                 PrepositionFeature.prepositionFeaures,
                 Collections.emptyList(),
                 Collections.emptyList());
@@ -281,19 +281,11 @@ public class ALTraining {
                         continue;
                     }
                     // Get template.
-                    QuestionTemplate template = questionGenerator.getTemplate(predicateIndex, words, categories,
+                    List<String> question = questionGenerator.generateQuestion(targetDependency, words, categories,
                             dependencies);
-                    if (template == null) {
-                        continue;
-                    }
-                    // Get question.
-                    List<String> question = questionGenerator.generateQuestionFromTemplate(template, argumentNumber);
-                    if (question == null) {
-                        continue;
-                    }
                     String questionStr = StringUtils.join(question) + " ?";
                     if (!questionToDeps.containsKey(questionStr)) {
-                        questionToDeps.put(questionStr, new RerankingInfo(nb, targetDependency, template));
+                        questionToDeps.put(questionStr, new RerankingInfo(nb, targetDependency, null));
                     }
                     allQGDependencies.add(targetDependency);
                 }

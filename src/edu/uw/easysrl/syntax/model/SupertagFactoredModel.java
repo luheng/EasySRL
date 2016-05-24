@@ -18,6 +18,7 @@ import edu.uw.easysrl.syntax.tagger.Tagger.ScoredCategory;
 public class SupertagFactoredModel extends Model {
 
 	private final List<List<ScoredCategory>> tagsForWords;
+	private static final boolean includeDeps = false;
 
 	public SupertagFactoredModel(final List<List<ScoredCategory>> tagsForWords) {
 		super(tagsForWords.size());
@@ -36,7 +37,7 @@ public class SupertagFactoredModel extends Model {
 						getOutsideUpperBound(i, i + 1), /* outside score upperbound */
 						i,    /* start index */
 						1,    /* length */
-						false /* includeDeps */
+						includeDeps
 				));
 			}
 		}
@@ -50,17 +51,27 @@ public class SupertagFactoredModel extends Model {
 		for (final UnlabelledDependency dep : resolvedUnlabelledDependencies) {
 			node = new SyntaxTreeNodeLabelling(
 					node,
-					dep.setLabel(SRLFrame.NONE),
+					dep.setLabel(SRLFrame.UNLABELLED_ARGUMENT),
 					resolvedUnlabelledDependencies.subList(i + 1, resolvedUnlabelledDependencies.size()));
 			i++;
 		}
+
+		// Add a penalty based on length of dependency.
+		final int depLength = Math.abs(leftChild.getParse().getHeadIndex() - rightChild.getParse().getHeadIndex());
+		double lengthPenalty = 0.00001 * depLength;
+
+		// Extra penalty for clitics, to really make sure they attach locally.
+		if (rightChild.getSpanLength() == 1 && rightChild.getParse().getWord().startsWith("'")) {
+			lengthPenalty = lengthPenalty * 10;
+		}
+
 		return new AgendaItem(
 				node,
-				leftChild.getInsideScore() + rightChild.getInsideScore(),
+				leftChild.getInsideScore() + rightChild.getInsideScore() - lengthPenalty,
 				getOutsideUpperBound(leftChild.startOfSpan, leftChild.startOfSpan + length),
 				leftChild.startOfSpan,
 				length,
-				false);
+				includeDeps);
 	}
 
 	@Override
@@ -71,7 +82,7 @@ public class SupertagFactoredModel extends Model {
 				child.outsideScoreUpperbound,
 				child.startOfSpan,
 				child.spanLength,
-				false /* includeDeps */);
+				includeDeps);
 	}
 
 	@Override
@@ -91,6 +102,11 @@ public class SupertagFactoredModel extends Model {
 		@Override
 		public SupertagFactoredModel make(final List<InputWord> sentence) {
 			return new SupertagFactoredModel(tagger.tag(sentence));
+		}
+
+		@Override
+		public Model make(List<InputWord> sentence, List<List<Tagger.ScoredCategory>> scoredCategories) {
+			return new SupertagFactoredModel(scoredCategories);
 		}
 
 		@Override

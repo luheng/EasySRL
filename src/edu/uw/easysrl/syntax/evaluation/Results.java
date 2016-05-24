@@ -9,7 +9,7 @@ public class Results {
 	private final AtomicInteger correctDependencies;
 	private final AtomicInteger goldDependencies;
 
-	Results(final int parseDependencies, final int correctDependencies, final int goldDependencies) {
+	public Results(final int parseDependencies, final int correctDependencies, final int goldDependencies) {
 		this.parseDependencies = new AtomicInteger(parseDependencies);
 		this.correctDependencies = new AtomicInteger(correctDependencies);
 		this.goldDependencies = new AtomicInteger(goldDependencies);

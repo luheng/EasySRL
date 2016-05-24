@@ -4,7 +4,6 @@ import edu.uw.easysrl.corpora.CCGBankDependencies.CCGBankDependency;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.qg.QuestionSlot.*;
 import edu.uw.easysrl.syntax.grammar.Category;
-import edu.uw.easysrl.syntax.grammar.Preposition;
 
 import java.util.*;
 
@@ -14,7 +13,6 @@ import java.util.*;
 public class QuestionGenerator {
     private static final Category somethingVerbal = Category.valueOf("S|NP");
     private static final Category somethingAdjunctive = Category.valueOf("S|S");
-
     private static final Category intransitiveVerb = Category.valueOf("S\\NP");
 
     private static final Category[] transitiveVerbs = {
@@ -46,6 +44,12 @@ public class QuestionGenerator {
             Category.valueOf("((S\\NP)\\(S\\NP))/(S[ng]\\NP)"), // ``by'' as in ``by doing something''.
     };
 
+    // TODO: special cases:
+    // according (to): ((S\NP)\(S\NP))/PP
+    // down (from): ((S\NP)\(S\NP))/PP
+    // Possible questions: What is the case, according to someone? What is down from something?
+    // What is something according to? What something down from?
+
     // Categories to skip ..
     private static final Category prepositions = Category.valueOf("((S\\NP)\\(S\\NP))/NP");
     private static final Category auxiliaries = Category.valueOf("(S[dcl]\\NP)/(S[b]\\NP)");
@@ -54,11 +58,16 @@ public class QuestionGenerator {
     private static final Category pastParticiples = Category.valueOf("(S[dcl]\\NP)/(S[pt]\\NP)");
 
     private static final String[] otherFilteredCategories = new String[] {
-            "(S/S)/NP", "(S\\NP)\\(S\\NP)",
-            "S[em]/S[dcl]", "(S/S)/(S/S)",
-            "(S[b]\\NP)/(S[pt]\\NP)", "S[qem]/S[dcl]",
-            "(S\\S)/S[dcl]", "(S[adj]\\NP)/(S[to]\\NP)",
+            "(S/S)/NP",
+            "(S\\NP)\\(S\\NP)",
+            "S[em]/S[dcl]",
+            "(S/S)/(S/S)",
+            "(S[b]\\NP)/(S[pt]\\NP)",
+            "S[qem]/S[dcl]",
+            "(S\\S)/S[dcl]",
+            "(S[adj]\\NP)/(S[to]\\NP)",
             "S/S",
+            "((S\\NP)/(S\\NP))/((S\\NP)/(S\\NP))", // i.e. more
             "((S\\NP)\\(S\\NP))/((S\\NP)\\(S\\NP))",
             "((S\\NP)\\(S\\NP))\\((S\\NP)\\(S\\NP))",
             "((S\\NP)\\(S\\NP))/(S[b]\\NP)",
@@ -85,178 +94,87 @@ public class QuestionGenerator {
         String word = words.get(targetDependency.getHead());
         Category category = targetDependency.getCategory();
         int predicateIdx = targetDependency.getHead();
-        int argumentIdx = targetDependency.getArgument();
         // Filter.
         if (filterPredicate(word, category)) {
             return null;
         }
-        QuestionTemplate template = getTemplate(predicateIdx, words, categories, ccgDeps);
+        int[] argNumToPosition = new int[category.getNumberOfArguments() + 1];
+        Arrays.fill(argNumToPosition, -1);
+        for (ResolvedDependency dep : ccgDeps) {
+            if (dep.getHead() == predicateIdx && dep.getArgument() != dep.getHead()) {
+                argNumToPosition[dep.getArgNumber()] = dep.getArgument();
+            }
+        }
+        QuestionTemplate template = getTemplate(predicateIdx, argNumToPosition, words, categories);
         if (template == null) {
-            // Unable to generate template.
             return null;
         }
-        return generateQuestionFromTemplate(template, argumentIdx);
+        return generateQuestionFromTemplate(template, targetDependency.getArgNumber());
     }
 
-    public QuestionTemplate getTemplate(int predicateIndex,
-                                        List<String> words,
-                                        List<Category> categories,
-                                        Collection<ResolvedDependency> dependencies) {
-        Map<Integer, ResolvedDependency> argNumToDependency = new HashMap<>();
-        Category predicateCategory = categories.get(predicateIndex);
-        int numArguments = predicateCategory.getNumberOfArguments();
-        if (numArguments == 0 || filterPredicate(words.get(predicateIndex), predicateCategory)) {
-            return null;
-        }
-        for (ResolvedDependency dep : dependencies) {
-            int argNum = dep.getArgNumber();
-            int predIdx = dep.getHead();
-            int argIdx = dep.getArgument();
-            if (predIdx == predicateIndex && predIdx != argIdx) {
-                argNumToDependency.put(argNum, dep);
-            }
-        }
-        List<Integer> auxChain = verbHelper.getAuxiliaryChain(words, categories, predicateIndex);
-        QuestionSlot verb;
-        boolean hasParticle = predicateCategory.getArgument(numArguments).isFunctionInto(Category.PR);
-        if (hasParticle) {
-            // TODO: pay attention to PR.
-            int particleIndex = argNumToDependency.get(numArguments).getArgument();
-            verb = new VerbSlot(predicateIndex, particleIndex, auxChain, predicateCategory);
-        } else {
-            verb = new VerbSlot(predicateIndex, auxChain, predicateCategory);
-        }
-        QuestionSlot[] arguments = new QuestionSlot[numArguments + 1];
-        for (int argNum = 1; argNum <= numArguments; argNum++) {
-            ResolvedDependency dep = argNumToDependency.get(argNum);
-            Category argumentCategory = predicateCategory.getArgument(argNum);
-            ArgumentSlot slot;
-            if (argumentCategory.equals(Category.PR)) {
-                slot = null;
-            } else if (dep == null) {
-                slot = new UnrealizedArgumentSlot(argNum, argumentCategory);
-            } else {
-                String ppStr = dep.getPreposition().equals(Preposition.NONE) ? "" :
-                        dep.getPreposition().toString().toLowerCase();
-                slot = new ArgumentSlot(dep.getArgumentIndex(), argNum, argumentCategory, ppStr);
-
-            }
-            arguments[argNum] = slot;
-        }
-        if (numArguments == 2 && predicateCategory.getArgument(1).equals(Category.Sdcl)) {
-            // T1, T2 said, or T2, said T1
-            QuestionSlot[] slots = new QuestionSlot[] { arguments[2], verb, arguments[1] };
-            return new QuestionTemplate(slots, words, categories);
-        }
-        List<QuestionSlot> slots = new ArrayList<>();
-        slots.add(arguments[1]);
-        slots.add(verb);
-        for (int i = numArguments; i > 1; i--) {
-            if (arguments[i] != null) {
-                slots.add(arguments[i]);
-            }
-        }
-        QuestionSlot[] slotList = slots.toArray(new QuestionSlot[slots.size()]);
-        return new QuestionTemplate(slotList, words, categories);
-    }
-
-    public List<String> generateQuestionFromTemplate(QuestionTemplate template, int targetArgNum) {
-        int totalArgs = template.getNumArguments();
-        List<String> question = new ArrayList<>();
-        // If target is not part of the template, return.
-        if (!template.argNumToSlotId.containsKey(targetArgNum)) {
-            return question;
-        }
-        String[] wh = template.getWhWordByArgNum(targetArgNum);
-        // {Pat} built a robot -> Who built a robot ?
-        // Who gave T3 T2?
-        // T2 said T1
-        if (targetArgNum == template.slots[0].argumentNumber) {
-            add(question, wh[0]);
-            addAll(question, template.getActiveVerb(verbHelper));
-            for (int slotId = 2; slotId < template.slots.length; slotId++) {
-                ArgumentSlot argSlot = (ArgumentSlot) template.slots[slotId];
-                if (totalArgs >= 3 && !argSlot.preposition.isEmpty()) {
-                    continue;
-                }
-                addAll(question, template.getPlaceHolderWordByArgNum(argSlot.argumentNumber));
-            }
-            add(question, wh[1]);
-            return question;
-        }
-
-        // {Pat} built a robot* -> What did Pat build / What was built ?
-        // What did T1 give T3?, i.e. What did John give Pat?
-        // (to) Who did T1 give T3?, Who did John give a robot to?
-        String[] verb = template.getActiveSplitVerb(verbHelper);
-        add(question, wh[0]);
-        add(question, verb[0]);
-        addAll(question, template.getPlaceHolderWordByArgNum(template.slots[0].argumentNumber));
-        add(question, verb[1]);
-        for (int slotId = 2; slotId < template.slots.length; slotId++) {
-            ArgumentSlot argSlot = (ArgumentSlot) template.slots[slotId];
-            if (argSlot.argumentNumber == targetArgNum || (totalArgs >= 3 && !argSlot.preposition.isEmpty())) {
-                continue;
-            }
-            addAll(question, template.getPlaceHolderWordByArgNum(argSlot.argumentNumber));
-        }
-        add(question, wh[1]);
-        return question;
-    }
-
-
-    /**
-     * Given a set of CCG dependencies and a target predicate, generate a QuestionTemplate object.
-     * @param predicateIndex : target predicate
-     * @param words          : words in the sentence
-     * @param categories     : categories for each word
-     * @param dependencies   : all the gold CCG dependencies.
-     * @return questionTemplate
-     */
     public QuestionTemplate getTemplateFromCCGBank(int predicateIndex,
                                                    List<String> words,
                                                    List<Category> categories,
-                                                   Collection<CCGBankDependency> dependencies) {
-        Map<Integer, CCGBankDependency> argNumToDependency = new HashMap<>();
+                                                   Collection<CCGBankDependency> ccgDeps) {
+        String word = words.get(predicateIndex);
+        Category category = categories.get(predicateIndex);
+        if (filterPredicate(word, category)) {
+            return null;
+        }
+        int[] argNumToPosition = new int[category.getNumberOfArguments() + 1];
+        Arrays.fill(argNumToPosition, -1);
+        for (CCGBankDependency dep : ccgDeps) {
+            int predIdx = dep.getSentencePositionOfPredicate();
+            int argIdx = dep.getSentencePositionOfArgument();
+            if (predIdx == predicateIndex && argIdx != predIdx) {
+                argNumToPosition[dep.getArgNumber()] = argIdx;
+            }
+        }
+        return getTemplate(predicateIndex, argNumToPosition, words, categories);
+    }
+
+    /**
+     * Given a set of CCG dependencies and a target predicate, generate a QuestionTemplate object.
+     * @param predicateIndex   : target predicate
+     * @param argNumToPosition : argument position in sentence for each argNum. -1 for unrealized arguments.
+     * @param words            : words in the sentence
+     * @param categories       : categories for each word
+     * @return questionTemplate
+     */
+    public QuestionTemplate getTemplate(int predicateIndex,
+                                        int[] argNumToPosition,
+                                        List<String> words,
+                                        List<Category> categories) {
         Category predicateCategory = categories.get(predicateIndex);
         int numArguments = predicateCategory.getNumberOfArguments();
         if (numArguments == 0 || filterPredicate(words.get(predicateIndex), predicateCategory)) {
             return null;
-        }
-        // Map argument id to dependency.
-        for (CCGBankDependency dep : dependencies) {
-            int argNum = dep.getArgNumber();
-            int predId = dep.getSentencePositionOfPredicate();
-            int argId = dep.getSentencePositionOfArgument();
-            if (dep.getSentencePositionOfPredicate() == predicateIndex && predId != argId) {
-                argNumToDependency.put(argNum, dep);
-            }
         }
         // Create the verb slot.
         List<Integer> auxChain = verbHelper.getAuxiliaryChain(words, categories, predicateIndex);
         QuestionSlot verb;
-        boolean hasParticle = predicateCategory.getArgument(numArguments).isFunctionInto(Category.PR);
-        if (hasParticle) {
-            int particleIndex = argNumToDependency.get(numArguments).getSentencePositionOfArgument();
+        // If last argument is PR, as in "sweep out"
+        if (predicateCategory.getArgument(numArguments).equals(Category.PR)) {
+            int particleIndex = argNumToPosition[numArguments];
             verb = new VerbSlot(predicateIndex, particleIndex, auxChain, predicateCategory);
         } else {
             verb = new VerbSlot(predicateIndex, auxChain, predicateCategory);
         }
-        // Generate slots. Skipping PR.
+        // Generate slots. Skipping PR argument.
         QuestionSlot[] arguments = new QuestionSlot[numArguments + 1];
         for (int argNum = 1; argNum <= numArguments; argNum++) {
-            CCGBankDependency dep = argNumToDependency.get(argNum);
+            int argIdx = argNumToPosition[argNum];
             Category argumentCategory = predicateCategory.getArgument(argNum);
             ArgumentSlot slot;
-            if (dep == null) {
+            if (argIdx < 0) {
                 slot = new UnrealizedArgumentSlot(argNum, argumentCategory);
             } else if (argumentCategory.equals(Category.PR)) {
                 slot = null;
             } else {
-                int argumentIndex = dep.getSentencePositionOfArgument();
+                // TODO: maybe we should use the identified PP? Add later.
                 String ppStr = argumentCategory.isFunctionInto(Category.PP) ?
-                        PrepositionHelper.getPreposition(words, categories, argumentIndex) : "";
-                slot = new ArgumentSlot(argumentIndex, argNum, argumentCategory, ppStr);
+                        PrepositionHelper.getPreposition(words, categories, argIdx) : "";
+                slot = new ArgumentSlot(argIdx, argNum, argumentCategory, ppStr);
             }
             arguments[argNum] = slot;
         }
@@ -265,6 +183,8 @@ public class QuestionGenerator {
             QuestionSlot[] slots = new QuestionSlot[] { arguments[2], verb, arguments[1] };
             return new QuestionTemplate(slots, words, categories);
         }
+        // Otherwise it follows this order: T1 verb Tn Tn-1 ... T2
+        // The first argument is always the subject. Why is this always true in English?
         List<QuestionSlot> slots = new ArrayList<>();
         slots.add(arguments[1]);
         slots.add(verb);
@@ -277,13 +197,13 @@ public class QuestionGenerator {
         return new QuestionTemplate(slotList, words, categories);
     }
 
-    // FIXME ...
+    // FIXME: there must be a better way to do this.
     public boolean filterPredicate(String word, Category category) {
         if (VerbHelper.isCopulaVerb(word)) {
             //System.out.println("skipping because copula");
             return true;
         }
-        if (!verbHelper.hasInflectedForms(word)) {
+        if (!verbHelper.hasInflectedForms(word) && !category.equals(Category.valueOf("(S[adj]\\NP)/(S[to]\\NP)"))  ) {
             return true;
         }
         if (!category.isFunctionInto(somethingVerbal) &&
@@ -297,7 +217,7 @@ public class QuestionGenerator {
                 category.isFunctionInto(controlParticles) ||
                 category.isFunctionInto(pastParticiples) ||
                 otherFilteredCategorySet.contains(category.toString())) {
-           // System.out.println("skipping because in other filtered list");
+            // System.out.println("skipping because in other filtered list");
             return true;
         }
         if (category.isFunctionInto(intransitiveVerb) ||
@@ -311,6 +231,40 @@ public class QuestionGenerator {
             return true;
         }
         return false;
+    }
+
+    public List<String> generateQuestionFromTemplate(QuestionTemplate template, int targetArgNum) {
+        int totalArgs = template.getNumArguments();
+        List<String> question = new ArrayList<>();
+        if (!template.argNumToSlotId.containsKey(targetArgNum)) {
+            return question;
+        }
+        String[] wh = template.getWhWordByArgNum(targetArgNum);
+        // Wh-word for the argument.
+        add(question, wh[0]);
+        // Add verb or aux-subject-verb.
+        if (targetArgNum == template.slots[0].argumentNumber) {
+            // If target argument is the subject (occupies the first slot).
+            // Not necessary Arg#1, for example, "xxxx", said she.
+            addAll(question, template.getActiveVerb(verbHelper));
+        } else {
+            String[] verb = template.getActiveSplitVerb(verbHelper);
+            // Add auxiliaries, as "did" in "What did someone build?".
+            add(question, verb[0]);
+            addAll(question, template.getPlaceHolderWordByArgNum(template.slots[0].argumentNumber));
+            add(question, verb[1]);
+        }
+        // Add other Arguments.
+        for (int slotId = 2; slotId < template.slots.length; slotId++) {
+            ArgumentSlot argSlot = (ArgumentSlot) template.slots[slotId];
+            if (targetArgNum == argSlot.argumentNumber || (totalArgs >= 3 && !argSlot.preposition.isEmpty())) {
+                continue;
+            }
+            addAll(question, template.getPlaceHolderWordByArgNum(argSlot.argumentNumber));
+        }
+        // Put preposition to the end.
+        add(question, wh[1]);
+        return question;
     }
 
     private static void add(List<String> question, String word) {
