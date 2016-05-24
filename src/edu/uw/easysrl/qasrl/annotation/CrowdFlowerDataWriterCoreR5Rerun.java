@@ -32,7 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class CrowdFlowerDataWriterCoreR5Rerun {
 
     static final int nBest = 100;
-    static final int maxNumQueriesPerFile = 500;
+    static final int maxNumQueriesPerFile = 600;
     static final int numSentences = 2000;
     static final int randomSeed = 12345;
 
@@ -40,15 +40,15 @@ public class CrowdFlowerDataWriterCoreR5Rerun {
     private final static ReparsingHistory history = new ReparsingHistory(hitlParser);
 
     private static final String csvOutputFilePrefix =
-            "./Crowdflower_temp/rerun_r5_100best";
+            "./Crowdflower_unannotated/rerun_r5_100best";
 
     private static final String outputSentenceIdsFile =
-            "./Crowdflower_temp/rerun_r5_100best.sent_ids.txt";
+            "./Crowdflower_unannotated/rerun_r5_100best.sent_ids.txt";
 
     private static final String[] reviewedTestQuestionFiles = new String[] {
             "./Crowdflower_unannotated/test_questions/test_question_core_pronoun_r04.tsv",
             "./Crowdflower_unannotated/test_questions/auto_test_questions_r345.tsv",
-            //"./Crowdflower_unannotated/test_questions/auto_test_questions_r126.tsv",
+            "./Crowdflower_unannotated/test_questions/auto_test_questions_r126.tsv"
     };
 
     private static ImmutableSet<Integer> otherSentencesToSkip = ImmutableSet.of(1695, 1244, 1839);

@@ -69,7 +69,8 @@ public class HITLParser {
 
         String preparsedFile = getTestSet ? "parses.tagged.test.100best.out" : "parses.tagged.dev.100best.out";
         nbestLists = NBestList.loadNBestListsFromFile(preparsedFile, nBest).get();
-        System.out.println(String.format("Load pre-parsed %d-best lists for %d sentences.", nBest, nbestLists.size()));
+        System.out.println(String.format("Load pre-parsed %d-best lists for %d sentences from %s.",
+                nBest, nbestLists.size(), preparsedFile));
 
         reparser = new BaseCcgParser.ConstrainedCcgParser(BaseCcgParser.modelFolder, 1 /* nbest */);
         reparser.cacheSupertags(parseData);

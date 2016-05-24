@@ -39,7 +39,7 @@ public class PostagSanityCheck {
                 SyntaxTreeNode.SyntaxTreeNodeLeaf leaf1 = parse.syntaxTree.getLeaves().get(i);
                 SyntaxTreeNode.SyntaxTreeNodeLeaf leaf2 = taggedParse.syntaxTree.getLeaves().get(i);
                 if (!leaf2.getPos().equals(leaf1.getPos())) {
-                    System.err.println(leaf1.getWord() + "\t" + leaf1.getPos() + "\t" + leaf2.getPos());
+                  //  System.err.println(leaf1.getWord() + "\t" + leaf1.getPos() + "\t" + leaf2.getPos());
                 } else {
                     ++numCorrectPostags;
                 }
@@ -56,7 +56,7 @@ public class PostagSanityCheck {
                 SyntaxTreeNode.SyntaxTreeNodeLeaf leaf1 = parse.syntaxTree.getLeaves().get(i);
                 InputReader.InputWord word = parseData.getSentenceInputWords().get(sid).get(i);
                 if (!word.pos.equals(leaf1.getPos())) {
-                    System.err.println(leaf1.getWord() + "\t" + leaf1.getPos() + "\t" + word.pos);
+                //    System.err.println(leaf1.getWord() + "\t" + leaf1.getPos() + "\t" + word.pos);
                 } else {
                     ++numCorrectPostags;
                 }
