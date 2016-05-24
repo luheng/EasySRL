@@ -107,7 +107,23 @@ public class QuestionGenerator {
     }
 
     private static Verb withTenseForQuestion(Verb verb) {
-        return verb.withModal("would").withProgressive(false);
+        if(verb.getTense() == Verb.Tense.FUTURE ||
+           verb.getTense() == Verb.Tense.PRESENT ||
+           verb.getTense() == Verb.Tense.PAST) {
+            return verb;
+        } else {
+            return verb.withModal("would").withProgressive(false);
+        }
+
+    }
+
+    private static int numberOfLeftNPArgs(Category cat) {
+        if(cat.getNumberOfArguments() > 0) {
+            boolean isLeftNPSlash = cat.getRight().matches(Category.NP) && cat.getSlash() == Category.Slash.BWD;
+            return (isLeftNPSlash ? 1 : 0) + numberOfLeftNPArgs(cat.getLeft());
+        } else {
+            return 0;
+        }
     }
 
     private static boolean isVerbValid(Verb verb, boolean shouldBeCopula) {
@@ -115,7 +131,8 @@ public class QuestionGenerator {
             (shouldBeCopula
              ? verb.isCopular()
              : !verb.isCopular() && !VerbHelper.isAuxiliaryVerb(verb.getPredicate(), verb.getPredicateCategory())) &&
-            !Preposition.prepositionWords.contains(verb.getPredicate());
+            !Preposition.prepositionWords.contains(verb.getPredicate()) &&
+            numberOfLeftNPArgs(verb.getPredicateCategory()) <= 1;
     }
 
     private static final ImmutableSet<String> bannedAdverbs = ImmutableSet.of("--", "and", "or");
@@ -139,11 +156,13 @@ public class QuestionGenerator {
                     }
                     return Stream.of(v)
             .filter(verb -> isVerbValid(verb, false))
+            .map(verb -> PredicationUtils.elideInnerPPs(verb))
             .flatMap(verb -> IntStream.range(1, verb.getPredicateCategory().getNumberOfArguments() + 1)
             .boxed()
             .filter(argNum -> Category.NP.matches(verb.getPredicateCategory().getArgument(argNum)))
             .flatMap(askingArgNum -> verb.getArgs().get(askingArgNum).stream()
             .filter(answerArg -> !((Noun) answerArg.getPredication()).isExpletive()) // this should always be true when arg cat is NP
+            .filter(answerArg -> !answerArg.getPredication().getPredicate().matches("[0-9]*"))
             .filter(answerArg -> answerArg.getDependency().isPresent())
             .flatMap(answerArg -> PredicationUtils
                      .sequenceArgChoices(PredicationUtils
@@ -153,6 +172,8 @@ public class QuestionGenerator {
                     Noun whNoun = ((Noun) answerArg.getPredication())
                     .getPronoun()
                     .withPerson(Noun.Person.THIRD)
+                    .withNumber(Noun.Number.SINGULAR)
+                    .withGender(Noun.Gender.INANIMATE)
                     .withDefiniteness(Noun.Definiteness.FOCAL);
                     ImmutableList<String> whWord = whNoun.getPhrase(Category.NP);
                     Verb questionPred = withTenseForQuestion(sequencedVerb.transformArgs((argNum, args) -> argNum == askingArgNum
@@ -219,13 +240,12 @@ public class QuestionGenerator {
                         return verb;
                     }
                 })
-            .flatMap(verb -> PredicationUtils.sequenceArgChoices(PredicationUtils.addPlaceholderArguments(verb)).stream()
-            .filter(sequencedVerb -> sequencedVerb.getArgs().get(2).get(0).getDependency().isPresent() &&
-                    sequencedVerb.getArgs().get(2).get(0).getPredication().getPredicateCategory().matches(Category.valueOf("PP/NP")) &&
-                    sequencedVerb.getArgs().get(2).get(0).getPredication().getArgs().get(1).get(0).getDependency().isPresent())
+            .flatMap(verb -> verb.getArgs().get(2).stream()
+            .filter(ppArg -> ppArg.getPredication().getPredicateCategory().matches(Category.valueOf("PP/NP")))
+            .flatMap(ppArg -> ppArg.getPredication().getArgs().get(1).stream()
+            .filter(ppObjArg -> ppObjArg.getDependency().isPresent())
+            .flatMap(ppObjArg -> PredicationUtils.sequenceArgChoices(PredicationUtils.addPlaceholderArguments(PredicationUtils.elideInnerPPs(verb))).stream()
             .map(sequencedVerb -> {
-                    Argument ppArg = sequencedVerb.getArgs().get(2).get(0);
-                    Argument ppObjArg = ppArg.getPredication().getArgs().get(1).get(0);
                     ResolvedDependency targetDep = ppObjArg.getDependency().get();
                     Noun ppObj = (Noun) ppObjArg.getPredication();
                     Predication gappedPP = ppArg.getPredication()
@@ -239,7 +259,7 @@ public class QuestionGenerator {
                         });
                     Verb gappedVerbWithPronouns = PredicationUtils.withIndefinitePronouns(gappedVerb);
                     return new QATemplate(predicateIndex, gappedVerbWithPronouns, targetDep, 2, ppObj, Optional.empty());
-                }));});
+                }))));});
 
         final Stream<QATemplate> adverbTemplates = IntStream
             .range(0, parse.categories.size())
@@ -270,7 +290,7 @@ public class QuestionGenerator {
             .filter(verbArg -> !VerbHelper.isAuxiliaryVerb(words.get(verbArg.getDependency().get().getArgument()),
                                                            parse.categories.get(verbArg.getDependency().get().getArgument())))
             .flatMap(verbArg -> PredicationUtils
-                     .sequenceArgChoices(PredicationUtils.withIndefinitePronouns(PredicationUtils.addPlaceholderArguments(verbArg.getPredication()))).stream()
+                     .sequenceArgChoices(PredicationUtils.withIndefinitePronouns(PredicationUtils.addPlaceholderArguments(PredicationUtils.elideInnerPPs(verbArg.getPredication())))).stream()
             .map(verb -> (Verb) verb)
             .filter(verb -> isVerbValid(verb, false))
             .map(verb -> {
@@ -283,13 +303,14 @@ public class QuestionGenerator {
                     return new QATemplate(vpAttachmentDep.getArgument(), verb, ppObjDep, -1, (Noun) ppObjArg.getPredication(), Optional.of(attachedPreposition));
                 })))));});
 
-        final Stream<QATemplate> templates = Stream.concat(verbTemplates, adverbTemplates);
-        // final Stream<QATemplate> templates = verbTemplates;
+        //final Stream<QATemplate> templates = Stream.concat(verbTemplates, adverbTemplates);
+        final Stream<QATemplate> templates = verbTemplates;
 
         return templates.map(template -> {
-
                 ImmutableList<String> whWords = template.ppObj.getPronoun()
                     .withPerson(Noun.Person.THIRD)
+                    .withNumber(Noun.Number.SINGULAR)
+                    .withGender(Noun.Gender.INANIMATE)
                     .withDefiniteness(Noun.Definiteness.FOCAL)
                     .getPhrase(Category.NP);
 
@@ -322,7 +343,8 @@ public class QuestionGenerator {
                                                    template.argNum,
                                                    template.predicateIndex, null,
                                                    questionDeps, questionWords,
-                                                   template.ppObjDep, answerTWD);
+                                                   template.ppObjDep,
+                                                   answerTWD);
             })
             .collect(toImmutableList());
     }
@@ -411,6 +433,7 @@ public class QuestionGenerator {
                     }
                     return Stream.of(v)
             .filter(verb -> isVerbValid(verb, true))
+            .map(verb -> PredicationUtils.elideInnerPPs(verb))
             .flatMap(verb -> IntStream.range(1, verb.getPredicateCategory().getNumberOfArguments() + 1)
             .boxed()
             .filter(argNum -> Category.NP.matches(verb.getPredicateCategory().getArgument(argNum)))
@@ -423,6 +446,7 @@ public class QuestionGenerator {
                     Noun whNoun = ((Noun) answerArg.getPredication())
                     .getPronoun()
                     .withPerson(Noun.Person.THIRD)
+                    .withGender(Noun.Gender.INANIMATE)
                     .withDefiniteness(Noun.Definiteness.FOCAL);
                     ImmutableList<String> whWords = whNoun.getPhrase(Category.NP);
                     // these may be necessary now since we didn't auto-pronoun everything
@@ -453,7 +477,7 @@ public class QuestionGenerator {
         return qaPairs;
     }
 
-    // TODO filter out punctuation predicates
+    // TODO filter out punctuation predicates. also, probably broken now
     public static ImmutableList<QuestionAnswerPair> newVPAttachmentQuestions(int sentenceId, int parseId, Parse parse) {
         class QATemplate {
             final int predicateIndex;
@@ -676,7 +700,7 @@ public class QuestionGenerator {
 
     public static void compareCoreArgQueries() {
         final ParseData parseData = getDevData();
-        ImmutableMap<Integer, NBestList> nBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 100).get();
+        ImmutableMap<Integer, NBestList> nBestLists = NBestList.loadNBestListsFromFile("parses.dev.100best.out", 100).get();
         HITLParser hitlParser = new HITLParser(100);
         long predsCoveredBoth = 0, predsCoveredOldOnly = 0, predsCoveredNewOnly = 0, totalPredsCovered = 0;
         for(int sentenceId = 0; sentenceId < parseData.getSentences().size(); sentenceId++) {
@@ -767,6 +791,102 @@ public class QuestionGenerator {
                                          predsCoveredNewOnly, (100.0 * predsCoveredNewOnly) / totalPredsCovered));
     }
 
+    public static void compareNBestListCoreArgQueries() {
+        final ParseData parseData = getDevData();
+        ImmutableMap<Integer, NBestList> oldNBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 100).get();
+        ImmutableMap<Integer, NBestList> newNBestLists = NBestList.loadNBestListsFromFile("parses.dev.100best.out", 100).get();
+        long predsCoveredBoth = 0, predsCoveredOldOnly = 0, predsCoveredNewOnly = 0, totalPredsCovered = 0;
+        for(int sentenceId = 0; sentenceId < parseData.getSentences().size(); sentenceId++) {
+            System.out.println(String.format("========== SID = %04d ==========", sentenceId));
+            ImmutableList<String> words = parseData.getSentences().get(sentenceId);
+            System.out.println(TextGenerationHelper.renderString(words));
+            NBestList oldNBestList = oldNBestLists.get(sentenceId);
+            NBestList newNBestList = newNBestLists.get(sentenceId);
+
+            if(oldNBestList == null || newNBestList == null) {
+                continue;
+            }
+
+            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> oldQueries = QuestionGenerationPipeline
+                .newCoreArgQGPipeline.generateAllQueries(sentenceId, oldNBestList);
+            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> newQueries = QuestionGenerationPipeline
+                .newCoreArgQGPipeline.generateAllQueries(sentenceId, newNBestList);
+
+            final ResponseSimulator oneBestResponseSimulator = new OneBestResponseSimulator();
+            final ResponseSimulator goldResponseSimulator = new ResponseSimulatorGold(parseData);
+
+            // final ImmutableSet<ResolvedDependency> targetDeps = ImmutableSet.Builder<ResolvedDependency>()
+            //     .addAll(oldQueries.stream())
+
+            // Map<Integer, List<ScoredQuery<QAStructureSurfaceForm>>> oldQueriesByPredId = oldQueries.stream()
+            //     .collect(groupingBy(query -> query.getPredicateId().getAsInt()));
+            // Map<Integer, List<ScoredQuery<QAStructureSurfaceForm>>> newQueriesByPredId = newQueries.stream()
+            //     .collect(groupingBy(query -> query.getPredicateId().getAsInt()));
+
+            Map<Integer, List<ScoredQuery<QAStructureSurfaceForm>>> oldQueriesByPredId = oldQueries.stream()
+                .collect(groupingBy(query -> query.getPredicateId().getAsInt()));
+            Map<Integer, List<ScoredQuery<QAStructureSurfaceForm>>> newQueriesByPredId = newQueries.stream()
+                .collect(groupingBy(query -> query.getPredicateId().getAsInt()));
+
+            ImmutableSet<Integer> overlap = oldQueriesByPredId.keySet().stream()
+                .filter(newQueriesByPredId.keySet()::contains)
+                .collect(toImmutableSet());
+            ImmutableSet<Integer> oldOnly = oldQueriesByPredId.keySet().stream()
+                .filter(id -> !newQueriesByPredId.keySet().contains(id))
+                .collect(toImmutableSet());
+            ImmutableSet<Integer> newOnly = newQueriesByPredId.keySet().stream()
+                .filter(id -> !oldQueriesByPredId.keySet().contains(id))
+                .collect(toImmutableSet());
+            long totalPredIdsCovered = overlap.size() + oldOnly.size() + newOnly.size();
+
+            predsCoveredBoth += overlap.size();
+            predsCoveredOldOnly += oldOnly.size();
+            predsCoveredNewOnly += newOnly.size();
+            totalPredsCovered += totalPredIdsCovered;
+
+            Consumer<List<ScoredQuery<QAStructureSurfaceForm>>> printQueries = queries -> {
+                for(ScoredQuery<QAStructureSurfaceForm> query : queries) {
+                    final ImmutableList<Integer> goldOptions = goldResponseSimulator.respondToQuery(query);
+                    final ImmutableList<Integer> oneBestOptions = oneBestResponseSimulator.respondToQuery(query);
+                    System.out.println();
+                    System.out.println(query.toString(words,
+                                                      'G', goldOptions,
+                                                      'B', oneBestOptions));
+                }
+            };
+
+            Consumer<ImmutableSet<Integer>> printQueriesOfBothMethods = ids -> {
+                for(int predicateIndex : ids) {
+                    System.out.println("Predicate: " + predicateIndex + ": " + words.get(predicateIndex));
+                    if(oldQueriesByPredId.get(predicateIndex) != null) {
+                        System.out.println("- Old -");
+                        printQueries.accept(oldQueriesByPredId.get(predicateIndex));
+                    }
+                    if(newQueriesByPredId.get(predicateIndex) != null) {
+                        System.out.println("- New -");
+                        printQueries.accept(newQueriesByPredId.get(predicateIndex));
+                    }
+                }
+            };
+
+            System.out.println("------- Overlap Queries  ------");
+            printQueriesOfBothMethods.accept(overlap);
+
+            System.out.println("------- Old Only Queries -------");
+            printQueriesOfBothMethods.accept(oldOnly);
+
+            System.out.println("------- New Only Queries -------");
+            printQueriesOfBothMethods.accept(newOnly);
+        }
+
+        System.out.println(String.format("Total predicates covered by both methods: %d (%.2f%%)",
+                                         predsCoveredBoth, (100.0 * predsCoveredBoth) / totalPredsCovered));
+        System.out.println(String.format("Predicates covered by old method only: %d (%.2f%%)",
+                                         predsCoveredOldOnly, (100.0 * predsCoveredOldOnly) / totalPredsCovered));
+        System.out.println(String.format("Predicates covered by new method only: %d (%.2f%%)",
+                                         predsCoveredNewOnly, (100.0 * predsCoveredNewOnly) / totalPredsCovered));
+    }
+
     /**
      * Run this to print all the generated QA pairs to stdout.
      */
@@ -781,14 +901,18 @@ public class QuestionGenerator {
         } else if(args[0].equalsIgnoreCase("gold")) {
             printGoldQAPairs(devData, qgPipeline);
         } else if(args[0].equalsIgnoreCase("compare")) {
-            compareCoreArgQueries();
+            compareNBestListCoreArgQueries();
         } else if (args[0].equalsIgnoreCase("queries")) {
             ImmutableList<Integer> testSentences = new ImmutableList.Builder<Integer>()
                 // .add(42).add(1489).add(36)
                 // .add(90)
                 // .add(3)
-                .add(268, 1016, 1232, 1695, 444, 1495, 1516, 1304, 1564, 397, 217, 90, 224, 563, 1489, 199, 1105, 1124, 1199, 294,
-                     1305, 705, 762)
+                // .add(971)
+                .add(941)
+                .add(507)
+                // .add(804)
+                // .add(268, 1016, 1232, 1695, 444, 1495, 1516, 1304, 1564, 397, 217, 90, 224, 563, 1489, 199, 1105, 1124, 1199, 294,
+                //      1305, 705, 762)
                 .build();
             ImmutableList<Integer> allSentences = IntStream.range(0, devData.getSentences().size()).boxed().collect(toImmutableList());
             printQueries(devData, allSentences, qgPipeline);
@@ -828,7 +952,8 @@ public class QuestionGenerator {
 
     private static void printQueries(ParseData parseData, ImmutableList<Integer> sentenceIds, QuestionGenerationPipeline qgPipeline) {
         System.out.println("\nQA Pairs for specific sentences:\n");
-        ImmutableMap<Integer, NBestList> nBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 100).get();
+        ImmutableMap<Integer, NBestList> nBestLists = NBestList.loadNBestListsFromFile("parses.dev.100best.out", 100).get();
+        int numberOfQueries = 0;
         for(int sentenceId : sentenceIds) {
             if(nBestLists.get(sentenceId) == null) {
                 continue;
@@ -856,13 +981,17 @@ public class QuestionGenerator {
                 System.out.println(query.toString(words,
                                                   'G', goldOptions,
                                                   'B', oneBestOptions));
+                numberOfQueries++;
             }
         }
+        System.out.println("\nTotal number of sentences: " + sentenceIds.size());
+        System.out.println(String.format("Total number of queries generated: %d (%.2f per sentence)",
+                                         numberOfQueries, ((double) numberOfQueries) / sentenceIds.size()));
     }
 
     private static void printStringAggregatedQueries(ParseData parseData, ImmutableList<Integer> sentenceIds, QuestionGenerationPipeline qgPipeline) {
         System.out.println("\nQA Pairs for specific sentences:\n");
-        ImmutableMap<Integer, NBestList> nBestLists = NBestList.loadNBestListsFromFile("parses.100best.out", 100).get();
+        ImmutableMap<Integer, NBestList> nBestLists = NBestList.loadNBestListsFromFile("parses.dev.100best.out", 100).get();
         for(int sentenceId : sentenceIds) {
             NBestList nBestList = nBestLists.get(sentenceId);
             if(nBestList == null) {

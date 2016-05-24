@@ -21,9 +21,7 @@ import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.qasrl.ui.Colors;
 import edu.uw.easysrl.syntax.evaluation.Results;
-import edu.uw.easysrl.syntax.parser.ParserAStar;
 import edu.uw.easysrl.util.GuavaCollectors;
-import scala.tools.nsc.doc.base.comment.Title;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -41,15 +39,17 @@ public class ReparsingExperiment {
     private static Map<Integer, List<AlignedAnnotation>> annotations;
 
     private static final String[] annotationFiles = {
-            "./Crowdflower_data/f878213.csv",                // Round1: radio-button, core + pp
-            "./Crowdflower_data/f882410.csv",                // Round2: radio-button, core only
+          //  "./Crowdflower_data/f878213.csv",                // Round1: radio-button, core + pp
+          //  "./Crowdflower_data/f882410.csv",                // Round2: radio-button, core only
           //  "./Crowdflower_data/all-checkbox-responses.csv", // Round3: checkbox, core + pp
           //  "./Crowdflower_data/f891522.csv",                // Round4: jeopardy checkbox, pp only
             "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
-            "./Crowdflower_data/f897179.csv",                 // Round2-3: NP clefting questions.
-            "./Crowdflower_data/f902142.csv",                   // Round4: checkbox, pronouns, core only, 300 sentences.
-            "./Crowdflower_data/f903842.csv",                   // Round4: np-clefting prnouns
+        //    "./Crowdflower_data/f897179.csv",                 // Round2-3: NP clefting questions.
+           "./Crowdflower_data/f902142.csv",                   // Round4: checkbox, pronouns, core only, 300 sentences.
+         //   "./Crowdflower_data/f903842.csv",                   // Round4: np-clefting prnouns
             "./Crowdflower_data/f909211.csv",                   // Round5: checkbox, pronouns, core only, 300+ sentences.
+            "./Crowdflower_data/f912533.csv",                   // Round1-2: rerun, new question generator.
+            "./Crowdflower_data/f912675.csv",                   // Round6: Dev wrapup. 400+ sentneces.
     };
 
     private static QueryPruningParameters queryPruningParameters;
@@ -58,8 +58,13 @@ public class ReparsingExperiment {
         queryPruningParameters.maxNumOptionsPerQuery = 6;
         queryPruningParameters.skipPPQuestions = true;
         queryPruningParameters.skipSAdjQuestions = true;
+        /*
         queryPruningParameters.minOptionConfidence = 0.05;
         queryPruningParameters.minOptionEntropy = 0.05;
+        queryPruningParameters.minPromptConfidence = 0.1;
+        */
+        queryPruningParameters.minOptionConfidence = 0.05;
+        queryPruningParameters.minOptionEntropy = -1;
         queryPruningParameters.minPromptConfidence = 0.1;
     }
 
@@ -67,7 +72,7 @@ public class ReparsingExperiment {
     static {
         reparsingParameters = new HITLParsingParameters();
         reparsingParameters.jeopardyQuestionMinAgreement = 1;
-        reparsingParameters.positiveConstraintMinAgreement = 5;
+        reparsingParameters.positiveConstraintMinAgreement = 4;
         reparsingParameters.negativeConstraintMaxAgreement = 1;
         reparsingParameters.skipPronounEvidence = false;
         reparsingParameters.jeopardyQuestionWeight = 1.0;
@@ -87,12 +92,12 @@ public class ReparsingExperiment {
     }
 
     private static void runExperiment() {
-        // final Collection<Integer> round1And2Ids = CrowdFlowerDataUtils.getRound1And2SentenceIds();
+        final Collection<Integer> round6Ids = CrowdFlowerDataUtils.getRound6SentenceIds();
         List<Integer> sentenceIds = myHTILParser.getAllSentenceIds();
                 //annotations.keySet().stream().sorted().collect(Collectors.toList());
                 /*myHTILParser.getAllSentenceIds().stream()
                         .filter(id -> !round1And2Ids.contains(id))
-                        .collect(Collectors.toList());*/
+                        .collect(Collectors.toList()); */
         System.out.println(sentenceIds.stream().map(String::valueOf).collect(Collectors.joining(", ")));
         System.out.println("Queried " + sentenceIds.size() + " sentences. Total number of questions:\t" +
             annotations.entrySet().stream().mapToInt(e -> e.getValue().size()).sum());
@@ -113,7 +118,7 @@ public class ReparsingExperiment {
         ImmutableList<Accuracy> goldStrictMatch = IntStream.range(0, 5).boxed()
                 .map(ignore -> new Accuracy())
                 .collect(GuavaCollectors.toImmutableList());
-        int numMatchedAnnotations = 0;
+        int numMatchedAnnotations = 0, numNewQuestions = 0;
 
         List<DebugBlock> debugging = new ArrayList<>();
         Results avgBaseline = new Results(),
@@ -129,6 +134,7 @@ public class ReparsingExperiment {
         TicToc.tic();
         for (int sentenceId : sentenceIds) {
             myHistory.addSentence(sentenceId);
+            Set<Integer> matchedAnnotationIds = new HashSet<>();
             if (++counter % 100 == 0) {
                 System.out.println(String.format("Processed %d sentences ... in %d seconds", counter, TicToc.toc()));
                 TicToc.tic();
@@ -157,17 +163,30 @@ public class ReparsingExperiment {
                 avgUnlabeledReparsed.add(unlabeledBaselineF1);
                 continue;
             }
+            IntStream.range(0, annotated.size()).forEach(i -> annotated.get(i).iterationId = i);
+
             boolean isCheckboxStyle = !annotated.stream()
                     .anyMatch(annot -> annot.answerOptions.stream()
                             .anyMatch(op -> op.contains(QAPairAggregatorUtils.answerDelimiter)));
+            boolean isClefting = annotated.stream()
+                    .anyMatch(annot -> annot.queryPrompt.startsWith("What is it"));
+            boolean useNewCoreArgsQuestions = round6Ids.contains(sentenceId);
 
             List<ScoredQuery<QAStructureSurfaceForm>> queryList = new ArrayList<>();
-            if (!isCheckboxStyle) {
-                queryList.addAll(myHTILParser.getCoreArgumentQueriesForSentence(sentenceId, false /* radiobutton version*/));
+            if (!isClefting) {
+                if (!isCheckboxStyle) {
+                    queryList.addAll(myHTILParser.getCoreArgumentQueriesForSentence(sentenceId,
+                            false /* radiobutton version*/));
+                } else {
+                    if (useNewCoreArgsQuestions) {
+                        queryList.addAll(myHTILParser.getNewCoreArgQueriesForSentence(sentenceId));
+                    } else {
+                        queryList.addAll(myHTILParser.getPronounCoreArgQueriesForSentence(sentenceId));
+                    }
+                }
             } else {
-                queryList.addAll(myHTILParser.getPronounCoreArgQueriesForSentence(sentenceId));
+                queryList.addAll(myHTILParser.getCleftedQuestionsForSentence(sentenceId));
             }
-            queryList.addAll(myHTILParser.getCleftedQuestionsForSentence(sentenceId));
 
             Results currentF1 = baselineF1,
                     oracleF1 = baselineF1,
@@ -188,19 +207,25 @@ public class ReparsingExperiment {
                                        oracleOptions  = myHTILParser.getOracleOptions(query);
                 if (annotation == null) {
                     /*
-                    System.out.println(Colors.ANSI_GREEN + "======New question======\n"
+                    sentenceDebuggingString += Colors.ANSI_BLUE
                             + query.toString(sentence, 'G', goldOptions, 'B', oneBestOptions, 'O', oracleOptions)
-                            + "\n" + Colors.ANSI_RESET); */
+                            + "\n" + Colors.ANSI_RESET; */
+                    numNewQuestions ++;
                     continue;
                 }
+                matchedAnnotationIds.add(annotation.iterationId);
+
                 int[] optionDist = AnnotationUtils.getUserResponseDistribution(query, annotation);
                 ImmutableList<ImmutableList<Integer>> responses = AnnotationUtils.getAllUserResponses(query, annotation);
                 ImmutableList<ImmutableList<Integer>> newResponses = HeuristicHelper.adjustVotes(sentence, query, responses);
                 int[] newOptionDist = new int[optionDist.length];
                 newResponses.stream().forEach(resp -> resp.stream().forEach(op -> newOptionDist[op]++));
 
-                ImmutableList<Integer> userOptions    = myHTILParser.getUserOptions(query, annotation),
-                                       userOptions2   = myHTILParser.getUserOptions(query, newOptionDist);
+                ImmutableList<Integer> userOptions  = myHTILParser.getUserOptions(query, annotation),
+                                       userOptions2 = myHTILParser.getUserOptions(query, newOptionDist);
+                if (responses.size() != 5) {
+                    continue;
+                }
 
                 // Update stats.
                 for (int i = 0; i < 5; i++) {
@@ -225,7 +250,7 @@ public class ReparsingExperiment {
                 if (query.isJeopardyStyle() && userOptions.contains(query.getBadQuestionOptionId().getAsInt())) {
                     continue;
                 }
-                ImmutableSet<Constraint> constraints = myHTILParser.getConstraints(query, newOptionDist),
+                ImmutableSet<Constraint> constraints = myHTILParser.getConstraints(query, optionDist), //myHTILParser.getConstraints(query, newOptionDist),
                                          oracleConstraints = myHTILParser.getOracleConstraints(query); //, goldOptions);
 
                 // Set constraint strength proportional to sentence length.
@@ -300,6 +325,13 @@ public class ReparsingExperiment {
                 String changeStr = deltaF1 < -1e-6 ? "Worsened." : (deltaF1 > 1e-6 ? "Improved." : "Unchanged.");
                 sentenceDebuggingString += String.format("Final F1: %.3f%% over %.3f%% baseline.\t%s\n",
                         100.0 * lastReparsedResult.get().getF1(), 100.0 * baselineF1.getF1(), changeStr);
+
+                /*
+                sentenceDebuggingString += annotated.stream()
+                        .filter(annot -> !matchedAnnotationIds.contains(annot.iterationId))
+                        .map(annot -> Colors.ANSI_GREEN + annot + Colors.ANSI_RESET)
+                        .collect(Collectors.joining("\n")); */
+
                 DebugBlock debugBlock = new DebugBlock(deltaF1, sentenceDebuggingString);
                 debugBlock.oracleDeltaF1 = oracleF1.getF1() - lastReparsedResult.get().getF1();
                 debugging.add(debugBlock);
@@ -316,10 +348,11 @@ public class ReparsingExperiment {
 
         debugging.stream()
                 .sorted((b1, b2) -> Double.compare(b1.deltaF1, b2.deltaF1))
-        //                .filter(b -> b.oracleDeltaF1 > 1e-3)
-        //         .filter(b -> Math.abs(b.deltaF1) > 1e-3)
+                        //                .filter(b -> b.oracleDeltaF1 > 1e-3)
+                .filter(b -> Math.abs(b.deltaF1) > 1e-3)
                 .forEach(b -> System.out.println(b.block));
 
+        System.out.println("Num. new questions:\t" + numNewQuestions);
         System.out.println("Num. matched annotations:\t" + numMatchedAnnotations);
         for (int i = 0; i < 5; i++) {
             System.out.println(String.format("Min agreement=%d\tCoverage=%.2f%%\t%s\t%s",

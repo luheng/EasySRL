@@ -18,6 +18,8 @@ import edu.uw.easysrl.dependencies.SRLFrame;
 import edu.uw.easysrl.syntax.evaluation.CCGBankEvaluation;
 import edu.uw.easysrl.syntax.grammar.Preposition;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
+import edu.uw.easysrl.syntax.tagger.POSTagger;
+import edu.uw.easysrl.util.Util;
 import scala.tools.cmd.Opt;
 
 /**
@@ -49,6 +51,7 @@ public final class ParseData {
     }
 
     public static Optional<ParseData> loadFromTestPool() {
+        POSTagger postagger = POSTagger.getStanfordTagger(Util.getFile(BaseCcgParser.modelFolder + "/posTagger"));
         List<List<InputReader.InputWord>> sentenceInputWords = new ArrayList<>();
         List<Parse> goldParses = new ArrayList<>();
         Iterator<Sentence> sentenceIterator;
@@ -60,7 +63,9 @@ public final class ParseData {
         }
         while (sentenceIterator.hasNext()) {
             Sentence sentence = sentenceIterator.next();
-            sentenceInputWords.add(sentence.getInputWords());
+            List<InputReader.InputWord> inputWords = sentence.getInputWords();
+            postagger.tag(inputWords);
+            sentenceInputWords.add(inputWords);
             Set<ResolvedDependency> goldDependencies = CCGBankEvaluation
                     .asResolvedDependencies(sentence.getCCGBankDependencyParse().getDependencies());
             goldParses.add(new Parse(sentence.getCcgbankParse(), sentence.getLexicalCategories(), goldDependencies));
@@ -74,10 +79,11 @@ public final class ParseData {
     }
 
     private static Optional<ParseData> devData = null;
-    private static Optional<ParseData> loadFromPropBank(boolean readDev) {
+    private static Optional<ParseData> loadFromPropBank(final boolean readDev) {
         if(readDev && devData != null) {
             return devData;
         }
+        POSTagger postagger = POSTagger.getStanfordTagger(Util.getFile(BaseCcgParser.modelFolder + "/posTagger"));
         List<List<InputReader.InputWord>> sentenceInputWords = new ArrayList<>();
         List<Parse> goldParses = new ArrayList<>();
         Iterator<Sentence> sentenceIterator;
@@ -90,7 +96,9 @@ public final class ParseData {
         }
         while (sentenceIterator.hasNext()) {
             Sentence sentence = sentenceIterator.next();
-            sentenceInputWords.add(sentence.getInputWords());
+            List<InputReader.InputWord> inputWords = sentence.getInputWords();
+            postagger.tag(inputWords);
+            sentenceInputWords.add(inputWords);
             Set<ResolvedDependency> goldDependencies = CCGBankEvaluation
                     .asResolvedDependencies(sentence.getCCGBankDependencyParse().getDependencies());
             goldParses.add(new Parse(sentence.getCcgbankParse(), sentence.getLexicalCategories(), goldDependencies));

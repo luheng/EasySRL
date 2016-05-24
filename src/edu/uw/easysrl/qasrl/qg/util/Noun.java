@@ -44,8 +44,11 @@ public abstract class Noun extends Predication {
     }
 
     /* factory methods */
-
     public static Noun getFromParse(Integer headIndex, Parse parse) {
+        return getFromParse(headIndex, parse, Optional.empty());
+    }
+
+    public static Noun getFromParse(Integer headIndex, Parse parse, Optional<SyntaxTreeNode> presetNPNodeOpt) {
         final SyntaxTreeNode tree = parse.syntaxTree;
         final SyntaxTreeNodeLeaf headLeaf = tree.getLeaves().get(headIndex);
 
@@ -53,7 +56,9 @@ public abstract class Noun extends Predication {
         final Optional<SyntaxTreeNode> npNodeOpt = TextGenerationHelper
             .getLowestAncestorSatisfyingPredicate(headLeaf, node -> Category.NP.matches(node.getCategory()), tree);
         final SyntaxTreeNode phraseNode;
-        if(!npNodeOpt.isPresent() || npNodeOpt.get().getHeadIndex() != headIndex) {
+        if(presetNPNodeOpt.isPresent()) {
+            phraseNode = presetNPNodeOpt.get();
+        } else if(!npNodeOpt.isPresent() || npNodeOpt.get().getHeadIndex() != headIndex) {
             // should always be present because leaf's head index is its own
             final SyntaxTreeNode candidatePhraseNode = TextGenerationHelper
                 .getHighestAncestorStillSatisfyingPredicate(headLeaf, node -> node.getHeadIndex() == headIndex, tree).get();
@@ -64,14 +69,17 @@ public abstract class Noun extends Predication {
                ((SyntaxTreeNode.SyntaxTreeNodeLeaf) candidatePhraseNode.getChild(0)).getPos().equals("CC")) {
                 phraseNode = candidatePhraseNode.getChild(1);
             } else {
-                phraseNode = candidatePhraseNode;
+                Optional<SyntaxTreeNode> parentOpt = TextGenerationHelper.getParent(candidatePhraseNode, tree);
+                if(parentOpt.isPresent() &&
+                   parentOpt.get().getChild(0) instanceof SyntaxTreeNode.SyntaxTreeNodeLeaf &&
+                   ((SyntaxTreeNode.SyntaxTreeNodeLeaf) parentOpt.get().getChild(0)).getPos().equals("DT")) {
+                    phraseNode = parentOpt.get();
+                }
+                else {
+                    phraseNode = candidatePhraseNode;
+                }
             }
-            // System.err.println("new category: " + phraseNode.getCategory());
-            // System.err.println("new phrase: " + phraseNode.getWord());
-            // System.err.println("actual head: " + headLeaf.getWord());
-            // if(npNodeOpt.isPresent()) {
-            //     System.err.println("(mistaken phrase: " + npNodeOpt.get().getWord() + ")");
-            // }
+
         } else {
             final SyntaxTreeNode npNode = npNodeOpt.get();
             final Category npNodeCategory = npNode.getCategory();

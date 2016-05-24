@@ -10,6 +10,7 @@ import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.syntax.grammar.Preposition;
 import edu.uw.easysrl.syntax.grammar.SyntaxTreeNode;
 import edu.uw.easysrl.syntax.parser.*;
+import edu.uw.easysrl.syntax.tagger.POSTagger;
 import edu.uw.easysrl.syntax.tagger.Tagger;
 import edu.uw.easysrl.util.GuavaCollectors;
 import edu.uw.easysrl.util.Util;

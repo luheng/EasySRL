@@ -67,6 +67,7 @@ public class HITLParser {
         goldParses = parseData.getGoldParses();
         System.out.println(String.format("Read %d sentences from the dev set.", sentences.size()));
 
+        // TODO: change back to dev.100best.out?
         String preparsedFile = getTestSet ? "parses.test.100best.out" : "parses.dev.100best.out";
         nbestLists = NBestList.loadNBestListsFromFile(preparsedFile, nBest).get();
         System.out.println(String.format("Load pre-parsed %d-best lists for %d sentences.", nBest, nbestLists.size()));
@@ -152,9 +153,10 @@ public class HITLParser {
         return queryList;
     }
 
+    @Deprecated
     public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getPronounCoreArgQueriesForSentence(int sentenceId) {
         final QueryPruningParameters queryPruningParams = new QueryPruningParameters(queryPruningParameters);
-        queryPruningParams.skipPPQuestions = true;
+       queryPruningParams.skipPPQuestions = true;
         final ImmutableList<String> sentence = sentences.get(sentenceId);
 
         if(nbestLists.get(sentenceId) == null) {
@@ -163,9 +165,9 @@ public class HITLParser {
 
         ImmutableList<ScoredQuery<QAStructureSurfaceForm>> copulaQueries = ExperimentUtils.generateAllQueries(
                     sentenceId, sentence, nbestLists.get(sentenceId),
-                    false /* isJeopardyStyle */,
-                    true  /* checkbox style */,
-                    false /* usePronouns */,
+                    false,  // isJeopardyStyle
+                    true,   // isCheckboxStyle
+                    false,  // usePronouns
                     queryPruningParams)
                 .stream().filter(query -> {
                     final int predicateId = query.getPredicateId().getAsInt();
@@ -174,9 +176,9 @@ public class HITLParser {
 
         List<ScoredQuery<QAStructureSurfaceForm>> queryList = ExperimentUtils.generateAllQueries(
                         sentenceId, sentence, nbestLists.get(sentenceId),
-                        false /* isJeopardyStyle */,
-                        true  /* checkbox style */,
-                        true /* usePronouns */,
+                        false, // isJeopardyStyle,
+                        true,  // isCheckboxStyle,
+                        true,  // usePronouns,
                         queryPruningParams)
                 .stream().filter(query -> {
                     final int predicateId = query.getPredicateId().getAsInt();
@@ -185,11 +187,33 @@ public class HITLParser {
 
         queryList.addAll(copulaQueries);
 
+        /*
+        if(nbestLists.get(sentenceId) == null) {
+            return ImmutableList.of();
+        }
+        List<ScoredQuery<QAStructureSurfaceForm>> queryList = QuestionGenerationPipeline.coreArgQGPipeline
+                .generateAllQueries(sentenceId, nbestLists.get(sentenceId));
+                */
+
         // Assign query ids.
         IntStream.range(0, queryList.size()).forEach(i -> queryList.get(i).setQueryId(i));
         return ImmutableList.copyOf(queryList);
     }
 
+    public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getNewCoreArgQueriesForSentence(int sentenceId) {
+        if(nbestLists.get(sentenceId) == null) {
+            return ImmutableList.of();
+        }
+        // Without verb-adjunct questions yet.
+        List<ScoredQuery<QAStructureSurfaceForm>> queryList = QuestionGenerationPipeline.coreArgQGPipeline
+                .setQueryPruningParameters(queryPruningParameters)
+                .generateAllQueries(sentenceId, nbestLists.get(sentenceId));
+        // Assign query ids.
+        IntStream.range(0, queryList.size()).forEach(i -> queryList.get(i).setQueryId(i));
+        return ImmutableList.copyOf(queryList);
+    }
+
+    @Deprecated
     public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getCoreArgumentQueriesForSentence(int sentenceId,
                                                                                                 boolean isCheckboxStyle) {
         QueryPruningParameters queryPruningParams = new QueryPruningParameters(queryPruningParameters);
@@ -264,7 +288,6 @@ public class HITLParser {
         return queryList;
     }
 
-    // FIXME: A bug where reparsing with empty constraint set makes results worse.
     public Parse getReparsed(int sentenceId, Set<Constraint> constraintSet) {
         if (constraintSet == null || constraintSet.isEmpty()) {
             return nbestLists.get(sentenceId).getParse(0);
@@ -404,7 +427,8 @@ public class HITLParser {
             final int headId = i;
             for (int j = 0; j < sentence.size(); j++) {
                 final int argId = j;
-                if (headId == argId || DependencyInstanceHelper.getDependencyType(query, headId, argId) == DependencyInstanceType.NONE) {
+                if (headId == argId || DependencyInstanceHelper.getDependencyType(query, headId, argId) ==
+                        DependencyInstanceType.NONE) {
                     continue;
                 }
                 //final DependencyInstanceType dtype = DependencyInstanceHelper.getDependencyType(query, headId, argId);

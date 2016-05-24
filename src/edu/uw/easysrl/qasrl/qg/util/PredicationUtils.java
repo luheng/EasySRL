@@ -25,7 +25,11 @@ public final class PredicationUtils {
             if(nounPred.isExpletive()) {
                 return (T) nounPred;
             } else {
-                return (T) nounPred.getPronoun().withDefiniteness(Noun.Definiteness.INDEFINITE);
+                return (T) nounPred.getPronoun()
+                    .withNumber(Noun.Number.SINGULAR)
+                    .withPerson(Noun.Person.THIRD)
+                    .withGender(Noun.Gender.INANIMATE)
+                    .withDefiniteness(Noun.Definiteness.INDEFINITE);
             }
         } else {
             return (T) pred.transformArgs((argNum, args) -> {
@@ -40,10 +44,11 @@ public final class PredicationUtils {
                                 if(noun.isExpletive()) {
                                     replacement = noun;
                                 }
-                                else if(noun.isPronoun()) {
-                                    replacement = noun;
-                                } else {
+                                else {
                                     replacement = noun.getPronoun()
+                                        .withNumber(Noun.Number.SINGULAR)
+                                        .withPerson(Noun.Person.THIRD)
+                                        .withGender(Noun.Gender.INANIMATE)
                                         .withDefiniteness(Noun.Definiteness.INDEFINITE);
                                 }
                             } else {
@@ -55,6 +60,22 @@ public final class PredicationUtils {
                     } else {
                         return args.stream()
                             .map(arg -> new Argument(arg.getDependency(), withIndefinitePronouns(arg.getPredication())))
+                            .collect(toImmutableList());
+                    }
+                });
+        }
+    }
+
+    public static <T extends Predication> T elideInnerPPs(T pred) {
+        if(pred instanceof Preposition) {
+            return pred;
+        } else {
+            return (T) pred.transformArgs((argNum, args) -> {
+                    if(pred.getPredicateCategory().getArgument(argNum).matches(Category.PP)) {
+                        return ImmutableList.of(Argument.withNoDependency(new Gap(Category.PP)));
+                    } else {
+                        return args.stream()
+                            .map(arg -> new Argument(arg.getDependency(), elideInnerPPs(arg.getPredication())))
                             .collect(toImmutableList());
                     }
                 });

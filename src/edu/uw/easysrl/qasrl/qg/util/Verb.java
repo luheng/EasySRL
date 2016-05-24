@@ -27,6 +27,7 @@ import java.util.stream.Stream;
 import java.util.function.Supplier;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.NoSuchElementException;
 
 public final class Verb extends Predication {
 
@@ -67,6 +68,7 @@ public final class Verb extends Predication {
         final SyntaxTreeNodeLeaf headLeaf = tree.getLeaves().get(headIndex);
         final Category initCategory = parse.categories.get(headIndex);
 
+        // final ImmutableMap<Integer, ImmutableList<Argument>> initArgs = Predication.extractArgs(headIndex, initCategory, parse, preds);
         final ImmutableMap<Integer, ImmutableList<Argument>> initArgs = IntStream
             .range(1, initCategory.getNumberOfArguments() + 1)
             .boxed()
@@ -122,7 +124,8 @@ public final class Verb extends Predication {
         final Optional<String> particle;
         if(headIndex + 1 < parse.categories.size() &&
            Category.valueOf("(S\\NP)\\(S\\NP)").matches(parse.categories.get(headIndex + 1)) &&
-           !VerbHelper.isNegationWord(words.get(headIndex + 1))) {
+           !VerbHelper.isNegationWord(words.get(headIndex + 1)) &&
+           Preposition.prepositionWords.contains(words.get(headIndex + 1))) {
             particle = Optional.of(words.get(headIndex + 1));
         } else {
             particle = Optional.empty();
@@ -131,10 +134,26 @@ public final class Verb extends Predication {
         for(int curAuxIndex = headIndex; curAuxIndex >= 0; curAuxIndex--) {
             String aux = words.get(curAuxIndex).toLowerCase();
             Category cat = parse.categories.get(curAuxIndex);
-            // adverbs might be between auxiliaries. including (S\NP)/(S\NP) maybe.
+
+            // negation generally follows the copula; check for it if our main guy is a copula.
+            if(curAuxIndex == headIndex && VerbHelper.isCopulaVerb(aux)) {
+                String possibleNegation = words.get(curAuxIndex + 1);
+                // we need to exclude the case of a "no" because in this position it is probably the determiner of the object or something
+                if(VerbHelper.isNegationWord(possibleNegation) && !possibleNegation.equalsIgnoreCase("no")) {
+                    isNegated = true;
+                }
+            }
+
             if(!VerbHelper.isAuxiliaryVerb(aux, cat) && !VerbHelper.isNegationWord(aux) &&
                cat.isFunctionInto(Category.valueOf("(S\\NP)|(S\\NP)"))) {
+                // adverbs might be between auxiliaries. including (S\NP)/(S\NP) maybe.
                 continue;
+            } else if(cat.isFunctionInto(Category.valueOf("S\\NP")) &&
+                      !cat.isFunctionInto(Category.valueOf("(S\\NP)|(S\\NP)")) &&
+                      !VerbHelper.isAuxiliaryVerb(aux, cat) && !VerbHelper.isNegationWord(aux) &&
+                      curAuxIndex != headIndex) {
+                // stop at another verb, e.g., "possible to win"
+                break;
             } else if(VerbHelper.isNegationWord(aux)) {
                 isNegated = true;
             } else if(cat.isFunctionInto(Category.valueOf("S[adj]\\NP"))) {
@@ -206,6 +225,14 @@ public final class Verb extends Predication {
         // add the particle now if we're never going to drop into the while loop below.
         if(desiredCategory.dropFeatures().matches(curCat) && particle.isPresent()) {
             rightArgs = ImmutableList.of(particle.get());
+        }
+
+        // also, add the auxiliaries if we're never going to hit that point in the while loop below.
+        if(Category.valueOf("(S\\NP)").matches(curCat)) {
+            leftArgs = new ImmutableList.Builder<String>()
+                .addAll(auxChain)
+                .addAll(leftArgs)
+                .build();
         }
 
         while(!desiredCategory.dropFeatures().matches(curCat)) { // in case there are disagreeing features (we want to ignore them)
@@ -368,12 +395,17 @@ public final class Verb extends Predication {
                 .addAll(auxChain)
                 .build();
         } else { // if we have a subject and need to flip the auxiliary
-            ImmutableList<String> wordsForFlip = getVerbWithSplit();
-            ImmutableList<String> flippedAux = wordsForFlip.subList(0, 1);
-            ImmutableList<String> remainingAuxChain = wordsForFlip.subList(1, wordsForFlip.size() - 1);
-            verbWords = wordsForFlip.subList(wordsForFlip.size() - 1, wordsForFlip.size());
+            // ImmutableList<String> wordsForFlip = getVerbWithSplit();
+            Deque<String> wordsForFlip = new LinkedList<>(getVerbWithSplit());
+            String flippedAux = wordsForFlip.removeFirst();
+            try {
+                verbWords = ImmutableList.of(wordsForFlip.removeLast());
+            } catch(NoSuchElementException e) {
+                verbWords = ImmutableList.of(); // no verb words if we flipped a copula
+            }
+            ImmutableList<String> remainingAuxChain = wordsForFlip.stream().collect(toImmutableList());
             questionPrefix = new ImmutableList.Builder<String>()
-                .addAll(flippedAux)
+                .add(flippedAux)
                 .addAll(subjWords)
                 .addAll(remainingAuxChain)
                 .build();
@@ -528,7 +560,8 @@ public final class Verb extends Predication {
             assert !isNegated : "aux flip should not cause changes when negated";
             splitVerb(verbStack);
         }
-        assert verbStack.size() >= 2; // should be splittable
+        assert verbStack.size() >= 2 || VerbHelper.isCopulaVerb(verbStack.getFirst())
+            : "Verb words need to be allow for auxiliary flip";
         return ImmutableList.copyOf(verbStack);
     }
 
@@ -608,12 +641,17 @@ public final class Verb extends Predication {
         //     !isProgressive && !isPerfect &&
         //     (tense == Tense.PAST || tense == Tense.PRESENT)
         //     : "verb should only be split in very specific circumstances";
-        verbStack.addFirst(VerbHelper.getStem(verbStack.removeFirst()));
-        switch(tense) {
-        case PAST: verbStack.addFirst(VerbHelper.getPastTense("do", getSubject())); break;
-        case PRESENT: verbStack.addFirst(VerbHelper.getPresentTense("do", getSubject())); break;
-        default: assert false;
+        if(verbStack.size() == 1 && VerbHelper.isCopulaVerb(verbStack.getFirst())) {
+            // if all we are is a copula, we flip the whole thing to the front without splitting.
+            return;
+        } else {
+            verbStack.addFirst(VerbHelper.getStem(verbStack.removeFirst()));
+            switch(tense) {
+            case PAST: verbStack.addFirst(VerbHelper.getPastTense("do", getSubject())); break;
+            case PRESENT: verbStack.addFirst(VerbHelper.getPresentTense("do", getSubject())); break;
+            default: assert false;
+            }
+            assert verbStack.size() > 1; // should have at least two words at the end in this case
         }
-        assert verbStack.size() > 1; // always should have at least two words at the end
     }
 }

@@ -1,25 +1,17 @@
 package edu.uw.easysrl.qasrl.annotation;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.ImmutableTable;
 import edu.uw.easysrl.qasrl.TextGenerationHelper;
-import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
-import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.syntax.AnswerStructure;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
-import edu.uw.easysrl.qasrl.query.QueryGeneratorUtils;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.util.GuavaCollectors;
-import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -46,6 +38,8 @@ public class CrowdFlowerDataUtils {
     public static final String cfRound4CoreArgsAnnotationFile = "./Crowdflower_data/f902142.csv";
     public static final String cfRound4CleftingAnnotationFile = "./Crowdflower_data/f903842.csv";
     public static final String cfRound5CoreArgsAnnotationFile = "./Crowdflower_data/f909211.csv";
+    public static final String cfRound1And2CoreArgsRerun = "./Crowdflower_data/f912533.csv";
+    public static final String cfRound6CoreArgsAnnotationFile = "./Crowdflower_data/f912675.csv";
 
     public static final ImmutableList<String> allCfAnnotationFiles = ImmutableList.of(
             cfRound1AnnotationFile,
@@ -55,7 +49,9 @@ public class CrowdFlowerDataUtils {
             cfRound23CleftingAnnotationFile,
             cfRound4CoreArgsAnnotationFile,
             cfRound4CleftingAnnotationFile,
-            cfRound5CoreArgsAnnotationFile
+            cfRound5CoreArgsAnnotationFile,
+            cfRound1And2CoreArgsRerun
+       //     cfRound6CoreArgsAnnotationFile
     );
 
     // Sentences that happened to appear in instructions ...
@@ -122,6 +118,18 @@ public class CrowdFlowerDataUtils {
                 .collect(GuavaCollectors.toImmutableList());
     }
 
+    public static ImmutableList<Integer> getRound6SentenceIds() {
+        List<AlignedAnnotation> cfAnnotations = new ArrayList<>();
+        try {
+            cfAnnotations.addAll(CrowdFlowerDataReader.readAggregatedAnnotationFromFile(cfRound6CoreArgsAnnotationFile));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return cfAnnotations.stream()
+                .map(annotation -> annotation.sentenceId).distinct().sorted()
+                .collect(GuavaCollectors.toImmutableList());
+    }
+
     public static ImmutableList<Integer> getAllAnnotatedSentenceIds() {
         final List<AlignedAnnotation> cfAnnotations = new ArrayList<>();
         allCfAnnotationFiles.forEach(cfFile -> {
@@ -167,6 +175,33 @@ public class CrowdFlowerDataUtils {
         }
         reader.close();
         return sentenceIds.stream().distinct().sorted().collect(GuavaCollectors.toImmutableList());
+    }
+
+    public static Map<Integer, List<AlignedAnnotation>> loadAnnotations(ImmutableList<String> fileNames) {
+        Map<Integer, List<AlignedAnnotation>> sentenceToAnnotations;
+        List<AlignedAnnotation> annotationList = new ArrayList<>();
+        try {
+            for (String fileName : fileNames) {
+                annotationList.addAll(CrowdFlowerDataReader.readAggregatedAnnotationFromFile(fileName));
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+        sentenceToAnnotations = new HashMap<>();
+        annotationList.forEach(annotation -> {
+            int sentId = annotation.sentenceId;
+            if (!sentenceToAnnotations.containsKey(sentId)) {
+                sentenceToAnnotations.put(sentId, new ArrayList<>());
+            }
+            sentenceToAnnotations.get(sentId).add(annotation);
+        });
+        return sentenceToAnnotations;
+    }
+
+    public static Map<Integer, List<AlignedAnnotation>> loadCorePronounAnnotations() {
+        return loadAnnotations(ImmutableList.of(cfRound3PrnonounAnnotationFile,
+                cfRound4CoreArgsAnnotationFile, cfRound5CoreArgsAnnotationFile));
     }
 
     public static void printQueryToCSVFile(final ScoredQuery<QAStructureSurfaceForm> query,
@@ -268,7 +303,9 @@ public class CrowdFlowerDataUtils {
         int predicateIndex = annotation.predicateId;
         int sentenceId = annotation.sentenceId;
         ImmutableList<String> sentence = ImmutableList.copyOf(annotation.sentenceString.split("\\s+"));
-        assert  annotation.predicateId < 0 || sentence.get(annotation.predicateId).equalsIgnoreCase(annotation.predicateString);
+
+        Preconditions.checkArgument(annotation.predicateId < 0 || sentence.get(annotation.predicateId).equalsIgnoreCase(annotation.predicateString));
+
         final String sentenceStr = TextGenerationHelper.renderHTMLSentenceString(sentence, predicateIndex, highlightPredicate);
         final List<String> options = annotation.optionStrings;
         List<String> csvRow = new ArrayList<>();
