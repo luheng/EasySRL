@@ -144,6 +144,7 @@ public class QuestionGenerator {
             .range(0, parse.categories.size())
             .boxed()
             .filter(index -> parse.categories.get(index).isFunctionInto(Category.valueOf("S\\NP")) &&
+                    // parse.categories.get(index).isFunctionInto(Category.valueOf("(S[dcl]|S[dcl])|NP")) &&
                     !parse.categories.get(index).isFunctionInto(Category.valueOf("(S\\NP)|(S\\NP)")) &&
                     !VerbHelper.isAuxiliaryVerb(words.get(index), parse.categories.get(index)))
             .flatMap(predicateIndex -> {
@@ -303,8 +304,8 @@ public class QuestionGenerator {
                     return new QATemplate(vpAttachmentDep.getArgument(), verb, ppObjDep, -1, (Noun) ppObjArg.getPredication(), Optional.of(attachedPreposition));
                 })))));});
 
-        final Stream<QATemplate> templates = Stream.concat(verbTemplates, adverbTemplates);
-        // final Stream<QATemplate> templates = verbTemplates;
+        // final Stream<QATemplate> templates = Stream.concat(verbTemplates, adverbTemplates);
+        final Stream<QATemplate> templates = verbTemplates;
 
         return templates.map(template -> {
 
