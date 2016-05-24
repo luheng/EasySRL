@@ -82,7 +82,9 @@ public class ParseFileGenerator {
 
         String outputFileName = generateDev ?
                 String.format("parses.tagged.dev.%dbest.new.out", nBest) :
-                String.format("parses.tagged.test.%dbest.new.out", nBest);
+                    includeGoldInTest ?
+                            String.format("parses.tagged.test.gold.%dbest.new.out", nBest) :
+                            String.format("parses.tagged.test.nogold.%dbest.new.out", nBest);
         try {
             ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(outputFileName));
             oos.writeObject(allParses);
