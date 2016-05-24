@@ -82,7 +82,7 @@ public abstract class BaseCcgParser {
         private Parser parser;
         private final double supertaggerBeam = 0.000001;
         private final double nbestBeam = 0.000001;
-        private final int maxChartSize = 2000000;
+        private final int maxChartSize = 1000000;
         private final int maxSentenceLength = 70;
 
         public AStarParser(String modelFolderPath, int nBest)  {
@@ -154,7 +154,6 @@ public abstract class BaseCcgParser {
                 System.err.println("Parser initialization failed.");
                 e.printStackTrace();
             }
-
             try {
                 batchTagger = Tagger.make(modelFolder, supertaggerBeam, 50, null);
             } catch (IOException e) {
