@@ -24,7 +24,7 @@ public class ParseFileGenerator {
 
     public static void main(String[] args) {
         Map<Integer, List<Parse>> allParses = new HashMap<>();
-        final ParseData dev = ParseData.loadFromDevPool().get();
+        final ParseData dev = ParseDataLoader.loadFromDevPool().get();
         //final ParseData test = ParseData.loadFromTestPool().get();
 
         ImmutableList<ImmutableList<InputReader.InputWord>> sentences = dev.getSentenceInputWords();

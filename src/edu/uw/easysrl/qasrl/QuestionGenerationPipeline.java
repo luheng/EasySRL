@@ -215,7 +215,7 @@ public abstract class QuestionGenerationPipeline {
             return simOpt.get();
         } else {
             // get the gold parses from somewhere else?
-            return new ResponseSimulatorGold(ParseData.loadFromDevPool().get());
+            return new ResponseSimulatorGold(ParseDataLoader.loadFromDevPool().get());
         }
     }
 }

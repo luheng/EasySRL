@@ -5,6 +5,7 @@ import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.main.ParsePrinter;
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.ParseData;
+import edu.uw.easysrl.qasrl.ParseDataLoader;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.handler.AbstractHandler;
@@ -47,7 +48,7 @@ public class DebuggingUI extends AbstractHandler {
 
     public static void main(final String[] args) throws Exception {
         final Server server = new Server(Integer.valueOf(args[0]));
-        final ParseData dev = ParseData.loadFromDevPool().get();
+        final ParseData dev = ParseDataLoader.loadFromDevPool().get();
         server.setHandler(new DebuggingUI(dev.getSentenceInputWords(), dev.getGoldParses()));
         server.start();
         server.join();

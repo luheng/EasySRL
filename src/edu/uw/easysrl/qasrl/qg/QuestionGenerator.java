@@ -38,7 +38,7 @@ public class QuestionGenerator {
     private static ParseData devData = null;
     private static ParseData getDevData() {
         if(devData == null) {
-            devData = ParseData.loadFromDevPool().get();
+            devData = ParseDataLoader.loadFromDevPool().get();
         }
         return devData;
     }

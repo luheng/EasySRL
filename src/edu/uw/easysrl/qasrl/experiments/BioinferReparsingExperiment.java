@@ -67,7 +67,7 @@ public class BioinferReparsingExperiment {
     }
 
     public static void main(String[] args) {
-        ParseData bioinfer = ParseData.loadFromBioinferDev().get();
+        ParseData bioinfer = ParseDataLoader.loadFromBioinferDev().get();
         myHTILParser = new HITLParser(bioinfer,
                 NBestList.loadNBestListsFromFile("bioinfer.dev.100best.out", 100).get());
         myHTILParser.setQueryPruningParameters(queryPruningParameters);
