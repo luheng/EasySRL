@@ -67,7 +67,7 @@ public class BioinferCCGCorpus {
                 }
                 if (words.size() > 0) {
                     List<InputReader.InputWord> taggedInputs = postagger.tag(inputs);
-                    System.out.println(taggedInputs.stream().map(InputReader.InputWord::toString).collect(Collectors.joining(" ")));
+                    //System.out.println(taggedInputs.stream().map(InputReader.InputWord::toString).collect(Collectors.joining(" ")));
                     inputSentences.add(ImmutableList.copyOf(taggedInputs));
                     sentences.add(ImmutableList.copyOf(words));
                     postags.add(ImmutableList.copyOf(pos));
