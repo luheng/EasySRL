@@ -91,6 +91,10 @@ public abstract class BaseCcgParser {
             this(modelFolderPath, nBest, supertaggerBeam, nbestBeam, maxChartSize, maxSentenceLength);
         }
 
+        public Parser getParser() {
+            return parser;
+        }
+
         public AStarParser(String modelFolderPath, int nBest, double supertaggerBeam, double nbestBeam,
                            int maxChartSize, int maxSentenceLength)  {
             final File modelFolder = Util.getFile(modelFolderPath);
