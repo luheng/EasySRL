@@ -57,8 +57,8 @@ public class BioinferReparsingExperiment {
     static {
         reparsingParameters = new HITLParsingParameters();
         reparsingParameters.jeopardyQuestionMinAgreement = 1;
-        reparsingParameters.positiveConstraintMinAgreement = 4;
-        reparsingParameters.negativeConstraintMaxAgreement = 1;
+        reparsingParameters.positiveConstraintMinAgreement = 1;
+        reparsingParameters.negativeConstraintMaxAgreement = 0;
         reparsingParameters.skipPronounEvidence = false;
         reparsingParameters.jeopardyQuestionWeight = 1.0;
         reparsingParameters.oraclePenaltyWeight = 5.0;
@@ -79,7 +79,6 @@ public class BioinferReparsingExperiment {
     }
 
     private static void runExperiment() {
-        final Collection<Integer> round6Ids = CrowdFlowerDataUtils.getRound6SentenceIds();
         List<Integer> sentenceIds = annotations.keySet().stream().sorted().collect(Collectors.toList());
 
         System.out.println(sentenceIds.stream().map(String::valueOf).collect(Collectors.joining(", ")));
@@ -179,11 +178,8 @@ public class BioinferReparsingExperiment {
                 //if (userOptions.isEmpty()) {
                 //    continue;
                 //}
-                ImmutableSet<Constraint> constraints = myHTILParser.getConstraints(query, optionDist), //myHTILParser.getConstraints(query, newOptionDist),
-                        oracleConstraints = myHTILParser.getOracleConstraints(query); //, goldOptions);
-
-                // Set constraint strength proportional to sentence length.
-                //constraints.stream().forEach(c -> c.setStrength(0.2 * sentence.size()));
+                ImmutableSet<Constraint> constraints = myHTILParser.getConstraints(query, optionDist),
+                                         oracleConstraints = myHTILParser.getConstraints(query, oracleOptions);
 
                 allConstraints.addAll(constraints);
                 allOracleConstraints.addAll(oracleConstraints);
@@ -198,9 +194,10 @@ public class BioinferReparsingExperiment {
                 rerankedF1 = nBestList.getResults(rerankedId);
 
                 // TODO: wrapper evaluator
-                reparsedF1 = CcgEvaluation.evaluate(reparse.dependencies, goldParse.dependencies);
-                oracleF1 = CcgEvaluation.evaluate(oracleReparse.dependencies, goldParse.dependencies);
-
+                final Accuracy reparsedAcc = CcgEvaluation.evaluateTags(reparse.categories, goldParse.categories);
+                final Accuracy oracleAcc = CcgEvaluation.evaluateTags(oracleReparse.categories, goldParse.categories);
+                reparsedF1 = new Results(reparsedAcc.getNumTotal(), reparsedAcc.getNumCorrect(), reparsedAcc.getNumTotal());
+                oracleF1 = new Results(oracleAcc.getNumTotal(), oracleAcc.getNumCorrect(), oracleAcc.getNumTotal());
                 myHistory.addEntry(sentenceId, query, userOptions, constraints, oracleConstraints, reparse,
                         oracleReparse, rerankedId, reparsedF1, rerankedF1, oracleF1);
 
@@ -218,8 +215,6 @@ public class BioinferReparsingExperiment {
                         .map(ap -> ap.stream().map(query.getOptions()::get).collect(Collectors.joining("\t---\t")))
                         .collect(Collectors.joining("\n")) + "\n";
                         */
-
-                // Evidence.
                 result += allConstraints.stream()
                         .map(c -> "Penalizing:\t \t" + c.toString(sentence))
                         .collect(Collectors.joining("\n")) + "\n";
@@ -234,9 +229,9 @@ public class BioinferReparsingExperiment {
                 }
                 result += String.format("F1: %.3f%% -> %.3f%% %s\n",
                         100.0 * currentF1.getF1(), 100.0 * reparsedF1.getF1(), f1Impv);
-                result += String.format("Reranked F1: %.3f%%\n", 100.0 * rerankedF1.getF1());
-                result += String.format("Reparsed F1: %.3f%%\n", 100.0 * reparsedF1.getF1());
-                result += String.format("Oracle F1: %.3f%%\n",   100.0 * oracleF1.getF1());
+                result += String.format("Reranked Acc: %.3f%%\n", 100.0 * rerankedF1.getF1());
+                result += String.format("Reparsed Acc: %.3f%%\n", 100.0 * reparsedF1.getF1());
+                result += String.format("Oracle Acc: %.3f%%\n",   100.0 * oracleF1.getF1());
                 sentenceDebuggingString += result + "\n";
                 currentF1 = reparsedF1;
             }
@@ -248,7 +243,7 @@ public class BioinferReparsingExperiment {
             if (lastReparsedResult.isPresent()) {
                 double deltaF1 = lastReparsedResult.get().getF1() - baselineF1.getF1();
                 String changeStr = deltaF1 < -1e-6 ? "Worsened." : (deltaF1 > 1e-6 ? "Improved." : "Unchanged.");
-                sentenceDebuggingString += String.format("Final F1: %.3f%% over %.3f%% baseline.\t%s\n",
+                sentenceDebuggingString += String.format("Final Acc: %.3f%% over %.3f%% baseline.\t%s\n",
                         100.0 * lastReparsedResult.get().getF1(), 100.0 * baselineF1.getF1(), changeStr);
 
                 DebugBlock debugBlock = new DebugBlock(deltaF1, sentenceDebuggingString);
@@ -258,17 +253,17 @@ public class BioinferReparsingExperiment {
         }
 
         myHistory.printSummary();
-        System.out.println("Labeled baseline:\n" + avgBaseline);
-        System.out.println("Labeled reranked:\n" + avgReranked);
-        System.out.println("Labeled reparsed:\n" + avgReparsed);
-        System.out.println("Unlabeled baseline:\n" + avgUnlabeledBaseline);
-        System.out.println("Unlabeled reranked:\n" + avgUnlabeledReranked);
-        System.out.println("Unlabeled reparsed:\n" + avgUnlabeledReparsed);
+        System.out.println("Labeled baseline:\t" + avgBaseline.getF1());
+        System.out.println("Labeled reranked:\t" + avgReranked.getF1());
+        System.out.println("Labeled reparsed:\t" + avgReparsed.getF1());
+        //System.out.println("Unlabeled baseline:\n" + avgUnlabeledBaseline);
+        //System.out.println("Unlabeled reranked:\n" + avgUnlabeledReranked);
+        //System.out.println("Unlabeled reparsed:\n" + avgUnlabeledReparsed);
 
         debugging.stream()
                 .sorted((b1, b2) -> Double.compare(b1.deltaF1, b2.deltaF1))
-                        //                .filter(b -> b.oracleDeltaF1 > 1e-3)
-                .filter(b -> Math.abs(b.deltaF1) > 1e-3)
+                //.filter(b -> b.oracleDeltaF1 > 1e-3)
+                //.filter(b -> Math.abs(b.deltaF1) > 1e-3)
                 .forEach(b -> System.out.println(b.block));
 
         System.out.println("Num. new questions:\t" + numNewQuestions);
