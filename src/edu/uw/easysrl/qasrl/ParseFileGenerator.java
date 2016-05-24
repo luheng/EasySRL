@@ -68,7 +68,7 @@ public class ParseFileGenerator {
             numParsed ++;
         }
 
-        String outputFileName = String.format("parses.dev.%dbest.new.out", nBest);
+        String outputFileName = String.format("parses.tagged.dev.%dbest.out", nBest);
         try {
             ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(outputFileName));
             oos.writeObject(allParses);
