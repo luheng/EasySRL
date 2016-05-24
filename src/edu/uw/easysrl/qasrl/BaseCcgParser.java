@@ -194,7 +194,6 @@ public abstract class BaseCcgParser {
                 System.err.println("Parser initialization failed.");
                 e.printStackTrace();
             }
-
             try {
                 batchTagger = Tagger.make(modelFolder, supertaggerBeam, 50, null);
             } catch (IOException e) {
