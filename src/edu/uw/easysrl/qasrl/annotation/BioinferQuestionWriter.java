@@ -9,6 +9,7 @@ import edu.uw.easysrl.qasrl.model.HITLParsingParameters;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
+import edu.uw.easysrl.util.GuavaCollectors;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 
@@ -86,6 +87,13 @@ public class BioinferQuestionWriter {
             IntStream.range(0, queryList.size()).forEach(i -> queryList.get(i).setQueryId(i));
             // Print test questions.
             for (ScoredQuery<QAStructureSurfaceForm> query : queryList) {
+                final ImmutableList<Integer> oneBestOptions = IntStream.range(0, query.getOptions().size())
+                        .filter(i -> query.getOptionToParseIds().get(i).contains(0))
+                        .boxed()
+                        .collect(GuavaCollectors.toImmutableList());
+                System.out.println(query.toString(
+                        corpus.getSentence(sentenceId),
+                        'B', oneBestOptions));
                 CrowdFlowerDataUtils.printQueryToCSVFileNew(
                         query,
                         corpus.getSentence(sentenceId),
@@ -105,6 +113,7 @@ public class BioinferQuestionWriter {
             }
         }
         csvPrinter.close();
+        System.out.println(String.format("Extracted %d queries.", lineCounter.get()));
     }
 
 
