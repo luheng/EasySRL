@@ -40,6 +40,9 @@ public class ParseDataLoader {
     }
 
     public static Optional<ParseData> loadFromTestPool(boolean includeGold) {
+        if (includeGold) {
+            System.err.println("### Waring ### Reading test data with gold parses.");
+        }
         POSTagger postagger = POSTagger.getStanfordTagger(Util.getFile(BaseCcgParser.modelFolder + "/posTagger"));
         List<List<InputReader.InputWord>> sentenceInputWords = new ArrayList<>();
         List<Parse> goldParses = new ArrayList<>();
