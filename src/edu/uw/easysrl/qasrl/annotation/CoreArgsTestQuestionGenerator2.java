@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
  * Mostly temporary and unorganized methods for getting test questions ...
  * Created by luheng on 4/6/16.
  */
-public class CoreArgsTestQuestionGenerator {
+public class CoreArgsTestQuestionGenerator2 {
     private final static HITLParser hitlParser = new HITLParser(100 /* nBest */);
 
     static QueryPruningParameters queryPruningParameters;
@@ -36,7 +36,7 @@ public class CoreArgsTestQuestionGenerator {
 
     private static final String reviewedTestQuestionsFile =
             "./Crowdflower_unannotated/test_questions/test_question_core_pronoun_r04.tsv";
-  
+
     public static void generateAndMergeTestQuestions() throws IOException {
         final List<RecordedAnnotation> reviewedTestQuestions =
                 AnnotationReader.readReviewedTestQuestionsFromTSV(reviewedTestQuestionsFile);
@@ -44,12 +44,15 @@ public class CoreArgsTestQuestionGenerator {
         final List<String> autoTestQuestions = new ArrayList<>();
 
         hitlParser.setQueryPruningParameters(queryPruningParameters);
-        Map<Integer, List<AlignedAnnotation>> allAnnotations = CrowdFlowerDataUtils.loadCorePronounAnnotations();
+        Map<Integer, List<AlignedAnnotation>> allAnnotations = CrowdFlowerDataUtils.loadAnnotations(ImmutableList.of(
+                CrowdFlowerDataUtils.cfRound1And2CoreArgsRerun,
+                CrowdFlowerDataUtils.cfRound6CoreArgsAnnotationFile
+        ));
 
         int numAnnotations = 0, numPredMatchedAnnotations = 0, numMatchedAnnotations = 0;
         for (int sid : allAnnotations.keySet()) {
             HashSet<Integer> predicateMatchedAnnotations = new HashSet<>(),
-                             matchedAnnotations = new HashSet<>();
+                    matchedAnnotations = new HashSet<>();
 
             final ImmutableList<String> sentence = hitlParser.getSentence(sid);
             final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList =
@@ -57,7 +60,6 @@ public class CoreArgsTestQuestionGenerator {
             final List<AlignedAnnotation> annotations = allAnnotations.get(sid);
 
             for (ScoredQuery<QAStructureSurfaceForm> query : queryList) {
-                // Match annotation: 5 overlapping annotations, same predicate.
                 final int predId = query.getPredicateId().getAsInt();
                 final Set<QuestionStructure> qstrs = query.getQAPairSurfaceForms().stream()
                         .flatMap(qa -> qa.getQuestionStructures().stream())
@@ -68,7 +70,7 @@ public class CoreArgsTestQuestionGenerator {
                     final AlignedAnnotation annot = annotations.get(annotId);
                     if (annot.predicateId == predId
                             && qstrs.stream().anyMatch(qstr -> qstr.category == annot.predicateCategory
-                                                                && qstr.targetArgNum == annot.argumentNumber)) {
+                            && qstr.targetArgNum == annot.argumentNumber)) {
                         predicateMatchedAnnotations.add(annotId);
                         HashMultiset<ImmutableList<Integer>> responses =
                                 HashMultiset.create(AnnotationUtils.getAllUserResponses(query, annot));

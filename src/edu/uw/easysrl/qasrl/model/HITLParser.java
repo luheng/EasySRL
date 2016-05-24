@@ -153,6 +153,7 @@ public class HITLParser {
         return queryList;
     }
 
+    @Deprecated
     public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getPronounCoreArgQueriesForSentence(int sentenceId) {
         final QueryPruningParameters queryPruningParams = new QueryPruningParameters(queryPruningParameters);
        queryPruningParams.skipPPQuestions = true;
@@ -212,6 +213,7 @@ public class HITLParser {
         return ImmutableList.copyOf(queryList);
     }
 
+    @Deprecated
     public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getCoreArgumentQueriesForSentence(int sentenceId,
                                                                                                 boolean isCheckboxStyle) {
         QueryPruningParameters queryPruningParams = new QueryPruningParameters(queryPruningParameters);
@@ -286,7 +288,6 @@ public class HITLParser {
         return queryList;
     }
 
-    // FIXME: A bug where reparsing with empty constraint set makes results worse.
     public Parse getReparsed(int sentenceId, Set<Constraint> constraintSet) {
         if (constraintSet == null || constraintSet.isEmpty()) {
             return nbestLists.get(sentenceId).getParse(0);
@@ -426,7 +427,8 @@ public class HITLParser {
             final int headId = i;
             for (int j = 0; j < sentence.size(); j++) {
                 final int argId = j;
-                if (headId == argId || DependencyInstanceHelper.getDependencyType(query, headId, argId) == DependencyInstanceType.NONE) {
+                if (headId == argId || DependencyInstanceHelper.getDependencyType(query, headId, argId) ==
+                        DependencyInstanceType.NONE) {
                     continue;
                 }
                 //final DependencyInstanceType dtype = DependencyInstanceHelper.getDependencyType(query, headId, argId);

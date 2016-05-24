@@ -175,7 +175,8 @@ public class ReparsingExperiment {
             List<ScoredQuery<QAStructureSurfaceForm>> queryList = new ArrayList<>();
             if (!isClefting) {
                 if (!isCheckboxStyle) {
-                    queryList.addAll(myHTILParser.getCoreArgumentQueriesForSentence(sentenceId, false /* radiobutton version*/));
+                    queryList.addAll(myHTILParser.getCoreArgumentQueriesForSentence(sentenceId,
+                            false /* radiobutton version*/));
                 } else {
                     if (useNewCoreArgsQuestions) {
                         queryList.addAll(myHTILParser.getNewCoreArgQueriesForSentence(sentenceId));
@@ -220,9 +221,8 @@ public class ReparsingExperiment {
                 int[] newOptionDist = new int[optionDist.length];
                 newResponses.stream().forEach(resp -> resp.stream().forEach(op -> newOptionDist[op]++));
 
-                ImmutableList<Integer> userOptions    = myHTILParser.getUserOptions(query, annotation),
-                                       userOptions2   = myHTILParser.getUserOptions(query, newOptionDist);
-
+                ImmutableList<Integer> userOptions  = myHTILParser.getUserOptions(query, annotation),
+                                       userOptions2 = myHTILParser.getUserOptions(query, newOptionDist);
                 if (responses.size() != 5) {
                     continue;
                 }
@@ -250,7 +250,7 @@ public class ReparsingExperiment {
                 if (query.isJeopardyStyle() && userOptions.contains(query.getBadQuestionOptionId().getAsInt())) {
                     continue;
                 }
-                ImmutableSet<Constraint> constraints = myHTILParser.getConstraints(query, newOptionDist),
+                ImmutableSet<Constraint> constraints = myHTILParser.getConstraints(query, optionDist), //myHTILParser.getConstraints(query, newOptionDist),
                                          oracleConstraints = myHTILParser.getOracleConstraints(query); //, goldOptions);
 
                 // Set constraint strength proportional to sentence length.

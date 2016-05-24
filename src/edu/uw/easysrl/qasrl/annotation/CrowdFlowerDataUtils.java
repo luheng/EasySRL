@@ -2,18 +2,12 @@ package edu.uw.easysrl.qasrl.annotation;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.ImmutableTable;
 import edu.uw.easysrl.qasrl.TextGenerationHelper;
-import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
-import edu.uw.easysrl.qasrl.qg.QAPairAggregatorUtils;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.syntax.AnswerStructure;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
-import edu.uw.easysrl.qasrl.query.QueryGeneratorUtils;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.util.GuavaCollectors;
-import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 
 import java.io.*;
@@ -183,7 +177,7 @@ public class CrowdFlowerDataUtils {
         return sentenceIds.stream().distinct().sorted().collect(GuavaCollectors.toImmutableList());
     }
 
-    public static Map<Integer, List<AlignedAnnotation>> loadAnnotation(ImmutableList<String> fileNames) {
+    public static Map<Integer, List<AlignedAnnotation>> loadAnnotations(ImmutableList<String> fileNames) {
         Map<Integer, List<AlignedAnnotation>> sentenceToAnnotations;
         List<AlignedAnnotation> annotationList = new ArrayList<>();
         try {
@@ -206,7 +200,7 @@ public class CrowdFlowerDataUtils {
     }
 
     public static Map<Integer, List<AlignedAnnotation>> loadCorePronounAnnotations() {
-        return loadAnnotation(ImmutableList.of(cfRound3PrnonounAnnotationFile,
+        return loadAnnotations(ImmutableList.of(cfRound3PrnonounAnnotationFile,
                 cfRound4CoreArgsAnnotationFile, cfRound5CoreArgsAnnotationFile));
     }
 
