@@ -39,7 +39,7 @@ public class ParseDataLoader {
         return loadFromPropBank(true);
     }
 
-    public static Optional<ParseData> loadFromTestPool() {
+    public static Optional<ParseData> loadFromTestPool(boolean includeGold) {
         POSTagger postagger = POSTagger.getStanfordTagger(Util.getFile(BaseCcgParser.modelFolder + "/posTagger"));
         List<List<InputReader.InputWord>> sentenceInputWords = new ArrayList<>();
         List<Parse> goldParses = new ArrayList<>();
@@ -56,7 +56,11 @@ public class ParseDataLoader {
             sentenceInputWords.add(taggedInput);
             Set<ResolvedDependency> goldDependencies = CCGBankEvaluation
                     .asResolvedDependencies(sentence.getCCGBankDependencyParse().getDependencies());
-            goldParses.add(new Parse(sentence.getCcgbankParse(), sentence.getLexicalCategories(), goldDependencies));
+            if (includeGold) {
+                goldParses.add(new Parse(sentence.getCcgbankParse(), sentence.getLexicalCategories(), goldDependencies));
+            } else {
+                goldParses.add(null);
+            }
         }
         System.out.println(String.format("Read %d sentences.", sentenceInputWords.size()));
         return Optional.of(makeParseData(sentenceInputWords, goldParses));

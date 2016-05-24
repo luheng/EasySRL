@@ -57,8 +57,8 @@ public class BioinferReparsingExperiment {
     static {
         reparsingParameters = new HITLParsingParameters();
         reparsingParameters.jeopardyQuestionMinAgreement = 1;
-        reparsingParameters.positiveConstraintMinAgreement = 4;
-        reparsingParameters.negativeConstraintMaxAgreement = 1;
+        reparsingParameters.positiveConstraintMinAgreement = 1;
+        reparsingParameters.negativeConstraintMaxAgreement = 0;
         reparsingParameters.skipPronounEvidence = false;
         reparsingParameters.jeopardyQuestionWeight = 1.0;
         reparsingParameters.oraclePenaltyWeight = 5.0;
@@ -79,7 +79,6 @@ public class BioinferReparsingExperiment {
     }
 
     private static void runExperiment() {
-        final Collection<Integer> round6Ids = CrowdFlowerDataUtils.getRound6SentenceIds();
         List<Integer> sentenceIds = annotations.keySet().stream().sorted().collect(Collectors.toList());
 
         System.out.println(sentenceIds.stream().map(String::valueOf).collect(Collectors.joining(", ")));
@@ -103,8 +102,6 @@ public class BioinferReparsingExperiment {
                 avgUnlabeledReranked = new Results(),
                 avgUnlabeledReparsed = new Results();
 
-        BaseCcgParser baseParser = null; // new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, 1);
-
         int counter = 0;
         TicToc.tic();
         for (int sentenceId : sentenceIds) {
@@ -119,42 +116,25 @@ public class BioinferReparsingExperiment {
             final NBestList nBestList = myHTILParser.getNBestList(sentenceId);
             final int numParses = nBestList.getN();
             final Parse goldParse = myHTILParser.getGoldParse(sentenceId);
-            final Parse baselineParse = baseParser == null ?
-                    myHTILParser.getParse(sentenceId, 0) :
-                    baseParser.parse(sentenceId, myHTILParser.getInputSentence(sentenceId));
+            final Parse baselineParse = myHTILParser.getParse(sentenceId, 0);
             Parse reparse = baselineParse, oracleReparse = baselineParse;
 
-            final Results baselineF1 = CcgEvaluation.evaluate(baselineParse.dependencies, goldParse.dependencies);
-            final Results unlabeledBaselineF1 = CcgEvaluation.evaluateUnlabeled(baselineParse.dependencies,
-                    goldParse.dependencies);
+            final Results baselineF1 = nBestList.getResults(0);
             avgBaseline.add(baselineF1);
-            avgUnlabeledBaseline.add(unlabeledBaselineF1);
 
             final List<AlignedAnnotation> annotated = annotations.get(sentenceId);
             if (annotated == null || annotated.isEmpty()) {
                 avgReparsed.add(baselineF1);
                 avgReranked.add(baselineF1);
-                avgUnlabeledReranked.add(unlabeledBaselineF1);
-                avgUnlabeledReparsed.add(unlabeledBaselineF1);
                 continue;
             }
             IntStream.range(0, annotated.size()).forEach(i -> annotated.get(i).iterationId = i);
-
-            boolean isCheckboxStyle = !annotated.stream()
-                    .anyMatch(annot -> annot.answerOptions.stream()
-                            .anyMatch(op -> op.contains(QAPairAggregatorUtils.answerDelimiter)));
-            boolean isClefting = annotated.stream()
-                    .anyMatch(annot -> annot.queryPrompt.startsWith("What is it"));
-            boolean useNewCoreArgsQuestions = round6Ids.contains(sentenceId);
-
             List<ScoredQuery<QAStructureSurfaceForm>> queryList =
                     myHTILParser.getNewCoreArgQueriesForSentence(sentenceId);
             Results currentF1 = baselineF1,
                     oracleF1 = baselineF1,
                     rerankedF1 = baselineF1,
-                    reparsedF1 = baselineF1,
-                    unlabeledRerankedF1 = unlabeledBaselineF1,
-                    unlabeledReparsedF1 = unlabeledBaselineF1;
+                    reparsedF1 = baselineF1;
 
             final Set<Constraint> allConstraints = new HashSet<>(), allOracleConstraints = new HashSet<>();
             String sentenceDebuggingString = "";
@@ -163,14 +143,9 @@ public class BioinferReparsingExperiment {
 
             for (ScoredQuery<QAStructureSurfaceForm> query : queryList) {
                 AlignedAnnotation annotation = ExperimentUtils.getAlignedAnnotation(query, annotations.get(sentenceId));
-                ImmutableList<Integer> goldOptions    = myHTILParser.getGoldOptions(query),
-                        oneBestOptions = myHTILParser.getOneBestOptions(query),
-                        oracleOptions  = myHTILParser.getOracleOptions(query);
+                ImmutableList<Integer> oneBestOptions = myHTILParser.getOneBestOptions(query),
+                                       oracleOptions  = myHTILParser.getOracleOptions(query);
                 if (annotation == null) {
-                    /*
-                    sentenceDebuggingString += Colors.ANSI_BLUE
-                            + query.toString(sentence, 'G', goldOptions, 'B', oneBestOptions, 'O', oracleOptions)
-                            + "\n" + Colors.ANSI_RESET; */
                     numNewQuestions ++;
                     continue;
                 }
@@ -184,9 +159,7 @@ public class BioinferReparsingExperiment {
 
                 ImmutableList<Integer> userOptions  = myHTILParser.getUserOptions(query, annotation),
                         userOptions2 = myHTILParser.getUserOptions(query, newOptionDist);
-                if (responses.size() != 5) {
-                    continue;
-                }
+                //if (responses.size() != 5) { continue; }
 
                 // Update stats.
                 for (int i = 0; i < 5; i++) {
@@ -195,27 +168,18 @@ public class BioinferReparsingExperiment {
                             .filter(id -> optionDist[id] >= minAgr)
                             .collect(GuavaCollectors.toImmutableList());
                     if (options.size() > 0) {
-                        goldStrictMatch.get(i).add(options.containsAll(goldOptions) && goldOptions.containsAll(options));
+                        goldStrictMatch.get(i).add(options.containsAll(oracleOptions) && oracleOptions.containsAll(options));
                         optionAccuracy.get(i).add(new Results(options.size(),
-                                (int) options.stream().filter(goldOptions::contains).count(), goldOptions.size()));
+                                (int) options.stream().filter(oracleOptions::contains).count(), oracleOptions.size()));
                     }
                 }
                 numMatchedAnnotations ++;
 
-                /*if (userOptions.isEmpty()) {
-                    continue;
-                }*/
-                if (Prepositions.prepositionWords.contains(sentence.get(query.getPredicateId().getAsInt()).toLowerCase())) {
-                    continue;
-                }
-                if (query.isJeopardyStyle() && userOptions.contains(query.getBadQuestionOptionId().getAsInt())) {
-                    continue;
-                }
-                ImmutableSet<Constraint> constraints = myHTILParser.getConstraints(query, optionDist), //myHTILParser.getConstraints(query, newOptionDist),
-                        oracleConstraints = myHTILParser.getOracleConstraints(query); //, goldOptions);
-
-                // Set constraint strength proportional to sentence length.
-                //constraints.stream().forEach(c -> c.setStrength(0.2 * sentence.size()));
+                //if (userOptions.isEmpty()) {
+                //    continue;
+                //}
+                ImmutableSet<Constraint> constraints = myHTILParser.getConstraints(query, optionDist),
+                                         oracleConstraints = myHTILParser.getConstraints(query, oracleOptions);
 
                 allConstraints.addAll(constraints);
                 allOracleConstraints.addAll(oracleConstraints);
@@ -228,18 +192,17 @@ public class BioinferReparsingExperiment {
                 oracleReparse = myHTILParser.getNBestList(sentenceId)
                         .getParse(myHTILParser.getRerankedParseId(sentenceId, allOracleConstraints));
                 rerankedF1 = nBestList.getResults(rerankedId);
-                unlabeledRerankedF1 = CcgEvaluation.evaluateUnlabeled(nBestList.getParse(rerankedId).dependencies,
-                        goldParse.dependencies);
-                reparsedF1 = CcgEvaluation.evaluate(reparse.dependencies, goldParse.dependencies);
-                unlabeledReparsedF1 = CcgEvaluation.evaluateUnlabeled(reparse.dependencies, goldParse.dependencies);
-                oracleF1 = CcgEvaluation.evaluate(oracleReparse.dependencies, goldParse.dependencies);
 
+                // TODO: wrapper evaluator
+                final Accuracy reparsedAcc = CcgEvaluation.evaluateTags(reparse.categories, goldParse.categories);
+                final Accuracy oracleAcc = CcgEvaluation.evaluateTags(oracleReparse.categories, goldParse.categories);
+                reparsedF1 = new Results(reparsedAcc.getNumTotal(), reparsedAcc.getNumCorrect(), reparsedAcc.getNumTotal());
+                oracleF1 = new Results(oracleAcc.getNumTotal(), oracleAcc.getNumCorrect(), oracleAcc.getNumTotal());
                 myHistory.addEntry(sentenceId, query, userOptions, constraints, oracleConstraints, reparse,
                         oracleReparse, rerankedId, reparsedF1, rerankedF1, oracleF1);
 
                 // Print debugging information.
                 String result = query.toString(sentence,
-                        'G', goldOptions,
                         'O', oracleOptions,
                         'B', oneBestOptions,
                         'U', userOptions,
@@ -252,8 +215,6 @@ public class BioinferReparsingExperiment {
                         .map(ap -> ap.stream().map(query.getOptions()::get).collect(Collectors.joining("\t---\t")))
                         .collect(Collectors.joining("\n")) + "\n";
                         */
-
-                // Evidence.
                 result += allConstraints.stream()
                         .map(c -> "Penalizing:\t \t" + c.toString(sentence))
                         .collect(Collectors.joining("\n")) + "\n";
@@ -268,23 +229,21 @@ public class BioinferReparsingExperiment {
                 }
                 result += String.format("F1: %.3f%% -> %.3f%% %s\n",
                         100.0 * currentF1.getF1(), 100.0 * reparsedF1.getF1(), f1Impv);
-                result += String.format("Reranked F1: %.3f%%\n", 100.0 * rerankedF1.getF1());
-                result += String.format("Reparsed F1: %.3f%%\n", 100.0 * reparsedF1.getF1());
-                result += String.format("Oracle F1: %.3f%%\n",   100.0 * oracleF1.getF1());
+                result += String.format("Reranked Acc: %.3f%%\n", 100.0 * rerankedF1.getF1());
+                result += String.format("Reparsed Acc: %.3f%%\n", 100.0 * reparsedF1.getF1());
+                result += String.format("Oracle Acc: %.3f%%\n",   100.0 * oracleF1.getF1());
                 sentenceDebuggingString += result + "\n";
                 currentF1 = reparsedF1;
             }
 
             avgReparsed.add(reparsedF1);
             avgReranked.add(rerankedF1);
-            avgUnlabeledReranked.add(unlabeledRerankedF1);
-            avgUnlabeledReparsed.add(unlabeledReparsedF1);
 
             Optional<Results> lastReparsedResult = myHistory.getLastReparsingResult(sentenceId);
             if (lastReparsedResult.isPresent()) {
                 double deltaF1 = lastReparsedResult.get().getF1() - baselineF1.getF1();
                 String changeStr = deltaF1 < -1e-6 ? "Worsened." : (deltaF1 > 1e-6 ? "Improved." : "Unchanged.");
-                sentenceDebuggingString += String.format("Final F1: %.3f%% over %.3f%% baseline.\t%s\n",
+                sentenceDebuggingString += String.format("Final Acc: %.3f%% over %.3f%% baseline.\t%s\n",
                         100.0 * lastReparsedResult.get().getF1(), 100.0 * baselineF1.getF1(), changeStr);
 
                 DebugBlock debugBlock = new DebugBlock(deltaF1, sentenceDebuggingString);
@@ -294,17 +253,17 @@ public class BioinferReparsingExperiment {
         }
 
         myHistory.printSummary();
-        System.out.println("Labeled baseline:\n" + avgBaseline);
-        System.out.println("Labeled reranked:\n" + avgReranked);
-        System.out.println("Labeled reparsed:\n" + avgReparsed);
-        System.out.println("Unlabeled baseline:\n" + avgUnlabeledBaseline);
-        System.out.println("Unlabeled reranked:\n" + avgUnlabeledReranked);
-        System.out.println("Unlabeled reparsed:\n" + avgUnlabeledReparsed);
+        System.out.println("Supertag baseline:\t" + avgBaseline.getF1());
+        System.out.println("Supertag reranked:\t" + avgReranked.getF1());
+        System.out.println("Supertag reparsed:\t" + avgReparsed.getF1());
+        //System.out.println("Unlabeled baseline:\n" + avgUnlabeledBaseline);
+        //System.out.println("Unlabeled reranked:\n" + avgUnlabeledReranked);
+        //System.out.println("Unlabeled reparsed:\n" + avgUnlabeledReparsed);
 
         debugging.stream()
                 .sorted((b1, b2) -> Double.compare(b1.deltaF1, b2.deltaF1))
-                        //                .filter(b -> b.oracleDeltaF1 > 1e-3)
-                .filter(b -> Math.abs(b.deltaF1) > 1e-3)
+                //.filter(b -> b.oracleDeltaF1 > 1e-3)
+                //.filter(b -> Math.abs(b.deltaF1) > 1e-3)
                 .forEach(b -> System.out.println(b.block));
 
         System.out.println("Num. new questions:\t" + numNewQuestions);

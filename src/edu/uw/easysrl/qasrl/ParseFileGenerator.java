@@ -19,16 +19,28 @@ import java.util.stream.Collectors;
  * Created by luheng on 1/30/16.
  */
 public class ParseFileGenerator {
+    static final boolean generateDev = false;
+    static final boolean includeGoldInTest = true;
     static final int nBest = 100;
     static ImmutableSet<Integer> skipDevSentences = ImmutableSet.of(1244, 1839);
 
     public static void main(String[] args) {
+        System.err.println(generateDev ? "Generating for CCG Dev set." : "Generating for CCG Test set.");
+        if (!generateDev && includeGoldInTest) {
+            System.err.println("Warning: reading gold parses for test!!!");
+        }
         Map<Integer, List<Parse>> allParses = new HashMap<>();
-        final ParseData dev = ParseDataLoader.loadFromDevPool().get();
-        //final ParseData test = ParseData.loadFromTestPool().get();
+        ParseData dev, test;
+        if (generateDev) {
+            dev = ParseDataLoader.loadFromDevPool().get();
+        } else {
+            test = ParseDataLoader.loadFromTestPool(includeGoldInTest).get();
+        }
 
-        ImmutableList<ImmutableList<InputReader.InputWord>> sentences = dev.getSentenceInputWords();
-        ImmutableList<Parse> goldParses = dev.getGoldParses();
+        ImmutableList<ImmutableList<InputReader.InputWord>> sentences =
+                generateDev ? dev.getSentenceInputWords() : test.getSentenceInputWords();
+        ImmutableList<Parse> goldParses =
+                generateDev ?  dev.getGoldParses() : test.getGoldParses();
 
         int numParsed = 0;
         double averageN = .0;
@@ -38,7 +50,7 @@ public class ParseFileGenerator {
 
         for (int sentIdx = 0; sentIdx < sentences.size(); sentIdx ++) {
             System.out.println(sentIdx + ", " + sentences.get(sentIdx).size());
-            List<Parse> parses = skipDevSentences.contains(sentIdx) ?
+            List<Parse> parses = generateDev && skipDevSentences.contains(sentIdx) ?
                     ImmutableList.of(backoffParser.parse(sentences.get(sentIdx))) :
                     parser.parseNBest(sentences.get(sentIdx));
             if (parses == null) {
@@ -68,7 +80,9 @@ public class ParseFileGenerator {
             numParsed ++;
         }
 
-        String outputFileName = String.format("parses.tagged.dev.%dbest.out", nBest);
+        String outputFileName = generateDev ?
+                String.format("parses.tagged.dev.%dbest.new.out", nBest) :
+                String.format("parses.tagged.test.%dbest.new.out", nBest);
         try {
             ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(outputFileName));
             oos.writeObject(allParses);
