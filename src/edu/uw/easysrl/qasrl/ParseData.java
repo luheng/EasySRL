@@ -63,9 +63,8 @@ public final class ParseData {
         }
         while (sentenceIterator.hasNext()) {
             Sentence sentence = sentenceIterator.next();
-            List<InputReader.InputWord> inputWords = sentence.getInputWords();
-            postagger.tag(inputWords);
-            sentenceInputWords.add(inputWords);
+            List<InputReader.InputWord> taggedInput = postagger.tag(sentence.getInputWords());
+            sentenceInputWords.add(taggedInput);
             Set<ResolvedDependency> goldDependencies = CCGBankEvaluation
                     .asResolvedDependencies(sentence.getCCGBankDependencyParse().getDependencies());
             goldParses.add(new Parse(sentence.getCcgbankParse(), sentence.getLexicalCategories(), goldDependencies));
@@ -96,9 +95,8 @@ public final class ParseData {
         }
         while (sentenceIterator.hasNext()) {
             Sentence sentence = sentenceIterator.next();
-            List<InputReader.InputWord> inputWords = sentence.getInputWords();
-            postagger.tag(inputWords);
-            sentenceInputWords.add(inputWords);
+            List<InputReader.InputWord> taggedInput = postagger.tag(sentence.getInputWords());
+            sentenceInputWords.add(taggedInput);
             Set<ResolvedDependency> goldDependencies = CCGBankEvaluation
                     .asResolvedDependencies(sentence.getCCGBankDependencyParse().getDependencies());
             goldParses.add(new Parse(sentence.getCcgbankParse(), sentence.getLexicalCategories(), goldDependencies));
