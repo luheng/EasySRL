@@ -48,6 +48,15 @@ public class Parse implements Serializable {
         categoriesImmutable = ImmutableList.copyOf(categories);
     }
 
+    public Parse(List<String> words, List<Category> categories) {
+        this.syntaxTree = null;
+        this.categories = categories;
+        this.dependencies = null;
+        this.score  =1.0;
+        this.words = ImmutableList.copyOf(words);
+        categoriesImmutable = ImmutableList.copyOf(categories);
+    }
+
     public Parse(SyntaxTreeNode syntaxTree, List<Category> categories, Set<ResolvedDependency> dependencies) {
         this(syntaxTree, categories, dependencies, 1.0);
     }

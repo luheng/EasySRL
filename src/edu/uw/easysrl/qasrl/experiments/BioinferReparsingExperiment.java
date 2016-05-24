@@ -32,25 +32,14 @@ import java.util.stream.IntStream;
  * Average cost: if we don't ask PP questions, avg cost is about 30c per sentence ...
  * Created by luheng on 3/20/16.
  */
-public class ReparsingExperiment {
+public class BioinferReparsingExperiment {
     private static final int nBest = 100;
     private static HITLParser myHTILParser;
     private static ReparsingHistory myHistory;
     private static Map<Integer, List<AlignedAnnotation>> annotations;
 
     private static final String[] annotationFiles = {
-          //  "./Crowdflower_data/f878213.csv",                // Round1: radio-button, core + pp
-          //  "./Crowdflower_data/f882410.csv",                // Round2: radio-button, core only
-          //  "./Crowdflower_data/all-checkbox-responses.csv", // Round3: checkbox, core + pp
-          //  "./Crowdflower_data/f891522.csv",                // Round4: jeopardy checkbox, pp only
-         //   "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
-        //    "./Crowdflower_data/f897179.csv",                 // Round2-3: NP clefting questions.
-         //  "./Crowdflower_data/f902142.csv",                   // Round4: checkbox, pronouns, core only, 300 sentences.
-         //   "./Crowdflower_data/f903842.csv",                   // Round4: np-clefting pronouns
-         //   "./Crowdflower_data/f909211.csv",                   // Round5: checkbox, pronouns, core only, 300+ sentences.
-         //   "./Crowdflower_data/f912533.csv",                   // Round1-2: rerun, new question generator.
-         //   "./Crowdflower_data/f912675.csv",                   // Round6: Dev wrap-up. 400+ sentences.
-            "./Crowdflower_data/f913098.csv",                   // Round5: Rerun 200+ sentences.
+            "./Crowdflower_bioinfer/f913083.csv",                   // Test run
     };
 
     private static QueryPruningParameters queryPruningParameters;
@@ -59,11 +48,6 @@ public class ReparsingExperiment {
         queryPruningParameters.maxNumOptionsPerQuery = 6;
         queryPruningParameters.skipPPQuestions = true;
         queryPruningParameters.skipSAdjQuestions = true;
-        /*
-        queryPruningParameters.minOptionConfidence = 0.05;
-        queryPruningParameters.minOptionEntropy = 0.05;
-        queryPruningParameters.minPromptConfidence = 0.1;
-        */
         queryPruningParameters.minOptionConfidence = 0.05;
         queryPruningParameters.minOptionEntropy = -1;
         queryPruningParameters.minPromptConfidence = 0.1;
@@ -83,7 +67,9 @@ public class ReparsingExperiment {
     }
 
     public static void main(String[] args) {
-        myHTILParser = new HITLParser(nBest);
+        ParseData bioinfer = ParseDataLoader.loadFromBioinferDev().get();
+        myHTILParser = new HITLParser(bioinfer,
+                NBestList.loadNBestListsFromFile("bioinfer.dev.100best.out", 100).get());
         myHTILParser.setQueryPruningParameters(queryPruningParameters);
         myHTILParser.setReparsingParameters(reparsingParameters);
         annotations = ExperimentUtils.loadCrowdflowerAnnotation(annotationFiles);
@@ -93,24 +79,12 @@ public class ReparsingExperiment {
     }
 
     private static void runExperiment() {
-        final Collection<Integer> newCoreAgsSentenceIds = CrowdFlowerDataUtils.getNewCoreArgAnnotatedSentenceIds();
-        List<Integer> sentenceIds = myHTILParser.getAllSentenceIds();
-                //annotations.keySet().stream().sorted().collect(Collectors.toList());
-                /*myHTILParser.getAllSentenceIds().stream()
-                        .filter(id -> !round1And2Ids.contains(id))
-                        .collect(Collectors.toList()); */
+        final Collection<Integer> round6Ids = CrowdFlowerDataUtils.getRound6SentenceIds();
+        List<Integer> sentenceIds = annotations.keySet().stream().sorted().collect(Collectors.toList());
+
         System.out.println(sentenceIds.stream().map(String::valueOf).collect(Collectors.joining(", ")));
         System.out.println("Queried " + sentenceIds.size() + " sentences. Total number of questions:\t" +
-            annotations.entrySet().stream().mapToInt(e -> e.getValue().size()).sum());
-
-        /*
-        ImmutableSet<String> annotators =
-                annotations.values().stream()
-                        .flatMap(al -> al.stream())
-                        .flatMap(annot -> annot.annotatorToAnswerIds.keySet().stream())
-                        .sorted()
-                        .collect(GuavaCollectors.toImmutableSet());
-        annotators.stream().forEach(System.err::println); */
+                annotations.entrySet().stream().mapToInt(e -> e.getValue().size()).sum());
 
         // Stats.
         ImmutableList<Results> optionAccuracy = IntStream.range(0, 5).boxed()
@@ -129,8 +103,6 @@ public class ReparsingExperiment {
                 avgUnlabeledReranked = new Results(),
                 avgUnlabeledReparsed = new Results();
 
-        BaseCcgParser baseParser = null; // new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, 1);
-
         int counter = 0;
         TicToc.tic();
         for (int sentenceId : sentenceIds) {
@@ -145,56 +117,25 @@ public class ReparsingExperiment {
             final NBestList nBestList = myHTILParser.getNBestList(sentenceId);
             final int numParses = nBestList.getN();
             final Parse goldParse = myHTILParser.getGoldParse(sentenceId);
-            final Parse baselineParse = baseParser == null ?
-                    myHTILParser.getParse(sentenceId, 0) :
-                    baseParser.parse(sentenceId, myHTILParser.getInputSentence(sentenceId));
+            final Parse baselineParse = myHTILParser.getParse(sentenceId, 0);
             Parse reparse = baselineParse, oracleReparse = baselineParse;
 
-            final Results baselineF1 = CcgEvaluation.evaluate(baselineParse.dependencies, goldParse.dependencies);
-            final Results unlabeledBaselineF1 = CcgEvaluation.evaluateUnlabeled(baselineParse.dependencies,
-                    goldParse.dependencies);
+            final Results baselineF1 = nBestList.getResults(0);
             avgBaseline.add(baselineF1);
-            avgUnlabeledBaseline.add(unlabeledBaselineF1);
 
             final List<AlignedAnnotation> annotated = annotations.get(sentenceId);
             if (annotated == null || annotated.isEmpty()) {
                 avgReparsed.add(baselineF1);
                 avgReranked.add(baselineF1);
-                avgUnlabeledReranked.add(unlabeledBaselineF1);
-                avgUnlabeledReparsed.add(unlabeledBaselineF1);
                 continue;
             }
             IntStream.range(0, annotated.size()).forEach(i -> annotated.get(i).iterationId = i);
-
-            boolean isCheckboxStyle = !annotated.stream()
-                    .anyMatch(annot -> annot.answerOptions.stream()
-                            .anyMatch(op -> op.contains(QAPairAggregatorUtils.answerDelimiter)));
-            boolean isClefting = annotated.stream()
-                    .anyMatch(annot -> annot.queryPrompt.startsWith("What is it"));
-            boolean useNewCoreArgsQuestions = newCoreAgsSentenceIds.contains(sentenceId);
-
-            List<ScoredQuery<QAStructureSurfaceForm>> queryList = new ArrayList<>();
-            if (!isClefting) {
-                if (!isCheckboxStyle) {
-                    queryList.addAll(myHTILParser.getCoreArgumentQueriesForSentence(sentenceId,
-                            false /* radiobutton version*/));
-                } else {
-                    if (useNewCoreArgsQuestions) {
-                        queryList.addAll(myHTILParser.getNewCoreArgQueriesForSentence(sentenceId));
-                    } else {
-                        queryList.addAll(myHTILParser.getPronounCoreArgQueriesForSentence(sentenceId));
-                    }
-                }
-            } else {
-                queryList.addAll(myHTILParser.getCleftedQuestionsForSentence(sentenceId));
-            }
-
+            List<ScoredQuery<QAStructureSurfaceForm>> queryList =
+                    myHTILParser.getNewCoreArgQueriesForSentence(sentenceId);
             Results currentF1 = baselineF1,
                     oracleF1 = baselineF1,
                     rerankedF1 = baselineF1,
-                    reparsedF1 = baselineF1,
-                    unlabeledRerankedF1 = unlabeledBaselineF1,
-                    unlabeledReparsedF1 = unlabeledBaselineF1;
+                    reparsedF1 = baselineF1;
 
             final Set<Constraint> allConstraints = new HashSet<>(), allOracleConstraints = new HashSet<>();
             String sentenceDebuggingString = "";
@@ -203,14 +144,9 @@ public class ReparsingExperiment {
 
             for (ScoredQuery<QAStructureSurfaceForm> query : queryList) {
                 AlignedAnnotation annotation = ExperimentUtils.getAlignedAnnotation(query, annotations.get(sentenceId));
-                ImmutableList<Integer> goldOptions    = myHTILParser.getGoldOptions(query),
-                                       oneBestOptions = myHTILParser.getOneBestOptions(query),
+                ImmutableList<Integer> oneBestOptions = myHTILParser.getOneBestOptions(query),
                                        oracleOptions  = myHTILParser.getOracleOptions(query);
                 if (annotation == null) {
-                    /*
-                    sentenceDebuggingString += Colors.ANSI_BLUE
-                            + query.toString(sentence, 'G', goldOptions, 'B', oneBestOptions, 'O', oracleOptions)
-                            + "\n" + Colors.ANSI_RESET; */
                     numNewQuestions ++;
                     continue;
                 }
@@ -223,10 +159,8 @@ public class ReparsingExperiment {
                 newResponses.stream().forEach(resp -> resp.stream().forEach(op -> newOptionDist[op]++));
 
                 ImmutableList<Integer> userOptions  = myHTILParser.getUserOptions(query, annotation),
-                                       userOptions2 = myHTILParser.getUserOptions(query, newOptionDist);
-                if (responses.size() != 5) {
-                    continue;
-                }
+                        userOptions2 = myHTILParser.getUserOptions(query, newOptionDist);
+                //if (responses.size() != 5) { continue; }
 
                 // Update stats.
                 for (int i = 0; i < 5; i++) {
@@ -235,26 +169,20 @@ public class ReparsingExperiment {
                             .filter(id -> optionDist[id] >= minAgr)
                             .collect(GuavaCollectors.toImmutableList());
                     if (options.size() > 0) {
-                        goldStrictMatch.get(i).add(options.containsAll(goldOptions) && goldOptions.containsAll(options));
+                        goldStrictMatch.get(i).add(options.containsAll(oracleOptions) && oracleOptions.containsAll(options));
                         optionAccuracy.get(i).add(new Results(options.size(),
-                                (int) options.stream().filter(goldOptions::contains).count(), goldOptions.size()));
+                                (int) options.stream().filter(oracleOptions::contains).count(), oracleOptions.size()));
                     }
                 }
                 numMatchedAnnotations ++;
 
-                /*if (userOptions.isEmpty()) {
-                    continue;
-                }*/
-                if (Prepositions.prepositionWords.contains(sentence.get(query.getPredicateId().getAsInt()).toLowerCase())) {
-                    continue;
-                }
-                if (query.isJeopardyStyle() && userOptions.contains(query.getBadQuestionOptionId().getAsInt())) {
-                    continue;
-                }
-                ImmutableSet<Constraint> constraints = myHTILParser.getConstraints(query, newOptionDist),
-                                         oracleConstraints = myHTILParser.getOracleConstraints(query); //, goldOptions);
+                //if (userOptions.isEmpty()) {
+                //    continue;
+                //}
+                ImmutableSet<Constraint> constraints = myHTILParser.getConstraints(query, optionDist), //myHTILParser.getConstraints(query, newOptionDist),
+                        oracleConstraints = myHTILParser.getOracleConstraints(query); //, goldOptions);
 
-                //` Set constraint strength proportional to sentence length.
+                // Set constraint strength proportional to sentence length.
                 //constraints.stream().forEach(c -> c.setStrength(0.2 * sentence.size()));
 
                 allConstraints.addAll(constraints);
@@ -268,18 +196,16 @@ public class ReparsingExperiment {
                 oracleReparse = myHTILParser.getNBestList(sentenceId)
                         .getParse(myHTILParser.getRerankedParseId(sentenceId, allOracleConstraints));
                 rerankedF1 = nBestList.getResults(rerankedId);
-                unlabeledRerankedF1 = CcgEvaluation.evaluateUnlabeled(nBestList.getParse(rerankedId).dependencies,
-                                                                      goldParse.dependencies);
+
+                // TODO: wrapper evaluator
                 reparsedF1 = CcgEvaluation.evaluate(reparse.dependencies, goldParse.dependencies);
-                unlabeledReparsedF1 = CcgEvaluation.evaluateUnlabeled(reparse.dependencies, goldParse.dependencies);
                 oracleF1 = CcgEvaluation.evaluate(oracleReparse.dependencies, goldParse.dependencies);
 
                 myHistory.addEntry(sentenceId, query, userOptions, constraints, oracleConstraints, reparse,
-                                   oracleReparse, rerankedId, reparsedF1, rerankedF1, oracleF1);
+                        oracleReparse, rerankedId, reparsedF1, rerankedF1, oracleF1);
 
                 // Print debugging information.
                 String result = query.toString(sentence,
-                        'G', goldOptions,
                         'O', oracleOptions,
                         'B', oneBestOptions,
                         'U', userOptions,
@@ -317,8 +243,6 @@ public class ReparsingExperiment {
 
             avgReparsed.add(reparsedF1);
             avgReranked.add(rerankedF1);
-            avgUnlabeledReranked.add(unlabeledRerankedF1);
-            avgUnlabeledReparsed.add(unlabeledReparsedF1);
 
             Optional<Results> lastReparsedResult = myHistory.getLastReparsingResult(sentenceId);
             if (lastReparsedResult.isPresent()) {
@@ -326,12 +250,6 @@ public class ReparsingExperiment {
                 String changeStr = deltaF1 < -1e-6 ? "Worsened." : (deltaF1 > 1e-6 ? "Improved." : "Unchanged.");
                 sentenceDebuggingString += String.format("Final F1: %.3f%% over %.3f%% baseline.\t%s\n",
                         100.0 * lastReparsedResult.get().getF1(), 100.0 * baselineF1.getF1(), changeStr);
-
-                /*
-                sentenceDebuggingString += annotated.stream()
-                        .filter(annot -> !matchedAnnotationIds.contains(annot.iterationId))
-                        .map(annot -> Colors.ANSI_GREEN + annot + Colors.ANSI_RESET)
-                        .collect(Collectors.joining("\n")); */
 
                 DebugBlock debugBlock = new DebugBlock(deltaF1, sentenceDebuggingString);
                 debugBlock.oracleDeltaF1 = oracleF1.getF1() - lastReparsedResult.get().getF1();

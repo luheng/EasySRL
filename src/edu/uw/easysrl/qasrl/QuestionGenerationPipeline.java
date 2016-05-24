@@ -1,35 +1,20 @@
 package edu.uw.easysrl.qasrl;
 
-import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.query.*;
-import edu.uw.easysrl.qasrl.qg.surfaceform.*;
 
-import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
-import edu.uw.easysrl.qasrl.qg.util.*;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregator;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregators;
 import edu.uw.easysrl.qasrl.qg.QuestionGenerator;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
-import edu.uw.easysrl.qasrl.query.*;
-import edu.uw.easysrl.qasrl.model.HITLParser;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import static edu.uw.easysrl.util.GuavaCollectors.*;
-import edu.uw.easysrl.qasrl.TextGenerationHelper;
-import static edu.uw.easysrl.qasrl.TextGenerationHelper.TextWithDependencies;
 
 import java.util.*;
-import java.util.stream.Collectors;
-import static java.util.stream.Collectors.*;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
-import java.util.function.Function;
-import java.util.function.Consumer;
-import java.util.function.Predicate;
 
 public abstract class QuestionGenerationPipeline {
 
@@ -42,6 +27,11 @@ public abstract class QuestionGenerationPipeline {
             @Override
             public QAPairAggregator<QAStructureSurfaceForm> getQAPairAggregator() {
                 return QAPairAggregators.aggregateWithAnswerAdverbAndPPArgDependencies();
+            }
+
+            @Override
+            public QuestionGenerationPipeline setQueryPruningParameters(final QueryPruningParameters pruningParameters) {
+                return this;
             }
 
             @Override
@@ -73,26 +63,24 @@ public abstract class QuestionGenerationPipeline {
 
             @Override
             public Optional<QueryFilter<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>>> getQueryFilter() {
-                final QueryFilter<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> queryFilter = (queries, nBestList, queryPruningParameters) -> {
-                    return queries.stream()
-                    .filter(query -> {
-                            final ImmutableList<String> words = query.getQAPairSurfaceForms().get(0).getQAPairs().get(0).getParse().syntaxTree
-                            .getLeaves().stream().map(l -> l.getWord())
-                            .collect(toImmutableList());
-                            final int predIndex = query.getQAPairSurfaceForms().get(0).getPredicateIndex();
-                            final boolean isAdj = query.getQAPairSurfaceForms().stream()
-                            .flatMap(sf -> sf.getQuestionStructures().stream())
-                            .allMatch(qStr -> qStr.category.isFunctionInto(Category.valueOf("S[adj]")));
-                            return query.getPromptScore() >= getQueryPruningParameters().minPromptConfidence &&
-                            query.getOptionEntropy() >= getQueryPruningParameters().minOptionEntropy &&
-                            (!getQueryPruningParameters().skipSAdjQuestions || !isAdj) &&
-                            (!getQueryPruningParameters().skipBinaryQueries || query.getQAPairSurfaceForms().size() > 1);
-                        })
-                    .collect(toImmutableList());
-                };
+                final QueryFilter<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> queryFilter =
+                        (queries, nBestList, queryPruningParameters) -> queries.stream()
+                                .filter(query -> {
+                                    final ImmutableList<String> words = query.getQAPairSurfaceForms().get(0).getQAPairs().get(0).getParse().syntaxTree
+                                    .getLeaves().stream().map(l -> l.getWord())
+                                    .collect(toImmutableList());
+                                    final int predIndex = query.getQAPairSurfaceForms().get(0).getPredicateIndex();
+                                    final boolean isAdj = query.getQAPairSurfaceForms().stream()
+                                    .flatMap(sf -> sf.getQuestionStructures().stream())
+                                    .allMatch(qStr -> qStr.category.isFunctionInto(Category.valueOf("S[adj]")));
+                                    return query.getPromptScore() >= getQueryPruningParameters().minPromptConfidence &&
+                                    query.getOptionEntropy() >= getQueryPruningParameters().minOptionEntropy &&
+                                    (!getQueryPruningParameters().skipSAdjQuestions || !isAdj) &&
+                                    (!getQueryPruningParameters().skipBinaryQueries || query.getQAPairSurfaceForms().size() > 1);
+                                })
+                                .collect(toImmutableList());
                 return Optional.of(queryFilter);
             }
-
 
             private QueryPruningParameters queryPruningParameters = null;
             @Override
@@ -113,6 +101,12 @@ public abstract class QuestionGenerationPipeline {
             }
 
             @Override
+            public QuestionGenerationPipeline setQueryPruningParameters(final QueryPruningParameters pruningParameters) {
+                this.queryPruningParameters = pruningParameters;
+                return this;
+            }
+
+            @Override
             public QueryGenerator<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> getQueryGenerator() {
                 return QueryGenerators.checkboxQueryGenerator();
             }
@@ -122,6 +116,50 @@ public abstract class QuestionGenerationPipeline {
                 return Optional.empty();
             }
         };
+
+    public static QuestionGenerationPipeline coreArgQGPipeline = new QuestionGenerationPipeline() {
+
+        @Override
+        public ImmutableList<QuestionAnswerPair> generateQAPairs(int sentenceId, int parseId, Parse parse) {
+            return new ImmutableList.Builder<QuestionAnswerPair>()
+                    .addAll(QuestionGenerator.newCoreNPArgQuestions(sentenceId, parseId, parse))
+                    .addAll(QuestionGenerator.newCopulaQuestions(sentenceId, parseId, parse))
+                    .addAll(QuestionGenerator.newPPObjPronounQuestions(sentenceId, parseId, parse))
+                    .build();
+        }
+
+        private QueryPruningParameters queryPruningParameters = null;
+
+        public QueryPruningParameters getQueryPruningParameters() {
+            return queryPruningParameters;
+        }
+
+        public QuestionGenerationPipeline setQueryPruningParameters(final QueryPruningParameters pruningParameters) {
+            this.queryPruningParameters = pruningParameters;
+            return this;
+        }
+
+        @Override
+        public QAPairAggregator<QAStructureSurfaceForm> getQAPairAggregator() {
+            return QAPairAggregators.aggregateForMultipleChoiceQA();
+        }
+
+        @Override
+        public QueryGenerator<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> getQueryGenerator() {
+            return QueryGenerators.checkboxQueryGenerator();
+        }
+
+        @Override
+        public Optional<QueryFilter<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>>> getQueryFilter() {
+            return Optional.of(QueryFilters.scoredQueryFilter());
+        }
+
+        @Override
+        public Optional<ResponseSimulator> getResponseSimulator(ImmutableMap<Integer, Parse> parses) {
+            return Optional.empty();
+        }
+    };
+
 
     public abstract ImmutableList<QuestionAnswerPair> generateQAPairs(int sentenceId, int parseId, Parse parse);
 
@@ -136,9 +174,12 @@ public abstract class QuestionGenerationPipeline {
     public Optional<QueryFilter<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>>> getQueryFilter() {
         return Optional.empty();
     }
+
     public QueryPruningParameters getQueryPruningParameters() {
         return new QueryPruningParameters();
     }
+
+    public abstract QuestionGenerationPipeline setQueryPruningParameters(final QueryPruningParameters pruningParameters);
 
     public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> generateAllQueries(int sentenceId, NBestList nBestList) {
         final ImmutableList<QuestionAnswerPair> allQAPairs = IntStream.range(0, nBestList.getN()).boxed()
@@ -174,7 +215,7 @@ public abstract class QuestionGenerationPipeline {
             return simOpt.get();
         } else {
             // get the gold parses from somewhere else?
-            return new ResponseSimulatorGold(ParseData.loadFromDevPool().get());
+            return new ResponseSimulatorGold(ParseDataLoader.loadFromDevPool().get());
         }
     }
 }

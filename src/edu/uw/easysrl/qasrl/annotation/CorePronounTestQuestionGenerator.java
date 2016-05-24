@@ -17,8 +17,7 @@ import java.util.stream.IntStream;
  * Created by luheng on 4/6/16.
  */
 public class CorePronounTestQuestionGenerator {
-    static final int nBest = 100;
-    private final static HITLParser hitlParser = new HITLParser(nBest);
+    private final static HITLParser hitlParser = new HITLParser(100 /* nbest */);
 
     static QueryPruningParameters queryPruningParameters;
     static {
@@ -60,15 +59,6 @@ public class CorePronounTestQuestionGenerator {
                                 'T', realignedOptionIds) +
                                 String.format("[reason]:\t\t%s\n", testQuestion.comment));
             });
-
-            //queryList.forEach(query -> {
-                //final ImmutableList<Integer> realignedOptionIds = AnnotationUtils.getSingleUserResponse(query, testQuestion);
-            //    System.out.println(query.toString(hitlParser.getSentence(sentId), 'G', hitlParser.getGoldOptions(query)));
-            //});
-
-            //if (queryList.size() == 0) {
-            //    System.out.println("------\n" + testQuestion);
-            //}
         }
     }
 

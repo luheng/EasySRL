@@ -45,8 +45,12 @@ public class CrowdFlowerDataReader {
                     continue;
                 }
             } else {
+                // 2:is_(S[dcl]\NP)/NP.2
                 String qkey = record.get("query_key");
                 annotation.predicateId = Integer.parseInt(qkey.split(":")[0]);
+                String qkey2 = qkey.split("_")[1].split("\\s+")[0];
+                annotation.predicateCategory = Category.valueOf(qkey2.split("\\.")[0]);
+                annotation.argumentNumber = Integer.parseInt(qkey2.split("\\.")[1]);
             }
 
             annotation.queryId = Integer.parseInt(record.get("query_id"));

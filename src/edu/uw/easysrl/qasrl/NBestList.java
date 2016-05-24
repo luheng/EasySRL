@@ -3,9 +3,11 @@ package edu.uw.easysrl.qasrl;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
+import edu.uw.easysrl.qasrl.evaluation.Accuracy;
 import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.main.InputReader;
+import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.List;
 import java.util.Map;
@@ -62,7 +64,16 @@ public final class NBestList {
 
 
     public void cacheResults(final Parse goldParse) {
-        results = ImmutableList.copyOf(CcgEvaluation.evaluateNBest(parses, goldParse.dependencies));
+        if (goldParse.dependencies != null) {
+            results = ImmutableList.copyOf(CcgEvaluation.evaluateNBest(parses, goldParse.dependencies));
+        } else {
+            results = parses.stream()
+                    .map(parse -> {
+                        final Accuracy acc = CcgEvaluation.evaluateTags(parse.categories, goldParse.categories);
+                        return new Results(acc.getNumTotal(), acc.getNumCorrect(), acc.getNumTotal());
+                    })
+                    .collect(GuavaCollectors.toImmutableList());
+        }
         oracleId = 0;
         for (int k = 1; k < parses.size(); k++) {
             if (results.get(k).getF1() > results.get(oracleId).getF1()) {

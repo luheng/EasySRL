@@ -1,11 +1,8 @@
 package edu.uw.easysrl.qasrl.analysis;
 
-import edu.uw.easysrl.qasrl.ParseData;
-import edu.uw.easysrl.qasrl.Parse;
-import edu.uw.easysrl.qasrl.NBestList;
+import edu.uw.easysrl.qasrl.*;
 
 import edu.uw.easysrl.dependencies.ResolvedDependency;
-import edu.uw.easysrl.qasrl.TextGenerationHelper;
 import edu.uw.easysrl.qasrl.analysis.DependencyProfiler;
 import edu.uw.easysrl.qasrl.analysis.ProfiledDependency;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
@@ -409,7 +406,7 @@ public class DependencyErrorAnalysis {
             .collect(toImmutableList());
     }
 
-    private static final ParseData parseData = ParseData.loadFromDevPool().get();
+    private static final ParseData parseData = ParseDataLoader.loadFromDevPool().get();
     private static final ImmutableList<Parse> goldParses = parseData.getGoldParses();
     private static final ImmutableList<ImmutableList<String>> sentences = parseData.getSentences();
     private static final String[] round3CoreArgAnnotationFiles = {

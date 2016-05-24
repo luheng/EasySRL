@@ -33,21 +33,35 @@ public class QueryFilters {
                 Category.valueOf("(NP\\NP)/NP"),
                 Category.valueOf("((S\\NP)\\(S\\NP))/S[dcl]"));
     }
+    final static ImmutableList<String> splitTokens = ImmutableList.of(", ", " and ", " or ", ", and ", ", or ");
 
-    private static boolean canBeSplitted(final String option, final ImmutableList<String> allOptions) {
-        for (String op1 : allOptions) {
-            for (String op2 : allOptions) {
-                if (option.equalsIgnoreCase(op1 + ", " + op2) ||
-                        option.equalsIgnoreCase(op1 + " and " + op2) ||
-                        option.equalsIgnoreCase(op1 + " or " + op2) ||
-                        option.equalsIgnoreCase(op1 + ", and " + op2) ||
-                        option.equalsIgnoreCase(op1 + ", or " + op2)) {
-                    //System.err.println(option);
+    private static boolean searchSplit(final String curr, final String targ, final int idx,
+                                       final ImmutableList<String> allOptions) {
+        for (int i = idx; i < allOptions.size(); i++) {
+            final String op = allOptions.get(i).toLowerCase();
+            if (curr.isEmpty() && targ.startsWith(op) && !targ.equals(op)) {
+                return searchSplit(op, targ, i + 1, allOptions);
+            }
+            for (String tok : splitTokens) {
+                final String str1 = curr + tok + op;
+                final String str2 = curr + "." + tok + op;
+                if (targ.equals(str1)|| targ.equals(str2)) {
+                    System.err.println(targ);
                     return true;
+                }
+                if (targ.startsWith(str1)) {
+                    return searchSplit(str1, targ, i + 1, allOptions);
+                }
+                if (targ.startsWith(str2)) {
+                    return searchSplit(str2, targ, i + 1, allOptions);
                 }
             }
         }
         return false;
+    }
+
+    private static boolean canBeSplitted(final String option, final ImmutableList<String> allOptions) {
+        return searchSplit("", option.toLowerCase(), 0, allOptions);
     }
 
     /**
@@ -67,8 +81,6 @@ public class QueryFilters {
                         !Prepositions.prepositionWords.contains(leaves.get(dep.getHead()).getWord().toLowerCase()));
     }
 
-    // TODO: filter answers that is a superspan of two non-overlapping answers. i.e.
-    //   Barack Obama, president vs. Obama vs. president
     public static QueryFilter<QAStructureSurfaceForm, ScoredQuery<QAStructureSurfaceForm>> scoredQueryFilter() {
         return (queries, nBestList, queryPruningParameters) -> queries.stream()
                 .filter(query -> {
@@ -111,7 +123,11 @@ public class QueryFilters {
                 })
                 .filter(query -> {
                     query.computeScores(nBestList);
+                    final int numQAOptions = query.getQAPairSurfaceForms().size();
+                    //final int numConfidentOptions = (int) IntStream.range(0, numQAOptions)
+                    //        .filter(i -> query.getOptionScores().get(i) > 1 - 1e-3).count();
                     return query.getPromptScore() > queryPruningParameters.minPromptConfidence
+                            //&& numConfidentOptions < numQAOptions
                             && query.getOptionEntropy() > queryPruningParameters.minOptionEntropy
                             && query.getQAPairSurfaceForms().size() < queryPruningParameters.maxNumOptionsPerQuery
                             && (!queryPruningParameters.skipBinaryQueries || query.getQAPairSurfaceForms().size() > 1);
