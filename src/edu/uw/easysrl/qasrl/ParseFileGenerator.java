@@ -2,12 +2,10 @@ package edu.uw.easysrl.qasrl;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import edu.uw.easysrl.main.EasySRL;
 import edu.uw.easysrl.main.InputReader;
 
 import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
 import edu.uw.easysrl.syntax.evaluation.Results;
-import uk.co.flamingpenguin.jewel.cli.CliFactory;
 
 import java.io.FileOutputStream;
 import java.io.ObjectOutputStream;
@@ -42,21 +40,26 @@ public class ParseFileGenerator {
         ImmutableList<Parse> goldParses =
                 generateDev ?  dev.getGoldParses() : test.getGoldParses();
 
+
         int numParsed = 0;
         double averageN = .0;
         Results oracleF1 = new Results(), baselineF1 = new Results();
-        BaseCcgParser parser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, nBest),
-                      backoffParser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, 1);
+        BaseCcgParser.AStarParser parser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, nBest,
+                              1e-6, 1e-6, 200000, 70);
+        BaseCcgParser.AStarParser backoffParser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, 1,
+                              1e-6, 1e-3, 200000, 70);
+        parser.cacheSupertags(generateDev ? dev : test);
 
         for (int sentIdx = 0; sentIdx < sentences.size(); sentIdx ++) {
             System.out.println(sentIdx + ", " + sentences.get(sentIdx).size());
-            List<Parse> parses = generateDev && skipDevSentences.contains(sentIdx) ?
-                    ImmutableList.of(backoffParser.parse(sentences.get(sentIdx))) :
-                    parser.parseNBest(sentences.get(sentIdx));
+            List<Parse> parses = //generateDev && skipDevSentences.contains(sentIdx) ?
+                    //ImmutableList.of(backoffParser.parse(sentences.get(sentIdx))) :
+                    parser.parseNBest(sentIdx, sentences.get(sentIdx));
             if (parses == null) {
-                System.err.println("Skipping sentence:\t" + sentIdx + "\t" + sentences.get(sentIdx).stream()
+                System.err.println("Backing-off:\t" + sentIdx + "\t" + sentences.get(sentIdx).stream()
                         .map(w -> w.word).collect(Collectors.joining(" ")));
-                continue;
+                parses = //backoffParser.parseNBest(sentences.get(sentIdx));
+                        ImmutableList.of(backoffParser.parse(sentIdx, sentences.get(sentIdx)));
             }
             averageN += parses.size();
             // Get results for every parse in the n-best list.

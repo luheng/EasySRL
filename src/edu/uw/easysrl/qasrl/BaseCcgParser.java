@@ -80,12 +80,19 @@ public abstract class BaseCcgParser {
     public static class AStarParser extends BaseCcgParser {
         private DependencyGenerator dependencyGenerator;
         private Parser parser;
-        private final double supertaggerBeam = 0.000001;
-        private final double nbestBeam = 0.000001;
-        private final int maxChartSize = 2000000;
-        private final int maxSentenceLength = 70;
+        private Tagger batchTagger = null;
+        private ImmutableList<List<List<Tagger.ScoredCategory>>> taggedSentences = null;
+        private static double supertaggerBeam = 1e-6;
+        private static double nbestBeam = 1e-6;
+        private static int maxChartSize = 1000000;
+        private static int maxSentenceLength = 70;
 
         public AStarParser(String modelFolderPath, int nBest)  {
+            this(modelFolderPath, nBest, supertaggerBeam, nbestBeam, maxChartSize, maxSentenceLength);
+        }
+
+        public AStarParser(String modelFolderPath, int nBest, double supertaggerBeam, double nbestBeam,
+                           int maxChartSize, int maxSentenceLength)  {
             final File modelFolder = Util.getFile(modelFolderPath);
             if (!modelFolder.exists()) {
                 throw new InputMismatchException("Couldn't load model from from: " + modelFolder);
@@ -106,6 +113,15 @@ public abstract class BaseCcgParser {
             }
         }
 
+        public void cacheSupertags(ParseData corpus) {
+            if (batchTagger != null) {
+                System.err.println("Batch tagging " + corpus.getSentences().size() + " sentences ...");
+                taggedSentences = batchTagger.tagBatch(corpus.getSentenceInputWords().parallelStream()
+                        .map(s -> s.stream().collect(Collectors.toList())))
+                        .collect(GuavaCollectors.toImmutableList());
+            }
+        }
+
         @Override
         public Parse parse(List<InputReader.InputWord> sentence) {
             List<Scored<SyntaxTreeNode>> parses = parser.doParsing(
@@ -120,6 +136,30 @@ public abstract class BaseCcgParser {
         public List<Parse> parseNBest(List<InputReader.InputWord> sentence) {
             List<Scored<SyntaxTreeNode>> parses = parser.doParsing(
                     new InputReader.InputToParser(sentence, null, null, false));
+            if (parses == null || parses.size() == 0) {
+                return null;
+            }
+            return parses.stream().map(p -> getParse(sentence, p, dependencyGenerator)).collect(Collectors.toList());
+        }
+
+        @Override
+        public Parse parse(int sentenceId, List<InputReader.InputWord> sentence) {
+            final InputReader.InputToParser input = taggedSentences == null ?
+                    new InputReader.InputToParser(sentence, null, null, false) :
+                    new InputReader.InputToParser(sentence, null, taggedSentences.get(sentenceId), true);
+            List<Scored<SyntaxTreeNode>> parses = parser.doParsing(input);
+            if (parses == null || parses.size() == 0) {
+                return null;
+            }
+            return getParse(sentence, parses.get(0), dependencyGenerator);
+        }
+
+        @Override
+        public List<Parse> parseNBest(int sentenceId, List<InputReader.InputWord> sentence) {
+            final InputReader.InputToParser input = taggedSentences == null ?
+                    new InputReader.InputToParser(sentence, null, null, false) :
+                    new InputReader.InputToParser(sentence, null, taggedSentences.get(sentenceId), true);
+            List<Scored<SyntaxTreeNode>> parses = parser.doParsing(input);
             if (parses == null || parses.size() == 0) {
                 return null;
             }
@@ -154,7 +194,6 @@ public abstract class BaseCcgParser {
                 System.err.println("Parser initialization failed.");
                 e.printStackTrace();
             }
-
             try {
                 batchTagger = Tagger.make(modelFolder, supertaggerBeam, 50, null);
             } catch (IOException e) {

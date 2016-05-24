@@ -232,7 +232,6 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
         for (int i = 0; i < options.size(); i++) {
             String matchingStr = "";
             for (int j = 0; j + 1 < optionLegends.length; j += 2) {
-                char legend = (char) optionLegends[j];
                 final ImmutableList<Integer> chosenOptions = (ImmutableList<Integer>) optionLegends[j + 1];
                 matchingStr += chosenOptions.contains(i) ? (char) optionLegends[j] : "";
             }
