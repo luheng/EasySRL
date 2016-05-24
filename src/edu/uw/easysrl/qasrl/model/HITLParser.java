@@ -106,7 +106,7 @@ public class HITLParser {
         reparser.cacheSupertags(parseData);
         goldSimulator = new ResponseSimulatorGold(parseData);
 
-        // Cache results.
+        // Cache results, is gold parses are given.
         nbestLists.entrySet().forEach(e -> e.getValue().cacheResults(goldParses.get(e.getKey())));
 
         // Print nbest stats
