@@ -134,6 +134,10 @@ public class BioinferCCGCorpus {
         BaseCcgParser.AStarParser backoffParser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, 1,
                 1e-6, 1e-6, 250000, 100);
 
+        parser.cacheSupertags(corpus.inputSentences);
+        backoffParser.cacheSupertags(corpus.inputSentences);
+
+
         final ImmutableList<ImmutableList<InputReader.InputWord>> inputSentences = corpus.getInputSentences();
         for (int sentIdx = 0; sentIdx < inputSentences.size(); sentIdx ++) {
             System.out.println(sentIdx + ", " + inputSentences.get(sentIdx).size());

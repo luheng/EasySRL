@@ -82,13 +82,9 @@ public abstract class BaseCcgParser {
         private Parser parser;
         private Tagger batchTagger = null;
         private ImmutableList<List<List<Tagger.ScoredCategory>>> taggedSentences = null;
-        private static double supertaggerBeam = 1e-6;
-        private static double nbestBeam = 1e-6;
-        private static int maxChartSize = 1000000;
-        private static int maxSentenceLength = 70;
 
         public AStarParser(String modelFolderPath, int nBest)  {
-            this(modelFolderPath, nBest, supertaggerBeam, nbestBeam, maxChartSize, maxSentenceLength);
+            this(modelFolderPath, nBest, 1e-6, 1e-6, 1000000, 70);
         }
 
         public Parser getParser() {
@@ -121,6 +117,15 @@ public abstract class BaseCcgParser {
             if (batchTagger != null) {
                 System.err.println("Batch tagging " + corpus.getSentences().size() + " sentences ...");
                 taggedSentences = batchTagger.tagBatch(corpus.getSentenceInputWords().parallelStream()
+                        .map(s -> s.stream().collect(Collectors.toList())))
+                        .collect(GuavaCollectors.toImmutableList());
+            }
+        }
+
+        public void cacheSupertags(ImmutableList<ImmutableList<InputReader.InputWord>> inputSentences) {
+            if (batchTagger != null) {
+                System.err.println("Batch tagging " + inputSentences.size() + " sentences ...");
+                taggedSentences = batchTagger.tagBatch(inputSentences.parallelStream()
                         .map(s -> s.stream().collect(Collectors.toList())))
                         .collect(GuavaCollectors.toImmutableList());
             }
