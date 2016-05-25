@@ -39,7 +39,8 @@ public class BioinferReparsingExperiment {
     private static Map<Integer, List<AlignedAnnotation>> annotations;
 
     private static final String[] annotationFiles = {
-            "./Crowdflower_bioinfer/f913083.csv",                   // Test run
+            // "./Crowdflower_bioinfer/f913083.csv",                   // Test run
+            "./Crowdflower_bioinfer/f913416.csv",                   // Dev trial run
     };
 
     private static QueryPruningParameters queryPruningParameters;
