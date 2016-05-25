@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
  */
 public class ParseFileGenerator {
     static final boolean generateDev = false;
-    static final boolean includeGoldInTest = trued;
+    static final boolean includeGoldInTest = true;
     static final int nBest = 100;
     static ImmutableSet<Integer> skipDevSentences = ImmutableSet.of(1244, 1839);
 

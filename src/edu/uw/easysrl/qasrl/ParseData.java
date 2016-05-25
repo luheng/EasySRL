@@ -51,7 +51,6 @@ public final class ParseData {
         return goldParses;
     }
 
-
     ParseData(ImmutableList<ImmutableList<InputReader.InputWord>> sentenceInputWords, ImmutableList<Parse> goldParses) {
         this.sentenceInputWords = sentenceInputWords;
         this.goldParses = goldParses;
