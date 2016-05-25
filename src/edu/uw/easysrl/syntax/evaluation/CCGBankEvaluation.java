@@ -80,7 +80,7 @@ public class CCGBankEvaluation {
 		final String pipelineFolder = Util.getHomeFolder() + "/Workspace/EasySRL/model_tritrain_finetune/";
 		final SRLParser pipeline = SRLParser.wrapperOf(new ParserAStar.Builder(new File(pipelineFolder))
 				.supertaggerBeam(0.0001).maxChartSize(250000).build());
-
+				
 		System.out.println(evaluate(pipeline, Partition.DEV));
 		System.out.println(evaluate(pipeline, Partition.TEST));
 	}

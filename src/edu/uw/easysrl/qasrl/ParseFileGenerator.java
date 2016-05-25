@@ -48,9 +48,9 @@ public class ParseFileGenerator {
         double averageN = .0;
         Results oracleF1 = new Results(), baselineF1 = new Results();
         BaseCcgParser.AStarParser parser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, nBest,
-                              1e-6, 1e-6, 200000, 70);
+                              1e-6, 1e-6, 1000000, 70);
         BaseCcgParser.AStarParser backoffParser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, 1,
-                              1e-6, 1e-6, 200000, 70);
+                              1e-6, 1e-6, 1000000, 70);
         parser.cacheSupertags(generateDev ? dev : test);
 
         try {
