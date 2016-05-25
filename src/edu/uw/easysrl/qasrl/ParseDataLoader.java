@@ -24,14 +24,14 @@ import static edu.uw.easysrl.util.GuavaCollectors.toImmutableList;
 public class ParseDataLoader {
 
     private static ParseData makeParseData(List<List<InputReader.InputWord>> sentenceInputWords,
-                                   List<Parse> goldParses) {
+                                           List<Parse> goldParses) {
         ImmutableList<ImmutableList<InputReader.InputWord>> thisSentences = sentenceInputWords
                 .stream()
                 .map(ImmutableList::copyOf)
                 .collect(toImmutableList());
-        ImmutableList<Parse> thisGoldParses = goldParses
-                .stream()
-                .collect(toImmutableList());
+        ImmutableList<Parse> thisGoldParses = goldParses.stream().allMatch(p -> p != null) ?
+                goldParses.stream().collect(toImmutableList()) :
+                ImmutableList.of();
         return new ParseData(thisSentences, thisGoldParses);
     }
 

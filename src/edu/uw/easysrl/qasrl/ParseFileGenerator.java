@@ -2,12 +2,16 @@ package edu.uw.easysrl.qasrl;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import edu.uw.easysrl.corpora.CCGBankDependencies;
 import edu.uw.easysrl.main.InputReader;
 
 import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
+import edu.uw.easysrl.syntax.evaluation.CCGBankEvaluation;
 import edu.uw.easysrl.syntax.evaluation.Results;
+import edu.uw.easysrl.syntax.parser.SRLParser;
 
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -46,8 +50,15 @@ public class ParseFileGenerator {
         BaseCcgParser.AStarParser parser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, nBest,
                               1e-6, 1e-6, 500000, 70);
         BaseCcgParser.AStarParser backoffParser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, 1,
-                              1e-6, 1e-3, 500000, 70);
+                              1e-6, 1e-6, 1000000, 70);
         parser.cacheSupertags(generateDev ? dev : test);
+
+        try {
+            CCGBankEvaluation.evaluate(SRLParser.wrapperOf(backoffParser.getParser()),
+                    CCGBankDependencies.Partition.TEST);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
         for (int sentIdx = 0; sentIdx < sentences.size(); sentIdx ++) {
             System.out.println(sentIdx + ", " + sentences.get(sentIdx).size());
@@ -96,6 +107,7 @@ public class ParseFileGenerator {
         System.out.println("Parsed:\t" + numParsed + " sentences.");
         System.out.println("baseline accuracy:\n" + baselineF1);
         System.out.println("oracle accuracy:\n" + oracleF1);
+        System.out.println("Average-N:\n" + averageN / allParses.size());
         System.out.println("saved to:\t" + outputFileName);
     }
 }
