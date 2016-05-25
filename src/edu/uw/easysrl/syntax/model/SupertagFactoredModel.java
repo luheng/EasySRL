@@ -89,8 +89,7 @@ public class SupertagFactoredModel extends Model {
         		return new SupertagFactoredModel(input.getInputSupertags(), includeDependencies);
       		} else {
         		Preconditions.checkNotNull(tagger, "Inputs should be already tagged if no tagger is given.");
-        		return new SupertagFactoredModel(tagger.tag(input.getInputWords()),
-                                         includeDependencies);
+        		return new SupertagFactoredModel(tagger.tag(input.getInputWords()), includeDependencies);
       		}
 		}
 
