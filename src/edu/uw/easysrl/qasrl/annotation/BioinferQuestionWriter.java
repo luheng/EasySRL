@@ -16,10 +16,13 @@ import org.apache.commons.csv.CSVPrinter;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
+import static edu.uw.easysrl.util.GuavaCollectors.*;
 
 /**
  * Create Crowdflower data for pronoun-style core questions.
@@ -32,23 +35,15 @@ import java.util.stream.IntStream;
  */
 public class BioinferQuestionWriter {
 
-    static final int nBest = 100;
+    // static final int nBest = 100;
     static final int maxNumQueriesPerFile = 500;
-    static final int numSentences = 2000;
-    static final int randomSeed = 12345;
 
     private static final String csvOutputFilePrefix =
             "./Crowdflower_temp/bioinfer_dev_100best";
 
-    private static final String outputSentenceIdsFile =
-            "./Crowdflower_temp/bioinfer_dev_100best";
-
     private static final String[] reviewedTestQuestionFiles = new String[] {
-            "./Crowdflower_unannotated/test_questions/test_question_core_pronoun_r04.tsv",
-            "./Crowdflower_unannotated/test_questions/auto_test_questions_r345.tsv",
+        "./Crowdflower_unannotated/test_questions/bioinfer_test_1to27.tsv",
     };
-
-    private static ImmutableList<Integer> testSentenceIds;
 
     private static QueryPruningParameters queryPruningParameters;
     static {
@@ -60,25 +55,50 @@ public class BioinferQuestionWriter {
         queryPruningParameters.minPromptConfidence = 0.1;
     }
 
-    private static HITLParsingParameters reparsingParameters;
-    static {
-        reparsingParameters = new HITLParsingParameters();
-        reparsingParameters.attachmentPenaltyWeight = 5.0;
-        reparsingParameters.supertagPenaltyWeight = 5.0;
+    private static void printTestQuestions() throws IOException {
+        Map<Integer, List<RecordedAnnotation>> annotations = new HashMap<>();
+        for (String testQuestionFile : reviewedTestQuestionFiles) {
+            AnnotationReader.readReviewedTestQuestionsFromTSV(testQuestionFile)
+                    .forEach(annot -> {
+                        if (!annotations.containsKey(annot.sentenceId)) {
+                            annotations.put(annot.sentenceId, new ArrayList<>());
+                        }
+                        annotations.get(annot.sentenceId).add(annot);
+                    });
+        }
+        final String testQuestionsFile = String.format("%s_test.csv", csvOutputFilePrefix);
+        CSVPrinter csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter(testQuestionsFile)),
+                CSVFormat.EXCEL.withRecordSeparator("\n"));
+        csvPrinter.printRecord((Object[]) CrowdFlowerDataUtils.csvHeaderNew);
+        AtomicInteger lineCounter = new AtomicInteger(0);
+        annotations.keySet().stream().forEach(sid ->
+                annotations.get(sid).stream()
+                        .forEach(annot -> {
+                            try {
+                                System.out.println(annot);
+                                CrowdFlowerDataUtils.printRecordToCSVFile(
+                                        annot,
+                                        10000 + lineCounter.getAndAdd(1),
+                                        true, // highlight predicate
+                                        csvPrinter);
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        })
+        );
+        csvPrinter.close();
+        System.out.println(String.format("Wrote %d test questions to file %s.", lineCounter.get(), testQuestionsFile));
     }
 
-    private static void printQuestionsToAnnotate() throws IOException {
-        BioinferCCGCorpus corpus = BioinferCCGCorpus.readDev().get();
-        Map<Integer, NBestList> nbestLists = NBestList.loadNBestListsFromFile("bioinfer.dev.100best.out", nBest).get();
-        System.out.println(String.format("Load pre-parsed %d-best lists for %d sentences.", nBest, nbestLists.size()));
-
+    private static void printQuestionsToAnnotate(BioinferCCGCorpus corpus,
+                                                 Map<Integer, NBestList> nbestLists,
+                                                 ImmutableList<Integer> sentenceIds) throws IOException {
         AtomicInteger lineCounter = new AtomicInteger(0), fileCounter = new AtomicInteger(0);
         CSVPrinter csvPrinter = new CSVPrinter(new BufferedWriter(new FileWriter(
                 String.format("%s_%03d.csv", csvOutputFilePrefix, fileCounter.getAndAdd(1)))),
                 CSVFormat.EXCEL.withRecordSeparator("\n"));
         csvPrinter.printRecord((Object[]) CrowdFlowerDataUtils.csvHeaderNew);
-
-        for (int sentenceId : nbestLists.keySet()) {
+        for (int sentenceId : sentenceIds) {
             final NBestList nbestList = nbestLists.get(sentenceId);
             List<ScoredQuery<QAStructureSurfaceForm>> queryList = QuestionGenerationPipeline.coreArgQGPipeline
                     .setQueryPruningParameters(queryPruningParameters)
@@ -118,6 +138,15 @@ public class BioinferQuestionWriter {
 
 
     public static void main(String[] args) throws IOException {
-        printQuestionsToAnnotate();
+        // BioinferCCGCorpus corpus = BioinferCCGCorpus.readDev().get();
+        // Map<Integer, NBestList> nbestLists = NBestList.loadNBestListsFromFile("bioinfer.dev.100best.out", 100).get();
+        // System.out.println(String.format("Load pre-parsed %d-best lists for %d sentences.", 100, nbestLists.size()));
+        // ImmutableList<Integer> sentenceIds = IntStream.range(100, 300)
+        //     .filter(nbestLists.keySet()::contains)
+        //     .limit(100)
+        //     .boxed()
+        //     .collect(toImmutableList());
+        // printQuestionsToAnnotate(corpus, nbestLists, sentenceIds);
+        printTestQuestions();
     }
 }
