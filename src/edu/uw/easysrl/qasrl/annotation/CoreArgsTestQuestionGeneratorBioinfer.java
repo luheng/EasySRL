@@ -34,6 +34,8 @@ public class CoreArgsTestQuestionGeneratorBioinfer {
         queryPruningParameters.minPromptConfidence = 0.1;
     }
 
+    private static final String annotationFile = CrowdFlowerDataUtils.cfBioinferCuratedAnnotations;
+
     public static void generateTestQuestions() throws IOException {
         BioinferCCGCorpus corpus = BioinferCCGCorpus.readDev().get();
         Map<Integer, NBestList> nbestLists = NBestList.loadNBestListsFromFile("bioinfer.dev.100best.out", 100).get();
@@ -41,7 +43,7 @@ public class CoreArgsTestQuestionGeneratorBioinfer {
         final List<String> autoTestQuestions = new ArrayList<>();
 
         Map<Integer, List<AlignedAnnotation>> allAnnotations = CrowdFlowerDataUtils
-            .loadAnnotations(ImmutableList.of(CrowdFlowerDataUtils.cfBioinferCuratedAnnotations));
+            .loadAnnotations(ImmutableList.of(annotationFile));
 
         int numAnnotations = 0, numMatchedAnnotations = 0;
         for (int sid : allAnnotations.keySet()) {
