@@ -42,6 +42,8 @@ public class CrowdFlowerDataUtils {
     public static final String cfRound6CoreArgsAnnotationFile = "./Crowdflower_data/f912675.csv";
     public static final String cfRound5CoreArgsRerun = "./Crowdflower_data/f913098.csv";
 
+    public static final String cfBioinferCuratedAnnotations = "./Crowdflower_data/f913083.csv";
+
     public static final ImmutableList<String> allCfAnnotationFiles = ImmutableList.of(
             cfRound1AnnotationFile,
             cfRound2AnnotationFile,
@@ -54,6 +56,7 @@ public class CrowdFlowerDataUtils {
             cfRound1And2CoreArgsRerun,
             cfRound5CoreArgsRerun
        //     cfRound6CoreArgsAnnotationFile
+       //     cfBioinferCuratedAnnotations
     );
 
     // Sentences that happened to appear in instructions ...
