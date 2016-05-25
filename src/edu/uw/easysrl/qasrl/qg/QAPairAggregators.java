@@ -177,7 +177,7 @@ public final class QAPairAggregators {
      * Each aggregated answer is single headed.
      * @return Aggregated QA pairs with structure information.
      */
-    public static QAPairAggregator<QAStructureSurfaceForm> aggregateForMultipleChoiceQA() {
+    public static QAPairAggregator<QAStructureSurfaceForm>  aggregateForMultipleChoiceQA() {
         return qaPairs ->  qaPairs
                 .stream()
                 .collect(groupingBy(QuestionAnswerPair::getPredicateIndex))

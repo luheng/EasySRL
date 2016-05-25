@@ -42,7 +42,7 @@ public class CrowdflowerDataWriterTest {
             "./Crowdflower_ccgtest/ccgtest_100best";
 
     private static final String outputSentenceIdsFile =
-            "./Crowdflower_ccgtest/ccgtest.sent_ids.txt";
+            "./Crowdflower_ccgtest  /ccgtest.sent_ids.txt";
 
     private static final String[] reviewedTestQuestionFiles = new String[] {
             "./Crowdflower_unannotated/test_questions/test_question_core_pronoun_r04.tsv",

@@ -19,10 +19,10 @@ import java.util.*;
  */
 public class ExperimentUtils {
 
-    static class DebugBlock {
-        double deltaF1, oracleDeltaF1;
-        String block;
-        DebugBlock(double deltaF1, String block) {
+    public static class DebugBlock {
+        public double deltaF1, oracleDeltaF1;
+        public String block;
+        public DebugBlock(double deltaF1, String block) {
             this.deltaF1 = deltaF1;
             this.block = block;
         }

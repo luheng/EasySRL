@@ -33,19 +33,17 @@ import java.util.stream.IntStream;
 public class BioinferQuestionWriter {
 
     static final int nBest = 100;
-    static final int maxNumQueriesPerFile = 500;
+    static final int maxNumQueriesPerFile = 200;
     static final int numSentences = 2000;
     static final int randomSeed = 12345;
 
     private static final String csvOutputFilePrefix =
-            "./Crowdflower_temp/bioinfer_dev_100best";
+            "./Crowdflower_bioinfer/bioinfer_dev_100best";
 
     private static final String outputSentenceIdsFile =
-            "./Crowdflower_temp/bioinfer_dev_100best";
+            "./Crowdflower_bioinfer/bioinfer_dev_100best";
 
     private static final String[] reviewedTestQuestionFiles = new String[] {
-            "./Crowdflower_unannotated/test_questions/test_question_core_pronoun_r04.tsv",
-            "./Crowdflower_unannotated/test_questions/auto_test_questions_r345.tsv",
     };
 
     private static ImmutableList<Integer> testSentenceIds;

@@ -102,7 +102,8 @@ public abstract class Combinator {
 					Slash.FWD), new GeneralizedForwardComposition(Slash.FWD, Slash.FWD, Slash.FWD),
 					new GeneralizedBackwardComposition(Slash.FWD, Slash.BWD, Slash.FWD), new Conjunction(),
 					new RemovePunctuation(false), new RemovePunctuation(true)// , new CommaAndVPtoNPmodifier() // TODO
-			, new CommaAndVerbPhrasetoAdverb(), new ParentheticalDirectSpeech()
+			// FIXME: add back when parsing ccg.
+			// , new CommaAndVerbPhrasetoAdverb(), new ParentheticalDirectSpeech()
 	// TODO
 			));
 
