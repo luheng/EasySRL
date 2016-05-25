@@ -39,15 +39,14 @@ public class CrowdflowerDataWriterTest {
     private static HITLParser hitlParser;
 
     private static final String csvOutputFilePrefix =
-            "./Crowdflower_temp/ccgtest_100best";
+            "./Crowdflower_ccgtest/ccgtest_100best";
 
     private static final String outputSentenceIdsFile =
-            "./Crowdflower_temp/ccgtest.sent_ids.txt";
+            "./Crowdflower_ccgtest/ccgtest.sent_ids.txt";
 
     private static final String[] reviewedTestQuestionFiles = new String[] {
             "./Crowdflower_unannotated/test_questions/test_question_core_pronoun_r04.tsv",
-            "./Crowdflower_unannotated/test_questions/auto_test_questions_r345.tsv",
-            "./Crowdflower_unannotated/test_questions/auto_test_questions_r126.tsv"
+            "./Crowdflower_unannotated/test_questions/auto_test_questions_all.tsv",
     };
 
     private static ImmutableList<Integer> testSentenceIds;
@@ -164,7 +163,7 @@ public class CrowdflowerDataWriterTest {
 
     public static void main(String[] args) throws IOException {
         initializeData();
-        //printTestQuestions();
+        printTestQuestions();
         printQuestionsToAnnotate();
     }
 }

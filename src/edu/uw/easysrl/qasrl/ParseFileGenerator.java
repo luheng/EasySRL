@@ -46,19 +46,12 @@ public class ParseFileGenerator {
 
         int numParsed = 0;
         double averageN = .0;
-        Results oracleF1 = new Results(), baselineF1 = new Results();
+        Results oracleF1 = new Results(), baselineF1 = new Results(), backoffBaseline = new Results();
         BaseCcgParser.AStarParser parser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, nBest,
-                              1e-6, 1e-6, 500000, 70);
+                              1e-6, 1e-6, 250000, 70);
         BaseCcgParser.AStarParser backoffParser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, 1,
-                              1e-6, 1e-6, 1000000, 70);
+                              1e-6, 1e-6, 250000, 70);
         parser.cacheSupertags(generateDev ? dev : test);
-
-        try {
-            CCGBankEvaluation.evaluate(SRLParser.wrapperOf(backoffParser.getParser()),
-                    CCGBankDependencies.Partition.TEST);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
 
         for (int sentIdx = 0; sentIdx < sentences.size(); sentIdx ++) {
             System.out.println(sentIdx + ", " + sentences.get(sentIdx).size());
@@ -82,11 +75,14 @@ public class ParseFileGenerator {
                 if (allParses.size() % 100 == 0) {
                     System.out.println("Parsed:\t" + allParses.size() + " sentences ...");
                     System.out.println("Baseline:\n" + baselineF1);
+                    System.out.println("BackoffBaseline:\n" + backoffBaseline);
                     System.out.println("Oracle:\n" + oracleF1);
                     System.out.println("Average-N:\n" + averageN / allParses.size());
                 }
                 oracleF1.add(results.get(oracleK));
                 baselineF1.add(results.get(0));
+                final Parse onebest = backoffParser.parse(sentIdx, sentences.get(sentIdx));
+                backoffBaseline.add(CcgEvaluation.evaluate(onebest.dependencies, goldParses.get(sentIdx).dependencies));
             }
             numParsed ++;
         }
@@ -106,8 +102,17 @@ public class ParseFileGenerator {
 
         System.out.println("Parsed:\t" + numParsed + " sentences.");
         System.out.println("baseline accuracy:\n" + baselineF1);
+        System.out.println("BackoffBaseline:\n" + backoffBaseline);
         System.out.println("oracle accuracy:\n" + oracleF1);
         System.out.println("Average-N:\n" + averageN / allParses.size());
         System.out.println("saved to:\t" + outputFileName);
+
+
+        try {
+            CCGBankEvaluation.evaluate(SRLParser.wrapperOf(backoffParser.getParser()),
+                    CCGBankDependencies.Partition.TEST);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }

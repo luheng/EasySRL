@@ -2,8 +2,10 @@ package edu.uw.easysrl.qasrl.query;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableTable;
 import edu.uw.easysrl.qasrl.TextGenerationHelper;
 import edu.uw.easysrl.qasrl.NBestList;
+import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
 import edu.uw.easysrl.qasrl.experiments.DebugPrinter;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.syntax.grammar.Category;
@@ -241,6 +243,39 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
                 structStr = isJeopardyStyle() ?
                         qa.getQuestionStructures().stream().map(s -> s.toString(sentence)).collect(Collectors.joining(" / ")) :
                         qa.getAnswerStructures().stream().map(s -> s.toString(sentence)).collect(Collectors.joining(" / "));
+            }
+            result += String.format("[%d]\t%-10s\t%.2f\t%s\t%s\n", i, matchingStr, optionScores.get(i), options.get(i), structStr);
+        }
+        return result;
+    }
+
+    /**
+     * @param sentence
+     * @param annotations
+     * @return
+     */
+    public String toAnnotationString(final ImmutableList<String> sentence,
+                                     ImmutableList<ImmutableList<Integer>> annotations) {
+        final String legend = "abcdefghijklm";
+        String result = String.format("SID=%d\t%s\n", sentenceId, sentence.stream().collect(Collectors.joining(" ")));
+        // Prompt structure.
+        String promptStructStr = qaPairSurfaceForms.stream()
+                .flatMap(qa -> qa.getQuestionStructures().stream())
+                .distinct()
+                .map(s -> s.toString(sentence))
+                .collect(Collectors.joining(" / "));
+        // Prompt.
+        result += String.format("[prompt]:\t \t%.2f\t%s\t%s\n", promptScore, prompt, promptStructStr);
+        for (int i = 0; i < options.size(); i++) {
+            String matchingStr = "";
+            for (int j = 0; j < annotations.size(); j++) {
+                final char legendChar = legend.charAt(j);
+                matchingStr += annotations.get(j).contains(i) ? legendChar : "";
+            }
+            String structStr = "";
+            if (i < qaPairSurfaceForms.size()) {
+                final QAStructureSurfaceForm qa = qaPairSurfaceForms.get(i);
+                structStr = qa.getAnswerStructures().stream().map(s -> s.toString(sentence)).collect(Collectors.joining(" / "));
             }
             result += String.format("[%d]\t%-10s\t%.2f\t%s\t%s\n", i, matchingStr, optionScores.get(i), options.get(i), structStr);
         }

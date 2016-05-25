@@ -95,6 +95,66 @@ public class AnnotationReader {
         return ImmutableList.copyOf(annotations);
     }
 
+    public static ImmutableList<RecordedAnnotation> readDisabledTestQuestionsFromTSV(String fileName)
+            throws IOException {
+        List<RecordedAnnotation> annotations = new ArrayList<>();
+        BufferedReader reader;
+        reader = new BufferedReader(new FileReader(new File(fileName)));
+        String line;
+        RecordedAnnotation curr;
+        while ((line = reader.readLine()) != null) {
+            line = line.trim();
+            String[] info = line.split("\\t");
+            if (info.length > 0 && info[0].equals("X")) {
+                annotations.add(new RecordedAnnotation());
+                curr = annotations.get(annotations.size() - 1);
+                curr.iterationId = -1;
+                curr.sentenceId = Integer.parseInt(info[1].split("=")[1]);
+                curr.queryId = -1;
+                curr.sentenceString = info[2];
+                line = reader.readLine().trim();
+                info = line.split("\\t");
+                curr.queryPrompt = info[1].trim().isEmpty() ? info[3] : info[2];
+                String qkey = info[1].trim().isEmpty() ? info[4] : info[3];
+                if (!qkey.isEmpty()) {
+                    curr.predicateId = Integer.parseInt(qkey.split(":")[0]);
+                    curr.predicateString = qkey.split("_")[0].split(":")[1];
+                }
+                List<Integer> optionIds = new ArrayList<>();
+                while ((line = reader.readLine()) != null) {
+                    line = line.trim();
+                    if (line.isEmpty() || line.trim().startsWith("[reason]:")) {
+                        break;
+                    }
+                    info = line.split("\\t");
+                    if (info[1].contains("U") || info[1].contains("T")) {
+                        optionIds.add(curr.optionStrings.size());
+                    }
+                    curr.optionStrings.add(info[3]);
+                }
+                curr.userOptionIds = ImmutableList.copyOf(optionIds);
+                curr.goldOptionIds = ImmutableList.of();
+                if (!curr.optionStrings.contains(QueryGeneratorUtils.kNoneApplicableString)) {
+                    curr.optionStrings.add(QueryGeneratorUtils.kNoneApplicableString);
+                }
+                if (line.isEmpty()) {
+                    line = reader.readLine().trim();
+                }
+                info = line.split("\\t");
+                for (int i = 1; i < info.length; i++) {
+                    if (!info[i].isEmpty()) {
+                        curr.comment = info[i];
+                        break;
+                    }
+                }
+                reader.readLine();
+            }
+        }
+        System.out.println(String.format("Loaded %d disabled annotation records from file: %s.",
+                annotations.size(), fileName));
+        return ImmutableList.copyOf(annotations);
+    }
+
     public static ImmutableList<RecordedAnnotation> loadAnnotationRecordsFromFile(String fileName) throws IOException {
         List<RecordedAnnotation> annotations = new ArrayList<>();
         BufferedReader reader;
