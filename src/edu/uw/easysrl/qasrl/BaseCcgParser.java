@@ -36,6 +36,7 @@ public abstract class BaseCcgParser {
     }
 
     public final static String modelFolder = "./model_tritrain_finetune/";
+    public final static String longModelFolder = "./model_tritrain_finetune_long/";
 
     private static void initializeFilter() {
         final CountDictionary dependencyDict = new CountDictionary();
@@ -173,6 +174,10 @@ public abstract class BaseCcgParser {
             final InputReader.InputToParser input = taggedSentences == null ?
                     new InputReader.InputToParser(sentence, null, null, false) :
                     new InputReader.InputToParser(sentence, null, taggedSentences.get(sentenceId), true);
+            if (taggedSentences.get(sentenceId).size() == 0) {
+                System.err.println("Untagged sentence:\t" + sentenceId);
+                return null;
+            }
             List<Scored<SyntaxTreeNode>> parses = parser.doParsing(input);
             if (parses == null || parses.size() == 0) {
                 return null;
