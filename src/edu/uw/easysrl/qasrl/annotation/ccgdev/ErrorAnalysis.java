@@ -12,8 +12,10 @@ import edu.uw.easysrl.qasrl.ParseDataLoader;
 import edu.uw.easysrl.qasrl.annotation.AnnotatedQuery;
 import edu.uw.easysrl.qasrl.model.HITLParser;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
+import edu.uw.easysrl.qasrl.qg.syntax.AnswerStructure;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
+import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.*;
@@ -24,7 +26,7 @@ import java.util.stream.IntStream;
  * Created by luheng on 5/26/16.
  */
 public class ErrorAnalysis {
-    final static int minAgreement = 5;
+    final static int minAgreement = 4;
 
     private static final ParseData dev = ParseDataLoader.loadFromDevPool().get();
     private static final Map<Integer, NBestList> nbestLists = NBestList.loadNBestListsFromFile("parses.tagged.dev.100best.out", 100).get();
@@ -35,12 +37,20 @@ public class ErrorAnalysis {
         int numUnmatchedAnnotations = 0, numMatchedAnnotations = 0, numHighAgreementAnnotations = 0,
                 numWrongAnnotations = 0;
         for (int sentenceId : parser.getAllSentenceIds()) {
+            final ImmutableList<String> sentence = parser.getSentence(sentenceId);
             final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries =
                     parser.getAllCoreArgQueriesForSentence(sentenceId);
             if (queries == null || queries.isEmpty() || !annotations.containsKey(sentenceId)) {
                 continue;
             }
             for (ScoredQuery<QAStructureSurfaceForm> query : queries) {
+                // Skip (S[b]\NP)/NP.1 and distransitives (patients)
+                if (query.getQAPairSurfaceForms().stream().flatMap(qa -> qa.getQuestionStructures().stream())
+                        .anyMatch(q -> (q.category.isFunctionInto(Category.valueOf("(S[b]\\NP)/NP")) && q.targetArgNum == 1)
+                                    || (q.category == Category.valueOf("((S[dcl]\\NP)/NP)/NP") && q.targetArgNum > 1))) {
+                    continue;
+                }
+
                 final int predicateId = query.getPredicateId().getAsInt();
                 final Optional<AnnotatedQuery> matchAnnotation = annotations.get(sentenceId).stream()
                         .filter(annotation -> annotation.predicateId == predicateId
@@ -58,7 +68,22 @@ public class ErrorAnalysis {
                 if (!agreedOptionsOpt.isPresent()) {
                     continue;
                 }
-                final ImmutableList<Integer> agreedOptions = agreedOptionsOpt.get();
+
+                ///// Heuristics
+                boolean fixedPronoun = false, fixedAppositive = false;
+
+                ImmutableList<Integer> agreedOptions = agreedOptionsOpt.get();
+                final ImmutableList<Integer> pronounFix = Fixer.pronounFixer(sentence, query, matchAnnotation.get().responses);
+                final ImmutableList<Integer> appositiveFix = Fixer.appositiveFixer(sentence, query, matchAnnotation.get().responses);
+
+                if (!appositiveFix.isEmpty()) {
+                    fixedAppositive = true;
+                    agreedOptions = appositiveFix;
+                } else if (!pronounFix.isEmpty()) {
+                    fixedPronoun = true;
+                    agreedOptions = pronounFix;
+                }
+
                 numHighAgreementAnnotations ++;
                 //final ImmutableList<Integer> goldOptions = getGoldOptions(query, parser.getGoldParse(sentenceId));
                 final Map<String, List<Integer>> allGoldOptions = getAllGoldOptions(query, parser.getGoldParse(sentenceId));
@@ -94,7 +119,7 @@ public class ErrorAnalysis {
                 if (goldOptions == null) {
                     goldOptions = ImmutableList.of(query.getBadQuestionOptionId().getAsInt());
                 }
-                if (!agreedOptions.equals(goldOptions)) {
+                if (!agreedOptions.equals(goldOptions)/* && fixedPronoun */) {
                     System.out.print(query.toString(parser.getSentence(sentenceId),
                             'G', ImmutableList.copyOf(goldOptions),
                             'U', agreedOptions));
@@ -115,41 +140,44 @@ public class ErrorAnalysis {
         System.out.println("Num. high-agreement wrong annotation:\t" + numWrongAnnotations);
     }
 
-    private static ImmutableList<Integer> getGoldOptions(ScoredQuery<QAStructureSurfaceForm> query,
-                                                         Parse goldParse) {
-        final int naOptionId = query.getBadQuestionOptionId().getAsInt();
-        final ImmutableList<Integer> labeledGoldOptions = parser.getGoldOptions(query);
-        if (!labeledGoldOptions.contains(naOptionId)) {
-            return labeledGoldOptions;
-        }
-        final Set<ResolvedDependency> goldDeps = goldParse.dependencies;
-        final List<QAStructureSurfaceForm> qaStructures = query.getQAPairSurfaceForms();
-        final int predicateId = query.getPredicateId().getAsInt();
-        ImmutableList<Integer> goldOptions = IntStream.range(0, qaStructures.size())
-                .boxed()
-                .filter(id -> goldDeps.stream()
-                        .filter(goldDep -> goldDep.getHead() == predicateId)
-                        .anyMatch(goldDep -> {
-                            final QAStructureSurfaceForm qa = qaStructures.get(id);
-                            return qa.getAnswerStructures().stream().flatMap(ans -> ans.argumentIndices.stream())
-                                    .anyMatch(argId -> goldDep.getArgument() == argId);
-                        })
-                ).collect(GuavaCollectors.toImmutableList());
-        return goldOptions.isEmpty() ? ImmutableList.of(naOptionId) : goldOptions;
-    }
-
     private static Map<String, List<Integer>> getAllGoldOptions(ScoredQuery<QAStructureSurfaceForm> query,
                                                                 Parse goldParse) {
 
         final Set<ResolvedDependency> goldDeps = goldParse.dependencies;
         final List<QAStructureSurfaceForm> qaStructures = query.getQAPairSurfaceForms();
-        final int predicateId = query.getPredicateId().getAsInt();
-
+        final List<QuestionStructure> questionStructures = qaStructures.stream()
+                .flatMap(qa -> qa.getQuestionStructures().stream()).collect(Collectors.toList());
+        final int headId = query.getPredicateId().getAsInt();
+        int ppId = -1;
+        for (QuestionStructure questionStructure : questionStructures) {
+            if (questionStructure.targetPrepositionIndex >= 0) {
+                ppId = questionStructure.targetPrepositionIndex;
+                break;
+            }
+        }
         Map<String, List<Integer>> allGoldOptions = new HashMap<>();
+        if (ppId >= 0) {
+            //System.out.println("PP id:\t" + ppId);
+            for (int id = 0; id < qaStructures.size(); id++) {
+                final QAStructureSurfaceForm qa = qaStructures.get(id);
+                for (ResolvedDependency goldDep : goldDeps) {
+                    final String label = goldDep.getCategory() + "." + goldDep.getArgNumber();
+                    if (goldDep.getHead() == ppId && qa.getAnswerStructures().stream()
+                            .anyMatch(ans -> ans.argumentIndices.contains(goldDep.getArgument()))) {
+                        if (!allGoldOptions.containsKey(label)) {
+                            allGoldOptions.put(label, new ArrayList<>());
+                        }
+                        allGoldOptions.get(label).add(id);
+                        break;
+                    }
+                }
+            }
+            return allGoldOptions;
+        }
         for (int id = 0; id < qaStructures.size(); id++) {
             final QAStructureSurfaceForm qa = qaStructures.get(id);
             for (ResolvedDependency goldDep : goldDeps) {
-                if (goldDep.getHead() == predicateId && qa.getAnswerStructures().stream()
+                if (goldDep.getHead() == headId && qa.getAnswerStructures().stream()
                         .flatMap(ans -> ans.argumentIndices.stream())
                         .anyMatch(argId -> goldDep.getArgument() == argId)) {
                     final String label = goldDep.getCategory() + "." + goldDep.getArgNumber();
@@ -157,6 +185,7 @@ public class ErrorAnalysis {
                         allGoldOptions.put(label, new ArrayList<>());
                     }
                     allGoldOptions.get(label).add(id);
+                    break;
                 }
             }
         }
