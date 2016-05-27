@@ -10,6 +10,7 @@ import java.util.Set;
  */
 public class PronounList {
     public static Set<String> englishPronounSet = new HashSet<>();
+    public static Set<String> nonPossessivePronouns = new HashSet<>();
     static {
         Collections.addAll(englishPronounSet,
                 "all","another","any","anybody","anyone","anything",
@@ -25,5 +26,20 @@ public class PronounList {
                 "those","us","we","what","whatever","which",
                 "whichever","who","whoever","whom","whomever","whose",
                 "you","your","yours","yourself","yourselves");
+
+        Collections.addAll(nonPossessivePronouns,
+                "all","another","any","anybody","anyone","anything",
+                "both","each","each other","either","everybody","everyone",
+                "everything","few","he","hers","herself",
+                "him","himself","i","it",
+                "itself","little","many","me","more",
+                "most","much","myself","neither","no one",
+                "nobody","none","nothing","one","one another","other",
+                "others","ours","ourselves","several","she",
+                "some","somebody","someone","something","that",
+                "theirs","them","themselves","these","they","this",
+                "those","us","we","what","whatever","which",
+                "whichever","who","whoever","whom","whomever","whose",
+                "you","yours","yourself","yourselves");
     }
 }
