@@ -107,7 +107,8 @@ public class ReparsingTest {
                 avgUnlabeledReranked = new Results(),
                 avgUnlabeledReparsed = new Results();
 
-        BaseCcgParser baseParser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, 1);
+        BaseCcgParser.AStarParser baseParser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, 1);
+        baseParser.cacheSupertags(myHTILParser.getParseData());
         int counter = 0;
         TicToc.tic();
         for (int sentenceId : sentenceIds) {

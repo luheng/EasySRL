@@ -70,7 +70,6 @@ public class BioinferCCGCorpus {
                     pos.add(info[1]);
                     categories.add(Category.valueOf(info[2]));
                     inputs.add(new InputReader.InputWord(info[0], "", ""));
-
                 }
                 if (words.size() > 0) {
                     List<InputReader.InputWord> taggedInputs = postagger.tag(inputs);
@@ -129,14 +128,13 @@ public class BioinferCCGCorpus {
         final int nBest = 100;
         int numParsed = 0;
         double averageN = .0;
-        BaseCcgParser.AStarParser parser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, nBest,
-                1e-6, 1e-6, 100000, 100);
-        BaseCcgParser.AStarParser backoffParser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, 1,
-                1e-6, 1e-6, 100000, 100);
+        BaseCcgParser.AStarParser parser = new BaseCcgParser.AStarParser(BaseCcgParser.longModelFolder, nBest,
+                1e-6, 1e-6, 250000, 100);
+        BaseCcgParser.AStarParser backoffParser = new BaseCcgParser.AStarParser(BaseCcgParser.longModelFolder, 1,
+                1e-6, 1e-6, 250000, 100);
 
         parser.cacheSupertags(corpus.inputSentences);
         backoffParser.cacheSupertags(corpus.inputSentences);
-
 
         final ImmutableList<ImmutableList<InputReader.InputWord>> inputSentences = corpus.getInputSentences();
         for (int sentIdx = 0; sentIdx < inputSentences.size(); sentIdx ++) {

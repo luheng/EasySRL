@@ -33,15 +33,12 @@ import java.util.stream.IntStream;
 public class BioinferQuestionWriter {
 
     static final int nBest = 100;
-    static final int maxNumQueriesPerFile = 200;
+    static final int maxNumQueriesPerFile = 350;
     static final int numSentences = 2000;
     static final int randomSeed = 12345;
 
     private static final String csvOutputFilePrefix =
-            "./Crowdflower_bioinfer/bioinfer_dev_100best";
-
-    private static final String outputSentenceIdsFile =
-            "./Crowdflower_bioinfer/bioinfer_dev_100best";
+            "./Crowdflower_bioinfer/bioinfer_test_100best";
 
     private static final String[] reviewedTestQuestionFiles = new String[] {
     };
@@ -66,8 +63,8 @@ public class BioinferQuestionWriter {
     }
 
     private static void printQuestionsToAnnotate() throws IOException {
-        BioinferCCGCorpus corpus = BioinferCCGCorpus.readDev().get();
-        Map<Integer, NBestList> nbestLists = NBestList.loadNBestListsFromFile("bioinfer.dev.100best.out", nBest).get();
+        BioinferCCGCorpus corpus = BioinferCCGCorpus.readTest().get();
+        Map<Integer, NBestList> nbestLists = NBestList.loadNBestListsFromFile("bioinfer.test.100best.out", nBest).get();
         System.out.println(String.format("Load pre-parsed %d-best lists for %d sentences.", nBest, nbestLists.size()));
 
         AtomicInteger lineCounter = new AtomicInteger(0), fileCounter = new AtomicInteger(0);
