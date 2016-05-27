@@ -46,7 +46,7 @@ public class QueryFilters {
                 final String str1 = curr + tok + op;
                 final String str2 = curr + "." + tok + op;
                 if (targ.equals(str1)|| targ.equals(str2)) {
-                    System.err.println(targ);
+                    //System.err.println(targ);
                     return true;
                 }
                 if (targ.startsWith(str1)) {

@@ -15,7 +15,7 @@ public class AlignedAnnotation extends RecordedAnnotation {
     public int[] answerDist;
     public double[] answerTrust;
 
-    AlignedAnnotation(RecordedAnnotation annotation) {
+    public AlignedAnnotation(RecordedAnnotation annotation) {
         super();
         this.iterationId = annotation.iterationId;
         this.sentenceId = annotation.sentenceId;

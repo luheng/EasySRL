@@ -19,6 +19,7 @@ public class TestDataUtils {
     final static String[] annotatedFiles = {
             "./Crowdflower_ccgtest/annotated/f913659.csv",
             "./Crowdflower_ccgtest/annotated/f914016.csv",
+            "./Crowdflower_ccgtest/annotated/f914045.csv",
     };
 
     public static Map<Integer, List<AlignedAnnotation>> readAllAnnotations() {
@@ -46,7 +47,7 @@ public class TestDataUtils {
 
     public static void main(String[] args) {
         try {
-            CrowdFlowerDataReader.readAggregatedAnnotationFromFile(annotatedFiles[1]);
+            CrowdFlowerDataReader.readAggregatedAnnotationFromFile(annotatedFiles[2]);
         } catch (IOException e) {
             e.printStackTrace();
         }

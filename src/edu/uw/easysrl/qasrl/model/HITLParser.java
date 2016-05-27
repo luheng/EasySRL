@@ -237,6 +237,21 @@ public class HITLParser {
         return ImmutableList.copyOf(queryList);
     }
 
+    public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getAllCoreArgQueriesForSentence(int sentenceId) {
+        if(nbestLists.get(sentenceId) == null) {
+            return ImmutableList.of();
+        }
+        List<ScoredQuery<QAStructureSurfaceForm>> queryList = new ArrayList<>();
+        queryList.addAll(getNewCoreArgQueriesForSentence(sentenceId));
+        final ImmutableSet<String> questionStrings = queryList.stream()
+                .map(q -> q.getPredicateId().getAsInt() + "\t" + q.getPrompt())
+                .collect(GuavaCollectors.toImmutableSet());
+        getCoreArgumentQueriesForSentence(sentenceId, true).stream()
+                .filter(q -> !questionStrings.contains(q.getPredicateId().getAsInt() + "\t" + q.getPrompt()))
+                .forEach(queryList::add);
+        return ImmutableList.copyOf(queryList);
+    }
+
     @Deprecated
     public ImmutableList<ScoredQuery<QAStructureSurfaceForm>> getCoreArgumentQueriesForSentence(int sentenceId,
                                                                                                 boolean isCheckboxStyle) {
