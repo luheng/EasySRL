@@ -130,9 +130,9 @@ public class BioinferCCGCorpus {
         int numParsed = 0;
         double averageN = .0;
         BaseCcgParser.AStarParser parser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, nBest,
-                1e-6, 1e-6, 250000, 100);
+                1e-6, 1e-6, 100000, 100);
         BaseCcgParser.AStarParser backoffParser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, 1,
-                1e-6, 1e-6, 250000, 100);
+                1e-6, 1e-6, 100000, 100);
 
         parser.cacheSupertags(corpus.inputSentences);
         backoffParser.cacheSupertags(corpus.inputSentences);

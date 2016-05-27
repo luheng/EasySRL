@@ -66,7 +66,7 @@ public abstract class Model {
 			total += getUpperBoundForWord(i);
 		}
 
-		total += getUpperBoundForWord(sentenceLength - 1);
+			total += getUpperBoundForWord(sentenceLength - 1);
 
 		for (int i = 0; i < sentenceLength + 1; i++) {
 			for (int j = i; j < sentenceLength + 1; j++) {
