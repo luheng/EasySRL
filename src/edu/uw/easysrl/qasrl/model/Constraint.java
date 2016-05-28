@@ -1,10 +1,13 @@
 package edu.uw.easysrl.qasrl.model;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.hash.HashCode;
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.*;
+import java.util.stream.Collector;
+import java.util.stream.Collectors;
 
 /**
  * Created by luheng on 3/9/16.
@@ -122,6 +125,44 @@ public abstract class Constraint {
         public String toString(List<String> sentence) {
             return (isPositive ? "[+]" : "[-]") + "\t" + strength + "\t" + headId + ":" + sentence.get(headId) + "-->"
                     + argId + ":" + sentence.get(argId);
+        }
+    }
+
+    /**
+     * Disjunctive constraints are always positive? probably not.
+     */
+    public static class DisjunctiveAttachmentConstraint extends Constraint {
+        final int headId;
+        final ImmutableList<Integer> argIds;
+        public DisjunctiveAttachmentConstraint(int headId, ImmutableList<Integer> argIds, boolean isPositive,
+                                               double confidence) {
+            super(isPositive, confidence);
+            this.headId = headId;
+            this.argIds = argIds;
+            this.hashString = toString();
+        }
+
+        public int getHeadId() {
+            return headId;
+        }
+
+        public ImmutableList<Integer> getArgId() {
+            return argIds;
+        }
+
+        public boolean isSatisfiedBy(Parse parse) {
+            return parse.dependencies.stream()
+                    .anyMatch(dep -> (dep.getHead() == headId && argIds.contains(dep.getArgument()))
+                            || (argIds.contains(dep.getHead()) && dep.getArgument() == headId));
+        }
+
+        public String toString() {
+            return (isPositive ? "[+]" : "[-]") + "\t" + strength + "\t" + headId + "\t" + argIds;
+        }
+
+        public String toString(List<String> sentence) {
+            return (isPositive ? "[+]" : "[-]") + "\t" + strength + "\t" + headId + ":" + sentence.get(headId) + "-->"
+                    + argIds + ":" + argIds.stream().map(sentence::get).collect(Collectors.joining(","));
         }
     }
 }

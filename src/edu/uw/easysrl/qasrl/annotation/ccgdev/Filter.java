@@ -39,7 +39,7 @@ public class Filter {
                     ++ covering;
                 }
             }
-            System.out.println(op1 + "\t" + covering);
+           // System.out.println(op1 + "\t" + covering);
             if (covering > 1) {
                 return true;
             }

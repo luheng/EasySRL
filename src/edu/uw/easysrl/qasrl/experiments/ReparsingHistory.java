@@ -138,6 +138,13 @@ public class ReparsingHistory {
         System.out.println();
     }
 
+    public boolean lastIsWorsened() {
+        final int sentId = getLast(sentenceIds);
+        final Results reparsedF1 = getLast(reparsingResults.get(sentId));
+        final Results previousF1  = reparsingResults.get(sentId).get(reparsingResults.get(sentId).size() - 2);
+        return previousF1.getF1() > reparsedF1.getF1() + 1e-2;
+    }
+
     public void printSummary() {
         System.out.println(
                 "Baseline:\n" + getAvgBaseline() + "\n" +

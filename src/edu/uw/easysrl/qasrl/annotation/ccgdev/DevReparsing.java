@@ -14,10 +14,7 @@ import edu.uw.easysrl.qasrl.annotation.AnnotatedQuery;
 import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
 import edu.uw.easysrl.qasrl.experiments.ReparsingHistory;
-import edu.uw.easysrl.qasrl.model.Constraint;
-import edu.uw.easysrl.qasrl.model.HITLParser;
-import edu.uw.easysrl.qasrl.model.HITLParsingParameters;
-import edu.uw.easysrl.qasrl.model.HeuristicHelper;
+import edu.uw.easysrl.qasrl.model.*;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
@@ -43,7 +40,7 @@ public class DevReparsing {
         reparsingParameters.skipPronounEvidence = false;
         reparsingParameters.jeopardyQuestionWeight = 1.0;
         reparsingParameters.oraclePenaltyWeight = 5.0;
-        reparsingParameters.attachmentPenaltyWeight = 3.0;
+        reparsingParameters.attachmentPenaltyWeight = 5.0;
         reparsingParameters.supertagPenaltyWeight = 0.0;
     }
 
@@ -59,7 +56,7 @@ public class DevReparsing {
                 numWrongAnnotations = 0;
 
         for (int sentenceId : parser.getAllSentenceIds()) {
-            if (sentenceId < 1500) { continue; }
+            //if (sentenceId < 1500) { continue; }
             history.addSentence(sentenceId);
 
             final ImmutableList<String> sentence = parser.getSentence(sentenceId);
@@ -68,8 +65,6 @@ public class DevReparsing {
             if (queries == null || queries.isEmpty() || !annotations.containsKey(sentenceId)) {
                 continue;
             }
-
-            Set<Constraint> allConstraints = new HashSet<>(), allOracleConstraints = new HashSet<>();
 
             for (ScoredQuery<QAStructureSurfaceForm> query : queries) {
                 final Optional<AnnotatedQuery> matchAnnotation =
@@ -116,8 +111,10 @@ public class DevReparsing {
                 history.addEntry(sentenceId, query,
                         parser.getUserOptions(query, newOptionDist),
                         parser.getConstraints(query, newOptionDist));
-                history.printLatestHistory();
-                System.out.println(query.toString(sentence, 'G', parser.getGoldOptions(query), '*', newOptionDist));
+                if (history.lastIsWorsened()) {
+                    history.printLatestHistory();
+                    System.out.println(query.toString(sentence, 'G', parser.getGoldOptions(query), '*', newOptionDist));
+                }
             }
         }
 
@@ -127,6 +124,28 @@ public class DevReparsing {
         System.out.println("Num. high-agreement wrong annotation:\t" + numWrongAnnotations);
 
         history.printSummary();
+    }
+
+    private static ImmutableSet<Constraint> getConstraints(final ScoredQuery<QAStructureSurfaceForm> query,
+                                                           final int[] optionDist) {
+        final Set<Constraint> constraints = new HashSet<>();
+        final int numQA = query.getQAPairSurfaceForms().size();
+
+        final Set<Integer> hitOptions = IntStream.range(0, optionDist.length).boxed()
+                .filter(i -> optionDist[i] >= reparsingParameters.positiveConstraintMinAgreement)
+                .collect(Collectors.toSet());
+        final Set<Integer> chosenOptions = IntStream.range(0, optionDist.length).boxed()
+                .filter(i -> optionDist[i] > reparsingParameters.negativeConstraintMaxAgreement)
+                .collect(Collectors.toSet());
+        ConstraintExtractor.extractPositiveConstraints(query, hitOptions)
+                .forEach(constraints::add);
+        ConstraintExtractor.extractNegativeConstraints(query, chosenOptions, reparsingParameters.skipPronounEvidence)
+                .forEach(constraints::add);
+        constraints.forEach(c -> c.setStrength(
+                (Constraint.SupertagConstraint.class.isInstance(c) ?
+                        reparsingParameters.supertagPenaltyWeight :
+                        reparsingParameters.attachmentPenaltyWeight)));
+        return ImmutableSet.copyOf(constraints);
     }
 
     private static ImmutableList<Integer> getAllGoldOption(ScoredQuery<QAStructureSurfaceForm> query, Parse goldParse,
