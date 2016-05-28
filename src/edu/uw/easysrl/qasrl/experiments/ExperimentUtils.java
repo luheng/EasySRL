@@ -3,6 +3,7 @@ package edu.uw.easysrl.qasrl.experiments;
 import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.qasrl.NBestList;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
+import edu.uw.easysrl.qasrl.annotation.AnnotatedQuery;
 import edu.uw.easysrl.qasrl.annotation.CrowdFlowerDataReader;
 import edu.uw.easysrl.qasrl.qg.QuestionAnswerPair;
 import edu.uw.easysrl.qasrl.qg.QAPairAggregator;
@@ -168,5 +169,28 @@ public class ExperimentUtils {
             }
         }
         return bestAligned;
+    }
+
+    /**
+     *
+     * @param query
+     * @param annotations
+     * @return
+     */
+    public static Optional<AnnotatedQuery> getAlignedAnnotatedQuery(ScoredQuery<QAStructureSurfaceForm> query,
+                                                                    List<AnnotatedQuery> annotations) {
+        AnnotatedQuery bestAligned = null;
+        int maxNumOverlappingOptions = 1;
+        for (AnnotatedQuery annotation : annotations) {
+            if (query.getPrompt().equals(annotation.questionString)) {
+                int numOverlappingOptions = (int) annotation.optionStrings.stream()
+                        .filter(op -> query.getOptions().contains(op))
+                        .count();
+                if (numOverlappingOptions > maxNumOverlappingOptions) {
+                    bestAligned = annotation;
+                }
+            }
+        }
+        return bestAligned != null ? Optional.of(bestAligned) : Optional.empty();
     }
 }

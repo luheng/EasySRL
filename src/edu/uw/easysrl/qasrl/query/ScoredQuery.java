@@ -8,6 +8,7 @@ import edu.uw.easysrl.qasrl.NBestList;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
 import edu.uw.easysrl.qasrl.experiments.DebugPrinter;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
+import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.GuavaCollectors;
 
@@ -165,6 +166,15 @@ public class ScoredQuery<QA extends QAStructureSurfaceForm> implements Query<QA>
 
     public OptionalInt getArgumentNumber() {
         return isJeopardyStyle()? OptionalInt.empty() : OptionalInt.of(qaPairSurfaceForms.get(0).getArgumentNumber());
+    }
+
+    public OptionalInt getPrepositionIndex() {
+        Optional<QuestionStructure> ppQuestionOpt = getQAPairSurfaceForms().stream()
+                .flatMap(qa -> qa.getQuestionStructures().stream())
+                .filter(q -> q.targetPrepositionIndex >= 0)
+                .findAny();
+        return ppQuestionOpt.isPresent() ? OptionalInt.of(ppQuestionOpt.get().targetPrepositionIndex)
+                : OptionalInt.empty();
     }
 
     /**

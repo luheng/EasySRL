@@ -246,7 +246,7 @@ public class HITLParser {
         final ImmutableSet<String> questionStrings = queryList.stream()
                 .map(q -> q.getPredicateId().getAsInt() + "\t" + q.getPrompt())
                 .collect(GuavaCollectors.toImmutableSet());
-        getCoreArgumentQueriesForSentence(sentenceId, true).stream()
+        getPronounCoreArgQueriesForSentence(sentenceId).stream()
                 .filter(q -> !questionStrings.contains(q.getPredicateId().getAsInt() + "\t" + q.getPrompt()))
                 .forEach(queryList::add);
         return ImmutableList.copyOf(queryList);

@@ -178,6 +178,7 @@ public class ReparsingHistory {
                 constraintsMap.get(sentenceId).stream()
                         .filter(s -> s != null)
                         .flatMap(ImmutableSet::stream)
+                        .distinct()
                         .collect(GuavaCollectors.toImmutableSet()) : ImmutableSet.of();
     }
 

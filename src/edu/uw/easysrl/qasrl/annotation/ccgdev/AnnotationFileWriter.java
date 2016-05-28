@@ -47,7 +47,7 @@ public class AnnotationFileWriter {
             "./Crowdflower_data/f913098.csv",                   // Round5: Rerun 200+ sentences.
     };
 
-    private static final String outputFilePath = "ccgdev.qa.tsv";
+    private static final String outputFilePath = "ccgdev.qa.tsv.temp";
 
     private static QueryPruningParameters queryPruningParameters;
     static {
@@ -70,7 +70,7 @@ public class AnnotationFileWriter {
         reparsingParameters.jeopardyQuestionWeight = 1.0;
         reparsingParameters.oraclePenaltyWeight = 5.0;
         reparsingParameters.attachmentPenaltyWeight = 2.0;
-        reparsingParameters.supertagPenaltyWeight = 2.0;
+        reparsingParameters.supertagPenaltyWeight = 0.0;
     }
 
     public static void main(String[] args) {
@@ -172,8 +172,8 @@ public class AnnotationFileWriter {
             for (ScoredQuery<QAStructureSurfaceForm> query : queryList) {
                 AlignedAnnotation annotation = ExperimentUtils.getAlignedAnnotation(query, annotations.get(sentenceId));
                 ImmutableList<Integer> goldOptions    = myHTILParser.getGoldOptions(query),
-                        oneBestOptions = myHTILParser.getOneBestOptions(query),
-                        oracleOptions  = myHTILParser.getOracleOptions(query);
+                                       oneBestOptions = myHTILParser.getOneBestOptions(query),
+                                       oracleOptions  = myHTILParser.getOracleOptions(query);
                 if (annotation == null) {
                     numNewQuestions ++;
                     continue;
@@ -182,12 +182,12 @@ public class AnnotationFileWriter {
 
                 int[] optionDist = AnnotationUtils.getUserResponseDistribution(query, annotation);
                 ImmutableList<ImmutableList<Integer>> responses = AnnotationUtils.getAllUserResponses(query, annotation);
-                ImmutableList<ImmutableList<Integer>> newResponses = HeuristicHelper.adjustVotes(sentence, query, responses);
-                int[] newOptionDist = new int[optionDist.length];
-                newResponses.stream().forEach(resp -> resp.stream().forEach(op -> newOptionDist[op]++));
+                //ImmutableList<ImmutableList<Integer>> newResponses = HeuristicHelper.adjustVotes(sentence, query, responses);
+                //int[] newOptionDist = new int[optionDist.length];
+                //newResponses.stream().forEach(resp -> resp.stream().forEach(op -> newOptionDist[op]++));
 
-                ImmutableList<Integer> userOptions  = myHTILParser.getUserOptions(query, annotation),
-                        userOptions2 = myHTILParser.getUserOptions(query, newOptionDist);
+                ImmutableList<Integer> userOptions  = myHTILParser.getUserOptions(query, annotation);
+                                       //userOptions2 = myHTILParser.getUserOptions(query, newOptionDist);
                 if (responses.size() != 5) {
                     continue;
                 }
@@ -209,7 +209,7 @@ public class AnnotationFileWriter {
                 if (Prepositions.prepositionWords.contains(sentence.get(query.getPredicateId().getAsInt()).toLowerCase())) {
                     continue;
                 }
-                ImmutableSet<Constraint> constraints = myHTILParser.getConstraints(query, newOptionDist),
+                ImmutableSet<Constraint> constraints = myHTILParser.getConstraints(query, optionDist),
                                          oracleConstraints = myHTILParser.getOracleConstraints(query);
                 allConstraints.addAll(constraints);
                 allOracleConstraints.addAll(oracleConstraints);
@@ -241,7 +241,7 @@ public class AnnotationFileWriter {
                         'O', oracleOptions,
                         'B', oneBestOptions,
                         'U', userOptions,
-                        'R', userOptions2,
+                      //  'R', userOptions2,
                         '*', optionDist);
                 result += allConstraints.stream()
                         .map(c -> "Penalizing:\t \t" + c.toString(sentence))

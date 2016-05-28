@@ -58,8 +58,8 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                 .filter(c -> !c.isPositive())
                 .filter(Constraint.AttachmentConstraint.class::isInstance)
                 .map(c -> (Constraint.AttachmentConstraint) c)
-                .filter(c -> !mustLinks.contains(c.getHeadId(), c.getArgId()))
-                        //&& !mustLinks.contains(c.getArgId(), c.getHeadId()))
+                .filter(c -> !mustLinks.contains(c.getHeadId(), c.getArgId())
+                           && !mustLinks.contains(c.getArgId(), c.getHeadId()))
                 .forEach(c -> cannotLinks.put(c.getHeadId(), c.getArgId(), c.getStrength()));
 
         constraints.stream()

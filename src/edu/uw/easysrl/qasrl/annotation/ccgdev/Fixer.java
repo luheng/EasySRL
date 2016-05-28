@@ -30,7 +30,7 @@ public class Fixer {
                                                       final ScoredQuery<QAStructureSurfaceForm> query,
                                                       final ImmutableList<ImmutableList<Integer>> responses) {
         // TODO: cut by votes and prior. Other features: X said [pron] ...
-        final int minPronounVotes = 1;
+        final int minPronounVotes = 0;
 
         final Multiset<ImmutableList<Integer>> responseSet = HashMultiset.create(responses);
         final ImmutableList<Integer> agreedOptions = responses.stream()
@@ -39,6 +39,7 @@ public class Fixer {
 
         final int numQAs = query.getQAPairSurfaceForms().size();
         final int predicateId = query.getPredicateId().getAsInt();
+        final String sentenceStr = sentence.stream().collect(Collectors.joining(" ")).toLowerCase();
         int minDist = sentence.size();
         int bestPronounOpId = -1;
         for (int opId : IntStream.range(0, numQAs).toArray()) {
@@ -46,7 +47,7 @@ public class Fixer {
             final int argId = query.getQAPairSurfaceForms().get(opId).getAnswerStructures().get(0).argumentIndices.get(0);
             final int dist = Math.abs(predicateId - argId);
             final int votes = (int) responses.stream().filter(r -> r.contains(opId)).count();
-            if (PronounList.nonPossessivePronouns.contains(op) && dist < minDist) {
+            if (PronounList.nonPossessivePronouns.contains(op) && !sentenceStr.contains(op + " \'s") && dist < minDist) {
                 if (dist == 1 || votes >= minPronounVotes) {
                     bestPronounOpId = opId;
                     minDist = dist;
