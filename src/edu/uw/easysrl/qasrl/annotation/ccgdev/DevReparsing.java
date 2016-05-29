@@ -32,7 +32,7 @@ public class DevReparsing {
     final static boolean fixSubspans = true;
     final static boolean fixAppositves = true;
     final static boolean fixRelatives = true;
-    final static boolean useSubspanDisjunctives = true;
+    final static boolean useSubspanDisjunctives = falses;
     final static boolean useOldConstraints = false;
 
     private static QueryPruningParameters queryPruningParameters;
@@ -52,12 +52,12 @@ public class DevReparsing {
         reparsingParameters.jeopardyQuestionMinAgreement = 1;
         reparsingParameters.positiveConstraintMinAgreement = 4;
         reparsingParameters.negativeConstraintMaxAgreement = 1;
-        reparsingParameters.badQuestionMinAgreement = 3;
+        reparsingParameters.badQuestionMinAgreement = 2;
         reparsingParameters.skipPronounEvidence = false;
         reparsingParameters.jeopardyQuestionWeight = 1.0;
         reparsingParameters.oraclePenaltyWeight = 5.0;
         reparsingParameters.attachmentPenaltyWeight = 2.0;
-        reparsingParameters.supertagPenaltyWeight = 0.0;
+        reparsingParameters.supertagPenaltyWeight = 2.0;
 
     }
 
@@ -134,7 +134,7 @@ public class DevReparsing {
                         useOldConstraints ? parser.getConstraints(query, newOptionDist) : constraints);
 
 
-                if (IntStream.range(0, query.getOptions().size())
+                if (IntStream.range(0, query.getQAPairSurfaceForms().size())
                         .anyMatch(i -> optionDist[i] == 1 || optionDist[i] == 2)) {
                 //if (hasSpanIssue(query)) {
                     history.printLatestHistory();
@@ -216,6 +216,7 @@ public class DevReparsing {
                         final String opStr2 = qa2.getAnswer().toLowerCase();
                         if (votes + numVotes.get(opId2) >= reparsingParameters.positiveConstraintMinAgreement
                                 && votes > 0 && numVotes.get(opId2) > 0) {
+                            // TODO: + or
                             if (opStr.startsWith(opStr2 + " and ") || opStr.endsWith(" and " + opStr2)
                                     || opStr2.endsWith(" and " + opStr) || opStr2.startsWith(opStr + " and ")) {
                                 final ImmutableList<Integer> concatArgs = Stream
