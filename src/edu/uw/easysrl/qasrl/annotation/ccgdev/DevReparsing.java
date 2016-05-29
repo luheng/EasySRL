@@ -29,7 +29,7 @@ import java.util.stream.Stream;
 public class DevReparsing {
 
     ///////////////////////////////// Knobs...
-    final static boolean fixPronouns = true;
+    final static boolean fixPronouns = false;
     final static boolean fixSubspans = false;
     final static boolean fixAppositves = false;
     final static boolean fixRelatives = false;
@@ -109,7 +109,7 @@ public class DevReparsing {
                         .flatMap(List::stream)
                         .collect(Collectors.toList()));
                 final ImmutableList<Integer> agreedOptions = votes.entrySet().stream()
-                        .filter(e -> e.getCount() >= 3)
+                        .filter(e -> e.getCount() >= reparsingParameters.positiveConstraintMinAgreement)
                         .map(e -> e.getElement()).distinct().sorted()
                         .collect(GuavaCollectors.toImmutableList());
 
@@ -119,7 +119,7 @@ public class DevReparsing {
                 final ImmutableList<Integer> subspanFix = Fixer.subspanFixer(sentence, query, matchedResponses);
                 final ImmutableList<Integer> relative = Fixer.relativeFixer(sentence, query, matchedResponses);
                 */
-                final ImmutableList<Integer> pronounFix = FixerNew.pronounFixer(query, optionDist);
+                final ImmutableList<Integer> pronounFix = FixerNew.pronounFixer(query, agreedOptions, optionDist);
                 final ImmutableList<Integer> appositiveFix = FixerNew.appositiveFixer(sentence, query, agreedOptions, optionDist);
                 final ImmutableList<Integer> subspanFix = FixerNew.subspanFixer(sentence, query, agreedOptions, optionDist);
                 final ImmutableList<Integer> relativeFix = FixerNew.relativeFixer(sentence, query, agreedOptions, optionDist);

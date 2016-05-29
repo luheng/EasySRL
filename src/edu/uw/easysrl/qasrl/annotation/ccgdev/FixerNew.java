@@ -33,12 +33,29 @@ import java.util.stream.Stream;
 public class FixerNew {
 
     public static ImmutableList<Integer> pronounFixer(final ScoredQuery<QAStructureSurfaceForm> query,
+                                                      final ImmutableList<Integer> options,
                                                       final int[] optionDist) {
-        // TODO: distance constraint
-        for (int opId = 0; opId < query.getQAPairSurfaceForms().size(); opId++) {
-            final String op = query.getOptions().get(opId).toLowerCase();
-            if (PronounList.nonPossessivePronouns.contains(op) && optionDist[opId] > 0) {
-                return ImmutableList.of(opId);
+        final int predId = query.getPredicateId().getAsInt();
+        final int numQAs = query.getQAPairSurfaceForms().size();
+        for (int opId1 : options) {
+            if (opId1 >= numQAs) {
+                continue;
+            }
+            final QAStructureSurfaceForm qa1 = query.getQAPairSurfaceForms().get(opId1);
+            final int dist1 = qa1.getAnswerStructures().stream()
+                    .flatMap(ans -> ans.argumentIndices.stream())
+                    .map(argId -> Math.abs(argId - predId))
+                    .min(Integer::compare).get();
+            for (int opId2 = 0; opId2 < query.getQAPairSurfaceForms().size(); opId2++) {
+                final QAStructureSurfaceForm qa2 = query.getQAPairSurfaceForms().get(opId2);
+                final String op2 = query.getOptions().get(opId2).toLowerCase();
+                final int dist2 = qa2.getAnswerStructures().stream()
+                        .flatMap(ans -> ans.argumentIndices.stream())
+                        .map(argId -> Math.abs(argId - predId))
+                        .min(Integer::compare).get();
+                if (PronounList.nonPossessivePronouns.contains(op2) && dist2 < dist1 && optionDist[opId2] > 0) {
+                    return ImmutableList.of(opId2);
+                }
             }
         }
         return ImmutableList.of();
@@ -75,20 +92,12 @@ public class FixerNew {
                 final boolean commaInBetween = IntStream.range(argId1, minArgId2)
                         .mapToObj(sentence::get)
                         .anyMatch(","::equals);
-                // Weak appositive.
-                if (commaInBetween && !op2.contains(op1)) {
-                    //newOptions.add(opId2);
-                    return Stream.concat(options.stream(), Stream.of(opId2))
-                            .distinct().sorted().collect(GuavaCollectors.toImmutableList());
+                if (sentenceStr.contains(op1 + ", " + op2) || sentenceStr.contains(op1 + "., " + op2)
+                        || sentenceStr.contains(op2 + ", " + op1) || sentenceStr.contains(op2 + "., " + op1)) {
+                      //  && !query.getQAPairSurfaceForms().get(opId1).getAnswer().equals(op1)
+                      //  && Determiners.determinerList.stream().anyMatch(d -> op2.startsWith(d + " "))) {
+                    newOptions.add(opId2);
                 }
-                // Strong appositive.
-                /*
-                if ((sentenceStr.contains(op1 + ", " + op2) || sentenceStr.contains(op1 + "., " + op2))
-                        && !query.getQAPairSurfaceForms().get(opId1).getAnswer().equals(op1)
-                        && Determiners.determinerList.stream().anyMatch(d -> op2.startsWith(d + " "))) {
-                    return Stream.concat(agreedOptions.stream(), Stream.of(opId2))
-                            .distinct().sorted().collect(GuavaCollectors.toImmutableList());
-                }*/
             }
         }
         if (newOptions.isEmpty()) {
