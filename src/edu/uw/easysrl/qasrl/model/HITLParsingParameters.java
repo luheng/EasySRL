@@ -7,6 +7,7 @@ public class HITLParsingParameters {
     // Inclusive boundary.
     public int positiveConstraintMinAgreement = 5;
     public int negativeConstraintMaxAgreement = 1;
+    public int badQuestionMinAgreement = 3;
     public double supertagPenaltyWeight = 1.0;
     public double attachmentPenaltyWeight = 1.0;
     // Like, really confident.
