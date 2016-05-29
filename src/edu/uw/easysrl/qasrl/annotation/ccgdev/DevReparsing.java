@@ -48,7 +48,7 @@ public class DevReparsing {
         reparsingParameters.jeopardyQuestionWeight = 1.0;
         reparsingParameters.oraclePenaltyWeight = 5.0;
         reparsingParameters.attachmentPenaltyWeight = 2.0;
-        //reparsingParameters.supertagPenaltyWeight = 2.0;
+        reparsingParameters.supertagPenaltyWeight = 2.0;
     }
 
     private static final ParseData dev = ParseDataLoader.loadFromDevPool().get();
@@ -139,6 +139,7 @@ public class DevReparsing {
 
         final int naOptionId = query.getBadQuestionOptionId().getAsInt();
         final int numQA = query.getQAPairSurfaceForms().size();
+        /*
         if (optionDist[naOptionId] >= reparsingParameters.positiveConstraintMinAgreement) {
             query.getQAPairSurfaceForms().stream()
                     .flatMap(qa -> qa.getQuestionStructures().stream())
@@ -146,7 +147,7 @@ public class DevReparsing {
                             .add(new Constraint.SupertagConstraint(qstr.predicateIndex, qstr.category, false,
                                     reparsingParameters.supertagPenaltyWeight)));
             return ImmutableSet.copyOf(constraints);
-        }
+        }*/
 
         final ImmutableList<Integer> numVotes = IntStream.range(0, numQA)
                 .mapToObj(i -> optionDist[i]).collect(GuavaCollectors.toImmutableList());
@@ -176,12 +177,13 @@ public class DevReparsing {
                 if (opId2 != opId1) {
                     final QAStructureSurfaceForm qa2 = query.getQAPairSurfaceForms().get(opId2);
                     final String opStr2 = qa2.getAnswer().toLowerCase();
-                    if (opStr.endsWith(" of " + opStr2) || opStr.endsWith(" and " + opStr2) || opStr.startsWith(opStr2 + " and ") ||
-                            opStr2.endsWith(" of " + opStr) || opStr2.endsWith(" and " + opStr) || opStr2.startsWith(opStr + " and ")) {
+                    if (opStr.endsWith(" of " + opStr2) || opStr.endsWith(" and " + opStr2)|| opStr.startsWith(opStr2 + " and ")) {
+                        //    opStr2.endsWith(" of " + opStr) || opStr2.endsWith(" and " + opStr) || opStr2.startsWith(opStr + " and ")) {
                         final ImmutableList<Integer> concatArgs = Stream
                                 .concat(argIds.stream(), qa2.getArgumentIndices().stream())
                                 .distinct().sorted().collect(GuavaCollectors.toImmutableList());
-                        if (votes + numVotes.get(opId2) >= reparsingParameters.positiveConstraintMinAgreement) {
+                       if (votes + numVotes.get(opId2) >= reparsingParameters.positiveConstraintMinAgreement) {
+                       // if (votes > reparsingParameters.positiveConstraintMinAgreement) {
                             constraints.add(new Constraint.DisjunctiveAttachmentConstraint(headId, concatArgs, true, 1.0));
                             hasDisjunctiveConstraints = true;
                             skipOps.add(opId2);

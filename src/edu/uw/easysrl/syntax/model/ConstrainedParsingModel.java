@@ -23,7 +23,7 @@ import java.util.stream.IntStream;
  */
 public class ConstrainedParsingModel extends SupertagFactoredModel {
     private static final boolean kIncludeDependencies = true;
-    private static final boolean kNormalizePositiveConstraints = false;
+    private static final boolean kNormalizePositiveConstraints = true;
     private static final boolean kNormalizeNegativeConstraints = false;
     private final List<List<Tagger.ScoredCategory>> tagsForWords;
     private Table<Integer, Integer, Double> mustLinks, cannotLinks;
@@ -59,8 +59,8 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                 .filter(c -> !c.isPositive())
                 .filter(Constraint.AttachmentConstraint.class::isInstance)
                 .map(c -> (Constraint.AttachmentConstraint) c)
-                .filter(c -> !mustLinks.contains(c.getHeadId(), c.getArgId()))
-                           //&& !mustLinks.contains(c.getArgId(), c.getHeadId()))
+                .filter(c -> !mustLinks.contains(c.getHeadId(), c.getArgId())
+                            && !mustLinks.contains(c.getArgId(), c.getHeadId()))
                 .forEach(c -> cannotLinks.put(c.getHeadId(), c.getArgId(), c.getStrength()));
 
         constraints.stream()
@@ -157,8 +157,8 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                     final int cHead = c.getRowKey(), cArg = c.getColumnKey();
                     return !dependencies.stream()
                             // Undirected match.
-                            .anyMatch(dep -> (dep.getHead() == cHead && dep.getArguments().contains(cArg)));
-                                    //|| (dep.getHead() == cArg && dep.getArguments().contains(cHead))));
+                            .anyMatch(dep -> (dep.getHead() == cHead && dep.getArguments().contains(cArg))
+                                    || (dep.getHead() == cArg && dep.getArguments().contains(cHead)));
                 })
                 .mapToDouble(Table.Cell::getValue)
                 .sum();
