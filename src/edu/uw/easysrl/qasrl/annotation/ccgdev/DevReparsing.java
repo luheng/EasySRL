@@ -31,7 +31,7 @@ public class DevReparsing {
     ///////////////////////////////// Knobs...
     final static boolean fixPronouns = false;
     final static boolean fixSubspans = false;
-    final static boolean fixAppositves = false;
+    final static boolean fixAppositves = true;
     final static boolean fixRelatives = true;
     final static boolean fixConjunctions = false;
     final static boolean useSubspanDisjunctives = false;
