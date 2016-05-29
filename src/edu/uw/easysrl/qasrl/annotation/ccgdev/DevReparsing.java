@@ -50,6 +50,7 @@ public class DevReparsing {
 
     public static void main(String[] args) {
         parser.setQueryPruningParameters(queryPruningParameters);
+        System.out.println(config.toString());
         int numMatchedAnnotations = 0;
 
         for (int sentenceId : parser.getAllSentenceIds()) {
@@ -135,6 +136,7 @@ public class DevReparsing {
             }
         }
         System.out.println("Num. matched annotation:\t" + numMatchedAnnotations);
+        System.out.println(config.toString());
         history.printSummary();
     }
 
