@@ -75,20 +75,12 @@ public class FixerNew {
                 final boolean commaInBetween = IntStream.range(argId1, minArgId2)
                         .mapToObj(sentence::get)
                         .anyMatch(","::equals);
-                // Weak appositive.
-                if (commaInBetween && !op2.contains(op1)) {
-                    //newOptions.add(opId2);
-                    return Stream.concat(options.stream(), Stream.of(opId2))
-                            .distinct().sorted().collect(GuavaCollectors.toImmutableList());
+                if (sentenceStr.contains(op1 + ", " + op2) || sentenceStr.contains(op1 + "., " + op2)
+                        || sentenceStr.contains(op2 + ", " + op1) || sentenceStr.contains(op2 + "., " + op1)) {
+                      //  && !query.getQAPairSurfaceForms().get(opId1).getAnswer().equals(op1)
+                      //  && Determiners.determinerList.stream().anyMatch(d -> op2.startsWith(d + " "))) {
+                    newOptions.add(opId2);
                 }
-                // Strong appositive.
-                /*
-                if ((sentenceStr.contains(op1 + ", " + op2) || sentenceStr.contains(op1 + "., " + op2))
-                        && !query.getQAPairSurfaceForms().get(opId1).getAnswer().equals(op1)
-                        && Determiners.determinerList.stream().anyMatch(d -> op2.startsWith(d + " "))) {
-                    return Stream.concat(agreedOptions.stream(), Stream.of(opId2))
-                            .distinct().sorted().collect(GuavaCollectors.toImmutableList());
-                }*/
             }
         }
         if (newOptions.isEmpty()) {
