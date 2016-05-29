@@ -133,7 +133,9 @@ public class DevReparsing {
                 history.addEntry(sentenceId, query, parser.getUserOptions(query, newOptionDist),
                         useOldConstraints ? parser.getConstraints(query, newOptionDist) : constraints);
 
-                if (history.lastIsWorsened()) {
+
+                if (IntStream.range(0, query.getOptions().size())
+                        .anyMatch(i -> optionDist[i] == 1 || optionDist[i] == 2)) {
                 //if (hasSpanIssue(query)) {
                     history.printLatestHistory();
                     System.out.println(query.toString(sentence, 'G', parser.getGoldOptions(query), '*', optionDist));

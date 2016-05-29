@@ -98,7 +98,7 @@ public class Fixer {
                 final boolean commaInBetween = IntStream.range(argId1, argId2).mapToObj(sentence::get)
                         .anyMatch(","::equals);
                 // Weak appositive.
-                if (commaInBetween && votes2 > 0) {
+                if (commaInBetween && !op2.contains(op1) && votes2 > 0) {
                     return Stream.concat(agreedOptions.stream(), Stream.of(opId2))
                             .distinct().sorted().collect(GuavaCollectors.toImmutableList());
                 }
