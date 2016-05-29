@@ -32,7 +32,7 @@ public class DevReparsing {
     final static boolean fixPronouns = false;
     final static boolean fixSubspans = false;
     final static boolean fixAppositves = false;
-    final static boolean fixRelatives = false;
+    final static boolean fixRelatives = true;
     final static boolean fixConjunctions = false;
     final static boolean useSubspanDisjunctives = false;
     final static boolean useOldConstraints = false;
