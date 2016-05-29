@@ -31,7 +31,7 @@ public class DevReparsing {
     final static boolean fixPronouns = false;
     final static boolean fixSubspans = false;
     final static boolean fixAppositves = true;
-    final static boolean fixRelatives = false;
+    final static boolean fixRelatives = true;
     final static boolean useSubspanDisjunctives = false;
     final static boolean useOldConstraints = false;
 
@@ -108,11 +108,13 @@ public class DevReparsing {
                 final ImmutableList<Integer> appositiveFix = Fixer.appositiveFixer(sentence, query, matchedResponses);
                 final ImmutableList<Integer> subspanFix = Fixer.subspanFixer(sentence, query, matchedResponses);
                 final ImmutableList<Integer> relative = Fixer.relativeFixer(sentence, query, matchedResponses);
+                boolean fixedPronoun = false, fixedAppositive = false, fixedSubspan = false, fixedRelative = false;
                 List<Integer> fixedResopnse = null;
                 if (fixRelatives && !relative.isEmpty()) {
                     fixedResopnse = relative;
                 } else if (fixAppositves && !appositiveFix.isEmpty()) {
                     fixedResopnse = appositiveFix;
+                    fixedAppositive = true;
                 } else if (fixPronouns && !pronounFix.isEmpty()) {
                     fixedResopnse = pronounFix;
                 } else if (fixSubspans && !subspanFix.isEmpty()) {

@@ -82,20 +82,33 @@ public class Fixer {
             if (opId1 >= numQAs) {
                 continue;
             }
-            final String op1 = query.getQAPairSurfaceForms().get(opId1).getAnswer().toLowerCase();
+            final QAStructureSurfaceForm qa1 = query.getQAPairSurfaceForms().get(opId1);
+            final String op1 = qa1.getAnswer().toLowerCase();
+            final int argId1 = qa1.getAnswerStructures().stream().flatMap(ans -> ans.argumentIndices.stream())
+                    .max(Integer::compare).get();
             for (int opId2 : IntStream.range(0, numQAs).toArray()) {
                 if (opId1 == opId2) {
                     continue;
                 }
-                final String op2 = query.getQAPairSurfaceForms().get(opId2).getAnswer().toLowerCase();
+                final QAStructureSurfaceForm qa2 = query.getQAPairSurfaceForms().get(opId2);
+                final String op2 = qa2.getAnswer().toLowerCase();
+                final int argId2 = qa2.getAnswerStructures().stream().flatMap(ans -> ans.argumentIndices.stream())
+                        .min(Integer::compare).get();
+                final int votes2 = (int) responses.stream().filter(r -> r.contains(opId2)).count();
+                final boolean commaInBetween = IntStream.range(argId1, argId2).mapToObj(sentence::get)
+                        .anyMatch(","::equals);
+                // Weak appositive.
+                if (commaInBetween && votes2 > 0) {
+                    return Stream.concat(agreedOptions.stream(), Stream.of(opId2))
+                            .distinct().sorted().collect(GuavaCollectors.toImmutableList());
+                }
+                // Strong appositive.
                 if ((sentenceStr.contains(op1 + ", " + op2) || sentenceStr.contains(op1 + "., " + op2))
-                       //|| sentenceStr.contains(op2 + " , " + op1 + " , ") || sentenceStr.contains(op2 + ". , " + op1 + " , "))
                         && !query.getQAPairSurfaceForms().get(opId1).getAnswer().equals(op1)
                         && Determiners.determinerList.stream().anyMatch(d -> op2.startsWith(d + " "))) {
-                   // System.err.println(sentenceStr + "\n" + op1 + "\n" + op2);
-                    // FIXME: do not return.
+                    //System.err.println(sentenceStr + "\n" + op1 + "\n" + op2);
                     return Stream.concat(agreedOptions.stream(), Stream.of(opId2))
-                            .sorted().collect(GuavaCollectors.toImmutableList());
+                            .distinct().sorted().collect(GuavaCollectors.toImmutableList());
                 }
             }
         }
@@ -156,15 +169,20 @@ public class Fixer {
                 }
                 final QAStructureSurfaceForm qa2 = query.getQAPairSurfaceForms().get(opId2);
                 final String op2 = qa2.getAnswer().toLowerCase();
-                final int argId2 = qa2.getAnswerStructures().stream().flatMap(ans -> ans.argumentIndices.stream())
+                final int minArgId2 = qa2.getAnswerStructures().stream().flatMap(ans -> ans.argumentIndices.stream())
+                        .min(Integer::compare).get();
+                final int maxArgId2 = qa2.getAnswerStructures().stream().flatMap(ans -> ans.argumentIndices.stream())
                         .max(Integer::compare).get();
-                boolean copulaInBetween = IntStream.range(argId1, argId2).mapToObj(sentence::get)
+                final boolean copulaInBetween = IntStream.range(argId1, minArgId2).mapToObj(sentence::get)
                         .anyMatch(VerbHelper::isCopulaVerb);
-                boolean commaInBetween = IntStream.range(argId1, argId2).mapToObj(sentence::get)
+                final boolean commaInBetween = IntStream.range(argId1, minArgId2).mapToObj(sentence::get)
                         .anyMatch(","::equals);
-                boolean trailingWhoThat = sentenceStr.contains(op2 + " who ") || sentenceStr.contains(op2 + " that ")
-                                        || sentenceStr.contains(op2 + ". who ") || sentenceStr.contains(op2 + ". that ");
-                if ((copulaInBetween || commaInBetween) && trailingWhoThat && predicateId > argId2) {
+                final boolean trailingWhoThat = sentenceStr.contains(op2 + " who ") || sentenceStr.contains(op2 + " that ")
+                                                || sentenceStr.contains(op2 + ". who ") || sentenceStr.contains(op2 + ". that ");
+                final boolean trailingPss = (maxArgId2 + 1 == predicateId) && query.getQAPairSurfaceForms().stream()
+                        .flatMap(qa -> qa.getQuestionStructures().stream())
+                        .anyMatch(q -> q.category.isFunctionInto(Category.valueOf("S[pss]")));
+                if ((copulaInBetween || commaInBetween) && (trailingWhoThat || trailingPss) && predicateId > maxArgId2) {
                     return Stream.concat(agreedOptions.stream().filter(i -> i != opId1), Stream.of(opId2))
                             .distinct().sorted()
                             .collect(GuavaCollectors.toImmutableList());
