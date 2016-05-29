@@ -47,7 +47,7 @@ public class AnnotationFileWriter {
             "./Crowdflower_data/f913098.csv",                   // Round5: Rerun 200+ sentences.
     };
 
-    private static final String outputFilePath = "ccgdev.qa.tsv.temp";
+    private static final String outputFilePath = "ccgdev2.qa.tsv";
 
     private static QueryPruningParameters queryPruningParameters;
     static {
@@ -120,7 +120,6 @@ public class AnnotationFileWriter {
         TicToc.tic();
         for (int sentenceId : sentenceIds) {
             myHistory.addSentence(sentenceId);
-            Set<Integer> matchedAnnotationIds = new HashSet<>();
             if (++counter % 100 == 0) {
                 System.out.println(String.format("Processed %d sentences ... in %d seconds", counter, TicToc.toc()));
                 TicToc.tic();
@@ -147,8 +146,6 @@ public class AnnotationFileWriter {
                 avgUnlabeledReparsed.add(unlabeledBaselineF1);
                 continue;
             }
-            IntStream.range(0, annotated.size()).forEach(i -> annotated.get(i).iterationId = i);
-
 
             boolean useNewCoreArgsQuestions = newCoreAgsSentenceIds.contains(sentenceId);
             List<ScoredQuery<QAStructureSurfaceForm>> queryList = new ArrayList<>();
@@ -169,28 +166,29 @@ public class AnnotationFileWriter {
             double[] penalty = new double[numParses];
             Arrays.fill(penalty, 0);
 
-            for (ScoredQuery<QAStructureSurfaceForm> query : queryList) {
-                AlignedAnnotation annotation = ExperimentUtils.getAlignedAnnotation(query, annotations.get(sentenceId));
+            for (AlignedAnnotation annotation : annotations.get(sentenceId)) {
+                Optional<ScoredQuery<QAStructureSurfaceForm>> queryOpt =
+                        ExperimentUtils.getQueryForAlignedAnnotation(annotation, queryList);
+                if (!queryOpt.isPresent()) {
+                    continue;
+                }
+                final ScoredQuery<QAStructureSurfaceForm> query = queryOpt.get();
                 ImmutableList<Integer> goldOptions    = myHTILParser.getGoldOptions(query),
                                        oneBestOptions = myHTILParser.getOneBestOptions(query),
                                        oracleOptions  = myHTILParser.getOracleOptions(query);
-                if (annotation == null) {
-                    numNewQuestions ++;
-                    continue;
-                }
-                matchedAnnotationIds.add(annotation.iterationId);
 
                 int[] optionDist = AnnotationUtils.getUserResponseDistribution(query, annotation);
                 ImmutableList<ImmutableList<Integer>> responses = AnnotationUtils.getAllUserResponses(query, annotation);
-                //ImmutableList<ImmutableList<Integer>> newResponses = HeuristicHelper.adjustVotes(sentence, query, responses);
-                //int[] newOptionDist = new int[optionDist.length];
-                //newResponses.stream().forEach(resp -> resp.stream().forEach(op -> newOptionDist[op]++));
+                ImmutableList<ImmutableList<Integer>> newResponses = HeuristicHelper.adjustVotes(sentence, query, responses);
+                int[] newOptionDist = new int[optionDist.length];
+                newResponses.stream().forEach(resp -> resp.stream().forEach(op -> newOptionDist[op]++));
 
                 ImmutableList<Integer> userOptions  = myHTILParser.getUserOptions(query, annotation);
                                        //userOptions2 = myHTILParser.getUserOptions(query, newOptionDist);
                 if (responses.size() != 5) {
                     continue;
                 }
+                numMatchedAnnotations ++;
 
                 // Update stats.
                 for (int i = 0; i < 5; i++) {
@@ -204,12 +202,11 @@ public class AnnotationFileWriter {
                                 (int) options.stream().filter(goldOptions::contains).count(), goldOptions.size()));
                     }
                 }
-                numMatchedAnnotations ++;
 
                 if (Prepositions.prepositionWords.contains(sentence.get(query.getPredicateId().getAsInt()).toLowerCase())) {
                     continue;
                 }
-                ImmutableSet<Constraint> constraints = myHTILParser.getConstraints(query, optionDist),
+                ImmutableSet<Constraint> constraints = myHTILParser.getConstraints(query, newOptionDist),
                                          oracleConstraints = myHTILParser.getOracleConstraints(query);
                 allConstraints.addAll(constraints);
                 allOracleConstraints.addAll(oracleConstraints);

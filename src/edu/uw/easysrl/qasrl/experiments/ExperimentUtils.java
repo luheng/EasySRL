@@ -171,6 +171,26 @@ public class ExperimentUtils {
         return bestAligned;
     }
 
+    public static Optional<ScoredQuery<QAStructureSurfaceForm>> getQueryForAlignedAnnotation(
+            final AlignedAnnotation annotation,
+            final List<ScoredQuery<QAStructureSurfaceForm>> queries) {
+        ScoredQuery<QAStructureSurfaceForm> bestAligned = null;
+        int maxNumOverlappingOptions = 2;
+        for (ScoredQuery<QAStructureSurfaceForm> query : queries) {
+            if (query.getPredicateId().getAsInt() == annotation.predicateId
+                    && query.getPrompt().equals(annotation.queryPrompt)) {
+                int numOverlappingOptions = (int) annotation.answerOptions.stream()
+                        .filter(op -> query.getOptions().contains(op))
+                        .count();
+                if (numOverlappingOptions > maxNumOverlappingOptions) {
+                    bestAligned = query;
+                    maxNumOverlappingOptions = numOverlappingOptions;
+                }
+            }
+        }
+        return bestAligned != null ? Optional.of(bestAligned) : Optional.empty();
+    }
+
     /**
      *
      * @param query
@@ -180,7 +200,7 @@ public class ExperimentUtils {
     public static Optional<AnnotatedQuery> getAlignedAnnotatedQuery(ScoredQuery<QAStructureSurfaceForm> query,
                                                                     List<AnnotatedQuery> annotations) {
         AnnotatedQuery bestAligned = null;
-        int maxNumOverlappingOptions = 1;
+        int maxNumOverlappingOptions = 2;
         for (AnnotatedQuery annotation : annotations) {
             if (query.getPrompt().equals(annotation.questionString)) {
                 int numOverlappingOptions = (int) annotation.optionStrings.stream()
@@ -188,6 +208,26 @@ public class ExperimentUtils {
                         .count();
                 if (numOverlappingOptions > maxNumOverlappingOptions) {
                     bestAligned = annotation;
+                    maxNumOverlappingOptions = numOverlappingOptions;
+                }
+            }
+        }
+        return bestAligned != null ? Optional.of(bestAligned) : Optional.empty();
+    }
+
+    public static Optional<ScoredQuery<QAStructureSurfaceForm>> getBestAlignedQuery(AnnotatedQuery annotation,
+                List<ScoredQuery<QAStructureSurfaceForm>> queries) {
+        ScoredQuery<QAStructureSurfaceForm> bestAligned = null;
+        int maxNumOverlappingOptions = 2;
+        for (ScoredQuery<QAStructureSurfaceForm> query : queries) {
+            if (query.getPredicateId().getAsInt() == annotation.predicateId
+                    && query.getPrompt().equals(annotation.questionString)) {
+                int numOverlappingOptions = (int) annotation.optionStrings.stream()
+                        .filter(op -> query.getOptions().contains(op))
+                        .count();
+                if (numOverlappingOptions > maxNumOverlappingOptions) {
+                    bestAligned = query;
+                    maxNumOverlappingOptions = numOverlappingOptions;
                 }
             }
         }
