@@ -1,7 +1,6 @@
 package edu.uw.easysrl.qasrl.annotation.ccgdev;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.*;
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.NBestList;
 import edu.uw.easysrl.qasrl.Parse;
@@ -11,11 +10,13 @@ import edu.uw.easysrl.qasrl.annotation.AnnotatedQuery;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
 import edu.uw.easysrl.qasrl.experiments.ReparsingHistory;
 import edu.uw.easysrl.qasrl.model.*;
+import edu.uw.easysrl.qasrl.model.Constraint;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.util.GuavaCollectors;
+import jdk.nashorn.internal.ir.annotations.Immutable;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -32,7 +33,8 @@ public class DevReparsing {
     final static boolean fixSubspans = true;
     final static boolean fixAppositves = true;
     final static boolean fixRelatives = true;
-    final static boolean useSubspanDisjunctives = falses;
+    final static boolean fixConjunctions = true;
+    final static boolean useSubspanDisjunctives = true;
     final static boolean useOldConstraints = false;
 
     private static QueryPruningParameters queryPruningParameters;
@@ -49,9 +51,8 @@ public class DevReparsing {
     private static HITLParsingParameters reparsingParameters;
     static {
         reparsingParameters = new HITLParsingParameters();
-        reparsingParameters.jeopardyQuestionMinAgreement = 1;
-        reparsingParameters.positiveConstraintMinAgreement = 4;
-        reparsingParameters.negativeConstraintMaxAgreement = 1;
+        reparsingParameters.positiveConstraintMinAgreement = 3;
+        reparsingParameters.negativeConstraintMaxAgreement = 2;
         reparsingParameters.badQuestionMinAgreement = 2;
         reparsingParameters.skipPronounEvidence = false;
         reparsingParameters.jeopardyQuestionWeight = 1.0;
@@ -104,21 +105,44 @@ public class DevReparsing {
                 Arrays.fill(newOptionDist, 0);
                 matchedResponses.forEach(r -> r.stream().forEach(op -> optionDist[op] ++));
 
+                final Multiset<Integer> votes = HashMultiset.create(matchedResponses.stream()
+                        .flatMap(List::stream)
+                        .collect(Collectors.toList()));
+                final ImmutableList<Integer> agreedOptions = votes.entrySet().stream()
+                        .filter(e -> e.getCount() >= 3)
+                        .map(e -> e.getElement()).distinct().sorted()
+                        .collect(GuavaCollectors.toImmutableList());
+
+                /*
                 final ImmutableList<Integer> pronounFix = Fixer.pronounFixer(sentence, query, matchedResponses);
                 final ImmutableList<Integer> appositiveFix = Fixer.appositiveFixer(sentence, query, matchedResponses);
                 final ImmutableList<Integer> subspanFix = Fixer.subspanFixer(sentence, query, matchedResponses);
                 final ImmutableList<Integer> relative = Fixer.relativeFixer(sentence, query, matchedResponses);
-                boolean fixedPronoun = false, fixedAppositive = false, fixedSubspan = false, fixedRelative = false;
+                */
+                final ImmutableList<Integer> pronounFix = FixerNew.pronounFixer(query, optionDist);
+                final ImmutableList<Integer> appositiveFix = FixerNew.appositiveFixer(sentence, query, agreedOptions, optionDist);
+                final ImmutableList<Integer> subspanFix = FixerNew.subspanFixer(sentence, query, agreedOptions, optionDist);
+                final ImmutableList<Integer> relativeFix = FixerNew.relativeFixer(sentence, query, agreedOptions, optionDist);
+                final ImmutableList<Integer> conjunctionFix = FixerNew.conjunctionFixer(sentence, query, agreedOptions, optionDist);
+                //boolean fixedPronoun = false, fixedAppositive = false, fixedSubspan = false, fixedRelative = false;
+                String fixType = "None";
                 List<Integer> fixedResopnse = null;
-                if (fixRelatives && !relative.isEmpty()) {
-                    fixedResopnse = relative;
+
+                if (fixRelatives && !relativeFix.isEmpty()) {
+                    fixedResopnse = relativeFix;
+                    fixType = "relative";
                 } else if (fixAppositves && !appositiveFix.isEmpty()) {
                     fixedResopnse = appositiveFix;
-                    fixedAppositive = true;
+                    fixType = "appositive";
                 } else if (fixPronouns && !pronounFix.isEmpty()) {
                     fixedResopnse = pronounFix;
+                    fixType = "pronoun";
                 } else if (fixSubspans && !subspanFix.isEmpty()) {
                     fixedResopnse = subspanFix;
+                    fixType = "subspan";
+                } else if (fixConjunctions && !conjunctionFix.isEmpty()) {
+                    fixedResopnse = conjunctionFix;
+                    fixType = "conjunction";
                 }
                 if (fixedResopnse != null) {
                     fixedResopnse.stream().forEach(op -> newOptionDist[op] += 5);
@@ -134,11 +158,13 @@ public class DevReparsing {
                         useOldConstraints ? parser.getConstraints(query, newOptionDist) : constraints);
 
 
-                if (IntStream.range(0, query.getQAPairSurfaceForms().size())
-                        .anyMatch(i -> optionDist[i] == 1 || optionDist[i] == 2)) {
+               // if (IntStream.range(0, query.getQAPairSurfaceForms().size())
+                     //   .anyMatch(i -> optionDist[i] == 1 || optionDist[i] == 2)) {
                 //if (hasSpanIssue(query)) {
+                if (history.lastIsWorsened()) {
                     history.printLatestHistory();
                     System.out.println(query.toString(sentence, 'G', parser.getGoldOptions(query), '*', optionDist));
+                    System.out.println("Fixed:\t" + fixType);
                     System.out.println(query.toString(sentence, 'G', parser.getGoldOptions(query), '*', newOptionDist));
                 }
             }
