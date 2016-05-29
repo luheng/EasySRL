@@ -28,11 +28,11 @@ import java.util.stream.Stream;
 public class DevReparsing {
 
     ///////////////////////////////// Knobs...
-    final static boolean fixPronouns = true;
-    final static boolean fixSubspans = true;
+    final static boolean fixPronouns = false;
+    final static boolean fixSubspans = false;
     final static boolean fixAppositves = true;
-    final static boolean fixRelatives = true;
-    final static boolean usseSubspanDisjunctives = true;
+    final static boolean fixRelatives = false;
+    final static boolean useSubspanDisjunctives = false;
     final static boolean useOldConstraints = false;
 
     private static QueryPruningParameters queryPruningParameters;
@@ -181,7 +181,7 @@ public class DevReparsing {
             final String opStr = qa.getAnswer().toLowerCase();
 
             // Handle subspan/superspan.
-            if (usseSubspanDisjunctives) {
+            if (useSubspanDisjunctives) {
                 boolean hasDisjunctiveConstraints = false;
                 for (int opId2 : optionOrder) {
                     if (opId2 != opId1) {
