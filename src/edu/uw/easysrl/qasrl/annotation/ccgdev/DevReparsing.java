@@ -50,6 +50,7 @@ public class DevReparsing {
 
     public static void main(String[] args) {
         parser.setQueryPruningParameters(queryPruningParameters);
+        config = new DevReparsingConfig(args);
         System.out.println(config.toString());
         int numMatchedAnnotations = 0;
 

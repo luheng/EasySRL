@@ -1,5 +1,7 @@
 package edu.uw.easysrl.qasrl.annotation.ccgdev;
 
+import org.kohsuke.args4j.CmdLineException;
+import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 
 /**
@@ -7,22 +9,22 @@ import org.kohsuke.args4j.Option;
  */
 public class DevReparsingConfig {
     @Option(name="-pronoun",usage="Fix pronoun")
-    boolean fixPronouns = true;
+    boolean fixPronouns = false;
 
     @Option(name="-subspan",usage="Fix subspans")
-    boolean fixSubspans = true;
+    boolean fixSubspans = false;
 
     @Option(name="-appositive",usage="Fix appositives")
     boolean fixAppositves = false;
 
-    @Option(name="-relatives",usage="Fix relatives")
+    @Option(name="-relative",usage="Fix relatives")
     boolean fixRelatives = false;
 
-    @Option(name="-conjunctions",usage="Fix conjunctions")
+    @Option(name="-conjunction",usage="Fix conjunctions")
     boolean fixConjunctions = false;
 
-    @Option(name="-disjunctives",usage="Use disjunctives")
-    boolean useSubspanDisjunctives = true;
+    @Option(name="-disjunctive",usage="Use disjunctives")
+    boolean useSubspanDisjunctives = false;
 
     @Option(name="-pos_threshold",usage="")
     int positiveConstraintMinAgreement = 3;
@@ -40,7 +42,16 @@ public class DevReparsingConfig {
     double supertagPenalty = 0.0;
 
     public DevReparsingConfig() {
+    }
 
+    public DevReparsingConfig(final String[] args) {
+        CmdLineParser parser = new CmdLineParser(this);
+        //parser.setUsageWidth(120);
+        try {
+            parser.parseArgument(args);
+        } catch (CmdLineException e) {
+            e.printStackTrace();
+        }
     }
 
     public String toString() {
