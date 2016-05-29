@@ -50,8 +50,7 @@ public class Fixer {
             final int argId = query.getQAPairSurfaceForms().get(opId).getAnswerStructures().get(0).argumentIndices.get(0);
             final int dist = Math.abs(predicateId - argId);
             if (PronounList.nonPossessivePronouns.contains(op) && !sentenceStr.contains(op + " \'s")
-                    && argId < predicateId
-                    && dist < minDist) {
+                    && argId < predicateId && dist < minDist) {
                 bestPronounOpId = opId;
                 bestArgId = argId;
                 minDist = dist;
@@ -59,12 +58,9 @@ public class Fixer {
         }
         if (bestPronounOpId >= 0) {
             final int bestPronounArgId = bestArgId;
-            final int minPredicatePronounDist = minDist;
             if (agreedOptions.size() == 1 && agreedOptions.get(0) < numQAs) {
                 if (query.getQAPairSurfaceForms().get(agreedOptions.get(0)).getAnswerStructures().stream()
-                        .flatMap(ans -> ans.argumentIndices.stream())
-                        .allMatch(argId -> argId < bestPronounArgId
-                                            && Math.abs(argId - predicateId) > minPredicatePronounDist)) {
+                        .flatMap(ans -> ans.argumentIndices.stream()).allMatch(argId -> argId < bestPronounArgId)) {
                     return ImmutableList.of(bestPronounOpId);
                 }
             }
@@ -95,7 +91,7 @@ public class Fixer {
                 if ((sentenceStr.contains(op1 + ", " + op2) || sentenceStr.contains(op1 + "., " + op2))
                        //|| sentenceStr.contains(op2 + " , " + op1 + " , ") || sentenceStr.contains(op2 + ". , " + op1 + " , "))
                         && !query.getQAPairSurfaceForms().get(opId1).getAnswer().equals(op1)
-                        && (op2.startsWith("a ") || op2.startsWith("the ") || op2.startsWith("an ") || op2.startsWith("both "))) {
+                        && Determiners.determinerList.stream().anyMatch(d -> op2.startsWith(d + " "))) {
                    // System.err.println(sentenceStr + "\n" + op1 + "\n" + op2);
                     // FIXME: do not return.
                     return Stream.concat(agreedOptions.stream(), Stream.of(opId2))

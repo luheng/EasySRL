@@ -28,10 +28,10 @@ import java.util.stream.Stream;
 public class DevReparsing {
 
     ///////////////////////////////// Knobs...
-    final static boolean fixPronouns = true;
-    final static boolean fixSubspans = true;
+    final static boolean fixPronouns = false;
+    final static boolean fixSubspans = false;
     final static boolean fixAppositves = true;
-    final static boolean fixRelatives = true;
+    final static boolean fixRelatives = false;
     final static boolean usseSubspanDisjunctives = false;
     final static boolean useOldConstraints = false;
 
