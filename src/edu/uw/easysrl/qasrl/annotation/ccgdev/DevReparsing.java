@@ -187,16 +187,20 @@ public class DevReparsing {
                     if (opId2 != opId1) {
                         final QAStructureSurfaceForm qa2 = query.getQAPairSurfaceForms().get(opId2);
                         final String opStr2 = qa2.getAnswer().toLowerCase();
-                        if (opStr.endsWith(" of " + opStr2) || opStr.endsWith(" and " + opStr2)) {
-                            //|| opStr2.endsWith(" of " + opStr) || opStr2.endsWith(" and " + opStr) || opStr2.startsWith(opStr + " and ")) {
+                        if (opStr.startsWith(opStr2 + " and ")
+                                || opStr.endsWith(" and " + opStr2)
+                                || opStr2.endsWith(" and " + opStr)
+                                || opStr2.startsWith(opStr + " and ")) {
                             final ImmutableList<Integer> concatArgs = Stream
                                     .concat(argIds.stream(), qa2.getArgumentIndices().stream())
                                     .distinct().sorted().collect(GuavaCollectors.toImmutableList());
-                            if (votes + numVotes.get(opId2) >= reparsingParameters.positiveConstraintMinAgreement) {
+                            if (votes  + numVotes.get(opId2) >= reparsingParameters.positiveConstraintMinAgreement) {
                                 constraints.add(new Constraint.DisjunctiveAttachmentConstraint(headId, concatArgs, true, 1.0));
                                 hasDisjunctiveConstraints = true;
                                 skipOps.add(opId2);
                             }
+                        } else if (opStr.endsWith(" of " + opStr2) || opStr2.endsWith(" of " + opStr)){
+
                         }
                     }
                 }
