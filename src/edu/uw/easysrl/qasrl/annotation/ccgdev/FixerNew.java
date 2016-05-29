@@ -32,6 +32,13 @@ import java.util.stream.Stream;
  */
 public class FixerNew {
 
+    /**
+     * Pronoun rule:
+     * @param query
+     * @param options
+     * @param optionDist
+     * @return
+     */
     public static ImmutableList<Integer> pronounFixer(final ScoredQuery<QAStructureSurfaceForm> query,
                                                       final ImmutableList<Integer> options,
                                                       final int[] optionDist) {

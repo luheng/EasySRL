@@ -94,8 +94,7 @@ public class ClassificationExperimentNew {
         alignedOldAnnotations = new HashMap<>();
         assert annotations != null;
 
-        ImmutableList<Integer> sentenceIds = annotations.keySet().stream()
-                .sorted()
+        ImmutableList<Integer> sentenceIds = annotations.keySet().stream().sorted()
                 .collect(GuavaCollectors.toImmutableList());
         System.out.println(sentenceIds.stream().map(String::valueOf).collect(Collectors.joining(", ")));
         System.out.println("Queried " + sentenceIds.size() + " sentences. Total number of questions:\t" +
@@ -114,8 +113,6 @@ public class ClassificationExperimentNew {
                 myParser, alignedQueries, alignedAnnotations, alignedOldAnnotations));
 
         coreArgsFeatureExtractor = new FeatureExtractor();
-        //cleftingFeatureExtractor = new FeatureExtractor();
-
         coreArgTrainInstances = ClassificationUtils.getInstances(trainSents, myParser,
                 ImmutableSet.of(QueryType.Forward), coreArgsFeatureExtractor, alignedQueries, alignedAnnotations)
                 .stream()
@@ -138,9 +135,9 @@ public class ClassificationExperimentNew {
                 coreArgsFeatureExtractor, alignedQueries, alignedAnnotations);
 
         final Map<String, Object> params1 = ImmutableMap.of(
-                "eta", 0.05,
-                "min_child_weight", 3.0,
-                "max_depth", 5,
+                "eta", 0.1,
+                "min_child_weight", 1.0,
+                "max_depth", 3,
                 "objective", "binary:logistic"
         );
         coreArgClassifier = Classifier.trainClassifier(coreArgTrainInstances, params1, 100);
