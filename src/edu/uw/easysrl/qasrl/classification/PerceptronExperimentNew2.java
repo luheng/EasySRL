@@ -116,7 +116,8 @@ public class PerceptronExperimentNew2 {
         alignedOldAnnotations = new HashMap<>();
         assert annotations != null;
 
-        ImmutableList<Integer> sentenceIds = myParser.getAllSentenceIds();
+        ImmutableList<Integer> sentenceIds = //myParser.getAllSentenceIds();
+                annotations.keySet().stream().sorted().collect(GuavaCollectors.toImmutableList());
         System.out.println(sentenceIds.stream().map(String::valueOf).collect(Collectors.joining(", ")));
         System.out.println("Queried " + sentenceIds.size() + " sentences. Total number of questions:\t" +
                 annotations.entrySet().stream().mapToInt(e -> e.getValue().size()).sum());
