@@ -16,7 +16,7 @@ import java.util.stream.IntStream;
  * Created by luheng on 5/26/16.
  */
 public class AnnotatedQuery {
-    public int sentenceId, predicateId;
+    public int sentenceId, predicateId, annotationId = -1;
     public String sentenceString, questionString;
     public ImmutableList<String> optionStrings;
     public ImmutableList<ImmutableList<Integer>> responses;

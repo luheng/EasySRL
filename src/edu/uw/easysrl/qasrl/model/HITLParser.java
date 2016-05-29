@@ -243,11 +243,12 @@ public class HITLParser {
         }
         List<ScoredQuery<QAStructureSurfaceForm>> queryList = new ArrayList<>();
         queryList.addAll(getNewCoreArgQueriesForSentence(sentenceId));
+        /*
         final ImmutableSet<String> questionStrings = queryList.stream()
                 .map(q -> q.getPredicateId().getAsInt() + "\t" + q.getPrompt())
-                .collect(GuavaCollectors.toImmutableSet());
+                .collect(GuavaCollectors.toImmutableSet());*/
         getPronounCoreArgQueriesForSentence(sentenceId).stream()
-                .filter(q -> !questionStrings.contains(q.getPredicateId().getAsInt() + "\t" + q.getPrompt()))
+                //.filter(q -> !questionStrings.contains(q.getPredicateId().getAsInt() + "\t" + q.getPrompt()))
                 .forEach(queryList::add);
         return ImmutableList.copyOf(queryList);
     }

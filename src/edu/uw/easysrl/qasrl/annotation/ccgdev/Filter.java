@@ -6,7 +6,6 @@ import edu.uw.easysrl.qasrl.NBestList;
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
-import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.*;
@@ -23,6 +22,8 @@ public class Filter {
         final int numQAs = query.getQAPairSurfaceForms().size();
         // Skip (S[b]\NP)/NP.1 (... to do)
         // Ditransitives (patients)
+
+        /*
         if (query.getQAPairSurfaceForms().stream().flatMap(qa -> qa.getQuestionStructures().stream())
                 .allMatch(q ->
            //             (q.category.isFunctionInto(Category.valueOf("S[b]\\NP")) && q.targetArgNum == 1)
@@ -36,27 +37,15 @@ public class Filter {
             for (int opId2 : IntStream.range(0, numQAs).toArray()) {
                 final String op2 = query.getQAPairSurfaceForms().get(opId2).getAnswer().toLowerCase();
                 if (opId1 != opId2 && op1.contains(op2)) {
-                    ++ covering;
+                    ++covering;
                 }
             }
-           // System.out.println(op1 + "\t" + covering);
-            if (covering > 1) {
+            // System.out.println(op1 + "\t" + covering);
+            if (covering > 2) {
                 return true;
             }
         }
-        /*
-        // Skip X of Y is user annotated either.
-        for (int opId1 : IntStream.range(0, numQAs).toArray()) {
-            final String op1 = query.getQAPairSurfaceForms().get(opId1).getAnswer().toLowerCase();
-            final int votes1 = (int) responses.stream().filter(r -> r.contains(opId1)).count();
-            for (int opId2 : IntStream.range(0, numQAs).toArray()) {
-                final String op2 = query.getQAPairSurfaceForms().get(opId2).getAnswer().toLowerCase();
-                final int votes2 = (int) responses.stream().filter(r -> r.contains(opId2)).count();
-                if (op1.endsWith(" of " + op2) && (votes1 > 0 || votes2 > 0)) {
-                    return true;
-                }
-            }
-        }*/
+        */
         /*
         final int predicateId = query.getPredicateId().getAsInt();
         final String predicateString = sentence.get(predicateId);

@@ -98,7 +98,7 @@ public class ErrorAnalysis {
                 final ImmutableList<Integer> pronounFix = Fixer.pronounFixer(sentence, query, matchedResponses);
                 final ImmutableList<Integer> appositiveFix = Fixer.appositiveFixer(sentence, query, matchedResponses);
                 final ImmutableList<Integer> subspanFix = Fixer.subspanFixer(sentence, query, matchedResponses);
-                final ImmutableList<Integer> clauseFix = Fixer.restrictiveClauseFixer(sentence, query, matchedResponses);
+                final ImmutableList<Integer> clauseFix = Fixer.relativeFixer(sentence, query, matchedResponses);
 
                 if (!clauseFix.isEmpty()) {
                     fixedClause = true;

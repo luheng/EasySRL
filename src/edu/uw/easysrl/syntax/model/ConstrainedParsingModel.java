@@ -23,7 +23,8 @@ import java.util.stream.IntStream;
  */
 public class ConstrainedParsingModel extends SupertagFactoredModel {
     private static final boolean kIncludeDependencies = true;
-    private static final boolean kNormalizeConstraints = false;
+    private static final boolean kNormalizePositiveConstraints = false;
+    private static final boolean kNormalizeNegativeConstraints = false;
     private final List<List<Tagger.ScoredCategory>> tagsForWords;
     private Table<Integer, Integer, Double> mustLinks, cannotLinks;
     private Table<Integer, Category, Double> mustSupertags, cannotSupertags;
@@ -69,7 +70,7 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                 .filter(c -> !mustSupertags.contains(c.getPredId(), c.getCategory()))
                 .forEach(c -> cannotSupertags.put(c.getPredId(), c.getCategory(), c.getStrength()));
 
-        if (kNormalizeConstraints) {
+        if (kNormalizePositiveConstraints) {
             mustLinks.rowKeySet().stream().forEach(head -> {
                 int numArgs = mustLinks.row(head).size();
                 double norm = 1.0 * numArgs;
@@ -80,6 +81,8 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                     mustLinks.put(head, arg, weight / norm);
                 });
             });
+        }
+        if (kNormalizeNegativeConstraints) {
             cannotLinks.rowKeySet().stream().forEach(head -> {
                 int numArgs = cannotLinks.row(head).size();
                 double norm = 1.0 * numArgs;
