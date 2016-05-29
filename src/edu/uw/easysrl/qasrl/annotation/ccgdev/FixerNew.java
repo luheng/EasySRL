@@ -34,6 +34,7 @@ public class FixerNew {
 
     public static ImmutableList<Integer> pronounFixer(final ScoredQuery<QAStructureSurfaceForm> query,
                                                       final int[] optionDist) {
+        // TODO: distance constraint
         for (int opId = 0; opId < query.getQAPairSurfaceForms().size(); opId++) {
             final String op = query.getOptions().get(opId).toLowerCase();
             if (PronounList.nonPossessivePronouns.contains(op) && optionDist[opId] > 0) {
@@ -76,7 +77,9 @@ public class FixerNew {
                         .anyMatch(","::equals);
                 // Weak appositive.
                 if (commaInBetween && !op2.contains(op1)) {
-                    newOptions.add(opId2);
+                    //newOptions.add(opId2);
+                    return Stream.concat(options.stream(), Stream.of(opId2))
+                            .distinct().sorted().collect(GuavaCollectors.toImmutableList());
                 }
                 // Strong appositive.
                 /*

@@ -33,8 +33,8 @@ public class DevReparsing {
     final static boolean fixSubspans = true;
     final static boolean fixAppositves = true;
     final static boolean fixRelatives = true;
-    final static boolean fixConjunctions = true;
-    final static boolean useSubspanDisjunctives = true;
+    final static boolean fixConjunctions = false;
+    final static boolean useSubspanDisjunctives = false;
     final static boolean useOldConstraints = false;
 
     private static QueryPruningParameters queryPruningParameters;

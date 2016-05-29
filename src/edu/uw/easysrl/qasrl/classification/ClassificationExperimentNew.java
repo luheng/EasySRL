@@ -42,24 +42,23 @@ public class ClassificationExperimentNew {
 
     private HITLParser myParser;
     private Map<Integer, List<AlignedAnnotation>> annotations;
-    private FeatureExtractor coreArgsFeatureExtractor, cleftingFeatureExtractor;
+    private FeatureExtractor coreArgsFeatureExtractor;
 
     private Map<Integer, List<ScoredQuery<QAStructureSurfaceForm>>> alignedQueries;
     private Map<Integer, List<ImmutableList<ImmutableList<Integer>>>> alignedAnnotations;
     private Map<Integer, List<AlignedAnnotation>> alignedOldAnnotations;
 
     private ImmutableList<Integer> trainSents, devSents, testSents;
-    private ImmutableList<DependencyInstance> coreArgTrainInstances, coreArgDevInstances, coreArgTestInstances,
-            cleftingTrainInstances, cleftingDevInstances, cleftingTestInstances;
+    private ImmutableList<DependencyInstance> coreArgTrainInstances, coreArgDevInstances;
 
-    private Classifier coreArgClassifier, cleftingClassifier;
+    private Classifier coreArgClassifier;
 
     private static final String[] annotationFiles = {
             "./Crowdflower_data/f893900.csv",                   // Round3-pronouns: checkbox, core only, pronouns.
             "./Crowdflower_data/f902142.csv",                   // Round4: checkbox, pronouns, core only, 300 sentences.
-            "./Crowdflower_data/f909211.csv",                 // Round5: core.
-            "./Crowdflower_data/f897179.csv",                 // Round2-3: NP clefting questions.
-            "./Crowdflower_data/f903842.csv"                  // Round4: clefting.
+            "./Crowdflower_data/f912533.csv",                   // Round1-2: rerun, new question generator.
+            "./Crowdflower_data/f912675.csv",                   // Round6: Dev wrap-up. 400+ sentences.
+            "./Crowdflower_data/f913098.csv",                   // Round5: Rerun 200+ sentences.
     };
 
     private QueryPruningParameters queryPruningParameters;
@@ -115,7 +114,7 @@ public class ClassificationExperimentNew {
                 myParser, alignedQueries, alignedAnnotations, alignedOldAnnotations));
 
         coreArgsFeatureExtractor = new FeatureExtractor();
-        cleftingFeatureExtractor = new FeatureExtractor();
+        //cleftingFeatureExtractor = new FeatureExtractor();
 
         coreArgTrainInstances = ClassificationUtils.getInstances(trainSents, myParser,
                 ImmutableSet.of(QueryType.Forward), coreArgsFeatureExtractor, alignedQueries, alignedAnnotations)
@@ -128,27 +127,15 @@ public class ClassificationExperimentNew {
         System.out.println(String.format("Percentage of critical gold constraints: %.3f%%.",
                 100.0 * numCriticalGoldConstraints / coreArgTrainInstances.size()));
 
-        cleftingTrainInstances = ClassificationUtils.getInstances(trainSents, myParser,
-                ImmutableSet.of(QueryType.Clefted), cleftingFeatureExtractor, alignedQueries, alignedAnnotations);
-
         coreArgsFeatureExtractor.freeze();
-        cleftingFeatureExtractor.freeze();
 
         final int numPositiveCoreArgs = (int) coreArgTrainInstances.stream().filter(inst -> inst.inGold).count();
         System.out.println(String.format("Extracted %d training samples and %d features, %d positive and %d negative.",
                 coreArgTrainInstances.size(), coreArgsFeatureExtractor.featureMap.size(),
                 numPositiveCoreArgs, coreArgTrainInstances.size() - numPositiveCoreArgs));
 
-        final int numPositiveClefting = (int) cleftingTrainInstances.stream().filter(inst -> inst.inGold).count();
-        System.out.println(String.format("Extracted %d training samples and %d features, %d positive and %d negative.",
-                cleftingTrainInstances.size(), cleftingFeatureExtractor.featureMap.size(),
-                numPositiveClefting, cleftingTrainInstances.size() - numPositiveClefting));
-
-
         coreArgDevInstances = ClassificationUtils.getInstances(devSents, myParser, ImmutableSet.of(QueryType.Forward),
                 coreArgsFeatureExtractor, alignedQueries, alignedAnnotations);
-        cleftingDevInstances = ClassificationUtils.getInstances(devSents, myParser, ImmutableSet.of(QueryType.Clefted),
-                cleftingFeatureExtractor, alignedQueries, alignedAnnotations);
 
         final Map<String, Object> params1 = ImmutableMap.of(
                 "eta", 0.05,
@@ -156,22 +143,12 @@ public class ClassificationExperimentNew {
                 "max_depth", 5,
                 "objective", "binary:logistic"
         );
-        /*
-        final Map<String, Object> params2 = ImmutableMap.of(
-                "eta", 0.05,
-                "min_child_weight", 0.1,
-                "max_depth", 3,
-                "objective", "binary:logistic"
-        );*/
         coreArgClassifier = Classifier.trainClassifier(coreArgTrainInstances, params1, 100);
-        cleftingClassifier = Classifier.trainClassifier(cleftingTrainInstances, params1, 30);
     }
 
     private ImmutableMap<String, Double> reparse(boolean skipCleftingQueries) {
-        final ImmutableList<Double> coreArgsPred = coreArgClassifier.predict(coreArgDevInstances),
-                                    cleftingPred = cleftingClassifier.predict(cleftingDevInstances);
-        Map<String, Accuracy> coreArgsPredAcc = new HashMap<>(),
-                              cleftingPredAcc = new HashMap<>();
+        final ImmutableList<Double> coreArgsPred = coreArgClassifier.predict(coreArgDevInstances);
+        Map<String, Accuracy> coreArgsPredAcc = new HashMap<>();
 
         for (int i = 0; i < coreArgDevInstances.size(); i++) {
             final DependencyInstance instance = coreArgDevInstances.get(i);
@@ -183,21 +160,8 @@ public class ClassificationExperimentNew {
             coreArgsPredAcc.get(depType).add(p == instance.inGold);
         }
 
-        for (int i = 0; i < cleftingDevInstances.size(); i++) {
-            final DependencyInstance instance = cleftingDevInstances.get(i);
-            final boolean p = (cleftingPred.get(i) > 0.5);
-            final String depType = instance.instanceType.toString();
-            if (!cleftingPredAcc.containsKey(depType)) {
-                cleftingPredAcc.put(depType, new Accuracy());
-            }
-            cleftingPredAcc.get(depType).add(p == instance.inGold);
-        }
-
         System.out.println("CoreArgs accuracy:\t");
         coreArgsPredAcc.keySet().forEach(depType -> System.out.println(depType + '\t' + coreArgsPredAcc.get(depType)));
-        System.out.println("Clefting accuracy:\t");
-        cleftingPredAcc.keySet().forEach(depType -> System.out.println(depType + '\t' + cleftingPredAcc.get(depType)));
-
         System.out.println();
 
         Results avgBaseline = new Results(),
@@ -243,7 +207,7 @@ public class ClassificationExperimentNew {
 
                 Set<Constraint> constraints = new HashSet<>(),
                                 heuristicConstraints = myParser.getConstraints(query, annotation),
-                                oracleConstraints = myParser.getOracleConstraints(query); //, myParser.getGoldOptions(query));
+                                oracleConstraints = myParser.getOracleConstraints(query);
 
                 Set<String> predictions = new HashSet<>();
                 IntStream.range(0, coreArgsPred.size()).boxed()
@@ -262,26 +226,8 @@ public class ClassificationExperimentNew {
                             }
                         });
 
-                /*
-                IntStream.range(0, cleftingPred.size()).boxed()
-                        .forEach(i -> {
-                            final DependencyInstance inst = cleftingDevInstances.get(i);
-                            if (inst.sentenceId == sentenceId && inst.queryId == qid) {
-                                final boolean pred = cleftingPred.get(i) > 0.5;
-                                Constraint newConstraint = pred ?
-                                        new Constraint.AttachmentConstraint(inst.headId, inst.argId, true, reparsingParameters.attachmentPenaltyWeight) :
-                                        new Constraint.AttachmentConstraint(inst.headId, inst.argId, false, reparsingParameters.attachmentPenaltyWeight);
-                                newConstraint.prediction = cleftingPred.get(i);
-                                constraints.add(newConstraint);
-                                predictions.add(String.format("%s\tGold=%b\tPred=%.2f\t%d:%s-->%d:%s",
-                                        pred == inst.inGold ? "[Y]" : "[N]", inst.inGold, cleftingPred.get(i),
-                                        inst.headId, sentence.get(inst.headId), inst.argId, sentence.get(inst.argId)));
-                            }
-                        });
-                        */
-
                 heuristicConstraints.stream().filter(Constraint.SupertagConstraint.class::isInstance).forEach(constraints::add);
-                constraints.stream().filter(c -> c.prediction > 0.8 || c.prediction < 0.35).forEach(allConstraints::add);
+                constraints.stream().filter(c -> c.prediction > 0.5 || c.prediction < 0.5).forEach(allConstraints::add);
                 allHeuristicConstraints.addAll(heuristicConstraints);
                 allOracleConstraints.addAll(oracleConstraints);
 
