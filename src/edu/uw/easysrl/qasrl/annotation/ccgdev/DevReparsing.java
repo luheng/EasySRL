@@ -28,11 +28,11 @@ import java.util.stream.Stream;
 public class DevReparsing {
 
     ///////////////////////////////// Knobs...
-    final static boolean fixPronouns = false;
-    final static boolean fixSubspans = false;
+    final static boolean fixPronouns = true;
+    final static boolean fixSubspans = true;
     final static boolean fixAppositves = true;
-    final static boolean fixRelatives = false;
-    final static boolean useSubspanDisjunctives = false;
+    final static boolean fixRelatives = true;
+    final static boolean useSubspanDisjunctives = true;
     final static boolean useOldConstraints = false;
 
     private static QueryPruningParameters queryPruningParameters;
@@ -132,6 +132,7 @@ public class DevReparsing {
                         useOldConstraints ? parser.getConstraints(query, newOptionDist) : constraints);
 
                 if (history.lastIsWorsened()) {
+                //if (hasSpanIssue(query)) {
                     history.printLatestHistory();
                     System.out.println(query.toString(sentence, 'G', parser.getGoldOptions(query), '*', optionDist));
                     System.out.println(query.toString(sentence, 'G', parser.getGoldOptions(query), '*', newOptionDist));
@@ -140,6 +141,28 @@ public class DevReparsing {
         }
         System.out.println("Num. matched annotation:\t" + numMatchedAnnotations);
         history.printSummary();
+    }
+
+    private static boolean hasSpanIssue(final ScoredQuery<QAStructureSurfaceForm> query) {
+        for (int opId1 = 0; opId1 < query.getQAPairSurfaceForms().size(); opId1 ++) {
+            final QAStructureSurfaceForm qa = query.getQAPairSurfaceForms().get(opId1);
+            final ImmutableList<Integer> argIds = qa.getAnswerStructures().stream()
+                    .flatMap(ans -> ans.argumentIndices.stream())
+                    .distinct().sorted()
+                    .collect(GuavaCollectors.toImmutableList());
+            final String opStr = qa.getAnswer().toLowerCase();
+
+            for (int opId2 = 0; opId2 < query.getQAPairSurfaceForms().size(); opId2 ++) {
+                if (opId2 != opId1) {
+                    final QAStructureSurfaceForm qa2 = query.getQAPairSurfaceForms().get(opId2);
+                    final String opStr2 = qa2.getAnswer().toLowerCase();
+                    if (opStr.contains(opStr2) || opStr2.contains(opStr)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     private static ImmutableSet<Constraint> getConstraints(final ScoredQuery<QAStructureSurfaceForm> query,
@@ -187,20 +210,27 @@ public class DevReparsing {
                     if (opId2 != opId1) {
                         final QAStructureSurfaceForm qa2 = query.getQAPairSurfaceForms().get(opId2);
                         final String opStr2 = qa2.getAnswer().toLowerCase();
-                        if (opStr.startsWith(opStr2 + " and ")
-                                || opStr.endsWith(" and " + opStr2)
-                                || opStr2.endsWith(" and " + opStr)
-                                || opStr2.startsWith(opStr + " and ")) {
-                            final ImmutableList<Integer> concatArgs = Stream
-                                    .concat(argIds.stream(), qa2.getArgumentIndices().stream())
-                                    .distinct().sorted().collect(GuavaCollectors.toImmutableList());
-                            if (votes  + numVotes.get(opId2) >= reparsingParameters.positiveConstraintMinAgreement) {
+                        if (votes + numVotes.get(opId2) >= reparsingParameters.positiveConstraintMinAgreement
+                                && votes > 0 && numVotes.get(opId2) > 0) {
+                            if (opStr.startsWith(opStr2 + " and ") || opStr.endsWith(" and " + opStr2)
+                                    || opStr2.endsWith(" and " + opStr) || opStr2.startsWith(opStr + " and ")) {
+                                final ImmutableList<Integer> concatArgs = Stream
+                                        .concat(argIds.stream(), qa2.getArgumentIndices().stream())
+                                        .distinct().sorted().collect(GuavaCollectors.toImmutableList());
+                                if (votes + numVotes.get(opId2) >= reparsingParameters.positiveConstraintMinAgreement
+                                        && votes > 0 && numVotes.get(opId2) > 0) {
+                                    constraints.add(new Constraint.DisjunctiveAttachmentConstraint(headId, concatArgs, true, 1.0));
+                                    hasDisjunctiveConstraints = true;
+                                    skipOps.add(opId2);
+                                }
+                            } else if (opStr.endsWith(" of " + opStr2) || opStr2.endsWith(" of " + opStr)) {
+                                final ImmutableList<Integer> concatArgs = Stream
+                                        .concat(argIds.stream(), qa2.getArgumentIndices().stream())
+                                        .distinct().sorted().collect(GuavaCollectors.toImmutableList());
                                 constraints.add(new Constraint.DisjunctiveAttachmentConstraint(headId, concatArgs, true, 1.0));
                                 hasDisjunctiveConstraints = true;
                                 skipOps.add(opId2);
                             }
-                        } else if (opStr.endsWith(" of " + opStr2) || opStr2.endsWith(" of " + opStr)){
-
                         }
                     }
                 }
