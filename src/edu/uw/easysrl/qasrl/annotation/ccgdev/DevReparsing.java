@@ -108,11 +108,13 @@ public class DevReparsing {
                 final ImmutableList<Integer> appositiveFix = Fixer.appositiveFixer(sentence, query, matchedResponses);
                 final ImmutableList<Integer> subspanFix = Fixer.subspanFixer(sentence, query, matchedResponses);
                 final ImmutableList<Integer> relative = Fixer.relativeFixer(sentence, query, matchedResponses);
+                boolean fixedPronoun = false, fixedAppositive = false, fixedSubspan = false, fixedRelative = false;
                 List<Integer> fixedResopnse = null;
                 if (fixRelatives && !relative.isEmpty()) {
                     fixedResopnse = relative;
                 } else if (fixAppositves && !appositiveFix.isEmpty()) {
                     fixedResopnse = appositiveFix;
+                    fixedAppositive = true;
                 } else if (fixPronouns && !pronounFix.isEmpty()) {
                     fixedResopnse = pronounFix;
                 } else if (fixSubspans && !subspanFix.isEmpty()) {
