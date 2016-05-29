@@ -29,10 +29,10 @@ public class DevReparsing {
 
     ///////////////////////////////// Knobs...
     final static boolean fixPronouns = true;
-    final static boolean fixSubspans = true;
-    final static boolean fixAppositves = true;
-    final static boolean fixRelatives = true;
-    final static boolean useSubspanDisjunctives = true;
+    final static boolean fixSubspans = false;
+    final static boolean fixAppositves = false;
+    final static boolean fixRelatives = false;
+    final static boolean useSubspanDisjunctives = false;
     final static boolean useOldConstraints = false;
 
     private static QueryPruningParameters queryPruningParameters;
