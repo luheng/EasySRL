@@ -48,7 +48,7 @@ public class DevReparsing {
         reparsingParameters.jeopardyQuestionWeight = 1.0;
         reparsingParameters.oraclePenaltyWeight = 5.0;
         reparsingParameters.attachmentPenaltyWeight = 2.0;
-        //reparsingParameters.supertagPenaltyWeight = 2.0;
+        reparsingParameters.supertagPenaltyWeight = 0.0;
     }
 
     private static final ParseData dev = ParseDataLoader.loadFromDevPool().get();
@@ -121,9 +121,11 @@ public class DevReparsing {
                 //constraints.forEach(c -> System.out.println(c.toString(sentence)));
 
                 history.addEntry(sentenceId, query, parser.getUserOptions(query, newOptionDist), constraints);
-                if (history.lastIsWorsened()) {
-                    history.printLatestHistory();
-                    System.out.println(query.toString(sentence, 'G', parser.getGoldOptions(query), '*', optionDist));
+                if (constraints.stream().filter(Constraint::isPositive).count() > 1) {
+                 //   if (history.lastIsWorsened()) {
+                        history.printLatestHistory();
+                        System.out.println(query.toString(sentence, 'G', parser.getGoldOptions(query), '*', optionDist));
+                 //   }
                 }
             }
 
@@ -139,6 +141,8 @@ public class DevReparsing {
 
         final int naOptionId = query.getBadQuestionOptionId().getAsInt();
         final int numQA = query.getQAPairSurfaceForms().size();
+
+        /*
         if (optionDist[naOptionId] >= reparsingParameters.positiveConstraintMinAgreement) {
             query.getQAPairSurfaceForms().stream()
                     .flatMap(qa -> qa.getQuestionStructures().stream())
@@ -146,7 +150,7 @@ public class DevReparsing {
                             .add(new Constraint.SupertagConstraint(qstr.predicateIndex, qstr.category, false,
                                     reparsingParameters.supertagPenaltyWeight)));
             return ImmutableSet.copyOf(constraints);
-        }
+        }*/
 
         final ImmutableList<Integer> numVotes = IntStream.range(0, numQA)
                 .mapToObj(i -> optionDist[i]).collect(GuavaCollectors.toImmutableList());
@@ -176,12 +180,12 @@ public class DevReparsing {
                 if (opId2 != opId1) {
                     final QAStructureSurfaceForm qa2 = query.getQAPairSurfaceForms().get(opId2);
                     final String opStr2 = qa2.getAnswer().toLowerCase();
-                    if (opStr.endsWith(" of " + opStr2) || opStr.endsWith(" and " + opStr2) || opStr.startsWith(opStr2 + " and ") ||
-                            opStr2.endsWith(" of " + opStr) || opStr2.endsWith(" and " + opStr) || opStr2.startsWith(opStr + " and ")) {
+                    if (opStr.endsWith(" of " + opStr2) || opStr.endsWith(" and " + opStr2) || opStr.startsWith(opStr2 + " and ")
+                            || opStr2.endsWith(" of " + opStr) || opStr2.endsWith(" and " + opStr) || opStr2.startsWith(opStr + " and ")) {
                         final ImmutableList<Integer> concatArgs = Stream
                                 .concat(argIds.stream(), qa2.getArgumentIndices().stream())
                                 .distinct().sorted().collect(GuavaCollectors.toImmutableList());
-                        if (votes + numVotes.get(opId2) >= reparsingParameters.positiveConstraintMinAgreement) {
+                        if (votes + numVotes.get(opId2)  >= reparsingParameters.positiveConstraintMinAgreement) {
                             constraints.add(new Constraint.DisjunctiveAttachmentConstraint(headId, concatArgs, true, 1.0));
                             hasDisjunctiveConstraints = true;
                             skipOps.add(opId2);
@@ -207,8 +211,8 @@ public class DevReparsing {
         return ImmutableSet.copyOf(constraints);
     }
 
-    private static ImmutableList<Integer> getAllGoldOption(ScoredQuery<QAStructureSurfaceForm> query, Parse goldParse,
-                                                           ImmutableList<Integer> referenceOptions) {
+    private static ImmutableList<Integer> getGoldOption(ScoredQuery<QAStructureSurfaceForm> query, Parse goldParse,
+                                                        ImmutableList<Integer> referenceOptions) {
         List<Integer> goldOptions = null;
         final Map<String, List<Integer>> allGoldOptions = getAllGoldOptions(query, goldParse);
         final List<QuestionStructure> questionStructures = query.getQAPairSurfaceForms().stream()
@@ -244,6 +248,7 @@ public class DevReparsing {
         }
         return ImmutableList.copyOf(goldOptions);
     }
+
     private static Map<String, List<Integer>> getAllGoldOptions(ScoredQuery<QAStructureSurfaceForm> query,
                                                                 Parse goldParse) {
 
@@ -289,50 +294,4 @@ public class DevReparsing {
         return allGoldOptions;
     }
 
-    private static double printPrior(ScoredQuery<QAStructureSurfaceForm> query, NBestList nBestList) {
-        Map<ImmutableList<Integer>, AtomicDouble> distribution = new HashMap<>();
-        final List<QAStructureSurfaceForm> qaStructures = query.getQAPairSurfaceForms();
-        final Set<String> labelSet = new HashSet<>();
-        qaStructures.stream()
-                .flatMap(qa -> qa.getQuestionStructures().stream())
-                .map(q -> q.category + "." + q.targetArgNum)
-                .forEach(labelSet::add);
-        final OptionalInt prepositionIdOpt = query.getPrepositionIndex();
-        final int headId = prepositionIdOpt.isPresent() ?
-                prepositionIdOpt.getAsInt() :
-                query.getPredicateId().getAsInt();
-        if (prepositionIdOpt.isPresent()) {
-            labelSet.add("PP/NP.1");
-        }
-        for (Parse parse : nBestList.getParses()) {
-            final ImmutableList<Integer> options = IntStream.range(0, qaStructures.size())
-                    .boxed()
-                    .filter(op -> {
-                        final QAStructureSurfaceForm qa = qaStructures.get(op);
-                        final ImmutableList<Integer> argIds = qa.getAnswerStructures().stream()
-                                .flatMap(ans -> ans.argumentIndices.stream())
-                                .sorted()
-                                .collect(GuavaCollectors.toImmutableList());
-                        return parse.dependencies.stream()
-                                .filter(dep -> labelSet.contains(dep.getCategory() + "." + dep.getArgNumber()))
-                                .anyMatch(dep -> dep.getHead() == headId && argIds.contains(dep.getArgument()));
-                    })
-                    .collect(GuavaCollectors.toImmutableList());
-            if (!distribution.containsKey(options)) {
-                distribution.put(options, new AtomicDouble(0));
-            }
-            distribution.get(options).addAndGet(parse.score);
-        }
-        double norm = distribution.entrySet().stream()
-                .filter(e -> !e.getKey().isEmpty())
-                .mapToDouble(e -> e.getValue().get()).sum();
-        double entropy = distribution.entrySet().stream()
-                .filter(e -> !e.getKey().isEmpty())
-                .mapToDouble(p -> p.getValue().get() / norm)
-                .map(p -> 0.0 - p * Math.log(p) / Math.log(2))
-                .sum();
-        distribution.entrySet().forEach(e -> System.out.println(e.getKey() + "\t" + e.getValue()));
-        System.out.println("Entropy:\t" + entropy + "\n");
-        return entropy;
-    }
 }

@@ -59,8 +59,8 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                 .filter(c -> !c.isPositive())
                 .filter(Constraint.AttachmentConstraint.class::isInstance)
                 .map(c -> (Constraint.AttachmentConstraint) c)
-                .filter(c -> !mustLinks.contains(c.getHeadId(), c.getArgId()))
-                           //&& !mustLinks.contains(c.getArgId(), c.getHeadId()))
+                .filter(c -> !mustLinks.contains(c.getHeadId(), c.getArgId())
+                           && !mustLinks.contains(c.getArgId(), c.getHeadId()))
                 .forEach(c -> cannotLinks.put(c.getHeadId(), c.getArgId(), c.getStrength()));
 
         constraints.stream()
@@ -137,13 +137,13 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
         double constraintsPenalty = 0.0;
         final List<UnlabelledDependency> dependencies = node.getResolvedUnlabelledDependencies();
 
-        // Penalize cannot-links.
-        constraintsPenalty += dependencies.stream()
-                .mapToDouble(dep -> dep.getArguments().stream()
-                        // Directed match.
-                        .filter(argId -> cannotLinks.contains(dep.getHead(), argId))
-                        .mapToDouble(argId -> cannotLinks.get(dep.getHead(), argId))
-                        .sum())
+        constraintsPenalty += cannotLinks.cellSet().stream()
+                .filter(c -> {
+                    final int cHead = c.getRowKey(), cArg = c.getColumnKey();
+                    return dependencies.stream()
+                            .anyMatch(dep -> dep.getHead() == cHead && dep.getArguments().contains(cArg));
+                })
+                .mapToDouble(Table.Cell::getValue)
                 .sum();
 
         // Penalize missed must-links.
@@ -157,15 +157,15 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                     final int cHead = c.getRowKey(), cArg = c.getColumnKey();
                     return !dependencies.stream()
                             // Undirected match.
-                            .anyMatch(dep -> (dep.getHead() == cHead && dep.getArguments().contains(cArg)));
-                                    //|| (dep.getHead() == cArg && dep.getArguments().contains(cHead))));
+                            .anyMatch(dep -> (dep.getHead() == cHead && dep.getArguments().contains(cArg))
+                                         || (dep.getHead() == cArg && dep.getArguments().contains(cHead)));
                 })
                 .mapToDouble(Table.Cell::getValue)
                 .sum();
 
         return new AgendaItem(node,
             leftChild.getInsideScore() + rightChild.getInsideScore() - lengthPenalty - constraintsPenalty, /* inside */
-            getOutsideUpperBound(leftChild.startOfSpan, leftChild.startOfSpan + length),                /* outside */
+            getOutsideUpperBound(leftChild.startOfSpan, leftChild.startOfSpan + length),                   /* outside */
             leftChild.startOfSpan,
             length,
             kIncludeDependencies);
