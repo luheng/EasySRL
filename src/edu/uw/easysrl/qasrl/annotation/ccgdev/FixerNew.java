@@ -162,22 +162,20 @@ public class FixerNew {
                 final String op2 = qa2.getAnswer().toLowerCase();
                 final int minArgId2 = qa2.getAnswerStructures().stream().flatMap(ans -> ans.argumentIndices.stream())
                         .min(Integer::compare).get();
-                final int maxArgId2 = qa2.getAnswerStructures().stream().flatMap(ans -> ans.argumentIndices.stream())
-                        .max(Integer::compare).get();
                 final boolean copulaInBetween = IntStream.range(argId1, minArgId2).mapToObj(sentence::get)
                         .anyMatch(VerbHelper::isCopulaVerb);
                 final boolean commaBetweenArg1Arg2 = IntStream.range(argId1, minArgId2).mapToObj(sentence::get)
                         .anyMatch(","::equals);
-                final boolean commaBetweenArg2Pred = IntStream.range(maxArgId2, predicateId).mapToObj(sentence::get)
-                        .anyMatch(","::equals);
-                final boolean trailingWhoThat = sentenceStr.contains(op2 + " who ") || sentenceStr.contains(op2 + " that ")
-                        || sentenceStr.contains(op2 + ". who ") || sentenceStr.contains(op2 + ". that ");
-                final boolean trailingPss = sentenceStr.contains(op2 + " " + sentence.get(predicateId))
+                final String predStr = sentence.get(predicateId).toLowerCase();
+                final boolean trailingWhoThat = sentenceStr.contains(op2 + " who " + predStr)
+                        || sentenceStr.contains(op2 + " that " + predStr)
+                        || sentenceStr.contains(op2 + ". who " + predStr)
+                        || sentenceStr.contains(op2 + ". that " + predStr);
+                final boolean trailingPss = sentenceStr.contains(op2 + " " + predStr)
                         && query.getQAPairSurfaceForms().stream()
                         .flatMap(qa -> qa.getQuestionStructures().stream())
                         .anyMatch(q -> q.category.isFunctionInto(Category.valueOf("S[pss]")));
-                if ((copulaInBetween || commaBetweenArg1Arg2) && (trailingWhoThat || trailingPss)
-                        && !commaBetweenArg2Pred) {
+                if ((copulaInBetween || commaBetweenArg1Arg2) && (trailingWhoThat || trailingPss)) {
                     return ImmutableList.of(opId2);
                 }
             }
