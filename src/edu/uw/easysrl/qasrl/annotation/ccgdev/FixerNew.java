@@ -111,9 +111,9 @@ public class FixerNew {
                         IntStream.range(maxArgId2, minArgId1).mapToObj(sentence::get).anyMatch(","::equals);
                 final boolean commaBetweenArgAndPred = IntStream.range(Math.max(maxArgId1, maxArgId2), predicateId)
                         .mapToObj(sentence::get).anyMatch(","::equals);
-                if //((sentenceStr.contains(op1 + ", " + op2) || sentenceStr.contains(op1 + "., " + op2)
-                    //    || sentenceStr.contains(op2 + ", " + op1) || sentenceStr.contains(op2 + "., " + op1))
-                        (commaBetweenArgs && commaBetweenArgAndPred) {
+                if ((sentenceStr.contains(op1 + ", " + op2) || sentenceStr.contains(op1 + "., " + op2)
+                        || sentenceStr.contains(op2 + ", " + op1) || sentenceStr.contains(op2 + "., " + op1))
+                        && (predicateId < Math.min(minArgId1, minArgId2) || commaBetweenArgAndPred)) {
                       //  && !query.getQAPairSurfaceForms().get(opId1).getAnswer().equals(op1)
                       //  && Determiners.determinerList.stream().anyMatch(d -> op2.startsWith(d + " "))) {
                     newOptions.add(opId2);
