@@ -82,7 +82,7 @@ public class AnnotationFileLoader {
             e.printStackTrace();
         }
         System.out.println(String.format("Loaded %d annotation records, covering %d sentences from file: %s.",
-                numAnnotationRecords, annotations.size(), devAnnotationFilePath));
+                numAnnotationRecords, annotations.size(), annotationFilePath));
         return annotations;
     }
 
