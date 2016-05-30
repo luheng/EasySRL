@@ -27,7 +27,6 @@ import java.util.stream.Stream;
  */
 public class DevReparsing {
 
-    ///////////////////////////////// Knobs...
     private static DevReparsingConfig config = new DevReparsingConfig();
 
     private static QueryPruningParameters queryPruningParameters;
