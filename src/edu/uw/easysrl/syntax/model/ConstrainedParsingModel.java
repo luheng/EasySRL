@@ -50,7 +50,6 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                 .forEach(c -> mustLinks.put(c.getHeadId(), c.getArgId(), c.getStrength()));
 
         // Disjunctive attachment constraint
-        /*
         constraints.stream()
                 .filter(Constraint::isPositive)
                 .filter(Constraint.DisjunctiveAttachmentConstraint.class::isInstance)
@@ -62,7 +61,7 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                             mustLinks.put(c.getHeadId(), argId, amortizedPenalty);
                         }
                     });
-                }); */
+                });
 
         constraints.stream()
                 .filter(Constraint::isPositive)

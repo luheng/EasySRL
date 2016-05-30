@@ -16,7 +16,7 @@ import java.util.Map;
  * Created by luheng on 5/24/16.
  */
 public class TestDataUtils {
-    final static String[] annotatedFiles = {
+    public final static String[] annotatedFiles = {
             "./Crowdflower_ccgtest/annotated/f913659.csv",
             "./Crowdflower_ccgtest/annotated/f914016.csv",
             "./Crowdflower_ccgtest/annotated/f914045.csv",

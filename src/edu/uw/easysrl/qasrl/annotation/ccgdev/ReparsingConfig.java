@@ -7,44 +7,44 @@ import org.kohsuke.args4j.Option;
 /**
  * Created by luheng on 5/29/16.
  */
-public class DevReparsingConfig {
+public class ReparsingConfig {
     @Option(name="-pronoun",usage="Fix pronoun")
-    boolean fixPronouns = false;
+    public boolean fixPronouns = false;
 
     @Option(name="-subspan",usage="Fix subspans")
-    boolean fixSubspans = false;
+    public boolean fixSubspans = false;
 
     @Option(name="-appositive",usage="Fix appositives")
-    boolean fixAppositves = false;
+    public boolean fixAppositves = false;
 
     @Option(name="-relative",usage="Fix relatives")
-    boolean fixRelatives = false;
+    public boolean fixRelatives = false;
 
     @Option(name="-conjunction",usage="Fix conjunctions")
-    boolean fixConjunctions = false;
+    public boolean fixConjunctions = false;
 
     @Option(name="-disjunctive",usage="Use disjunctives")
-    boolean useSubspanDisjunctives = false;
+    public boolean useSubspanDisjunctives = false;
 
     @Option(name="-pos_threshold",usage="")
-    int positiveConstraintMinAgreement = 3;
+    public int positiveConstraintMinAgreement = 3;
 
     @Option(name="-neg_threshold",usage="")
-    int negativeConstraintMaxAgreement = 2;
+    public int negativeConstraintMaxAgreement = 2;
 
     @Option(name="-pos_penalty",usage="")
-    double positiveConstraintPenalty = 1.5;
+    public double positiveConstraintPenalty = 1.5;
 
     @Option(name="-neg_penalty",usage="")
-    double negativeConstraintPenalty = 1.5;
+    public double negativeConstraintPenalty = 1.5;
 
     @Option(name="-tag_penalty",usage="supertag penalty")
-    double supertagPenalty = 0.0;
+    public double supertagPenalty = 0.0;
 
-    public DevReparsingConfig() {
+    public ReparsingConfig() {
     }
 
-    public DevReparsingConfig(final String[] args) {
+    public ReparsingConfig(final String[] args) {
         CmdLineParser parser = new CmdLineParser(this);
         //parser.setUsageWidth(120);
         try {

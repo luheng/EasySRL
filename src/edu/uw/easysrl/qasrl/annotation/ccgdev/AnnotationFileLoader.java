@@ -17,12 +17,21 @@ import java.util.*;
 public class AnnotationFileLoader {
 
     private static final String devAnnotationFilePath = "ccgdev2.qa.tsv";
+    private static final String testAnnotationFilePath = "ccgtest.qa.tsv";
 
     public static Map<Integer, List<AnnotatedQuery>> loadDev() {
+        return loadFromFile(devAnnotationFilePath);
+    }
+
+    public static Map<Integer, List<AnnotatedQuery>> loadTest() {
+        return loadFromFile(testAnnotationFilePath);
+    }
+
+    private static Map<Integer, List<AnnotatedQuery>> loadFromFile(final String annotationFilePath) {
         Map<Integer, List<AnnotatedQuery>> annotations = new HashMap<>();
         int numAnnotationRecords = 0;
         try {
-            BufferedReader reader = new BufferedReader(new FileReader(new File(devAnnotationFilePath)));
+            BufferedReader reader = new BufferedReader(new FileReader(new File(annotationFilePath)));
             String line;
             AnnotatedQuery curr;
             while ((line = reader.readLine()) != null) {

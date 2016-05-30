@@ -27,7 +27,7 @@ import java.util.stream.Stream;
  */
 public class DevReparsing {
 
-    private static DevReparsingConfig config = new DevReparsingConfig();
+    private static ReparsingConfig config = new ReparsingConfig();
 
     private static QueryPruningParameters queryPruningParameters;
     static {
@@ -49,7 +49,7 @@ public class DevReparsing {
 
     public static void main(String[] args) {
         parser.setQueryPruningParameters(queryPruningParameters);
-        config = new DevReparsingConfig(args);
+        config = new ReparsingConfig(args);
         System.out.println(config.toString());
         int numMatchedAnnotations = 0;
 
@@ -109,7 +109,7 @@ public class DevReparsing {
                     fixType = "subspan";
                 } else if (config.fixRelatives && !relativeFix.isEmpty()) {
                     fixedResopnse = relativeFix;
-                    fixType = "relative";
+                    fixType = "relative";   
                 } else if (config.fixAppositves && !appositiveFix.isEmpty()) {
                     fixedResopnse = appositiveFix;
                     fixType = "appositive";
@@ -163,8 +163,8 @@ public class DevReparsing {
         return false;
     }
 
-    private static ImmutableSet<Constraint> getConstraints(final ScoredQuery<QAStructureSurfaceForm> query,
-                                                           final int[] optionDist) {
+    public static ImmutableSet<Constraint> getConstraints(final ScoredQuery<QAStructureSurfaceForm> query,
+                                                          final int[] optionDist) {
         final Set<Constraint> constraints = new HashSet<>();
         final int numQA = query.getQAPairSurfaceForms().size();
 
