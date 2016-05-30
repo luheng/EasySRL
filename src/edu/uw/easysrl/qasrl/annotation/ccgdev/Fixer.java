@@ -170,7 +170,8 @@ public class Fixer {
                 continue;
             }
             final QAStructureSurfaceForm qa1 = query.getQAPairSurfaceForms().get(opId1);
-            final int argId1 = qa1.getAnswerStructures().stream().flatMap(ans -> ans.argumentIndices.stream())
+            final int argId1 = qa1.getAnswerStructures().stream()
+                    .flatMap(ans -> ans.argumentIndices.stream())
                     .max(Integer::compare).get();
             for (int opId2 : IntStream.range(0, numQAs).toArray()) {
                 if (opId1 == opId2) {
@@ -178,9 +179,11 @@ public class Fixer {
                 }
                 final QAStructureSurfaceForm qa2 = query.getQAPairSurfaceForms().get(opId2);
                 final String op2 = qa2.getAnswer().toLowerCase();
-                final int minArgId2 = qa2.getAnswerStructures().stream().flatMap(ans -> ans.argumentIndices.stream())
+                final int minArgId2 = qa2.getAnswerStructures().stream()
+                        .flatMap(ans -> ans.argumentIndices.stream())
                         .min(Integer::compare).get();
-                final int maxArgId2 = qa2.getAnswerStructures().stream().flatMap(ans -> ans.argumentIndices.stream())
+                final int maxArgId2 = qa2.getAnswerStructures().stream()
+                        .flatMap(ans -> ans.argumentIndices.stream())
                         .max(Integer::compare).get();
                 final boolean copulaInBetween = IntStream.range(argId1, minArgId2).mapToObj(sentence::get)
                         .anyMatch(VerbHelper::isCopulaVerb);

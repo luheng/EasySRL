@@ -85,7 +85,14 @@ public class FixerNew {
             }
             final QAStructureSurfaceForm qa1 = query.getQAPairSurfaceForms().get(opId1);
             final String op1 = qa1.getAnswer().toLowerCase();
-            final int argId1 = qa1.getAnswerStructures().stream().flatMap(ans -> ans.argumentIndices.stream())
+            if (op1.contains(" of ")) {
+                continue;
+            }
+            final int minArgId1 = qa1.getAnswerStructures().stream()
+                    .flatMap(ans -> ans.argumentIndices.stream())
+                    .min(Integer::compare).get();
+            final int maxArgId1 = qa1.getAnswerStructures().stream()
+                    .flatMap(ans -> ans.argumentIndices.stream())
                     .max(Integer::compare).get();
             for (int opId2 : IntStream.range(0, numQAs).toArray()) {
                 if (opId1 == opId2 || optionDist[opId2] == 0) {
@@ -96,11 +103,17 @@ public class FixerNew {
                 final int minArgId2 = qa2.getAnswerStructures().stream()
                         .flatMap(ans -> ans.argumentIndices.stream())
                         .min(Integer::compare).get();
-                final boolean commaInBetween = IntStream.range(argId1, minArgId2)
-                        .mapToObj(sentence::get)
-                        .anyMatch(","::equals);
-                if (sentenceStr.contains(op1 + ", " + op2) || sentenceStr.contains(op1 + "., " + op2)
-                        || sentenceStr.contains(op2 + ", " + op1) || sentenceStr.contains(op2 + "., " + op1)) {
+                final int maxArgId2 = qa2.getAnswerStructures().stream()
+                        .flatMap(ans -> ans.argumentIndices.stream())
+                        .min(Integer::compare).get();
+                final boolean commaBetweenArgs = maxArgId1 < minArgId2 ?
+                        IntStream.range(maxArgId1, minArgId2).mapToObj(sentence::get).anyMatch(","::equals) :
+                        IntStream.range(maxArgId2, minArgId1).mapToObj(sentence::get).anyMatch(","::equals);
+                final boolean commaBetweenArgAndPred = IntStream.range(Math.max(maxArgId1, maxArgId2), predicateId)
+                        .mapToObj(sentence::get).anyMatch(","::equals);
+                if //((sentenceStr.contains(op1 + ", " + op2) || sentenceStr.contains(op1 + "., " + op2)
+                    //    || sentenceStr.contains(op2 + ", " + op1) || sentenceStr.contains(op2 + "., " + op1))
+                        (commaBetweenArgs && commaBetweenArgAndPred) {
                       //  && !query.getQAPairSurfaceForms().get(opId1).getAnswer().equals(op1)
                       //  && Determiners.determinerList.stream().anyMatch(d -> op2.startsWith(d + " "))) {
                     newOptions.add(opId2);
