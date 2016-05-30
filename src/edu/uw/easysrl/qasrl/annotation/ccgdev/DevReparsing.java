@@ -53,7 +53,8 @@ public class DevReparsing {
         System.out.println(config.toString());
         int numMatchedAnnotations = 0;
 
-        for (int sentenceId : parser.getAllSentenceIds()) {
+        //for (int sentenceId : parser.getAllSentenceIds()) {
+        for (int sentenceId : annotations.keySet()) {
             history.addSentence(sentenceId);
 
             final ImmutableList<String> sentence = parser.getSentence(sentenceId);

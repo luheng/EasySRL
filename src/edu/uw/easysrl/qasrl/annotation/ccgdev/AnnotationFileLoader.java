@@ -16,7 +16,7 @@ import java.util.*;
  */
 public class AnnotationFileLoader {
 
-    private static final String devAnnotationFilePath = "ccgdev.qa.tsv";
+    private static final String devAnnotationFilePath = "ccgdev2.qa.tsv";
 
     public static Map<Integer, List<AnnotatedQuery>> loadDev() {
         Map<Integer, List<AnnotatedQuery>> annotations = new HashMap<>();
