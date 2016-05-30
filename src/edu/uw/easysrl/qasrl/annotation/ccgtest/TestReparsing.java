@@ -4,10 +4,8 @@ import com.google.common.collect.*;
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
 import edu.uw.easysrl.qasrl.annotation.AnnotatedQuery;
-import edu.uw.easysrl.qasrl.annotation.ccgdev.AnnotationFileLoader;
-import edu.uw.easysrl.qasrl.annotation.ccgdev.DevReparsing;
-import edu.uw.easysrl.qasrl.annotation.ccgdev.FixerNew;
-import edu.uw.easysrl.qasrl.annotation.ccgdev.ReparsingConfig;
+import edu.uw.easysrl.qasrl.annotation.Annotation;
+import edu.uw.easysrl.qasrl.annotation.ccgdev.*;
 import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
 import edu.uw.easysrl.qasrl.experiments.ReparsingHistory;
@@ -40,12 +38,15 @@ public class TestReparsing {
         queryPruningParameters.minPromptConfidence = 0.1;
     }
 
-    private static final ParseData test = ParseDataLoader.loadFromTestPool(true).get();
+    private static final ParseData data = //ParseDataLoader.loadFromTestPool(true).get();
+            ParseDataLoader.loadFromDevPool().get();
     private static final Map<Integer, NBestList> nbestLists = NBestList
-            .loadNBestListsFromFile("parses.tagged.test.gold.100best.new.out", 100).get();
-    private static final HITLParser parser = new HITLParser(test, nbestLists);
+            //.loadNBestListsFromFile("parses.tagged.test.gold.100best.new.out", 100).get();
+            .loadNBestListsFromFile("parses.tagged.dev.100best.out", 100).get();
+    private static final HITLParser parser = new HITLParser(data, nbestLists);
     private static final ReparsingHistory history =  new ReparsingHistory(parser);
-    private static final Map<Integer, List<AnnotatedQuery>> annotations = AnnotationFileLoader.loadTest();
+    private static final Map<Integer, List<AnnotatedQuery>> annotations =//AnnotationFileLoader.loadTest();
+            AnnotationFileLoader.loadDev();
 
     public static void main(String[] args) {
         parser.setQueryPruningParameters(queryPruningParameters);
@@ -64,10 +65,10 @@ public class TestReparsing {
                 avgUnlabeledReranked = new Results(),
                 avgUnlabeledReparsed = new Results();
 
+        int sentenceCounter = 0;
         for (int sentenceId : parser.getAllSentenceIds()) {
-            //if (sentenceId > 500) {break;}
-
             history.addSentence(sentenceId);
+            sentenceCounter ++;
             final ImmutableList<String> sentence = parser.getSentence(sentenceId);
             final NBestList nBestList = parser.getNBestList(sentenceId);
             final Parse goldParse = parser.getGoldParse(sentenceId);
@@ -77,8 +78,9 @@ public class TestReparsing {
             final Results unlabeledBaselineF1 = CcgEvaluation.evaluateUnlabeled(baselineParse.dependencies, goldParse.dependencies);
             avgBaseline.add(baselineF1);
             avgUnlabeledBaseline.add(unlabeledBaselineF1);
-
-            final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries = parser.getNewCoreArgQueriesForSentence(sentenceId);
+            final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries =
+                        //parser.getNewCoreArgQueriesForSentence(sentenceId);
+                        parser.getAllCoreArgQueriesForSentence(sentenceId);
             if (queries == null || queries.isEmpty() || !annotations.containsKey(sentenceId)) {
                 avgReparsed.add(baselineF1);
                 avgReranked.add(baselineF1);
@@ -86,11 +88,10 @@ public class TestReparsing {
                 avgUnlabeledReparsed.add(unlabeledBaselineF1);
                 continue;
             }
-
             Set<Constraint> constraints = new HashSet<>();
-
             for (AnnotatedQuery annotation : annotations.get(sentenceId)) {
-                final Optional<ScoredQuery<QAStructureSurfaceForm>> matchQueryOpt = ExperimentUtils.getBestAlignedQuery(annotation, queries);
+                final Optional<ScoredQuery<QAStructureSurfaceForm>> matchQueryOpt =
+                        ExperimentUtils.getBestAlignedQuery(annotation, queries);
                 if (!matchQueryOpt.isPresent()) {
                     continue;
                 }
@@ -100,19 +101,16 @@ public class TestReparsing {
                     continue;
                 }
                 numMatchedAnnotations ++;
-
                 // Filter ditransitives.
                 if (query.getQAPairSurfaceForms().stream().flatMap(qa -> qa.getQuestionStructures().stream())
                         .allMatch(q -> (q.category == Category.valueOf("((S[dcl]\\NP)/NP)/NP") && q.targetArgNum > 1)
                                 || (q.category == Category.valueOf("((S[b]\\NP)/NP)/NP") && q.targetArgNum > 1))) {
                     continue;
                 }
-
                 ///// Heuristics and constraints.
-                final int[] newOptionDist = DevReparsing.getNewOptionDist(sentence, query, matchedResponses, config);
-                constraints.addAll(DevReparsing.getConstraints(query, newOptionDist, config));
+                final int[] newOptionDist = ReparsingHelper.getNewOptionDist(sentence, query, matchedResponses, config);
+                constraints.addAll(ReparsingHelper.getConstraints(query, newOptionDist, config));
             }
-            System.out.println(sentenceId + "\t" + constraints.size());
             if (constraints.isEmpty()) {
                 avgReparsed.add(baselineF1);
                 avgReranked.add(baselineF1);
@@ -131,6 +129,9 @@ public class TestReparsing {
                 avgUnlabeledReranked.add(unlabeledRerankedF1);
                 avgUnlabeledReparsed.add(unlabeledReparsedF1);
             }
+            if (sentenceCounter % 100 == 0) {
+                System.out.println("Parsed " + sentenceCounter + " sentences ...");
+            }
         }
         System.out.println("Num. matched annotation:\t" + numMatchedAnnotations);
         System.out.println("Labeled baseline:\n" + avgBaseline);
@@ -139,7 +140,6 @@ public class TestReparsing {
         System.out.println("Unlabeled baseline:\n" + avgUnlabeledBaseline);
         System.out.println("Unlabeled reranked:\n" + avgUnlabeledReranked);
         System.out.println("Unlabeled reparsed:\n" + avgUnlabeledReparsed);
-
         System.out.println(config.toString());
         history.printSummary();
     }
