@@ -94,8 +94,8 @@ public class DevReparsing {
                         .collect(GuavaCollectors.toImmutableList());
 
                 final ImmutableList<Integer> pronounFix = FixerNew.pronounFixer(query, agreedOptions, optionDist);
+                final ImmutableList<Integer> subspanFix = FixerNew.subspanFixer(query, agreedOptions, optionDist);
                 final ImmutableList<Integer> appositiveFix = FixerNew.appositiveFixer(sentence, query, agreedOptions, optionDist);
-                final ImmutableList<Integer> subspanFix = FixerNew.subspanFixer(sentence, query, agreedOptions, optionDist);
                 final ImmutableList<Integer> relativeFix = FixerNew.relativeFixer(sentence, query, agreedOptions, optionDist);
                 final ImmutableList<Integer> conjunctionFix = FixerNew.conjunctionFixer(sentence, query, agreedOptions, optionDist);
                 String fixType = "None";
@@ -128,7 +128,7 @@ public class DevReparsing {
                 //constraints.forEach(c -> System.out.println(c.toString(sentence)));
                 final ImmutableSet<Constraint> constraints = getConstraints(query, newOptionDist);
                 history.addEntry(sentenceId, query, parser.getUserOptions(query, newOptionDist), constraints);
-                if (history.lastIsWorsened() && fixType.equals("appositive")) {
+                if (history.lastIsWorsened() /*&& !fixType.equals("None") */) {
                     history.printLatestHistory();
                     System.out.println(query.toString(sentence, 'G', parser.getGoldOptions(query), '*', optionDist));
                     System.out.println("Fixed:\t" + fixType);

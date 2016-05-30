@@ -1,8 +1,6 @@
 package edu.uw.easysrl.qasrl.annotation.ccgdev;
 
-import com.google.common.collect.HashMultiset;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Multiset;
 import edu.uw.easysrl.qasrl.TextGenerationHelper;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.util.Prepositions;
@@ -32,6 +30,8 @@ import java.util.stream.Stream;
  */
 public class FixerNew {
 
+    final static int minVotesToFix = 1;
+
     /**
      * Pronoun rule:
      * @param query
@@ -42,89 +42,34 @@ public class FixerNew {
     public static ImmutableList<Integer> pronounFixer(final ScoredQuery<QAStructureSurfaceForm> query,
                                                       final ImmutableList<Integer> options,
                                                       final int[] optionDist) {
-        final int predId = query.getPredicateId().getAsInt();
+        final int headId = query.getPrepositionIndex().isPresent() ?
+                query.getPrepositionIndex().getAsInt() : query.getPredicateId().getAsInt();
         final int numQAs = query.getQAPairSurfaceForms().size();
-        for (int opId1 : options) {
-            if (opId1 >= numQAs) {
+        final int minOptionDist = options.stream()
+                .filter(op -> op < numQAs)
+                .mapToInt(op -> {
+                    final QAStructureSurfaceForm qa1 = query.getQAPairSurfaceForms().get(op);
+                    return qa1.getAnswerStructures().stream()
+                            .flatMap(ans -> ans.argumentIndices.stream())
+                            .mapToInt(argId -> Math.abs(argId - headId))
+                            .min().getAsInt();
+                })
+                .min().orElse(-1);
+        for (int opId2 = 0; opId2 < numQAs; opId2++) {
+            if (optionDist[opId2] < minVotesToFix) {
                 continue;
             }
-            final QAStructureSurfaceForm qa1 = query.getQAPairSurfaceForms().get(opId1);
-            final int dist1 = qa1.getAnswerStructures().stream()
+            final QAStructureSurfaceForm qa2 = query.getQAPairSurfaceForms().get(opId2);
+            final String op2 = query.getOptions().get(opId2).toLowerCase();
+            final int dist2 = qa2.getAnswerStructures().stream()
                     .flatMap(ans -> ans.argumentIndices.stream())
-                    .map(argId -> Math.abs(argId - predId))
+                    .map(argId -> Math.abs(argId - headId))
                     .min(Integer::compare).get();
-            for (int opId2 = 0; opId2 < query.getQAPairSurfaceForms().size(); opId2++) {
-                final QAStructureSurfaceForm qa2 = query.getQAPairSurfaceForms().get(opId2);
-                final String op2 = query.getOptions().get(opId2).toLowerCase();
-                final int dist2 = qa2.getAnswerStructures().stream()
-                        .flatMap(ans -> ans.argumentIndices.stream())
-                        .map(argId -> Math.abs(argId - predId))
-                        .min(Integer::compare).get();
-                if (PronounList.nonPossessivePronouns.contains(op2) && dist2 < dist1 && optionDist[opId2] > 0) {
-                    return ImmutableList.of(opId2);
-                }
+            if (PronounList.nonPossessivePronouns.contains(op2) && dist2 < minOptionDist) {
+                return ImmutableList.of(opId2);
             }
         }
         return ImmutableList.of();
-    }
-
-    public static ImmutableList<Integer> appositiveFixer(final ImmutableList<String> sentence,
-                                                         final ScoredQuery<QAStructureSurfaceForm> query,
-                                                         final ImmutableList<Integer> options,
-                                                         final int[] optionDist) {
-        // TODO: other appositive (A,B) features: A has capitalized words, B starts with a/an/the/both/each/one/two/another
-        // TODO: B followed by , or .
-        final int numQAs = query.getQAPairSurfaceForms().size();
-        final int predicateId = query.getPredicateId().getAsInt();
-        final String sentenceStr = TextGenerationHelper.renderString(sentence).toLowerCase();
-        final Set<Integer> newOptions = new HashSet<>();
-
-        for (int opId1 : options) {
-            if (opId1 >= numQAs) {
-                continue;
-            }
-            final QAStructureSurfaceForm qa1 = query.getQAPairSurfaceForms().get(opId1);
-            final String op1 = qa1.getAnswer().toLowerCase();
-            if (op1.contains(" of ")) {
-                continue;
-            }
-            final int minArgId1 = qa1.getAnswerStructures().stream()
-                    .flatMap(ans -> ans.argumentIndices.stream())
-                    .min(Integer::compare).get();
-            final int maxArgId1 = qa1.getAnswerStructures().stream()
-                    .flatMap(ans -> ans.argumentIndices.stream())
-                    .max(Integer::compare).get();
-            for (int opId2 : IntStream.range(0, numQAs).toArray()) {
-                if (opId1 == opId2 || optionDist[opId2] == 0) {
-                    continue;
-                }
-                final QAStructureSurfaceForm qa2 = query.getQAPairSurfaceForms().get(opId2);
-                final String op2 = qa2.getAnswer().toLowerCase();
-                final int minArgId2 = qa2.getAnswerStructures().stream()
-                        .flatMap(ans -> ans.argumentIndices.stream())
-                        .min(Integer::compare).get();
-                final int maxArgId2 = qa2.getAnswerStructures().stream()
-                        .flatMap(ans -> ans.argumentIndices.stream())
-                        .min(Integer::compare).get();
-                final boolean commaBetweenArgs = maxArgId1 < minArgId2 ?
-                        IntStream.range(maxArgId1, minArgId2).mapToObj(sentence::get).anyMatch(","::equals) :
-                        IntStream.range(maxArgId2, minArgId1).mapToObj(sentence::get).anyMatch(","::equals);
-                final boolean commaBetweenArgAndPred = IntStream.range(Math.max(maxArgId1, maxArgId2), predicateId)
-                        .mapToObj(sentence::get).anyMatch(","::equals);
-                if ((sentenceStr.contains(op1 + ", " + op2) || sentenceStr.contains(op1 + "., " + op2)
-                        || sentenceStr.contains(op2 + ", " + op1) || sentenceStr.contains(op2 + "., " + op1))
-                        && (predicateId < Math.min(minArgId1, minArgId2) || commaBetweenArgAndPred)) {
-                      //  && !query.getQAPairSurfaceForms().get(opId1).getAnswer().equals(op1)
-                      //  && Determiners.determinerList.stream().anyMatch(d -> op2.startsWith(d + " "))) {
-                    newOptions.add(opId2);
-                }
-            }
-        }
-        if (newOptions.isEmpty()) {
-            return ImmutableList.of();
-        }
-        newOptions.addAll(options);
-        return newOptions.stream().distinct().sorted().collect(GuavaCollectors.toImmutableList());
     }
 
     /**
@@ -132,8 +77,7 @@ public class FixerNew {
      * Have to give up signals such as X of Y ..
      * @return
      */
-    public static ImmutableList<Integer> subspanFixer(final ImmutableList<String> sentence,
-                                                      final ScoredQuery<QAStructureSurfaceForm> query,
+    public static ImmutableList<Integer> subspanFixer(final ScoredQuery<QAStructureSurfaceForm> query,
                                                       final ImmutableList<Integer> options,
                                                       final int[] optionDist) {
         final int numQAs = query.getQAPairSurfaceForms().size();
@@ -143,7 +87,7 @@ public class FixerNew {
             }
             final String op1 = query.getQAPairSurfaceForms().get(opId1).getAnswer().toLowerCase();
             for (int opId2 : IntStream.range(0, numQAs).toArray()) {
-                if (opId1 == opId2 || optionDist[opId2] == 0) {
+                if (opId1 == opId2 || optionDist[opId2] < minVotesToFix) {
                     continue;
                 }
                 final String op2 = query.getQAPairSurfaceForms().get(opId2).getAnswer().toLowerCase();
@@ -160,12 +104,65 @@ public class FixerNew {
         return ImmutableList.of();
     }
 
+    public static ImmutableList<Integer> appositiveFixer(final ImmutableList<String> sentence,
+                                                         final ScoredQuery<QAStructureSurfaceForm> query,
+                                                         final ImmutableList<Integer> options,
+                                                         final int[] optionDist) {
+        final int numQAs = query.getQAPairSurfaceForms().size();
+        final int headId = query.getPredicateId().getAsInt();
+        final String sentenceStr = TextGenerationHelper.renderString(sentence).toLowerCase();
+        final Set<Integer> newOptions = new HashSet<>();
+        for (int opId1 : options) {
+            if (opId1 >= numQAs) {
+                continue;
+            }
+            final QAStructureSurfaceForm qa1 = query.getQAPairSurfaceForms().get(opId1);
+            final String op1 = qa1.getAnswer().toLowerCase();
+            if (op1.contains(" of ")) {
+                continue;
+            }
+            final int minArgId1 = qa1.getAnswerStructures().stream()
+                    .flatMap(ans -> ans.argumentIndices.stream())
+                    .min(Integer::compare).get();
+            final int maxArgId1 = qa1.getAnswerStructures().stream()
+                    .flatMap(ans -> ans.argumentIndices.stream())
+                    .max(Integer::compare).get();
+            for (int opId2 : IntStream.range(0, numQAs).toArray()) {
+                if (opId1 == opId2 || optionDist[opId2] < minVotesToFix) {
+                    continue;
+                }
+                final QAStructureSurfaceForm qa2 = query.getQAPairSurfaceForms().get(opId2);
+                final String op2 = qa2.getAnswer().toLowerCase();
+                final int minArgId2 = qa2.getAnswerStructures().stream()
+                        .flatMap(ans -> ans.argumentIndices.stream())
+                        .min(Integer::compare).get();
+                final int maxArgId2 = qa2.getAnswerStructures().stream()
+                        .flatMap(ans -> ans.argumentIndices.stream())
+                        .min(Integer::compare).get();
+                final boolean commaBetweenArgAndPred = IntStream.range(Math.max(maxArgId1, maxArgId2), headId)
+                        .mapToObj(sentence::get).anyMatch(","::equals);
+                if ((sentenceStr.contains(op1 + ", " + op2) || sentenceStr.contains(op1 + "., " + op2)
+                        || sentenceStr.contains(op2 + ", " + op1) || sentenceStr.contains(op2 + "., " + op1))
+                        && !query.getQAPairSurfaceForms().get(opId1).getAnswer().equals(op1)
+                        && Determiners.determinerList.stream().anyMatch(d -> op2.startsWith(d + " "))
+                        && (headId < Math.min(minArgId1, minArgId2) || commaBetweenArgAndPred)) {
+                    newOptions.add(opId2);
+                }
+            }
+        }
+        if (newOptions.isEmpty()) {
+            return ImmutableList.of();
+        }
+        newOptions.addAll(options);
+        return newOptions.stream().distinct().sorted().collect(GuavaCollectors.toImmutableList());
+    }
+
     public static ImmutableList<Integer> relativeFixer(final ImmutableList<String> sentence,
                                                        final ScoredQuery<QAStructureSurfaceForm> query,
                                                        final ImmutableList<Integer> options,
                                                        final int[] optionDist) {
         final int numQAs = query.getQAPairSurfaceForms().size();
-        final int predicateId = query.getPredicateId().getAsInt();
+        final int headId = query.getPredicateId().getAsInt();
         final String sentenceStr = TextGenerationHelper.renderString(sentence).toLowerCase();
         for (int opId1 : options) {
             if (opId1 >= numQAs) {
@@ -176,7 +173,7 @@ public class FixerNew {
                     .flatMap(ans -> ans.argumentIndices.stream())
                     .max(Integer::compare).get();
             for (int opId2 : IntStream.range(0, numQAs).toArray()) {
-                if (opId1 == opId2 || optionDist[opId2] == 0) {
+                if (opId1 == opId2 || optionDist[opId2] < minVotesToFix) {
                     continue;
                 }
                 final QAStructureSurfaceForm qa2 = query.getQAPairSurfaceForms().get(opId2);
@@ -195,8 +192,8 @@ public class FixerNew {
                         .anyMatch(","::equals);
                 //final String predStr = sentence.get(predicateId).toLowerCase();
                 final boolean trailingWhoThat = (sentenceStr.contains(op2 + " who ")
-                        || sentenceStr.contains(op2 + " that ")) && Math.abs(predicateId - maxArgId2) <= 3;
-                final boolean trailingPredicate = maxArgId2 + 1 == predicateId && query.getQAPairSurfaceForms().stream()
+                        || sentenceStr.contains(op2 + " that ")) && Math.abs(headId - maxArgId2) <= 3;
+                final boolean trailingPredicate = maxArgId2 + 1 == headId && query.getQAPairSurfaceForms().stream()
                         .flatMap(qa -> qa.getQuestionStructures().stream())
                         .anyMatch(q -> q.category.isFunctionInto(Category.valueOf("S[pss]"))
                                 || q.category.isFunctionInto(Category.valueOf("S[ng]")));
@@ -208,6 +205,7 @@ public class FixerNew {
         return ImmutableList.of();
     }
 
+    @Deprecated
     public static ImmutableList<Integer> conjunctionFixer(final ImmutableList<String> sentence,
                                                           final ScoredQuery<QAStructureSurfaceForm> query,
                                                           final ImmutableList<Integer> options,
