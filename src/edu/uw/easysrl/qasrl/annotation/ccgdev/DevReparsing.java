@@ -46,7 +46,7 @@ public class DevReparsing {
                 .loadNBestListsFromFile("parses.tagged.dev.100best.out", 100).get();
         final HITLParser parser = new HITLParser(dev, nbestLists);
         final ReparsingHistory history =  new ReparsingHistory(parser);
-        final Map<Integer, List<AnnotatedQuery>> annotations = AnnotationFileLoader.loadDev();  
+        final Map<Integer, List<AnnotatedQuery>> annotations = AnnotationFileLoader.loadDev();
         parser.setQueryPruningParameters(queryPruningParameters);
         config = new ReparsingConfig(args);
         System.out.println(config.toString());
