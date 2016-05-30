@@ -425,7 +425,7 @@ public class HITLParser {
         constraints.forEach(c -> c.setStrength(
                 (Constraint.SupertagConstraint.class.isInstance(c) ?
                         reparsingParameters.supertagPenaltyWeight :
-                        reparsingParameters.attachmentPenaltyWeight)));
+                        (c.isPositive() ? reparsingParameters.attachmentPenaltyWeight * 2 : reparsingParameters.attachmentPenaltyWeight))));
         return ImmutableSet.copyOf(constraints);
     }
 

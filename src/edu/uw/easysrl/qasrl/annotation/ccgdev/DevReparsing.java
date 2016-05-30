@@ -15,6 +15,7 @@ import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
+import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.*;
@@ -26,8 +27,6 @@ import java.util.stream.Stream;
  * Created by luheng on 5/26/16.
  */
 public class DevReparsing {
-
-    private static ReparsingConfig config = new ReparsingConfig();
 
     private static QueryPruningParameters queryPruningParameters;
     static {
@@ -48,12 +47,12 @@ public class DevReparsing {
         final ReparsingHistory history =  new ReparsingHistory(parser);
         final Map<Integer, List<AnnotatedQuery>> annotations = AnnotationFileLoader.loadDev();
         parser.setQueryPruningParameters(queryPruningParameters);
-        config = new ReparsingConfig(args);
+        ReparsingConfig config = new ReparsingConfig(args);
         System.out.println(config.toString());
         int numMatchedAnnotations = 0;
 
-        //for (int sentenceId : parser.getAllSentenceIds()) {
-        for (int sentenceId : annotations.keySet()) {
+        for (int sentenceId : parser.getAllSentenceIds()) {
+        //for (int sentenceId : annotations.keySet()) {
             history.addSentence(sentenceId);
 
             final ImmutableList<String> sentence = parser.getSentence(sentenceId);
@@ -77,60 +76,23 @@ public class DevReparsing {
                 }
                 numMatchedAnnotations ++;
 
+                // Filter ditransitives.
+                if (query.getQAPairSurfaceForms().stream().flatMap(qa -> qa.getQuestionStructures().stream())
+                        .allMatch(q -> (q.category == Category.valueOf("((S[dcl]\\NP)/NP)/NP") && q.targetArgNum > 1)
+                                || (q.category == Category.valueOf("((S[b]\\NP)/NP)/NP") && q.targetArgNum > 1))) {
+                    continue;
+                }
+
                 ///// Heuristics
-                final int[] optionDist = new int[query.getOptions().size()];
-                int[] newOptionDist = new int[optionDist.length];
-                Arrays.fill(optionDist, 0);
-                Arrays.fill(newOptionDist, 0);
-                matchedResponses.forEach(r -> r.stream().forEach(op -> optionDist[op] ++));
+                final int[] newOptionDist = getNewOptionDist(sentence, query, matchedResponses, config);
+                final ImmutableSet<Constraint> constraints = getConstraints(query, newOptionDist, config);
 
-                final Multiset<Integer> votes = HashMultiset.create(matchedResponses.stream()
-                        .flatMap(List::stream)
-                        .collect(Collectors.toList()));
-                final ImmutableList<Integer> agreedOptions = votes.entrySet().stream()
-                        .filter(e -> e.getCount() >= config.positiveConstraintMinAgreement)
-                        .map(e -> e.getElement()).distinct().sorted()
-                        .collect(GuavaCollectors.toImmutableList());
-
-                final ImmutableList<Integer> pronounFix = FixerNew.pronounFixer(query, agreedOptions, optionDist);
-                final ImmutableList<Integer> subspanFix = FixerNew.subspanFixer(query, agreedOptions, optionDist);
-                final ImmutableList<Integer> appositiveFix = FixerNew.appositiveFixer(sentence, query, agreedOptions, optionDist);
-                final ImmutableList<Integer> relativeFix = FixerNew.relativeFixer(sentence, query, agreedOptions, optionDist);
-                final ImmutableList<Integer> conjunctionFix = FixerNew.conjunctionFixer(sentence, query, agreedOptions, optionDist);
-                String fixType = "None";
-                List<Integer> fixedResopnse = null;
-
-                if (config.fixPronouns && !pronounFix.isEmpty()) {
-                    fixedResopnse = pronounFix;
-                    fixType = "pronoun";
-                } else if (config.fixSubspans && !subspanFix.isEmpty()) {
-                    fixedResopnse = subspanFix;
-                    fixType = "subspan";
-                } else if (config.fixRelatives && !relativeFix.isEmpty()) {
-                    fixedResopnse = relativeFix;
-                    fixType = "relative";
-                } else if (config.fixAppositves && !appositiveFix.isEmpty()) {
-                    fixedResopnse = appositiveFix;
-                    fixType = "appositive";
-                } else if (config.fixConjunctions && !conjunctionFix.isEmpty()) {
-                    fixedResopnse = conjunctionFix;
-                    fixType = "conjunction";
-                }
-                if (fixedResopnse != null) {
-                    fixedResopnse.stream().forEach(op -> newOptionDist[op] += 5);
-                } else {
-                    for (ImmutableList<Integer> response : matchedResponses) {
-                        response.stream().forEach(op -> newOptionDist[op] ++);
-                    }
-                }
-                //System.out.println("---");
-                //constraints.forEach(c -> System.out.println(c.toString(sentence)));
-                final ImmutableSet<Constraint> constraints = getConstraints(query, newOptionDist);
+                //final ImmutableSet<Constraint> constraints = parser.getConstraints(query, newOptionDist);
                 history.addEntry(sentenceId, query, parser.getUserOptions(query, newOptionDist), constraints);
                 if (history.lastIsWorsened() /*&& !fixType.equals("None") */) {
                     history.printLatestHistory();
-                    System.out.println(query.toString(sentence, 'G', parser.getGoldOptions(query), '*', optionDist));
-                    System.out.println("Fixed:\t" + fixType);
+                    //System.out.println(query.toString(sentence, 'G', parser.getGoldOptions(query), '*', optionDist));
+                    //System.out.println("Fixed:\t" + fixType);
                     System.out.println(query.toString(sentence, 'G', parser.getGoldOptions(query), '*', newOptionDist));
                 }
             }
@@ -162,8 +124,61 @@ public class DevReparsing {
         return false;
     }
 
+    public static int[] getNewOptionDist (final ImmutableList<String> sentence,
+                                          final ScoredQuery<QAStructureSurfaceForm> query,
+                                          final ImmutableList<ImmutableList<Integer>> matchedResponses,
+                                          final ReparsingConfig config) {
+        final int[] optionDist = new int[query.getOptions().size()];
+        int[] newOptionDist = new int[optionDist.length];
+        Arrays.fill(optionDist, 0);
+        Arrays.fill(newOptionDist, 0);
+        matchedResponses.forEach(r -> r.stream().forEach(op -> optionDist[op] ++));
+
+        final Multiset<Integer> votes = HashMultiset.create(matchedResponses.stream()
+                .flatMap(List::stream)
+                .collect(Collectors.toList()));
+        final ImmutableList<Integer> agreedOptions = votes.entrySet().stream()
+                .filter(e -> e.getCount() >= config.positiveConstraintMinAgreement)
+                .map(e -> e.getElement()).distinct().sorted()
+                .collect(GuavaCollectors.toImmutableList());
+
+
+        final ImmutableList<Integer> pronounFix = FixerNew.pronounFixer(query, agreedOptions, optionDist);
+        final ImmutableList<Integer> subspanFix = FixerNew.subspanFixer(query, agreedOptions, optionDist);
+        final ImmutableList<Integer> appositiveFix = FixerNew.appositiveFixer(sentence, query, agreedOptions, optionDist);
+        final ImmutableList<Integer> relativeFix = FixerNew.relativeFixer(sentence, query, agreedOptions, optionDist);
+        final ImmutableList<Integer> conjunctionFix = FixerNew.conjunctionFixer(sentence, query, agreedOptions, optionDist);
+        String fixType = "None";
+        List<Integer> fixedResopnse = null;
+        if (config.fixPronouns && !pronounFix.isEmpty()) {
+            fixedResopnse = pronounFix;
+            fixType = "pronoun";
+        } else if (config.fixSubspans && !subspanFix.isEmpty()) {
+            fixedResopnse = subspanFix;
+            fixType = "subspan";
+        } else if (config.fixRelatives && !relativeFix.isEmpty()) {
+            fixedResopnse = relativeFix;
+            fixType = "relative";
+        } else if (config.fixAppositves && !appositiveFix.isEmpty()) {
+            fixedResopnse = appositiveFix;
+            fixType = "appositive";
+        } else if (config.fixConjunctions && !conjunctionFix.isEmpty()) {
+            fixedResopnse = conjunctionFix;
+            fixType = "conjunction";
+        }
+        if (fixedResopnse != null) {
+            fixedResopnse.stream().forEach(op -> newOptionDist[op] += config.positiveConstraintMinAgreement);
+        } else {
+            for (ImmutableList<Integer> response : matchedResponses) {
+                response.stream().forEach(op -> newOptionDist[op] ++);
+            }
+        }
+        return newOptionDist;
+    }
+
     public static ImmutableSet<Constraint> getConstraints(final ScoredQuery<QAStructureSurfaceForm> query,
-                                                          final int[] optionDist) {
+                                                          final int[] optionDist,
+                                                          final ReparsingConfig config) {
         final Set<Constraint> constraints = new HashSet<>();
         final int numQA = query.getQAPairSurfaceForms().size();
 
@@ -193,6 +208,7 @@ public class DevReparsing {
             final QAStructureSurfaceForm qa = query.getQAPairSurfaceForms().get(opId1);
             final ImmutableList<Integer> argIds = qa.getAnswerStructures().stream()
                     .flatMap(ans -> ans.argumentIndices.stream())
+                    .filter(argId -> argId != headId)
                     .distinct().sorted()
                     .collect(GuavaCollectors.toImmutableList());
             final String opStr = qa.getAnswer().toLowerCase();
@@ -213,7 +229,8 @@ public class DevReparsing {
                                 final ImmutableList<Integer> concatArgs = Stream
                                         .concat(argIds.stream(), qa2.getArgumentIndices().stream())
                                         .distinct().sorted().collect(GuavaCollectors.toImmutableList());
-                                constraints.add(new Constraint.DisjunctiveAttachmentConstraint(headId, concatArgs, true, 1.0));
+                                constraints.add(new Constraint.DisjunctiveAttachmentConstraint(headId, concatArgs, true,// 1.0));
+                                        config.positiveConstraintPenalty));
                                 hasDisjunctiveConstraints = true;
                                 skipOps.add(opId2);
                             }

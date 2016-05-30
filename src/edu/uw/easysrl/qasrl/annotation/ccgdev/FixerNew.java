@@ -141,11 +141,10 @@ public class FixerNew {
                         .min(Integer::compare).get();
                 final boolean commaBetweenArgAndPred = IntStream.range(Math.max(maxArgId1, maxArgId2), headId)
                         .mapToObj(sentence::get).anyMatch(","::equals);
-                if ((sentenceStr.contains(op1 + ", " + op2) || sentenceStr.contains(op1 + "., " + op2)
-                        || sentenceStr.contains(op2 + ", " + op1) || sentenceStr.contains(op2 + "., " + op1))
+                if ((sentenceStr.contains(op1 + ", " + op2) || sentenceStr.contains(op1 + "., " + op2))
                         && !query.getQAPairSurfaceForms().get(opId1).getAnswer().equals(op1)
                         && Determiners.determinerList.stream().anyMatch(d -> op2.startsWith(d + " "))
-                        && (headId < Math.min(minArgId1, minArgId2) || commaBetweenArgAndPred)) {
+                        && commaBetweenArgAndPred) {
                     newOptions.add(opId2);
                 }
             }
@@ -184,20 +183,23 @@ public class FixerNew {
                 final int maxArgId2 = qa2.getAnswerStructures().stream()
                         .flatMap(ans -> ans.argumentIndices.stream())
                         .min(Integer::compare).get();
-                final boolean copulaInBetween = IntStream.range(argId1, minArgId2)
+                final int copulaBetweenArgs = (int) IntStream.range(argId1, minArgId2)
                         .mapToObj(sentence::get)
-                        .anyMatch(VerbHelper::isCopulaVerb);
-                final boolean commaBetweenArg1Arg2 = IntStream.range(argId1, minArgId2)
+                        .filter(VerbHelper::isCopulaVerb)
+                        .count();
+                final int commaBetweenArg1Arg2 = (int) IntStream.range(argId1, minArgId2)
                         .mapToObj(sentence::get)
-                        .anyMatch(","::equals);
-                //final String predStr = sentence.get(predicateId).toLowerCase();
+                        .filter(","::equals)
+                        .count();
                 final boolean trailingWhoThat = (sentenceStr.contains(op2 + " who ")
                         || sentenceStr.contains(op2 + " that ")) && Math.abs(headId - maxArgId2) <= 3;
                 final boolean trailingPredicate = maxArgId2 + 1 == headId && query.getQAPairSurfaceForms().stream()
                         .flatMap(qa -> qa.getQuestionStructures().stream())
                         .anyMatch(q -> q.category.isFunctionInto(Category.valueOf("S[pss]"))
                                 || q.category.isFunctionInto(Category.valueOf("S[ng]")));
-                if ((copulaInBetween || commaBetweenArg1Arg2) && (trailingWhoThat || trailingPredicate)) {
+                if ((copulaBetweenArgs == 1 || commaBetweenArg1Arg2 == 1)
+                        && Determiners.determinerList.stream().anyMatch(d -> op2.startsWith(d + " "))
+                        && (trailingWhoThat || trailingPredicate)) {
                     return ImmutableList.of(opId2);
                 }
             }
