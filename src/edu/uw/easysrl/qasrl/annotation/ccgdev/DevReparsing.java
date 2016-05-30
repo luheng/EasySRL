@@ -101,18 +101,18 @@ public class DevReparsing {
                 String fixType = "None";
                 List<Integer> fixedResopnse = null;
 
-                if (config.fixRelatives && !relativeFix.isEmpty()) {
-                    fixedResopnse = relativeFix;
-                    fixType = "relative";
-                } else if (config.fixAppositves && !appositiveFix.isEmpty()) {
-                    fixedResopnse = appositiveFix;
-                    fixType = "appositive";
-                } else if (config.fixPronouns && !pronounFix.isEmpty()) {
+                if (config.fixPronouns && !pronounFix.isEmpty()) {
                     fixedResopnse = pronounFix;
                     fixType = "pronoun";
                 } else if (config.fixSubspans && !subspanFix.isEmpty()) {
                     fixedResopnse = subspanFix;
                     fixType = "subspan";
+                } else if (config.fixRelatives && !relativeFix.isEmpty()) {
+                    fixedResopnse = relativeFix;
+                    fixType = "relative";
+                } else if (config.fixAppositves && !appositiveFix.isEmpty()) {
+                    fixedResopnse = appositiveFix;
+                    fixType = "appositive";
                 } else if (config.fixConjunctions && !conjunctionFix.isEmpty()) {
                     fixedResopnse = conjunctionFix;
                     fixType = "conjunction";

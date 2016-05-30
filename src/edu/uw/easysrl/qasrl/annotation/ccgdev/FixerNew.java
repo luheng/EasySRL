@@ -196,11 +196,11 @@ public class FixerNew {
                 //final String predStr = sentence.get(predicateId).toLowerCase();
                 final boolean trailingWhoThat = (sentenceStr.contains(op2 + " who ")
                         || sentenceStr.contains(op2 + " that ")) && Math.abs(predicateId - maxArgId2) <= 3;
-                final boolean trailingPss = maxArgId2 + 1 == predicateId
-                        && query.getQAPairSurfaceForms().stream()
+                final boolean trailingPredicate = maxArgId2 + 1 == predicateId && query.getQAPairSurfaceForms().stream()
                         .flatMap(qa -> qa.getQuestionStructures().stream())
-                        .anyMatch(q -> q.category.isFunctionInto(Category.valueOf("S[pss]")));
-                if ((copulaInBetween || commaBetweenArg1Arg2) && (trailingWhoThat || trailingPss)) {
+                        .anyMatch(q -> q.category.isFunctionInto(Category.valueOf("S[pss]"))
+                                || q.category.isFunctionInto(Category.valueOf("S[ng]")));
+                if ((copulaInBetween || commaBetweenArg1Arg2) && (trailingWhoThat || trailingPredicate)) {
                     return ImmutableList.of(opId2);
                 }
             }
