@@ -109,7 +109,7 @@ public class DevReparsing {
                     fixType = "subspan";
                 } else if (config.fixRelatives && !relativeFix.isEmpty()) {
                     fixedResopnse = relativeFix;
-                    fixType = "relative";   
+                    fixType = "relative";
                 } else if (config.fixAppositves && !appositiveFix.isEmpty()) {
                     fixedResopnse = appositiveFix;
                     fixType = "appositive";
