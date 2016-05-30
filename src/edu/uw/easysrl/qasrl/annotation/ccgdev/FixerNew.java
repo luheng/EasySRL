@@ -159,7 +159,8 @@ public class FixerNew {
                 continue;
             }
             final QAStructureSurfaceForm qa1 = query.getQAPairSurfaceForms().get(opId1);
-            final int argId1 = qa1.getAnswerStructures().stream().flatMap(ans -> ans.argumentIndices.stream())
+            final int argId1 = qa1.getAnswerStructures().stream()
+                    .flatMap(ans -> ans.argumentIndices.stream())
                     .max(Integer::compare).get();
             for (int opId2 : IntStream.range(0, numQAs).toArray()) {
                 if (opId1 == opId2 || optionDist[opId2] == 0) {
@@ -167,18 +168,22 @@ public class FixerNew {
                 }
                 final QAStructureSurfaceForm qa2 = query.getQAPairSurfaceForms().get(opId2);
                 final String op2 = qa2.getAnswer().toLowerCase();
-                final int minArgId2 = qa2.getAnswerStructures().stream().flatMap(ans -> ans.argumentIndices.stream())
+                final int minArgId2 = qa2.getAnswerStructures().stream()
+                        .flatMap(ans -> ans.argumentIndices.stream())
                         .min(Integer::compare).get();
-                final boolean copulaInBetween = IntStream.range(argId1, minArgId2).mapToObj(sentence::get)
+                final int maxArgId2 = qa2.getAnswerStructures().stream()
+                        .flatMap(ans -> ans.argumentIndices.stream())
+                        .min(Integer::compare).get();
+                final boolean copulaInBetween = IntStream.range(argId1, minArgId2)
+                        .mapToObj(sentence::get)
                         .anyMatch(VerbHelper::isCopulaVerb);
-                final boolean commaBetweenArg1Arg2 = IntStream.range(argId1, minArgId2).mapToObj(sentence::get)
+                final boolean commaBetweenArg1Arg2 = IntStream.range(argId1, minArgId2)
+                        .mapToObj(sentence::get)
                         .anyMatch(","::equals);
-                final String predStr = sentence.get(predicateId).toLowerCase();
-                final boolean trailingWhoThat = sentenceStr.contains(op2 + " who " + predStr)
-                        || sentenceStr.contains(op2 + " that " + predStr)
-                        || sentenceStr.contains(op2 + ". who " + predStr)
-                        || sentenceStr.contains(op2 + ". that " + predStr);
-                final boolean trailingPss = sentenceStr.contains(op2 + " " + predStr)
+                //final String predStr = sentence.get(predicateId).toLowerCase();
+                final boolean trailingWhoThat = (sentenceStr.contains(op2 + " who ")
+                        || sentenceStr.contains(op2 + " that ")) && Math.abs(predicateId - maxArgId2) <= 3;
+                final boolean trailingPss = maxArgId2 + 1 == predicateId
                         && query.getQAPairSurfaceForms().stream()
                         .flatMap(qa -> qa.getQuestionStructures().stream())
                         .anyMatch(q -> q.category.isFunctionInto(Category.valueOf("S[pss]")));

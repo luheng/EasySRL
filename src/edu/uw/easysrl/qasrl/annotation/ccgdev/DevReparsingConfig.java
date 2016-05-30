@@ -33,10 +33,10 @@ public class DevReparsingConfig {
     int negativeConstraintMaxAgreement = 2;
 
     @Option(name="-pos_penalty",usage="")
-    double positiveConstraintPenalty = 2.0;
+    double positiveConstraintPenalty = 1.5;
 
     @Option(name="-neg_penalty",usage="")
-    double negativeConstraintPenalty = 2.0;
+    double negativeConstraintPenalty = 1.5;
 
     @Option(name="-tag_penalty",usage="supertag penalty")
     double supertagPenalty = 0.0;

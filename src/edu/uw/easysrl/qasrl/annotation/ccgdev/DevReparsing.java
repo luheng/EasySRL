@@ -128,7 +128,7 @@ public class DevReparsing {
                 //constraints.forEach(c -> System.out.println(c.toString(sentence)));
                 final ImmutableSet<Constraint> constraints = getConstraints(query, newOptionDist);
                 history.addEntry(sentenceId, query, parser.getUserOptions(query, newOptionDist), constraints);
-                if (history.lastIsWorsened()) {
+                if (history.lastIsWorsened() && fixType.equals("relative")) {
                     history.printLatestHistory();
                     System.out.println(query.toString(sentence, 'G', parser.getGoldOptions(query), '*', optionDist));
                     System.out.println("Fixed:\t" + fixType);
