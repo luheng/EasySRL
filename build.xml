@@ -35,6 +35,7 @@
             <fileset file="lib/libdeeptagger.jnilib"/>
             <fileset file="lib/libdeeptagger.so"/>
             <zipfileset excludes="META-INF/*.SF" src="lib/commons-csv-1.2.jar"/>
+            <zipfileset excludes="META-INF/*.SF" src="lib/args4j-2.33.jar"/>
             <zipfileset excludes="META-INF/*.SF" src="lib/guava-15.0.jar"/>
             <zipfileset excludes="META-INF/*.SF" src="lib/jewelcli-0.7.6.jar"/>
             <zipfileset excludes="META-INF/*.SF" src="lib/junit-4.11.jar"/>

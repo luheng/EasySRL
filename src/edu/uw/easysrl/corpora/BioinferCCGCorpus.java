@@ -117,6 +117,8 @@ public class BioinferCCGCorpus {
             }
 
         } catch (IOException e) {
+            System.err.println(e.getMessage());
+            e.printStackTrace();
             return Optional.empty();
         }
         System.out.println(String.format("Read %d sentences from %s.", sentences.size(), BioinferTestFile));
