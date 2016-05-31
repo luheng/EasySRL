@@ -43,7 +43,7 @@ public class TestDataWriter {
 
     private static final String[] annotationFiles = TestDataUtils.annotatedFiles;
 
-    private static final String outputFilePath = "ccgtest.qa.tsv";
+    private static final String outputFilePath = "ccgtest2.qa.tsv";
 
     private static QueryPruningParameters queryPruningParameters;
     static {
@@ -84,11 +84,9 @@ public class TestDataWriter {
 
     private static void writeAggregatedAnnotation() throws IOException {
         List<Integer> sentenceIds = myHTILParser.getAllSentenceIds();
-
         System.out.println(sentenceIds.stream().map(String::valueOf).collect(Collectors.joining(", ")));
         System.out.println("Queried " + sentenceIds.size() + " sentences. Total number of questions:\t" +
                 annotations.entrySet().stream().mapToInt(e -> e.getValue().size()).sum());
-
         // Stats.
         ImmutableList<Results> optionAccuracy = IntStream.range(0, 5).boxed()
                 .map(ignore -> new Results())
@@ -97,19 +95,16 @@ public class TestDataWriter {
                 .map(ignore -> new Accuracy())
                 .collect(GuavaCollectors.toImmutableList());
         int numMatchedAnnotations = 0, numNewQuestions = 0;
-
         Results avgBaseline = new Results(),
                 avgReranked = new Results(),
                 avgReparsed = new Results(),
                 avgUnlabeledBaseline = new Results(),
                 avgUnlabeledReranked = new Results(),
                 avgUnlabeledReparsed = new Results();
-
-        BaseCcgParser baseParser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, 1);
-
+        BaseCcgParser.AStarParser baseParser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, 1);
+        baseParser.cacheSupertags(myHTILParser.getParseData());
         // Output file writer
         BufferedWriter writer = new BufferedWriter(new FileWriter(new File(outputFilePath)));
-
         int counter = 0, numWrittenAnnotations = 0;
         TicToc.tic();
         for (int sentenceId : sentenceIds) {
@@ -118,7 +113,6 @@ public class TestDataWriter {
                 System.out.println(String.format("Processed %d sentences ... in %d seconds", counter, TicToc.toc()));
                 TicToc.tic();
             }
-
             final ImmutableList<String> sentence = myHTILParser.getSentence(sentenceId);
             final NBestList nBestList = myHTILParser.getNBestList(sentenceId);
             final int numParses = nBestList.getN();
@@ -160,22 +154,17 @@ public class TestDataWriter {
                     continue;
                 }
                 final ScoredQuery<QAStructureSurfaceForm> query = queryOpt.get();
-                ImmutableList<Integer> goldOptions    = myHTILParser.getGoldOptions(query),
-                        oneBestOptions = myHTILParser.getOneBestOptions(query),
-                        oracleOptions  = myHTILParser.getOracleOptions(query);
-
+                ImmutableList<Integer> goldOptions    = myHTILParser.getGoldOptions(query);
                 int[] optionDist = AnnotationUtils.getUserResponseDistribution(query, annotation);
                 ImmutableList<ImmutableList<Integer>> responses = AnnotationUtils.getAllUserResponses(query, annotation);
                 ImmutableList<ImmutableList<Integer>> newResponses = HeuristicHelper.adjustVotes(sentence, query, responses);
                 int[] newOptionDist = new int[optionDist.length];
                 newResponses.stream().forEach(resp -> resp.stream().forEach(op -> newOptionDist[op]++));
-
                 ImmutableList<Integer> userOptions  = myHTILParser.getUserOptions(query, annotation);
                 if (responses.size() != 5) {
                     continue;
                 }
                 numMatchedAnnotations ++;
-
                 // Update stats.
                 for (int i = 0; i < 5; i++) {
                     final int minAgr = i + 1;
@@ -213,47 +202,11 @@ public class TestDataWriter {
                 // Write to output file.
                 writer.write(query.toAnnotationString(sentence, responses) + "\n");
                 numWrittenAnnotations ++;
-
-                // Print debugging information.
-                String result = query.toString(sentence,
-                        'G', goldOptions,
-                        'O', oracleOptions,
-                        'B', oneBestOptions,
-                        'U', userOptions,
-                        //  'R', userOptions2,
-                        '*', optionDist);
-                result += allConstraints.stream()
-                        .map(c -> "Penalizing:\t \t" + c.toString(sentence))
-                        .collect(Collectors.joining("\n")) + "\n";
-                String f1Impv = " ";
-                if (reparsedF1 != null) {
-                    if (reparsedF1.getF1() < currentF1.getF1() - 1e-8) {
-                        f1Impv = "[-]";
-                    } else if (reparsedF1.getF1() > currentF1.getF1() + 1e-8) {
-                        f1Impv = "[+]";
-                    }
-                }
-                result += String.format("F1: %.3f%% -> %.3f%% %s\n",
-                        100.0 * currentF1.getF1(), 100.0 * reparsedF1.getF1(), f1Impv);
-                result += String.format("Reranked F1: %.3f%%\n", 100.0 * rerankedF1.getF1());
-                result += String.format("Reparsed F1: %.3f%%\n", 100.0 * reparsedF1.getF1());
-                result += String.format("Oracle F1: %.3f%%\n",   100.0 * oracleF1.getF1());
-                System.out.println(result);
-                currentF1 = reparsedF1;
             }
-
             avgReparsed.add(reparsedF1);
             avgReranked.add(rerankedF1);
             avgUnlabeledReranked.add(unlabeledRerankedF1);
             avgUnlabeledReparsed.add(unlabeledReparsedF1);
-
-            Optional<Results> lastReparsedResult = myHistory.getLastReparsingResult(sentenceId);
-            if (lastReparsedResult.isPresent()) {
-                double deltaF1 = lastReparsedResult.get().getF1() - baselineF1.getF1();
-                String changeStr = deltaF1 < -1e-6 ? "Worsened." : (deltaF1 > 1e-6 ? "Improved." : "Unchanged.");
-                System.out.println(String.format("Final F1: %.3f%% over %.3f%% baseline.\t%s\n",
-                        100.0 * lastReparsedResult.get().getF1(), 100.0 * baselineF1.getF1(), changeStr));
-            }
         }
 
         myHistory.printSummary();

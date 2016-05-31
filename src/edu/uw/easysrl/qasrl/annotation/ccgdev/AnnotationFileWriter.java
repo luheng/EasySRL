@@ -47,7 +47,7 @@ public class AnnotationFileWriter {
             "./Crowdflower_data/f913098.csv",                   // Round5: Rerun 200+ sentences.
     };
 
-    private static final String outputFilePath = "ccgdev2.qa.tsv";
+    private static final String outputFilePath = "ccgdev3.qa.tsv";
 
     private static QueryPruningParameters queryPruningParameters;
     static {
@@ -64,13 +64,13 @@ public class AnnotationFileWriter {
     static {
         reparsingParameters = new HITLParsingParameters();
         reparsingParameters.jeopardyQuestionMinAgreement = 1;
-        reparsingParameters.positiveConstraintMinAgreement = 4;
+        reparsingParameters.positiveConstraintMinAgreement = 3;
         reparsingParameters.negativeConstraintMaxAgreement = 1;
         reparsingParameters.skipPronounEvidence = false;
         reparsingParameters.jeopardyQuestionWeight = 1.0;
         reparsingParameters.oraclePenaltyWeight = 5.0;
-        reparsingParameters.attachmentPenaltyWeight = 2.0;
-        reparsingParameters.supertagPenaltyWeight = 0.0;
+        reparsingParameters.attachmentPenaltyWeight = 1.5;
+        reparsingParameters.supertagPenaltyWeight = 1.0;
     }
 
     public static void main(String[] args) {

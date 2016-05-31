@@ -47,6 +47,7 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                 .filter(Constraint::isPositive)
                 .filter(Constraint.AttachmentConstraint.class::isInstance)
                 .map(c -> (Constraint.AttachmentConstraint) c)
+                .filter(c -> c.getHeadId() != c.getArgId())
                 .forEach(c -> mustLinks.put(c.getHeadId(), c.getArgId(), c.getStrength()));
 
         // Disjunctive attachment constraint
@@ -56,11 +57,13 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                 .map(c -> (Constraint.DisjunctiveAttachmentConstraint) c)
                 .forEach(c -> {
                     final double amortizedPenalty = 1.0 * c.getStrength() / c.getArgId().size();
-                    c.getArgId().forEach(argId -> {
-                        if (!mustLinks.contains(c.getHeadId(), argId)) {
-                            mustLinks.put(c.getHeadId(), argId, amortizedPenalty);
-                        }
-                    });
+                    c.getArgId().stream()
+                            .filter(argId -> argId != c.getHeadId())
+                            .forEach(argId -> {
+                                if (!mustLinks.contains(c.getHeadId(), argId)) {
+                                    mustLinks.put(c.getHeadId(), argId, amortizedPenalty);
+                                }
+                            });
                 });
 
         constraints.stream()
@@ -74,6 +77,7 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                 .filter(c -> !c.isPositive())
                 .filter(Constraint.AttachmentConstraint.class::isInstance)
                 .map(c -> (Constraint.AttachmentConstraint) c)
+                .filter(c -> c.getHeadId() != c.getArgId())
                 .filter(c -> !mustLinks.contains(c.getHeadId(), c.getArgId())
                            && !mustLinks.contains(c.getArgId(), c.getHeadId()))
                 .forEach(c -> cannotLinks.put(c.getHeadId(), c.getArgId(), c.getStrength()));

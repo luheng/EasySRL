@@ -9,24 +9,13 @@ import edu.uw.easysrl.qasrl.ParseData;
 import edu.uw.easysrl.qasrl.ParseDataLoader;
 import edu.uw.easysrl.syntax.grammar.Category;
 
-import java.util.HashSet;
-import java.util.Set;
 
 /**
  * Created by luheng on 5/28/16.
  */
 public class Determiners {
     public static ImmutableList<String> determinerList = ImmutableList.of(
-            "your", "dozen", "these", "that", "either", "his", "her", "few",
-            "those", "all", "this", "its", "my", "an", "each", "both",
-            "some", "no", "another",
-            "their",
-            "our",
-            "every",
-            "a",
-            "any",
-            "the",
-            "neither"
+            "a", "an", "the", "both"
     );
 
 
