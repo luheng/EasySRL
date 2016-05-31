@@ -41,14 +41,57 @@ public class ReparsingHelper {
                 .filter(e -> e.getCount() >= config.positiveConstraintMinAgreement)
                 .map(e -> e.getElement()).distinct().sorted()
                 .collect(GuavaCollectors.toImmutableList());
-
-
         final ImmutableList<Integer> pronounFix = FixerNew.pronounFixer(query, agreedOptions, optionDist);
-                //FixerNew.pronounFixer2(query, agreedOptions, nBestList);
         final ImmutableList<Integer> subspanFix = FixerNew.subspanFixer(query, agreedOptions, optionDist);
         final ImmutableList<Integer> appositiveFix = FixerNew.appositiveFixer(sentence, query, agreedOptions, optionDist);
         final ImmutableList<Integer> relativeFix = FixerNew.relativeFixer(sentence, query, agreedOptions, optionDist);
-        //final ImmutableList<Integer> conjunctionFix = FixerNew.conjunctionFixer(sentence, query, agreedOptions, optionDist);
+        String fixType = "None";
+        List<Integer> fixedResopnse = null;
+        if (config.fixPronouns && !pronounFix.isEmpty()) {
+            fixedResopnse = pronounFix;
+            fixType = "pronoun";
+        } else if (config.fixSubspans && !subspanFix.isEmpty()) {
+            fixedResopnse = subspanFix;
+            fixType = "subspan";
+        } else if (config.fixRelatives && !relativeFix.isEmpty()) {
+            fixedResopnse = relativeFix;
+            fixType = "relative";
+        } else if (config.fixAppositves && !appositiveFix.isEmpty()) {
+            fixedResopnse = appositiveFix;
+            fixType = "appositive";
+        }
+        if (fixedResopnse != null) {
+            fixedResopnse.stream().forEach(op -> newOptionDist[op] += config.positiveConstraintMinAgreement);
+        } else {
+            for (ImmutableList<Integer> response : matchedResponses) {
+                response.stream().forEach(op -> newOptionDist[op] ++);
+            }
+        }
+        return newOptionDist;
+    }
+
+    public static int[] getNewOptionDist2(final int sentenceId,
+                                          final ImmutableList<String> sentence,
+                                          final ScoredQuery<QAStructureSurfaceForm> query,
+                                          final ImmutableList<ImmutableList<Integer>> matchedResponses,
+                                          final NBestList nBestList,
+                                          final ReparsingConfig config) {
+        final int[] optionDist = new int[query.getOptions().size()];
+        int[] newOptionDist = new int[optionDist.length];
+        Arrays.fill(optionDist, 0);
+        Arrays.fill(newOptionDist, 0);
+        matchedResponses.forEach(r -> r.stream().forEach(op -> optionDist[op] ++));
+        final Multiset<Integer> votes = HashMultiset.create(matchedResponses.stream()
+                .flatMap(List::stream)
+                .collect(Collectors.toList()));
+        final ImmutableList<Integer> agreedOptions = votes.entrySet().stream()
+                .filter(e -> e.getCount() >= config.positiveConstraintMinAgreement)
+                .map(e -> e.getElement()).distinct().sorted()
+                .collect(GuavaCollectors.toImmutableList());
+        final ImmutableList<Integer> pronounFix = FixerNewStanford.pronounFixer(sentenceId, sentence, query, agreedOptions, optionDist);
+        final ImmutableList<Integer> subspanFix = FixerNew.subspanFixer(query, agreedOptions, optionDist);
+        final ImmutableList<Integer> appositiveFix = FixerNewStanford.appositiveFixer(sentenceId, sentence, query, agreedOptions, optionDist);
+        final ImmutableList<Integer> relativeFix = FixerNew.relativeFixer(sentence, query, agreedOptions, optionDist);
         String fixType = "None";
         List<Integer> fixedResopnse = null;
         if (config.fixPronouns && !pronounFix.isEmpty()) {

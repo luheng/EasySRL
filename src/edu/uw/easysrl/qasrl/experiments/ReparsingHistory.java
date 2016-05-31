@@ -189,6 +189,11 @@ public class ReparsingHistory {
                         .collect(GuavaCollectors.toImmutableSet()) : ImmutableSet.of();
     }
 
+    public Optional<Parse> getLastReparsed(int sentenceId) {
+        return reparses.containsKey(sentenceId) && reparses.get(sentenceId).size() > 0 ?
+                Optional.of(getLast(reparses.get(sentenceId))) : Optional.empty();
+    }
+
     public Optional<Results> getLastReparsingResult(int sentenceId) {
         return reparsingResults.containsKey(sentenceId) && reparsingResults.get(sentenceId).size() > 0 ?
                 Optional.of(getLast(reparsingResults.get(sentenceId))) : Optional.empty();

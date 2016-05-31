@@ -193,7 +193,7 @@ public abstract class BaseCcgParser {
         private ImmutableList<List<List<Tagger.ScoredCategory>>> taggedSentences = null;
         private final double supertaggerBeam = 0.000001;
         private final int maxChartSize = 1000000;
-        private final int maxSentenceLength = 70;
+        private final int maxSentenceLength = 100;
 
         public ConstrainedCcgParser(String modelFolderPath, int nBest) {
             final File modelFolder = Util.getFile(modelFolderPath);
@@ -224,6 +224,15 @@ public abstract class BaseCcgParser {
             if (batchTagger != null) {
                 System.err.println("Batch tagging " + corpus.getSentences().size() + " sentences ...");
                 taggedSentences = batchTagger.tagBatch(corpus.getSentenceInputWords().parallelStream()
+                        .map(s -> s.stream().collect(Collectors.toList())))
+                        .collect(GuavaCollectors.toImmutableList());
+            }
+        }
+
+        public void cacheSupertags(ImmutableList<ImmutableList<InputReader.InputWord>> inputSentences) {
+            if (batchTagger != null) {
+                System.err.println("Batch tagging " + inputSentences.size() + " sentences ...");
+                taggedSentences = batchTagger.tagBatch(inputSentences.parallelStream()
                         .map(s -> s.stream().collect(Collectors.toList())))
                         .collect(GuavaCollectors.toImmutableList());
             }

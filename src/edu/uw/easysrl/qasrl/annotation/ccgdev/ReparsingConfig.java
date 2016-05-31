@@ -30,16 +30,16 @@ public class ReparsingConfig {
     public int positiveConstraintMinAgreement = 3;
 
     @Option(name="-neg_threshold",usage="")
-    public int negativeConstraintMaxAgreement = 2;
+    public int negativeConstraintMaxAgreement = 1;
 
     @Option(name="-pos_penalty",usage="")
-    public double positiveConstraintPenalty = 1.5;
+    public double positiveConstraintPenalty = 2.0;
 
     @Option(name="-neg_penalty",usage="")
     public double negativeConstraintPenalty = 1.5;
 
     @Option(name="-tag_penalty",usage="supertag penalty")
-    public double supertagPenalty = 0.0;
+    public double supertagPenalty = 1.0;
 
     public ReparsingConfig() {
     }

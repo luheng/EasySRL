@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 /**
  * Created by luheng on 5/26/16.
  */
-public class DevReparsing {
+public class DevReparsingExp {
 
     private static QueryPruningParameters queryPruningParameters;
     static {
@@ -55,12 +55,12 @@ public class DevReparsing {
         Results avgChange = new Results();
 
         for (int sentenceId : CrowdFlowerDataUtils.getNewCoreArgAnnotatedSentenceIds()) {
-        //for (int sentenceId : annotations.keySet()) {
+            //for (int sentenceId : annotations.keySet()) {
             history.addSentence(sentenceId);
 
             final ImmutableList<String> sentence = parser.getSentence(sentenceId);
             final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries = parser.getAllCoreArgQueriesForSentence(sentenceId);
-                    //parser.getNewCoreArgQueriesForSentence(sentenceId);
+            //parser.getNewCoreArgQueriesForSentence(sentenceId);
 
             if (queries == null || queries.isEmpty() || !annotations.containsKey(sentenceId)) {
                 Parse baselineParse = parser.getNBestList(sentenceId).getParse(0);
@@ -91,7 +91,7 @@ public class DevReparsing {
                 ///// Heuristics
                 final int[] optionDist = new int[query.getOptions().size()];
                 matchedResponses.forEach(response -> response.stream().forEach(r -> optionDist[r] ++));
-                final int[] newOptionDist = ReparsingHelper.getNewOptionDist(sentence, query, matchedResponses,
+                final int[] newOptionDist = ReparsingHelper.getNewOptionDist2(sentenceId, sentence, query, matchedResponses,
                         nbestLists.get(sentenceId), config);
                 final ImmutableSet<Constraint> constraints = ReparsingHelper.getConstraints(query, newOptionDist,
                         nbestLists.get(sentenceId), config);
@@ -125,111 +125,4 @@ public class DevReparsing {
         System.out.println("Avg. change:\t" + avgChange);
         history.printSummary();
     }
-
-    private static boolean hasSpanIssue(final ScoredQuery<QAStructureSurfaceForm> query) {
-        for (int opId1 = 0; opId1 < query.getQAPairSurfaceForms().size(); opId1 ++) {
-            final QAStructureSurfaceForm qa = query.getQAPairSurfaceForms().get(opId1);
-            final ImmutableList<Integer> argIds = qa.getAnswerStructures().stream()
-                    .flatMap(ans -> ans.argumentIndices.stream())
-                    .distinct().sorted()
-                    .collect(GuavaCollectors.toImmutableList());
-            final String opStr = qa.getAnswer().toLowerCase();
-
-            for (int opId2 = 0; opId2 < query.getQAPairSurfaceForms().size(); opId2 ++) {
-                if (opId2 != opId1) {
-                    final QAStructureSurfaceForm qa2 = query.getQAPairSurfaceForms().get(opId2);
-                    final String opStr2 = qa2.getAnswer().toLowerCase();
-                    if (opStr.contains(opStr2) || opStr2.contains(opStr)) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
-
-    private static ImmutableList<Integer> getGoldOption(ScoredQuery<QAStructureSurfaceForm> query, Parse goldParse,
-                                                        ImmutableList<Integer> referenceOptions) {
-        List<Integer> goldOptions = null;
-        final Map<String, List<Integer>> allGoldOptions = getAllGoldOptions(query, goldParse);
-        final List<QuestionStructure> questionStructures = query.getQAPairSurfaceForms().stream()
-                .flatMap(qa -> qa.getQuestionStructures().stream()).collect(Collectors.toList());
-        boolean labeledMatch = false;
-        for (QuestionStructure questionStructure : questionStructures) {
-            String label = questionStructure.category + "." + questionStructure.targetArgNum;
-            // Labeled match.
-            if (allGoldOptions.containsKey(label)) {
-                goldOptions = allGoldOptions.get(label);
-                labeledMatch = true;
-                break;
-            }
-        }
-        // Unlabeled match.
-        if (goldOptions == null) {
-            int maxOverlap = 0;
-            List<Integer> bestMatch = null;
-            for (List<Integer> gold : allGoldOptions.values()) {
-                int overlap = (int) gold.stream().filter(referenceOptions::contains).count();
-                if (overlap > maxOverlap) {
-                    maxOverlap = overlap;
-                    bestMatch = gold;
-                }
-            }
-            if (maxOverlap > 0) {
-                goldOptions = bestMatch;
-            }
-        }
-        // Other.
-        if (goldOptions == null) {
-            goldOptions = ImmutableList.of(query.getBadQuestionOptionId().getAsInt());
-        }
-        return ImmutableList.copyOf(goldOptions);
-    }
-
-    private static Map<String, List<Integer>> getAllGoldOptions(ScoredQuery<QAStructureSurfaceForm> query,
-                                                                Parse goldParse) {
-
-        final Set<ResolvedDependency> goldDeps = goldParse.dependencies;
-        final List<QAStructureSurfaceForm> qaStructures = query.getQAPairSurfaceForms();
-        final int headId = query.getPredicateId().getAsInt();
-        final OptionalInt prepositionIdOpt = query.getPrepositionIndex();
-        Map<String, List<Integer>> allGoldOptions = new HashMap<>();
-        if (prepositionIdOpt.isPresent()) {
-            //System.out.println("PP id:\t" + ppId);
-            final int ppId = prepositionIdOpt.getAsInt();
-            for (int id = 0; id < qaStructures.size(); id++) {
-                final QAStructureSurfaceForm qa = qaStructures.get(id);
-                for (ResolvedDependency goldDep : goldDeps) {
-                    final String label = goldDep.getCategory() + "." + goldDep.getArgNumber();
-                    if (goldDep.getHead() == ppId && qa.getAnswerStructures().stream()
-                            .anyMatch(ans -> ans.argumentIndices.contains(goldDep.getArgument()))) {
-                        if (!allGoldOptions.containsKey(label)) {
-                            allGoldOptions.put(label, new ArrayList<>());
-                        }
-                        allGoldOptions.get(label).add(id);
-                        break;
-                    }
-                }
-            }
-            return allGoldOptions;
-        }
-        for (int id = 0; id < qaStructures.size(); id++) {
-            final QAStructureSurfaceForm qa = qaStructures.get(id);
-            for (ResolvedDependency goldDep : goldDeps) {
-                if (goldDep.getHead() == headId && qa.getAnswerStructures().stream()
-                        .flatMap(ans -> ans.argumentIndices.stream())
-                        .anyMatch(argId -> goldDep.getArgument() == argId)) {
-                    final String label = goldDep.getCategory() + "." + goldDep.getArgNumber();
-                    if (!allGoldOptions.containsKey(label)) {
-                        allGoldOptions.put(label, new ArrayList<>());
-                    }
-                    allGoldOptions.get(label).add(id);
-                    break;
-                }
-            }
-        }
-        return allGoldOptions;
-    }
-
 }

@@ -1,27 +1,21 @@
 package edu.uw.easysrl.qasrl.annotation.ccgdev;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import edu.stanford.nlp.ling.Sentence;
-import edu.stanford.nlp.trees.GrammaticalStructure;
-import edu.stanford.nlp.trees.GrammaticalStructureFactory;
-import edu.stanford.nlp.trees.PennTreebankLanguagePack;
-import edu.stanford.nlp.trees.TreebankLanguagePack;
-import edu.uw.easysrl.qasrl.NBestList;
+import edu.stanford.nlp.parser.lexparser.LexicalizedParser;
+import edu.stanford.nlp.trees.*;
+
 import edu.uw.easysrl.qasrl.TextGenerationHelper;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.util.Prepositions;
 import edu.uw.easysrl.qasrl.qg.util.PronounList;
 import edu.uw.easysrl.qasrl.qg.util.VerbHelper;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
-import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.GuavaCollectors;
 
-import edu.stanford.nlp.parser.lexparser.
-
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 
 
@@ -43,20 +37,24 @@ public class FixerNewStanford {
     final static int minVotesToFix = 1;
     final static double minMarginToFix = 0.33;
 
-    public void cacheDependencies(final ImmutableList<String> sentence) {
-        LexicalizedParser lp = LexicalizedParser.loadModel(
-                "edu/stanford/nlp/models/lexparser/englishPCFG.ser.gz",
-                "-maxLength", "80", "-retainTmpSubcategories");
-        TreebankLanguagePack tlp = new PennTreebankLanguagePack();
+    final static LexicalizedParser parser = LexicalizedParser.loadModel(
+            "./lib/stanford-english-corenlp-2016-01-10-models/edu/stanford/nlp/models/lexparser/englishPCFG.ser.gz",
+            "-maxLength", "100", "-retainTmpSubcategories");
+    final static TreebankLanguagePack tlp = new PennTreebankLanguagePack();
+    final static GrammaticalStructureFactory gsf = tlp.grammaticalStructureFactory();
 
-        GrammaticalStructureFactory gsf = tlp.grammaticalStructureFactory();
-        String[] sent = "This", "is", "an", "easy", "sentence", "." ;
-        Tree parse = lp.apply(Sentence.toWordList(sent));
+    static int cachedSentenceId = -1;
+    static ImmutableSet<TypedDependency> cachedDependencies = null;
+
+    public static void cacheDependencies(final int sentenceId, final ImmutableList<String> sentence) {
+        final String[] sent = new String[sentence.size()];
+        IntStream.range(0, sentence.size()).forEach(i -> sent[i] = sentence.get(i));
+        Tree parse = parser.apply(Sentence.toWordList(sent));
         GrammaticalStructure gs = gsf.newGrammaticalStructure(parse);
-        CollectionhTypedDependencyi tdl = gs.typedDependenciesCCprocessed();
-        System.out.println(tdl);
+        cachedDependencies = ImmutableSet.copyOf(gs.typedDependenciesCCprocessed());
+        cachedSentenceId = sentenceId;
+        cachedDependencies.stream().filter(d -> d.reln().toString().equals("appos")).forEach(System.out::println);
     }
-
 
     /**
      * Pronoun rule:
@@ -65,9 +63,14 @@ public class FixerNewStanford {
      * @param optionDist
      * @return
      */
-    public static ImmutableList<Integer> pronounFixer(final ScoredQuery<QAStructureSurfaceForm> query,
+    public static ImmutableList<Integer> pronounFixer(final int sentenceId,
+                                                      final ImmutableList<String> sentence,
+                                                      final ScoredQuery<QAStructureSurfaceForm> query,
                                                       final ImmutableList<Integer> options,
                                                       final int[] optionDist) {
+        if (sentenceId != cachedSentenceId) {
+            cacheDependencies(sentenceId, sentence);
+        }
         final int headId = query.getPrepositionIndex().isPresent() ?
                 query.getPrepositionIndex().getAsInt() : query.getPredicateId().getAsInt();
         final int numQAs = query.getQAPairSurfaceForms().size();
@@ -122,10 +125,14 @@ public class FixerNewStanford {
         return ImmutableList.of();
     }
 
-    public static ImmutableList<Integer> appositiveFixer(final ImmutableList<String> sentence,
+    public static ImmutableList<Integer> appositiveFixer(final int sentenceId,
+                                                         final ImmutableList<String> sentence,
                                                          final ScoredQuery<QAStructureSurfaceForm> query,
                                                          final ImmutableList<Integer> options,
                                                          final int[] optionDist) {
+        if (sentenceId != cachedSentenceId) {
+            cacheDependencies(sentenceId, sentence);
+        }
         final int numQAs = query.getQAPairSurfaceForms().size();
         final String sentenceStr = TextGenerationHelper.renderString(sentence).toLowerCase();
         final Set<Integer> newOptions = new HashSet<>();
@@ -134,20 +141,22 @@ public class FixerNewStanford {
                 continue;
             }
             final QAStructureSurfaceForm qa1 = query.getQAPairSurfaceForms().get(opId1);
-            final String op1 = qa1.getAnswer().toLowerCase();
-            if (op1.contains(" of ")) {
-                continue;
-            }
+            final ImmutableList<Integer> args1 = qa1.getAnswerStructures().stream()
+                    .flatMap(ans -> ans.argumentIndices.stream())
+                    .distinct().sorted().collect(GuavaCollectors.toImmutableList());
+
             for (int opId2 : IntStream.range(0, numQAs).toArray()) {
-                if (opId1 == opId2 || optionDist[opId2] < minVotesToFix) {
+                if (opId1 == opId2) {
                     continue;
                 }
                 final QAStructureSurfaceForm qa2 = query.getQAPairSurfaceForms().get(opId2);
-                final String op2 = qa2.getAnswer().toLowerCase();
-                if ((sentenceStr.contains(op1 + ", " + op2) || sentenceStr.contains(op1 + "., " + op2))
-                        && (sentenceStr.contains(op2 + ",") || sentenceStr.contains(op2 + ".,"))
-                        && !qa1.getAnswer().equals(op1)
-                        && Determiners.determinerList.stream().anyMatch(d -> op2.startsWith(d + " "))) {
+                final ImmutableList<Integer> args2 = qa2.getAnswerStructures().stream()
+                        .flatMap(ans -> ans.argumentIndices.stream())
+                        .distinct().sorted().collect(GuavaCollectors.toImmutableList());
+                if (cachedDependencies.stream()
+                        .filter(dep -> dep.reln().toString().equals("appos"))
+                        .anyMatch(dep -> (args1.contains(dep.gov().index()) && args2.contains(dep.dep().index())
+                                        || (args2.contains(dep.gov().index()) && args1.contains(dep.dep().index()))))) {
                     newOptions.add(opId2);
                 }
             }

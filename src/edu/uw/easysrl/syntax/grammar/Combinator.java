@@ -103,7 +103,7 @@ public abstract class Combinator {
 					new GeneralizedBackwardComposition(Slash.FWD, Slash.BWD, Slash.FWD), new Conjunction(),
 					new RemovePunctuation(false), new RemovePunctuation(true)// , new CommaAndVPtoNPmodifier() // TODO
 			// FIXME: add back when parsing ccg.
-			 , new CommaAndVerbPhrasetoAdverb(), new ParentheticalDirectSpeech()
+			// , new CommaAndVerbPhrasetoAdverb(), new ParentheticalDirectSpeech()
 	// TODO
 			));
 
