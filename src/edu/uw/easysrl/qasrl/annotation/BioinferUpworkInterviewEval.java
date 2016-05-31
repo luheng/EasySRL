@@ -53,6 +53,7 @@ public class BioinferUpworkInterviewEval {
         .put("Jessica", "37973746")
         .put("Rhonda", "38004555")
         .put("Tamir", "38005470")
+        .put("Sean", "38026552")
         .build();
 
     private static QueryPruningParameters queryPruningParameters;
@@ -158,7 +159,7 @@ public class BioinferUpworkInterviewEval {
 
     public static void main(String[] args) throws IOException {
         if(args.length == 0 || !annotatorToId.keySet().contains(args[0])) {
-            System.err.println("must pass an annotator name; one of (Jessica|Rhonda|Tamir)");
+            System.err.println("must pass an annotator name (Jessica|Rhonda|Tamir|Sean)");
             System.exit(1);
         }
         printAnswersByAnnotator(args[0], interviewDataFile);
