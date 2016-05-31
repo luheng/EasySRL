@@ -4,6 +4,7 @@ import com.google.common.collect.HashMultiset;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multiset;
+import edu.uw.easysrl.qasrl.NBestList;
 import edu.uw.easysrl.qasrl.model.Constraint;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
@@ -25,6 +26,7 @@ public class ReparsingHelper {
     public static int[] getNewOptionDist (final ImmutableList<String> sentence,
                                           final ScoredQuery<QAStructureSurfaceForm> query,
                                           final ImmutableList<ImmutableList<Integer>> matchedResponses,
+                                          final NBestList nBestList,
                                           final ReparsingConfig config) {
         final int[] optionDist = new int[query.getOptions().size()];
         int[] newOptionDist = new int[optionDist.length];
@@ -42,6 +44,7 @@ public class ReparsingHelper {
 
 
         final ImmutableList<Integer> pronounFix = FixerNew.pronounFixer(query, agreedOptions, optionDist);
+                //FixerNew.pronounFixer2(query, agreedOptions, nBestList);
         final ImmutableList<Integer> subspanFix = FixerNew.subspanFixer(query, agreedOptions, optionDist);
         final ImmutableList<Integer> appositiveFix = FixerNew.appositiveFixer(sentence, query, agreedOptions, optionDist);
         final ImmutableList<Integer> relativeFix = FixerNew.relativeFixer(sentence, query, agreedOptions, optionDist);
@@ -73,6 +76,7 @@ public class ReparsingHelper {
 
     public static ImmutableSet<Constraint> getConstraints(final ScoredQuery<QAStructureSurfaceForm> query,
                                                           final int[] optionDist,
+                                                          final NBestList nBestList,
                                                           final ReparsingConfig config) {
         final Set<Constraint> constraints = new HashSet<>();
         final int numQA = query.getQAPairSurfaceForms().size();
@@ -100,6 +104,7 @@ public class ReparsingHelper {
                 continue;
             }
             final int votes = numVotes.get(opId1);
+            //final double votes = (numVotes.get(opId1) * 0.2 + getNBestPrior(query, opId1, nBestList)) * 2.5;
             final QAStructureSurfaceForm qa = query.getQAPairSurfaceForms().get(opId1);
             final ImmutableList<Integer> argIds1 = qa.getAnswerStructures().stream()
                     .flatMap(ans -> ans.argumentIndices.stream())
@@ -164,5 +169,26 @@ public class ReparsingHelper {
             }
         }
         return ImmutableSet.copyOf(constraints);
+    }
+
+    public static double getNBestPrior(final ScoredQuery<QAStructureSurfaceForm> query,
+                                       final int optionId,
+                                       final NBestList nBestList) {
+        final QAStructureSurfaceForm qa = query.getQAPairSurfaceForms().get(optionId);
+        final ImmutableList<Integer> argIds = qa.getAnswerStructures().stream()
+                .flatMap(astr -> astr.argumentIndices.stream())
+                .collect(GuavaCollectors.toImmutableList());
+        final double scoreNorm = nBestList.getParses().stream().mapToDouble(p -> p.score).sum();
+        return nBestList.getParses()
+                .stream()
+                .filter(parse -> qa.getQuestionStructures().stream()
+                        .anyMatch(qstr -> {
+                            final int headId = qstr.targetPrepositionIndex >= 0 ? qstr.targetPrepositionIndex : qstr.predicateIndex;
+                            return parse.dependencies.stream()
+                                    .filter(dep -> dep.getHead() == headId && dep.getArgument() != dep.getHead())
+                                    .anyMatch(dep -> argIds.contains(dep.getArgument()));
+                        }))
+                .mapToDouble(parse -> parse.score)
+                .sum() / scoreNorm;
     }
 }

@@ -109,8 +109,9 @@ public class TestReparsing {
                     continue;
                 }
                 ///// Heuristics and constraints.
-                final int[] newOptionDist = ReparsingHelper.getNewOptionDist(sentence, query, matchedResponses, config);
-                constraints.addAll(ReparsingHelper.getConstraints(query, newOptionDist, config));
+                final int[] newOptionDist = ReparsingHelper.getNewOptionDist(sentence, query, matchedResponses,
+                        nBestList, config);
+                constraints.addAll(ReparsingHelper.getConstraints(query, newOptionDist, nBestList, config));
             }
             if (constraints.isEmpty()) {
                 avgReparsed.add(baselineF1);

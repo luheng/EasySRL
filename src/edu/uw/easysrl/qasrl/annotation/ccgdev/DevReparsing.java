@@ -86,8 +86,12 @@ public class DevReparsing {
                 }
 
                 ///// Heuristics
-                final int[] newOptionDist = ReparsingHelper.getNewOptionDist(sentence, query, matchedResponses, config);
-                final ImmutableSet<Constraint> constraints = ReparsingHelper.getConstraints(query, newOptionDist, config);
+                final int[] optionDist = new int[query.getOptions().size()];
+                matchedResponses.forEach(response -> response.stream().forEach(r -> optionDist[r] ++));
+                final int[] newOptionDist = ReparsingHelper.getNewOptionDist(sentence, query, matchedResponses,
+                        nbestLists.get(sentenceId), config);
+                final ImmutableSet<Constraint> constraints = ReparsingHelper.getConstraints(query, newOptionDist,
+                        nbestLists.get(sentenceId), config);
 
                 history.addEntry(sentenceId, query, parser.getUserOptions(query, newOptionDist), constraints);
                 if (history.lastIsWorsened() /*&& !fixType.equals("None") */) {
@@ -95,6 +99,13 @@ public class DevReparsing {
                     //System.out.println(query.toString(sentence, 'G', parser.getGoldOptions(query), '*', optionDist));
                     //System.out.println("Fixed:\t" + fixType);
                     //System.out.println(query.toString(sentence, 'G', parser.getGoldOptions(query), '*', newOptionDist));
+                    for (int i = 0; i < query.getQAPairSurfaceForms().size(); i++) {
+                        System.out.println(String.format("%.3f\t%.3f\t%s",
+                                0.2 * optionDist[i],
+                                ReparsingHelper.getNBestPrior(query, i, nbestLists.get(sentenceId)),
+                                query.getOptions().get(i)));
+                    }
+                    System.out.println();
                 }
             }
         }
