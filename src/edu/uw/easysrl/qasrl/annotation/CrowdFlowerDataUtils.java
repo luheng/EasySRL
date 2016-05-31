@@ -197,6 +197,28 @@ public class CrowdFlowerDataUtils {
         return sentenceIds.stream().distinct().sorted().collect(GuavaCollectors.toImmutableList());
     }
 
+    public static Map<Integer, List<AlignedAnnotation>> loadTestAnnotations(ImmutableList<String> fileNames) {
+        Map<Integer, List<AlignedAnnotation>> sentenceToAnnotations;
+        List<AlignedAnnotation> annotationList = new ArrayList<>();
+        try {
+            for (String fileName : fileNames) {
+                annotationList.addAll(CrowdFlowerDataReader.readAggregatedTestAnnotationFromFile(fileName));
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+        sentenceToAnnotations = new HashMap<>();
+        annotationList.forEach(annotation -> {
+                int sentId = annotation.sentenceId;
+                if (!sentenceToAnnotations.containsKey(sentId)) {
+                    sentenceToAnnotations.put(sentId, new ArrayList<>());
+                }
+                sentenceToAnnotations.get(sentId).add(annotation);
+            });
+        return sentenceToAnnotations;
+    }
+
     public static Map<Integer, List<AlignedAnnotation>> loadAnnotations(ImmutableList<String> fileNames) {
         Map<Integer, List<AlignedAnnotation>> sentenceToAnnotations;
         List<AlignedAnnotation> annotationList = new ArrayList<>();

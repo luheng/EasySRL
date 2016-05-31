@@ -34,16 +34,69 @@ public class CoreArgsTestQuestionGeneratorBioinfer {
         queryPruningParameters.minPromptConfidence = 0.1;
     }
 
-    private static final String annotationFile = CrowdFlowerDataUtils.cfBioinferCuratedAnnotations;
-
-    public static void generateTestQuestions() throws IOException {
+    public static void generateCrowdsourcedTestQuestions() throws IOException {
         BioinferCCGCorpus corpus = BioinferCCGCorpus.readDev().get();
         Map<Integer, NBestList> nbestLists = NBestList.loadNBestListsFromFile("bioinfer.dev.100best.out", 100).get();
 
         final List<String> autoTestQuestions = new ArrayList<>();
 
         Map<Integer, List<AlignedAnnotation>> allAnnotations = CrowdFlowerDataUtils
-            .loadAnnotations(ImmutableList.of(annotationFile));
+            .loadAnnotations(ImmutableList.of(CrowdFlowerDataUtils.cfBioinferDevTrialAnnotations));
+
+        int numAnnotations = 0, numMatchedAnnotations = 0;
+        for (int sid : allAnnotations.keySet()) {
+            final NBestList nbestList = nbestLists.get(sid);
+
+            final ImmutableList<String> sentence = corpus.getSentence(sid);
+            final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queryList = QuestionGenerationPipeline
+                .coreArgQGPipeline
+                .setQueryPruningParameters(queryPruningParameters)
+                .generateAllQueries(sid, nbestList);
+            final List<AlignedAnnotation> annotations = allAnnotations.get(sid);
+
+            for (ScoredQuery<QAStructureSurfaceForm> query : queryList) {
+                final int predId = query.getPredicateId().getAsInt();
+                final Set<QuestionStructure> qstrs = query.getQAPairSurfaceForms().stream()
+                        .flatMap(qa -> qa.getQuestionStructures().stream())
+                        .distinct()
+                        .collect(toSet());
+
+                for (int annotId = 0; annotId < annotations.size(); annotId++) {
+                    final AlignedAnnotation annot = annotations.get(annotId);
+                    if (annot.predicateId == predId
+                            && qstrs.stream().anyMatch(qstr -> qstr.category == annot.predicateCategory
+                            && qstr.targetArgNum == annot.argumentNumber)) {
+                        HashMultiset<ImmutableList<Integer>> responses =
+                                HashMultiset.create(AnnotationUtils.getAllUserResponses(query, annot));
+
+                        if (responses.elementSet().size() == 1) {
+                            numMatchedAnnotations++;
+
+                            String reason = "Based on unanimous agreement of 5 annotators.";
+                            ImmutableList<Integer> goldResponse = responses.stream().findFirst().get(); // only one element; the unanimous choices
+                            String queryStr = getTestQuestionString(sentence, query, annot, goldResponse, reason);
+                            autoTestQuestions.add(queryStr);
+                        }
+                    }
+                }
+            }
+            numAnnotations += annotations.size();
+        }
+
+        System.out.println("Num annotations:\t" + numAnnotations);
+        System.out.println("Num matched annotations:\t" + numMatchedAnnotations);
+
+        autoTestQuestions.forEach(System.out::println);
+    }
+
+    public static void generateCuratedTestQuestions() throws IOException {
+        BioinferCCGCorpus corpus = BioinferCCGCorpus.readDev().get();
+        Map<Integer, NBestList> nbestLists = NBestList.loadNBestListsFromFile("bioinfer.dev.100best.out", 100).get();
+
+        final List<String> autoTestQuestions = new ArrayList<>();
+
+        Map<Integer, List<AlignedAnnotation>> allAnnotations = CrowdFlowerDataUtils
+            .loadAnnotations(ImmutableList.of(CrowdFlowerDataUtils.cfBioinferCuratedAnnotations));
 
         int numAnnotations = 0, numMatchedAnnotations = 0;
         for (int sid : allAnnotations.keySet()) {
@@ -107,6 +160,6 @@ public class CoreArgsTestQuestionGeneratorBioinfer {
     }
 
     public static void main(String[] args) throws IOException {
-        generateTestQuestions();
+        generateCrowdsourcedTestQuestions();
     }
 }

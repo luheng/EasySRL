@@ -42,6 +42,9 @@ public class AlignedAnnotation extends RecordedAnnotation {
         if (answerOptions == null) {
             answerOptions = annotation.optionStrings;
         }
+        if (goldOptionIds == null) {
+            goldOptionIds = annotation.goldOptionIds;
+        }
         // Some annotation records may contain duplicates.
         //if (this.isSameQuestionAs(annotation) && !annotatorToAnswerIds.containsKey(annotator)) {
         if (!annotatorToAnswerIds.containsKey(annotator)) {

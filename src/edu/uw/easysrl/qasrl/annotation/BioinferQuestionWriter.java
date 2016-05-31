@@ -39,10 +39,15 @@ public class BioinferQuestionWriter {
     static final int maxNumQueriesPerFile = 500;
 
     private static final String csvOutputFilePrefix =
-            "./Crowdflower_temp/bioinfer_dev_100best";
+        // "./Crowdflower_temp/bioinfer_dev_100best";
+        // "./Crowdflower_temp/bioinfer_test_100best";
+        // "./Crowdflower_temp/bioinfer_upwork_interview_100best";
+        "./Crowdflower_temp/bioinfer_upwork_run_100best";
 
     private static final String[] reviewedTestQuestionFiles = new String[] {
-        "./Crowdflower_unannotated/test_questions/bioinfer_test_1to27.tsv",
+        // "./Crowdflower_unannotated/test_questions/bioinfer_test_1to27.tsv"
+        // "./Crowdflower_unannotated/test_questions/bioinfer_test_questions_for_test_run.tsv"
+        "./Crowdflower_unannotated/test_questions/bioinfer_test_upwork_test_run.tsv"
     };
 
     private static QueryPruningParameters queryPruningParameters;
