@@ -59,14 +59,11 @@ public class TestDataWriter {
     private static HITLParsingParameters reparsingParameters;
     static {
         reparsingParameters = new HITLParsingParameters();
-        reparsingParameters.jeopardyQuestionMinAgreement = 1;
         reparsingParameters.positiveConstraintMinAgreement = 3;
         reparsingParameters.negativeConstraintMaxAgreement = 1;
-        reparsingParameters.skipPronounEvidence = false;
-        reparsingParameters.jeopardyQuestionWeight = 1.0;
         reparsingParameters.oraclePenaltyWeight = 5.0;
         reparsingParameters.attachmentPenaltyWeight = 1.5;
-        reparsingParameters.supertagPenaltyWeight = 0.0;
+        reparsingParameters.supertagPenaltyWeight = 1.5;
     }
 
     public static void main(String[] args) {
