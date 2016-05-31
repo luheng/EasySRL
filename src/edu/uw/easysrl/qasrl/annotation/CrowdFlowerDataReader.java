@@ -20,6 +20,108 @@ import java.util.stream.IntStream;
  */
 public class CrowdFlowerDataReader {
 
+    public static ImmutableList<AlignedAnnotation> readAggregatedTestAnnotationFromFile(String filePath) throws IOException {
+        final Iterable<CSVRecord> records = CSVFormat.DEFAULT.withHeader().parse(new FileReader(filePath));
+        List<RecordedAnnotation> annotations = new ArrayList<>();
+        for (CSVRecord record : records) {
+            // Skip non-gold (non-test questions).
+            if (!(record.get("_golden").equalsIgnoreCase("true") ||
+                 (record.isMapped("orig_golden") && record.get("orig_golden").equalsIgnoreCase("true")))) {
+                continue;
+            }
+            RecordedAnnotation annotation = new RecordedAnnotation();
+            annotation.iterationId = -1; // unknown
+            annotation.sentenceId = Integer.parseInt(record.get("sent_id"));
+            annotation.sentenceString = record.get("sentence");
+
+            annotation.queryId = Integer.parseInt(record.get("query_id"));
+            annotation.queryPrompt = record.isMapped("question") ? record.get("question") : record.get("query_prompt");
+
+            String[] options = record.isMapped("answers") ?
+                    record.get("answers").split("\n") :
+                    record.get("options").split("\n");
+            annotation.optionStrings = ImmutableList.copyOf(options)
+                    .stream()
+                    .map(String::trim)
+                    .collect(Collectors.toList());
+            annotation.userOptions = ImmutableList.copyOf(record.get("choice").split("\n"))
+                    .stream()
+                    .map(String::trim)
+                    .collect(GuavaCollectors.toImmutableList());
+            ImmutableList<String> goldOptions = ImmutableList.copyOf(record.get("choice_gold").split("\n"))
+                .stream()
+                .map(String::trim)
+                .collect(GuavaCollectors.toImmutableList());
+            annotation.goldOptionIds = IntStream.range(0, annotation.optionStrings.size())
+                .boxed()
+                .filter(id -> goldOptions.contains(annotation.optionStrings.get(id)))
+                .collect(GuavaCollectors.toImmutableList());
+            annotation.userOptionIds = IntStream.range(0, annotation.optionStrings.size())
+                    .boxed()
+                    .filter(id -> annotation.userOptions.contains(annotation.optionStrings.get(id)))
+                    .collect(GuavaCollectors.toImmutableList());
+
+            annotation.predicateId = Integer.parseInt(record.get("query_key").split("=")[1]);
+            // annotation.predicateString = record.get("pred_head");
+
+            if (annotation.userOptionIds.size() == 0) {
+                System.err.print("Unannotated:\t" + record);
+            }
+            annotation.comment = record.get("comment");
+
+            // Crowdflower stuff
+            annotation.annotatorId = record.get("_worker_id");
+            annotation.trust = Double.parseDouble(record.get("_trust"));
+            annotations.add(annotation);
+        }
+        System.out.println(String.format("Read %d annotation records from %s.", annotations.size(), filePath));
+
+        // Align and aggregated annotations.
+        List<AlignedAnnotation> alignedAnnotations = AlignedAnnotation.getAlignedAnnotations(annotations);
+        System.out.println("Getting " + alignedAnnotations.size() + " aligned annotations.");
+        int maxNumAnnotators = alignedAnnotations.stream()
+                .map(AlignedAnnotation::getNumAnnotated)
+                .max(Integer::compare).get();
+        int[] agreementCount = new int[maxNumAnnotators + 1],
+              strictAgreementCount = new int[maxNumAnnotators + 1];
+        Arrays.fill(agreementCount, 0);
+        Arrays.fill(strictAgreementCount, 0);
+
+        alignedAnnotations.forEach(annotation -> {
+            //if (annotation.getNumAnnotated() != 5) {
+            //    System.err.println(annotation);
+            //}
+            int maxAgree = 0;
+            for (int agr : annotation.answerDist) {
+                maxAgree = Math.max(maxAgree, agr);
+            }
+            agreementCount[maxAgree] ++;
+            final int strictAgreement = annotation.annotatorToAnswerIds.values().stream()
+                    .collect(Collectors.groupingBy(Function.identity()))
+                    .values().stream()
+                    .map(Collection::size)
+                    .max(Integer::compare).get();
+            strictAgreementCount[strictAgreement] ++;
+        });
+
+        System.out.println("Agreement:");
+        for (int i = 0; i < agreementCount.length; i++) {
+            if (agreementCount[i] > 0) {
+                System.out.println(String.format("%d\t%d\t%.2f%%", i, agreementCount[i],
+                        100.0 * agreementCount[i] / alignedAnnotations.size()));
+            }
+        }
+        System.out.println("Strict Agreement:");
+        for (int i = 0; i < strictAgreementCount.length; i++) {
+            if (strictAgreementCount[i] > 0) {
+                System.out.println(String.format("%d\t%d\t%.2f%%", i, strictAgreementCount[i],
+                        100.0 * strictAgreementCount[i] / alignedAnnotations.size()));
+            }
+        }
+
+        return ImmutableList.copyOf(alignedAnnotations);
+    }
+
     public static ImmutableList<AlignedAnnotation> readAggregatedAnnotationFromFile(String filePath) throws IOException {
         final Iterable<CSVRecord> records = CSVFormat.DEFAULT.withHeader().parse(new FileReader(filePath));
         List<RecordedAnnotation> annotations = new ArrayList<>();

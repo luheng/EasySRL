@@ -42,6 +42,9 @@ public class CrowdFlowerDataUtils {
     public static final String cfRound6CoreArgsAnnotationFile = "./Crowdflower_data/f912675.csv";
     public static final String cfRound5CoreArgsRerun = "./Crowdflower_data/f913098.csv";
 
+    public static final String cfBioinferCuratedAnnotations = "./Crowdflower_bioinfer/f913083.csv";
+    public static final String cfBioinferDevTrialAnnotations = "./Crowdflower_bioinfer/f913416.csv";
+
     public static final ImmutableList<String> allCfAnnotationFiles = ImmutableList.of(
             cfRound1AnnotationFile,
             cfRound2AnnotationFile,
@@ -54,6 +57,8 @@ public class CrowdFlowerDataUtils {
             cfRound1And2CoreArgsRerun,
             cfRound5CoreArgsRerun
        //     cfRound6CoreArgsAnnotationFile
+       //     cfBioinferCuratedAnnotations
+       //     cfBioinferDevTrialAnnotations
     );
 
     // Sentences that happened to appear in instructions ...
@@ -190,6 +195,28 @@ public class CrowdFlowerDataUtils {
         }
         reader.close();
         return sentenceIds.stream().distinct().sorted().collect(GuavaCollectors.toImmutableList());
+    }
+
+    public static Map<Integer, List<AlignedAnnotation>> loadTestAnnotations(ImmutableList<String> fileNames) {
+        Map<Integer, List<AlignedAnnotation>> sentenceToAnnotations;
+        List<AlignedAnnotation> annotationList = new ArrayList<>();
+        try {
+            for (String fileName : fileNames) {
+                annotationList.addAll(CrowdFlowerDataReader.readAggregatedTestAnnotationFromFile(fileName));
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+        sentenceToAnnotations = new HashMap<>();
+        annotationList.forEach(annotation -> {
+                int sentId = annotation.sentenceId;
+                if (!sentenceToAnnotations.containsKey(sentId)) {
+                    sentenceToAnnotations.put(sentId, new ArrayList<>());
+                }
+                sentenceToAnnotations.get(sentId).add(annotation);
+            });
+        return sentenceToAnnotations;
     }
 
     public static Map<Integer, List<AlignedAnnotation>> loadAnnotations(ImmutableList<String> fileNames) {
