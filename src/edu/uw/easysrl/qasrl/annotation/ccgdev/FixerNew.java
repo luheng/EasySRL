@@ -61,10 +61,7 @@ public class FixerNew {
             }
             final QAStructureSurfaceForm qa2 = query.getQAPairSurfaceForms().get(opId2);
             final String op2 = query.getOptions().get(opId2).toLowerCase();
-            final int dist2 = qa2.getAnswerStructures().stream()
-                    .flatMap(ans -> ans.argumentIndices.stream())
-                    .map(argId -> Math.abs(argId - headId))
-                    .min(Integer::compare).get();
+            final int dist2 = Math.abs(qa2.getAnswerStructures().get(0).argumentIndices.get(0) - headId);
             if (PronounList.nonPossessivePronouns.contains(op2) && dist2 < minOptionDist) {
                 return ImmutableList.of(opId2);
             }
@@ -109,7 +106,6 @@ public class FixerNew {
                                                          final ImmutableList<Integer> options,
                                                          final int[] optionDist) {
         final int numQAs = query.getQAPairSurfaceForms().size();
-        final int headId = query.getPredicateId().getAsInt();
         final String sentenceStr = TextGenerationHelper.renderString(sentence).toLowerCase();
         final Set<Integer> newOptions = new HashSet<>();
         for (int opId1 : options) {
@@ -121,30 +117,16 @@ public class FixerNew {
             if (op1.contains(" of ")) {
                 continue;
             }
-            final int minArgId1 = qa1.getAnswerStructures().stream()
-                    .flatMap(ans -> ans.argumentIndices.stream())
-                    .min(Integer::compare).get();
-            final int maxArgId1 = qa1.getAnswerStructures().stream()
-                    .flatMap(ans -> ans.argumentIndices.stream())
-                    .max(Integer::compare).get();
             for (int opId2 : IntStream.range(0, numQAs).toArray()) {
                 if (opId1 == opId2 || optionDist[opId2] < minVotesToFix) {
                     continue;
                 }
                 final QAStructureSurfaceForm qa2 = query.getQAPairSurfaceForms().get(opId2);
                 final String op2 = qa2.getAnswer().toLowerCase();
-                final int minArgId2 = qa2.getAnswerStructures().stream()
-                        .flatMap(ans -> ans.argumentIndices.stream())
-                        .min(Integer::compare).get();
-                final int maxArgId2 = qa2.getAnswerStructures().stream()
-                        .flatMap(ans -> ans.argumentIndices.stream())
-                        .min(Integer::compare).get();
-                final boolean commaBetweenArgAndPred = IntStream.range(Math.max(maxArgId1, maxArgId2), headId)
-                        .mapToObj(sentence::get).anyMatch(","::equals);
                 if ((sentenceStr.contains(op1 + ", " + op2) || sentenceStr.contains(op1 + "., " + op2))
-                        && !query.getQAPairSurfaceForms().get(opId1).getAnswer().equals(op1)
-                        && Determiners.determinerList.stream().anyMatch(d -> op2.startsWith(d + " "))
-                        && commaBetweenArgAndPred) {
+                        && (sentenceStr.contains(op2 + ",") || sentenceStr.contains(op2 + ".,"))
+                        && !qa1.getAnswer().equals(op1)
+                        && Determiners.determinerList.stream().anyMatch(d -> op2.startsWith(d + " "))) {
                     newOptions.add(opId2);
                 }
             }
@@ -192,59 +174,16 @@ public class FixerNew {
                         .filter(","::equals)
                         .count();
                 final boolean trailingWhoThat = (sentenceStr.contains(op2 + " who ")
-                        || sentenceStr.contains(op2 + " that ")) && Math.abs(headId - maxArgId2) <= 3;
-                final boolean trailingPredicate = maxArgId2 + 1 == headId && query.getQAPairSurfaceForms().stream()
-                        .flatMap(qa -> qa.getQuestionStructures().stream())
-                        .anyMatch(q -> q.category.isFunctionInto(Category.valueOf("S[pss]"))
-                                || q.category.isFunctionInto(Category.valueOf("S[ng]")));
+                        || sentenceStr.contains(op2 + " that "))
+                        && Math.abs(headId - maxArgId2) <= 3;
                 if ((copulaBetweenArgs == 1 || commaBetweenArg1Arg2 == 1)
                         && Determiners.determinerList.stream().anyMatch(d -> op2.startsWith(d + " "))
-                        && (trailingWhoThat || trailingPredicate)) {
+                        && trailingWhoThat) {
                     return ImmutableList.of(opId2);
                 }
             }
         }
         return ImmutableList.of();
-    }
-
-    @Deprecated
-    public static ImmutableList<Integer> conjunctionFixer(final ImmutableList<String> sentence,
-                                                          final ScoredQuery<QAStructureSurfaceForm> query,
-                                                          final ImmutableList<Integer> options,
-                                                          final int[] optionDist) {
-        final int numQAs = query.getQAPairSurfaceForms().size();
-        final int predicateId = query.getPredicateId().getAsInt();
-        final String sentenceStr = TextGenerationHelper.renderString(sentence).toLowerCase();
-        final Set<Integer> newOptions = new HashSet<>();
-        for (int opId1 : options) {
-            if (opId1 >= numQAs) {
-                continue;
-            }
-            final QAStructureSurfaceForm qa1 = query.getQAPairSurfaceForms().get(opId1);
-            final String op1 = qa1.getAnswer().toLowerCase();
-            final int argId1 = qa1.getAnswerStructures().stream().flatMap(ans -> ans.argumentIndices.stream())
-                    .max(Integer::compare).get();
-            for (int opId2 : IntStream.range(0, numQAs).toArray()) {
-                final QAStructureSurfaceForm qa2 = query.getQAPairSurfaceForms().get(opId2);
-                final String op2 = qa2.getAnswer().toLowerCase();
-                if (opId1 == opId2 || optionDist[opId2] == 0 || op1.contains(op2) || op2.contains(op1)) {
-                    continue;
-                }
-                final int minArgId2 = qa2.getAnswerStructures().stream().flatMap(ans -> ans.argumentIndices.stream())
-                        .min(Integer::compare).get();
-                final String inBetween = IntStream.range(argId1, minArgId2)
-                        .mapToObj(sentence::get)
-                        .collect(Collectors.joining(" "));
-                if (Stream.of(" and ", " or ", " as well as ").anyMatch(inBetween::contains)) {
-                    newOptions.add(numQAs);
-                }
-            }
-        }
-        if (newOptions.isEmpty()) {
-            return ImmutableList.of();
-        }
-        newOptions.addAll(options);
-        return newOptions.stream().distinct().sorted().collect(GuavaCollectors.toImmutableList());
     }
 }
 

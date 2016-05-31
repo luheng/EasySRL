@@ -6,6 +6,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multiset;
 import edu.uw.easysrl.qasrl.model.Constraint;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
+import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.util.GuavaCollectors;
 
@@ -44,7 +45,7 @@ public class ReparsingHelper {
         final ImmutableList<Integer> subspanFix = FixerNew.subspanFixer(query, agreedOptions, optionDist);
         final ImmutableList<Integer> appositiveFix = FixerNew.appositiveFixer(sentence, query, agreedOptions, optionDist);
         final ImmutableList<Integer> relativeFix = FixerNew.relativeFixer(sentence, query, agreedOptions, optionDist);
-        final ImmutableList<Integer> conjunctionFix = FixerNew.conjunctionFixer(sentence, query, agreedOptions, optionDist);
+        //final ImmutableList<Integer> conjunctionFix = FixerNew.conjunctionFixer(sentence, query, agreedOptions, optionDist);
         String fixType = "None";
         List<Integer> fixedResopnse = null;
         if (config.fixPronouns && !pronounFix.isEmpty()) {
@@ -59,9 +60,6 @@ public class ReparsingHelper {
         } else if (config.fixAppositves && !appositiveFix.isEmpty()) {
             fixedResopnse = appositiveFix;
             fixType = "appositive";
-        } else if (config.fixConjunctions && !conjunctionFix.isEmpty()) {
-            fixedResopnse = conjunctionFix;
-            fixType = "conjunction";
         }
         if (fixedResopnse != null) {
             fixedResopnse.stream().forEach(op -> newOptionDist[op] += config.positiveConstraintMinAgreement);
@@ -78,12 +76,15 @@ public class ReparsingHelper {
                                                           final ReparsingConfig config) {
         final Set<Constraint> constraints = new HashSet<>();
         final int numQA = query.getQAPairSurfaceForms().size();
+        final ImmutableList<QuestionStructure> questionStructures = query.getQAPairSurfaceForms()
+                .stream()
+                .flatMap(qa -> qa.getQuestionStructures().stream())
+                .distinct()
+                .collect(GuavaCollectors.toImmutableList());
 
         if (IntStream.range(0, numQA).map(i -> optionDist[i]).sum() <= config.negativeConstraintMaxAgreement) {
-            query.getQAPairSurfaceForms().stream()
-                    .flatMap(qa -> qa.getQuestionStructures().stream())
-                    .forEach(qstr -> constraints.add(new Constraint
-                            .SupertagConstraint(qstr.predicateIndex, qstr.category, false, config.supertagPenalty)));
+            questionStructures.forEach(qstr -> constraints.add(new Constraint.SupertagConstraint(qstr.predicateIndex,
+                    qstr.category, false, config.supertagPenalty)));
             return ImmutableSet.copyOf(constraints);
         }
 
@@ -94,18 +95,14 @@ public class ReparsingHelper {
                 .collect(GuavaCollectors.toImmutableList());
 
         Set<Integer> skipOps = new HashSet<>();
-        final int headId = query.getPrepositionIndex().isPresent() ?
-                query.getPrepositionIndex().getAsInt() : query.getPredicateId().getAsInt();
-
         for (int opId1 : optionOrder) {
             if (skipOps.contains(opId1)) {
                 continue;
             }
             final int votes = numVotes.get(opId1);
             final QAStructureSurfaceForm qa = query.getQAPairSurfaceForms().get(opId1);
-            final ImmutableList<Integer> argIds = qa.getAnswerStructures().stream()
+            final ImmutableList<Integer> argIds1 = qa.getAnswerStructures().stream()
                     .flatMap(ans -> ans.argumentIndices.stream())
-                    .filter(argId -> argId != headId)
                     .distinct().sorted()
                     .collect(GuavaCollectors.toImmutableList());
             final String opStr = qa.getAnswer().toLowerCase();
@@ -118,16 +115,25 @@ public class ReparsingHelper {
                         final QAStructureSurfaceForm qa2 = query.getQAPairSurfaceForms().get(opId2);
                         final String opStr2 = qa2.getAnswer().toLowerCase();
                         final int votes2 = numVotes.get(opId2);
+                        final ImmutableList<Integer> argIds2 = qa2.getAnswerStructures().stream()
+                                .flatMap(ans -> ans.argumentIndices.stream())
+                                .distinct().sorted()
+                                .collect(GuavaCollectors.toImmutableList());
+
                         if (votes + votes2 >= config.positiveConstraintMinAgreement && votes > 0 && votes2 > 0) {
-                            // TODO: + or
                             if (opStr.startsWith(opStr2 + " and ") || opStr.endsWith(" and " + opStr2)
                                     || opStr2.endsWith(" and " + opStr) || opStr2.startsWith(opStr + " and ")
                                     || opStr.endsWith(" of " + opStr2) || opStr2.endsWith(" of " + opStr)) {
-                                final ImmutableList<Integer> concatArgs = Stream
-                                        .concat(argIds.stream(), qa2.getArgumentIndices().stream())
-                                        .distinct().sorted().collect(GuavaCollectors.toImmutableList());
-                                constraints.add(new Constraint.DisjunctiveAttachmentConstraint(headId, concatArgs, true,
-                                        config.positiveConstraintPenalty));
+                                for (QuestionStructure qstr : questionStructures) {
+                                    final int headId = qstr.targetPrepositionIndex >= 0 ? qstr.targetPrepositionIndex
+                                            : qstr.predicateIndex;
+                                    final ImmutableList<Integer> concatArgs = Stream
+                                            .concat(argIds1.stream(), argIds2.stream())
+                                            .filter(argId -> argId != headId)
+                                            .distinct().sorted().collect(GuavaCollectors.toImmutableList());
+                                    constraints.add(new Constraint.DisjunctiveAttachmentConstraint(headId, concatArgs,
+                                            true, config.positiveConstraintPenalty));
+                                }
                                 hasDisjunctiveConstraints = true;
                                 skipOps.add(opId2);
                             }
@@ -138,15 +144,23 @@ public class ReparsingHelper {
                     continue;
                 }
             }
-            if (votes >= config.positiveConstraintMinAgreement) {
-                if (argIds.size() == 1) {
-                    constraints.add(new Constraint.AttachmentConstraint(headId, argIds.get(0), true, config.positiveConstraintPenalty));
-                } else {
-                    constraints.add(new Constraint.DisjunctiveAttachmentConstraint(headId, argIds, true, config.positiveConstraintPenalty));
+            for (QuestionStructure qstr : questionStructures) {
+                final int headId = qstr.targetPrepositionIndex >= 0 ? qstr.targetPrepositionIndex : qstr.predicateIndex;
+                final ImmutableList<Integer> filteredArgs = argIds1.stream()
+                        .filter(argId -> argId != headId)
+                        .collect(GuavaCollectors.toImmutableList());
+                if (votes >= config.positiveConstraintMinAgreement) {
+                    if (filteredArgs.size() == 1) {
+                        constraints.add(new Constraint.AttachmentConstraint(headId, filteredArgs.get(0), true,
+                                config.positiveConstraintPenalty));
+                    } else if (filteredArgs.size() > 1) {
+                        constraints.add(new Constraint.DisjunctiveAttachmentConstraint(headId, filteredArgs, true,
+                                config.positiveConstraintPenalty));
+                    }
+                } else if (votes <= config.negativeConstraintMaxAgreement) {
+                    filteredArgs.forEach(argId -> constraints.add(new Constraint.AttachmentConstraint(headId, argId,
+                            false, config.negativeConstraintPenalty)));
                 }
-            } else if (votes <= config.negativeConstraintMaxAgreement && !skipOps.contains(opId1)) {
-                argIds.forEach(argId ->
-                        constraints.add(new Constraint.AttachmentConstraint(headId, argId, false, config.negativeConstraintPenalty)));
             }
         }
         return ImmutableSet.copyOf(constraints);

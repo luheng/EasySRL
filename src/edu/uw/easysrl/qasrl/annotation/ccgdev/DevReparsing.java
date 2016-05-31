@@ -7,6 +7,7 @@ import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.ParseData;
 import edu.uw.easysrl.qasrl.ParseDataLoader;
 import edu.uw.easysrl.qasrl.annotation.AnnotatedQuery;
+import edu.uw.easysrl.qasrl.annotation.CrowdFlowerDataUtils;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
 import edu.uw.easysrl.qasrl.experiments.ReparsingHistory;
 import edu.uw.easysrl.qasrl.model.*;
@@ -51,13 +52,14 @@ public class DevReparsing {
         System.out.println(config.toString());
         int numMatchedAnnotations = 0;
 
-        for (int sentenceId : parser.getAllSentenceIds()) {
+        for (int sentenceId : CrowdFlowerDataUtils.getNewCoreArgAnnotatedSentenceIds()) {
         //for (int sentenceId : annotations.keySet()) {
             history.addSentence(sentenceId);
 
             final ImmutableList<String> sentence = parser.getSentence(sentenceId);
             final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries =
-                    parser.getAllCoreArgQueriesForSentence(sentenceId);
+                   // parser.getAllCoreArgQueriesForSentence(sentenceId);
+                    parser.getNewCoreArgQueriesForSentence(sentenceId);
             if (queries == null || queries.isEmpty() || !annotations.containsKey(sentenceId)) {
                 continue;
             }
@@ -87,13 +89,12 @@ public class DevReparsing {
                 final int[] newOptionDist = ReparsingHelper.getNewOptionDist(sentence, query, matchedResponses, config);
                 final ImmutableSet<Constraint> constraints = ReparsingHelper.getConstraints(query, newOptionDist, config);
 
-                //final ImmutableSet<Constraint> constraints = parser.getConstraints(query, newOptionDist);
                 history.addEntry(sentenceId, query, parser.getUserOptions(query, newOptionDist), constraints);
                 if (history.lastIsWorsened() /*&& !fixType.equals("None") */) {
                     history.printLatestHistory();
                     //System.out.println(query.toString(sentence, 'G', parser.getGoldOptions(query), '*', optionDist));
                     //System.out.println("Fixed:\t" + fixType);
-                    System.out.println(query.toString(sentence, 'G', parser.getGoldOptions(query), '*', newOptionDist));
+                    //System.out.println(query.toString(sentence, 'G', parser.getGoldOptions(query), '*', newOptionDist));
                 }
             }
         }

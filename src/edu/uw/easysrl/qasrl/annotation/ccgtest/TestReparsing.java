@@ -38,15 +38,16 @@ public class TestReparsing {
         queryPruningParameters.minPromptConfidence = 0.1;
     }
 
-    private static final ParseData data = //ParseDataLoader.loadFromTestPool(true).get();
-            ParseDataLoader.loadFromDevPool().get();
+    private static final ParseData data = ParseDataLoader.loadFromTestPool(true).get();
+                                        //ParseDataLoader.loadFromDevPool().get();
     private static final Map<Integer, NBestList> nbestLists = NBestList
-            //.loadNBestListsFromFile("parses.tagged.test.gold.100best.new.out", 100).get();
-            .loadNBestListsFromFile("parses.tagged.dev.100best.out", 100).get();
+            .loadNBestListsFromFile("parses.tagged.test.gold.100best.new.out", 100).get();
+            //.loadNBestListsFromFile("parses.tagged.dev.100best.out", 100).get();
     private static final HITLParser parser = new HITLParser(data, nbestLists);
     private static final ReparsingHistory history =  new ReparsingHistory(parser);
-    private static final Map<Integer, List<AnnotatedQuery>> annotations =//AnnotationFileLoader.loadTest();
-            AnnotationFileLoader.loadDev();
+    private static final Map<Integer, List<AnnotatedQuery>> annotations =
+            AnnotationFileLoader.loadTest();
+            //AnnotationFileLoader.loadDev();
 
     public static void main(String[] args) {
         parser.setQueryPruningParameters(queryPruningParameters);
@@ -79,8 +80,8 @@ public class TestReparsing {
             avgBaseline.add(baselineF1);
             avgUnlabeledBaseline.add(unlabeledBaselineF1);
             final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries =
-                        //parser.getNewCoreArgQueriesForSentence(sentenceId);
-                        parser.getAllCoreArgQueriesForSentence(sentenceId);
+                        parser.getNewCoreArgQueriesForSentence(sentenceId);
+                        //parser.getAllCoreArgQueriesForSentence(sentenceId);
             if (queries == null || queries.isEmpty() || !annotations.containsKey(sentenceId)) {
                 avgReparsed.add(baselineF1);
                 avgReranked.add(baselineF1);
