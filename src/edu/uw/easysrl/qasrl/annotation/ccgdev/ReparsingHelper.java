@@ -239,8 +239,8 @@ public class ReparsingHelper {
                     }
                     if (config.fixSubspans
                             && rel.equals("subspan")  && votes + votes2 >= config.positiveConstraintMinAgreement
-                            && votes > 1 && votes2 > 1) {
-                        System.out.println("### X of Y");
+                            && votes > 1 && votes2 > 1 && Math.abs(votes - votes2) <= 1) {
+                        System.out.println("### subspans");
                         addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
                         appliedHeuristic = true;
                         skipOps.add(opId2);
