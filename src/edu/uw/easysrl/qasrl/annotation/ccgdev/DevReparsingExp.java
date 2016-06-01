@@ -8,6 +8,8 @@ import edu.uw.easysrl.qasrl.ParseDataLoader;
 import edu.uw.easysrl.qasrl.annotation.AnnotatedQuery;
 import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
+import edu.uw.easysrl.qasrl.experiments.ReparsingConfig;
+import edu.uw.easysrl.qasrl.experiments.ReparsingHelper;
 import edu.uw.easysrl.qasrl.experiments.ReparsingHistory;
 import edu.uw.easysrl.qasrl.model.*;
 import edu.uw.easysrl.qasrl.model.Constraint;
@@ -88,8 +90,8 @@ public class DevReparsingExp {
                 ///// Heuristics
                 final int[] optionDist = new int[query.getOptions().size()];
                 matchedResponses.forEach(response -> response.stream().forEach(r -> optionDist[r] ++));
-                final ImmutableSet<Constraint> constraints = ReparsingHelper.getConstraints2(sentenceId, sentence,
-                        query, matchedResponses, nbestLists.get(sentenceId), config);
+                final ImmutableSet<Constraint> constraints = ReparsingHelper.getConstraints(sentenceId, sentence,
+                        query, matchedResponses, config);
                 allConstraints.addAll(constraints);
 
                 int unsure = (int) IntStream.range(0, query.getQAPairSurfaceForms().size())

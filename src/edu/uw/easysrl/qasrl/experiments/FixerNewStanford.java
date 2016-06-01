@@ -1,4 +1,4 @@
-package edu.uw.easysrl.qasrl.annotation.ccgdev;
+package edu.uw.easysrl.qasrl.experiments;
 
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.ImmutableList;
@@ -39,6 +39,7 @@ import java.util.stream.IntStream;
  * A cleaner version of the heurstic fixer.
  * Created by luheng on 5/26/16.
  */
+@Deprecated
 public class FixerNewStanford {
     private final static int minVotesToFix = 1;
     private final static double minMarginToFix = 0.33;

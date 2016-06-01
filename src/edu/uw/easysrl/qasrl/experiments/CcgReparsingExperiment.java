@@ -1,4 +1,4 @@
-package edu.uw.easysrl.qasrl.annotation.ccgdev;
+package edu.uw.easysrl.qasrl.experiments;
 
 import com.google.common.collect.*;
 import edu.uw.easysrl.qasrl.NBestList;
@@ -6,8 +6,11 @@ import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.ParseData;
 import edu.uw.easysrl.qasrl.ParseDataLoader;
 import edu.uw.easysrl.qasrl.annotation.AnnotatedQuery;
+import edu.uw.easysrl.qasrl.annotation.ccgdev.AnnotationFileLoader;
 import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
+import edu.uw.easysrl.qasrl.experiments.ReparsingConfig;
+import edu.uw.easysrl.qasrl.experiments.ReparsingHelper;
 import edu.uw.easysrl.qasrl.experiments.ReparsingHistory;
 import edu.uw.easysrl.qasrl.model.*;
 import edu.uw.easysrl.qasrl.model.Constraint;
@@ -34,33 +37,43 @@ public class CcgReparsingExperiment {
     }
 
     public static void main(String[] args) {
-        final ParseData dev = ParseDataLoader.loadFromDevPool().get();
-        final Map<Integer, NBestList> nbestLists = NBestList
-                .loadNBestListsFromFile("parses.tagged.dev.100best.out", 100).get();
-        final HITLParser parser = new HITLParser(dev, nbestLists);
+        ReparsingConfig config = new ReparsingConfig(args);
+        System.out.println(config.toString());
+
+        ParseData corpus;
+        Map<Integer, NBestList> nbestLists;
+        if (!config.runTest) {
+            corpus = ParseDataLoader.loadFromDevPool().get();
+            nbestLists = NBestList.loadNBestListsFromFile("parses.tagged.dev.100best.out", 100).get();
+        } else {
+            corpus = ParseDataLoader.loadFromTestPool(true).get();
+            nbestLists = NBestList.loadNBestListsFromFile("parses.tagged.test.gold.100best.out", 100).get();
+        }
+        final HITLParser parser = new HITLParser(corpus, nbestLists);
         final ReparsingHistory history =  new ReparsingHistory(parser);
         final Map<Integer, List<AnnotatedQuery>> annotations = AnnotationFileLoader.loadDev();
         parser.setQueryPruningParameters(queryPruningParameters);
-        ReparsingConfig config = new ReparsingConfig(args);
-        System.out.println(config.toString());
+
         int numMatchedAnnotations = 0;
         int numChangedSentence = 0;
         Results avgChange = new Results();
 
-        for (int sentenceId : annotations.keySet()) {
+        for (int sentenceId = 0; sentenceId < corpus.getSentences().size(); sentenceId++) {
+            if (!config.runTest && !nbestLists.containsKey(sentenceId)) {
+                continue;
+            }
             history.addSentence(sentenceId);
-
             final ImmutableList<String> sentence = parser.getSentence(sentenceId);
-            final ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries = parser.getAllCoreArgQueriesForSentence(sentenceId);
-            //parser.getNewCoreArgQueriesForSentence(sentenceId);
-
+            ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries = null;
+            if (annotations.containsKey(sentenceId)) {
+                queries = !config.runTest ? parser.getAllCoreArgQueriesForSentence(sentenceId) :
+                        parser.getNewCoreArgQueriesForSentence(sentenceId);
+            }
             if (queries == null || queries.isEmpty() || !annotations.containsKey(sentenceId)) {
                 Parse baselineParse = parser.getNBestList(sentenceId).getParse(0);
                 avgChange.add(CcgEvaluation.evaluate(baselineParse.dependencies, baselineParse.dependencies));
                 continue;
             }
-            final Set<Constraint> allConstraints = new HashSet<>();
-
             for (AnnotatedQuery annotation : annotations.get(sentenceId)) {
                 final Optional<ScoredQuery<QAStructureSurfaceForm>> matchQueryOpt =
                         ExperimentUtils.getBestAlignedQuery(annotation, queries);
@@ -72,31 +85,21 @@ public class CcgReparsingExperiment {
                 if (matchedResponses.stream().filter(r -> r.size() > 0).count() < 5) {
                     continue;
                 }
-                numMatchedAnnotations ++;
-
                 // Filter ditransitives.
                 if (query.getQAPairSurfaceForms().stream().flatMap(qa -> qa.getQuestionStructures().stream())
                         .allMatch(q -> (q.category == Category.valueOf("((S[dcl]\\NP)/NP)/NP") && q.targetArgNum > 1)
                                 || (q.category == Category.valueOf("((S[b]\\NP)/NP)/NP") && q.targetArgNum > 1))) {
                     continue;
                 }
-
-                ///// Heuristics
+                numMatchedAnnotations ++;
+                // Get constraints.
+                final ImmutableSet<Constraint> constraints = ReparsingHelper.getConstraints(sentenceId, sentence,
+                        query, matchedResponses, config);
                 final int[] optionDist = new int[query.getOptions().size()];
                 matchedResponses.forEach(response -> response.stream().forEach(r -> optionDist[r] ++));
-                final ImmutableSet<Constraint> constraints = ReparsingHelper.getConstraints2(sentenceId, sentence,
-                        query, matchedResponses, nbestLists.get(sentenceId), config);
-                allConstraints.addAll(constraints);
-
-                int unsure = (int) IntStream.range(0, query.getQAPairSurfaceForms().size())
-                        .filter(i -> optionDist[i] == 2 || optionDist[i] == 3)
-                        .count();
-
                 history.addEntry(sentenceId, query, parser.getUserOptions(query, optionDist), constraints);
-                //if (unsure >= 2) {
-                if (history.lastIsWorsened()) {
-                    //if ( constraints.stream()
-                    //        .anyMatch(Constraint.DisjunctiveAttachmentConstraint.class::isInstance)) {
+                // Debug for dev.
+                if (!config.runTest && history.lastIsWorsened()) {
                     history.printLatestHistory();
                     System.out.println(query.toString(sentence, 'G', parser.getGoldOptions(query), '*', optionDist));
                     constraints.forEach(c -> System.out.println(c.toString(sentence)));

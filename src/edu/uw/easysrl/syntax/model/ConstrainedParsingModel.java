@@ -53,32 +53,6 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                 .filter(c -> c.getHeadId() != c.getArgId())
                 .forEach(c -> mustLinks.put(c.getHeadId(), c.getArgId(), c.getStrength()));
 
-        // Positive constraints can override disjunctive.
-        ImmutableSet<Constraint.DisjunctiveAttachmentConstraint> disjunctiveConstraints =
-                constraints.stream()
-                        .filter(Constraint::isPositive)
-                        .filter(Constraint.DisjunctiveAttachmentConstraint.class::isInstance)
-                        .map(c -> (Constraint.DisjunctiveAttachmentConstraint) c)
-                        .filter(c -> !c.getArgIds().stream()
-                                .anyMatch(argId -> mustLinks.contains(c.getHeadId(), argId)
-                                                || mustLinks.contains(argId, c.getHeadId())))
-                .collect(GuavaCollectors.toImmutableSet());
-
-        disjunctiveConstraints.forEach(c -> {
-            //final double amortizedPenalty = 1.0 * c.getStrength() / c.getArgIds().size();
-            final ImmutableList<Integer> argIds = c.getArgIds().stream()
-                    .filter(argId -> argId != c.getHeadId())
-                    .collect(GuavaCollectors.toImmutableList());
-            disjunctiveLinks.put(c.getHeadId(), argIds, c.getStrength());
-        });
-
-        disjunctiveConstraints.forEach(c -> {
-            //final double amortizedPenalty = 1.0 * c.getStrength() / c.getArgIds().size();
-            c.getArgIds().stream()
-                    .filter(argId -> argId != c.getHeadId())
-                    .forEach(argId -> mustLinks.put(c.getHeadId(), argId, c.getStrength()));
-        });
-
         // Positive supertag constraints.
         constraints.stream()
                 .filter(Constraint::isPositive)
@@ -99,9 +73,33 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
         constraints.stream()
                 .filter(c -> !c.isPositive())
                 .filter(Constraint.SupertagConstraint.class::isInstance)
-                 .map(c -> (Constraint.SupertagConstraint) c)
+                .map(c -> (Constraint.SupertagConstraint) c)
                 .filter(c -> !mustSupertags.contains(c.getPredId(), c.getCategory()))
                 .forEach(c -> cannotSupertags.put(c.getPredId(), c.getCategory(), c.getStrength()));
+
+        // Positive/negative constraints can override disjunctive.
+        ImmutableSet<Constraint.DisjunctiveAttachmentConstraint> disjunctiveConstraints =
+                constraints.stream()
+                        .filter(Constraint::isPositive)
+                        .filter(Constraint.DisjunctiveAttachmentConstraint.class::isInstance)
+                        .map(c -> (Constraint.DisjunctiveAttachmentConstraint) c)
+                        .filter(c -> {
+                            final int cHead = c.getHeadId();
+                            return !c.getArgIds().stream()
+                                    .anyMatch(argId -> mustLinks.contains(cHead, argId)
+                                            || mustLinks.contains(argId, cHead)
+                                            || cannotLinks.contains(cHead, argId));
+                        })
+                        .collect(GuavaCollectors.toImmutableSet());
+        
+        disjunctiveConstraints.forEach(c -> {
+            //final double amortizedPenalty = 1.0 * c.getStrength() / c.getArgIds().size();
+            final ImmutableList<Integer> argIds = c.getArgIds().stream()
+                    .filter(argId -> argId != c.getHeadId())
+                    .collect(GuavaCollectors.toImmutableList());
+            disjunctiveLinks.put(c.getHeadId(), argIds, c.getStrength());
+            argIds.forEach(argId -> mustLinks.put(c.getHeadId(), argId, c.getStrength()));
+        });
 
         if (kNormalizePositiveConstraints) {
             mustLinks.rowKeySet().stream().forEach(head -> {
@@ -170,6 +168,7 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
         double constraintsPenalty = 0.0;
         final List<UnlabelledDependency> dependencies = node.getResolvedUnlabelledDependencies();
 
+        // Penalize cannot-links.
         constraintsPenalty += cannotLinks.cellSet().stream()
                 .filter(c -> {
                     final int cHead = c.getRowKey(), cArg = c.getColumnKey();

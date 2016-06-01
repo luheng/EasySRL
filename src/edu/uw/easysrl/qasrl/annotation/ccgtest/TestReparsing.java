@@ -2,12 +2,12 @@ package edu.uw.easysrl.qasrl.annotation.ccgtest;
 
 import com.google.common.collect.*;
 import edu.uw.easysrl.qasrl.*;
-import edu.uw.easysrl.qasrl.annotation.AlignedAnnotation;
 import edu.uw.easysrl.qasrl.annotation.AnnotatedQuery;
-import edu.uw.easysrl.qasrl.annotation.Annotation;
 import edu.uw.easysrl.qasrl.annotation.ccgdev.*;
 import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
+import edu.uw.easysrl.qasrl.experiments.ReparsingConfig;
+import edu.uw.easysrl.qasrl.experiments.ReparsingHelper;
 import edu.uw.easysrl.qasrl.experiments.ReparsingHistory;
 import edu.uw.easysrl.qasrl.model.*;
 import edu.uw.easysrl.qasrl.model.Constraint;
@@ -16,11 +16,8 @@ import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
-import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.*;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 /**
  * Created by luheng on 5/26/16.
@@ -111,7 +108,7 @@ public class TestReparsing {
                 ///// Heuristics and constraints.
                 final int[] newOptionDist = ReparsingHelper.getNewOptionDist(sentence, query, matchedResponses,
                         nBestList, config);
-                constraints.addAll(ReparsingHelper.getConstraints(query, newOptionDist, nBestList, config));
+                constraints.addAll(ReparsingHelper.getConstraintsOld(query, newOptionDist, nBestList, config));
             }
             if (constraints.isEmpty()) {
                 avgReparsed.add(baselineF1);
