@@ -88,31 +88,22 @@ public class ReparsingHelper {
                 .filter(e -> e.getCount() >= config.positiveConstraintMinAgreement)
                 .map(e -> e.getElement()).distinct().sorted()
                 .collect(GuavaCollectors.toImmutableList());
+
         final ImmutableList<Integer> pronounFix = FixerNewStanford.pronounFixer(sentenceId, sentence, query, agreedOptions, optionDist);
-        final ImmutableList<Integer> subspanFix = FixerNew.subspanFixer(query, agreedOptions, optionDist);
         final ImmutableList<Integer> appositiveFix = FixerNewStanford.appositiveFixer(sentenceId, sentence, query, agreedOptions, optionDist);
-        final ImmutableList<Integer> relativeFix = FixerNew.relativeFixer(sentence, query, agreedOptions, optionDist);
-        String fixType = "None";
-        List<Integer> fixedResopnse = null;
+
+        List<Integer> fixedResponse = null;
         if (config.fixPronouns && !pronounFix.isEmpty()) {
-            fixedResopnse = pronounFix;
-            fixType = "pronoun";
-        } else if (config.fixSubspans && !subspanFix.isEmpty()) {
-            fixedResopnse = subspanFix;
-            fixType = "subspan";
-        } else if (config.fixRelatives && !relativeFix.isEmpty()) {
-            fixedResopnse = relativeFix;
-            fixType = "relative";
+            fixedResponse = pronounFix;
         } else if (config.fixAppositves && !appositiveFix.isEmpty()) {
-            fixedResopnse = appositiveFix;
-            fixType = "appositive";
+            fixedResponse = appositiveFix;
         }
-        if (fixedResopnse != null) {
-            fixedResopnse.stream().forEach(op -> newOptionDist[op] += config.positiveConstraintMinAgreement);
+        if (fixedResponse != null) {
+            fixedResponse.stream().forEach(op -> newOptionDist[op] =
+                            //config.positiveConstraintMinAgreement
+                    Math.max(optionDist[op], config.negativeConstraintMaxAgreement + 1));
         } else {
-            for (ImmutableList<Integer> response : matchedResponses) {
-                response.stream().forEach(op -> newOptionDist[op] ++);
-            }
+            matchedResponses.forEach(r -> r.stream().forEach(op -> newOptionDist[op] ++));
         }
         return newOptionDist;
     }
@@ -212,6 +203,102 @@ public class ReparsingHelper {
             }
         }
         return ImmutableSet.copyOf(constraints);
+    }
+
+    public static ImmutableSet<Constraint> getConstraints2(final int sentenceId,
+                                                           final ImmutableList<String> sentence,
+                                                           final ScoredQuery<QAStructureSurfaceForm> query,
+                                                           final ImmutableList<ImmutableList<Integer>> matchedResponses,
+                                                           final NBestList nBestList,
+                                                           final ReparsingConfig config) {
+        final int[] optionDist = new int[query.getOptions().size()];
+        int[] newOptionDist = new int[optionDist.length];
+        Arrays.fill(optionDist, 0);
+        Arrays.fill(newOptionDist, 0);
+        matchedResponses.forEach(r -> r.stream().forEach(op -> optionDist[op] ++));
+
+        final Set<Constraint> constraints = new HashSet<>();
+        final int numQA = query.getQAPairSurfaceForms().size();
+
+        /*
+        if (IntStream.range(0, numQA).map(i -> optionDist[i]).sum() <= config.negativeConstraintMaxAgreement) {
+            questionStructures.forEach(qstr -> constraints.add(new Constraint.SupertagConstraint(qstr.predicateIndex,
+                    qstr.category, false, config.supertagPenalty)));
+            return ImmutableSet.copyOf(constraints);
+        }*/
+
+        final ImmutableList<Integer> numVotes = IntStream.range(0, numQA)
+                .mapToObj(i -> optionDist[i]).collect(GuavaCollectors.toImmutableList());
+        final ImmutableList<Integer> optionOrder = IntStream.range(0, numQA).boxed()
+                .sorted((i, j) -> Integer.compare(-numVotes.get(i), -numVotes.get(j)))
+                .collect(GuavaCollectors.toImmutableList());
+
+        Set<Integer> processedOptions = new HashSet<>();
+        for (int opId1 : optionOrder) {
+            if (processedOptions.contains(opId1)) {
+                continue;
+            }
+            final int votes = numVotes.get(opId1);
+            final QAStructureSurfaceForm qa = query.getQAPairSurfaceForms().get(opId1);
+            final ImmutableList<Integer> argIds1 = qa.getAnswerStructures().stream()
+                    .flatMap(ans -> ans.argumentIndices.stream())
+                    .distinct().sorted()
+                    .collect(GuavaCollectors.toImmutableList());
+            final String op1 = qa.getAnswer().toLowerCase();
+
+            /*
+            final int pronounOpt = FixerNewStanford.getPronounOption(sentenceId, sentence, query, optionDist);
+            if (pronounOpt >= 0 && !processedOptions.contains(pronounOpt)) {
+                addConstraints(constraints, query,opId1, false, config);
+                addConstraints(constraints, query, ImmutableList.of(pronounOpt), true, config);
+                processedOptions.add(opId1);
+                processedOptions.add(pronounOpt);
+                continue;
+            }
+            */
+            if (votes >= config.positiveConstraintMinAgreement) {
+                addConstraints(constraints, query, ImmutableList.of(opId1), true, config);
+            } else if (votes <= config.negativeConstraintMaxAgreement) {
+                addConstraints(constraints, query, ImmutableList.of(opId1), false, config);
+            }
+        }
+        return ImmutableSet.copyOf(constraints);
+    }
+
+    private static void addConstraints(final Set<Constraint> constraints,
+                                       final ScoredQuery<QAStructureSurfaceForm> query,
+                                       final ImmutableList<Integer> options,
+                                       boolean positive,
+                                       ReparsingConfig config) {
+        final ImmutableList<QuestionStructure> questionStructures = query.getQAPairSurfaceForms()
+                .stream()
+                .flatMap(qa -> qa.getQuestionStructures().stream())
+                .distinct()
+                .collect(GuavaCollectors.toImmutableList());
+        final ImmutableList<Integer> argIds = options.stream()
+                .map(query.getQAPairSurfaceForms()::get)
+                .flatMap(qa -> qa.getAnswerStructures().stream())
+                .flatMap(astr -> astr.argumentIndices.stream())
+                .distinct().sorted()
+                .collect(GuavaCollectors.toImmutableList());
+        for (QuestionStructure qstr : questionStructures) {
+            final int headId = qstr.targetPrepositionIndex >= 0 ? qstr.targetPrepositionIndex : qstr.predicateIndex;
+            final ImmutableList<Integer> filteredArgs = argIds.stream()
+                    .filter(argId -> argId != headId)
+                    .collect(GuavaCollectors.toImmutableList());
+            if (positive) {
+                if (filteredArgs.size() == 1) {
+                    constraints.add(new Constraint.AttachmentConstraint(headId, filteredArgs.get(0), true,
+                            config.positiveConstraintPenalty));
+                } else if (filteredArgs.size() > 1) {
+                    constraints.add(new Constraint.DisjunctiveAttachmentConstraint(headId, filteredArgs, true,
+                            config.positiveConstraintPenalty));
+                }
+            } else {
+                filteredArgs.forEach(argId -> constraints.add(new Constraint.AttachmentConstraint(headId, argId,
+                        false, config.negativeConstraintPenalty)));
+            }
+        }
     }
 
     public static double getNBestPrior(final ScoredQuery<QAStructureSurfaceForm> query,

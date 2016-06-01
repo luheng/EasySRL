@@ -2,10 +2,17 @@ package edu.uw.easysrl.qasrl.annotation.ccgdev;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import edu.stanford.nlp.hcoref.data.CorefChain;
+import edu.stanford.nlp.hcoref.CorefCoreAnnotations;
+import edu.stanford.nlp.hcoref.data.Mention;
+import edu.stanford.nlp.ling.CoreAnnotations;
 import edu.stanford.nlp.ling.Sentence;
 import edu.stanford.nlp.parser.lexparser.LexicalizedParser;
+import edu.stanford.nlp.pipeline.Annotation;
+import edu.stanford.nlp.pipeline.StanfordCoreNLP;
 import edu.stanford.nlp.trees.*;
 
+import edu.stanford.nlp.util.CoreMap;
 import edu.uw.easysrl.qasrl.TextGenerationHelper;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.util.Prepositions;
@@ -13,8 +20,10 @@ import edu.uw.easysrl.qasrl.qg.util.PronounList;
 import edu.uw.easysrl.qasrl.qg.util.VerbHelper;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.util.GuavaCollectors;
+import scala.util.parsing.combinator.SubSequence;
 
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 
@@ -43,17 +52,73 @@ public class FixerNewStanford {
     final static TreebankLanguagePack tlp = new PennTreebankLanguagePack();
     final static GrammaticalStructureFactory gsf = tlp.grammaticalStructureFactory();
 
+    static final ImmutableSet<String> salientDependencies = ImmutableSet.of("appos", "acl", "acl:relcl", "nsubj", "cop");
     static int cachedSentenceId = -1;
     static ImmutableSet<TypedDependency> cachedDependencies = null;
+
 
     public static void cacheDependencies(final int sentenceId, final ImmutableList<String> sentence) {
         final String[] sent = new String[sentence.size()];
         IntStream.range(0, sentence.size()).forEach(i -> sent[i] = sentence.get(i));
         Tree parse = parser.apply(Sentence.toWordList(sent));
         GrammaticalStructure gs = gsf.newGrammaticalStructure(parse);
-        cachedDependencies = ImmutableSet.copyOf(gs.typedDependenciesCCprocessed());
+        // TODO: double check that we are using enhanced dependencies.
+        cachedDependencies = gs.typedDependenciesCCprocessed().stream()
+                .filter(dep -> salientDependencies.contains(dep.reln().toString()))
+                .collect(GuavaCollectors.toImmutableSet());
+        //cachedDependencies.forEach(System.out::println);
+
+        //// Cache coref chains ..
+        /*
+        Annotation document =  new Annotation(sentence.stream().collect(Collectors.joining(" ")));
+        Properties props = new Properties();
+        props.setProperty("annotators", "tokenize,ssplit,pos,lemma,ner,parse,mention,coref");
+        StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
+        pipeline.annotate(document);
+        System.out.println("---");
+        System.out.println("coref chains");
+        for (CorefChain cc : document.get(CorefCoreAnnotations.CorefChainAnnotation.class).values()) {
+            for (cc.ge)
+            System.out.println("\t"+cc);
+        }
+        for (CoreMap corefSent : document.get(CoreAnnotations.SentencesAnnotation.class)) {
+            System.out.println("---");
+            System.out.println("mentions");
+            for (Mention m : corefSent.get(CorefCoreAnnotations.CorefMentionsAnnotation.class)) {
+                System.out.println("\t"+m);
+            }
+        }*/
         cachedSentenceId = sentenceId;
-        cachedDependencies.stream().filter(d -> d.reln().toString().equals("appos")).forEach(System.out::println);
+    }
+
+    public static ImmutableList<ImmutableList<Integer>> getEquivalentOptionCluster(final int sentenceId,
+                                                                                   final ImmutableList<String> sentence,
+                                                                                   final ScoredQuery<QAStructureSurfaceForm> query) {
+        if (sentenceId != cachedSentenceId) {
+            cacheDependencies(sentenceId, sentence);
+        }
+        final int numQAs = query.getQAPairSurfaceForms().size();
+        Set<Integer> processed = new HashSet<>();
+        for (int opId1 = 0; opId1 < numQAs; opId1++) {
+            if (processed.contains(opId1)) {
+                continue;
+            }
+            final QAStructureSurfaceForm qa1 = query.getQAPairSurfaceForms().get(opId1);
+            final ImmutableList<Integer> args1 = qa1.getAnswerStructures().stream()
+                    .flatMap(ans -> ans.argumentIndices.stream())
+                    .distinct().sorted().collect(GuavaCollectors.toImmutableList());
+            for (int opId2 = 0; opId2 < numQAs; opId2++) {
+                if (opId2 == opId1 || processed.contains(opId2)) {
+                    continue;
+                }
+                final QAStructureSurfaceForm qa2 = query.getQAPairSurfaceForms().get(opId2);
+                final ImmutableList<Integer> args2 = qa2.getAnswerStructures().stream()
+                        .flatMap(ans -> ans.argumentIndices.stream())
+                        .distinct().sorted().collect(GuavaCollectors.toImmutableList());
+
+            }
+        }
+        return null;
     }
 
     /**
@@ -98,33 +163,6 @@ public class FixerNewStanford {
         return ImmutableList.of();
     }
 
-    public static ImmutableList<Integer> subspanFixer(final ScoredQuery<QAStructureSurfaceForm> query,
-                                                      final ImmutableList<Integer> options,
-                                                      final int[] optionDist) {
-        final int numQAs = query.getQAPairSurfaceForms().size();
-        for (int opId1 : options) {
-            if (opId1 >= numQAs) {
-                continue;
-            }
-            final String op1 = query.getQAPairSurfaceForms().get(opId1).getAnswer().toLowerCase();
-            for (int opId2 : IntStream.range(0, numQAs).toArray()) {
-                if (opId1 == opId2 || optionDist[opId2] < minVotesToFix) {
-                    continue;
-                }
-                final String op2 = query.getQAPairSurfaceForms().get(opId2).getAnswer().toLowerCase();
-                if (op1.endsWith("\'s " + op2)) {
-                    return ImmutableList.of(opId2);
-                }
-                for (String pp : Prepositions.prepositionWords) {
-                    if (!pp.equals("of") && op1.startsWith(op2 + " " + pp + " ")) {
-                        return ImmutableList.of(opId2);
-                    }
-                }
-            }
-        }
-        return ImmutableList.of();
-    }
-
     public static ImmutableList<Integer> appositiveFixer(final int sentenceId,
                                                          final ImmutableList<String> sentence,
                                                          final ScoredQuery<QAStructureSurfaceForm> query,
@@ -134,7 +172,7 @@ public class FixerNewStanford {
             cacheDependencies(sentenceId, sentence);
         }
         final int numQAs = query.getQAPairSurfaceForms().size();
-        final String sentenceStr = TextGenerationHelper.renderString(sentence).toLowerCase();
+        final int predicateId = query.getPredicateId().getAsInt();
         final Set<Integer> newOptions = new HashSet<>();
         for (int opId1 : options) {
             if (opId1 >= numQAs) {
@@ -144,7 +182,6 @@ public class FixerNewStanford {
             final ImmutableList<Integer> args1 = qa1.getAnswerStructures().stream()
                     .flatMap(ans -> ans.argumentIndices.stream())
                     .distinct().sorted().collect(GuavaCollectors.toImmutableList());
-
             for (int opId2 : IntStream.range(0, numQAs).toArray()) {
                 if (opId1 == opId2) {
                     continue;
@@ -153,67 +190,57 @@ public class FixerNewStanford {
                 final ImmutableList<Integer> args2 = qa2.getAnswerStructures().stream()
                         .flatMap(ans -> ans.argumentIndices.stream())
                         .distinct().sorted().collect(GuavaCollectors.toImmutableList());
-                if (cachedDependencies.stream()
+                //System.err.println(cachedDependencies + "\n" + args1 + "\n" + args2);
+                boolean hasAppositive = cachedDependencies.stream()
                         .filter(dep -> dep.reln().toString().equals("appos"))
-                        .anyMatch(dep -> (args1.contains(dep.gov().index()) && args2.contains(dep.dep().index())
-                                        || (args2.contains(dep.gov().index()) && args1.contains(dep.dep().index()))))) {
+                        .anyMatch(dep -> {
+                            final int head = dep.gov().index() - 1, child = dep.dep().index() - 1;
+                            return (args1.contains(head) && args2.contains(child));
+                                    // ||(args2.contains(head) && args1.contains(child));
+                        });
+                boolean hasRelative = cachedDependencies.stream()
+                        .filter(dep -> dep.reln().toString().equals("acl:relcl") || dep.reln().toString().equals("acl"))
+                        .anyMatch(dep -> {
+                            final int head = dep.gov().index() - 1, child = dep.dep().index() - 1;
+                            return args2.contains(head) && child == predicateId;
+                        });
+                //System.out.println("has appositive:\t" + hasAppositive + "\thas relative:\t" + hasRelative);
+                if (hasAppositive && hasRelative) {
+                    System.out.println("[relative fix:]");
+                    return ImmutableList.of(opId2);
+                }
+                if (hasAppositive) {
+                    System.out.println("[appositive fix:]");
                     newOptions.add(opId2);
                 }
-            }
-        }
-        if (newOptions.isEmpty()) {
-            return ImmutableList.of();
-        }
-        newOptions.addAll(options);
-        return newOptions.stream().distinct().sorted().collect(GuavaCollectors.toImmutableList());
-    }
-
-    public static ImmutableList<Integer> relativeFixer(final ImmutableList<String> sentence,
-                                                       final ScoredQuery<QAStructureSurfaceForm> query,
-                                                       final ImmutableList<Integer> options,
-                                                       final int[] optionDist) {
-        final int numQAs = query.getQAPairSurfaceForms().size();
-        final int headId = query.getPredicateId().getAsInt();
-        final String sentenceStr = TextGenerationHelper.renderString(sentence).toLowerCase();
-        for (int opId1 : options) {
-            if (opId1 >= numQAs) {
-                continue;
-            }
-            final QAStructureSurfaceForm qa1 = query.getQAPairSurfaceForms().get(opId1);
-            final int argId1 = qa1.getAnswerStructures().stream()
-                    .flatMap(ans -> ans.argumentIndices.stream())
-                    .max(Integer::compare).get();
-            for (int opId2 : IntStream.range(0, numQAs).toArray()) {
-                if (opId1 == opId2 || optionDist[opId2] < minVotesToFix) {
-                    continue;
-                }
-                final QAStructureSurfaceForm qa2 = query.getQAPairSurfaceForms().get(opId2);
-                final String op2 = qa2.getAnswer().toLowerCase();
-                final int minArgId2 = qa2.getAnswerStructures().stream()
-                        .flatMap(ans -> ans.argumentIndices.stream())
-                        .min(Integer::compare).get();
-                final int maxArgId2 = qa2.getAnswerStructures().stream()
-                        .flatMap(ans -> ans.argumentIndices.stream())
-                        .min(Integer::compare).get();
-                final int copulaBetweenArgs = (int) IntStream.range(argId1, minArgId2)
-                        .mapToObj(sentence::get)
-                        .filter(VerbHelper::isCopulaVerb)
-                        .count();
-                final int commaBetweenArg1Arg2 = (int) IntStream.range(argId1, minArgId2)
-                        .mapToObj(sentence::get)
-                        .filter(","::equals)
-                        .count();
-                final boolean trailingWhoThat = (sentenceStr.contains(op2 + " who ")
-                        || sentenceStr.contains(op2 + " that "))
-                        && Math.abs(headId - maxArgId2) <= 3;
-                if ((copulaBetweenArgs == 1 || commaBetweenArg1Arg2 == 1)
-                        && Determiners.determinerList.stream().anyMatch(d -> op2.startsWith(d + " "))
-                        && trailingWhoThat) {
+                // Handle copula.
+                boolean hasCopulaRelation =
+                        cachedDependencies.stream()
+                                .filter(dep -> dep.reln().toString().equals("cop"))
+                                .anyMatch(dep -> {
+                                    final int head = dep.gov().index() - 1, child = dep.dep().index() - 1;
+                                    return args2.contains(head) && args1.get(0) < child && child < args2.get(0);
+                                }) &&
+                        cachedDependencies.stream()
+                                .filter(dep -> dep.reln().toString().equals("nsubj"))
+                                .anyMatch(dep -> {
+                                    final int head = dep.gov().index() - 1, child = dep.dep().index() - 1;
+                                    return args2.contains(head) && args1.contains(child);
+                                });
+                if (hasCopulaRelation && hasRelative) {
+                    System.out.println("[copula relative fix:]");
                     return ImmutableList.of(opId2);
                 }
             }
         }
         return ImmutableList.of();
+        /*
+        if (newOptions.isEmpty()) {
+            return ImmutableList.of();
+        }
+        newOptions.addAll(options);
+        return newOptions.stream().distinct().sorted().collect(GuavaCollectors.toImmutableList());
+        */
     }
 }
 
