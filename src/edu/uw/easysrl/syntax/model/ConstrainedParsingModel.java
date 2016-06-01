@@ -193,12 +193,12 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                 .mapToDouble(Table.Cell::getValue)
                 .sum();
 
-        // Penalize disjunctive link for getting both dependencies.
+        // Penalize disjunctive constraint for getting both dependencies so we can get the voting right.
         constraintsPenalty += disjunctiveLinks.cellSet().stream()
                 .filter(c -> {
                     final int cHead = c.getRowKey();
                     final ImmutableList<Integer> cArgs = c.getColumnKey();
-                    return !dependencies.stream()
+                    return dependencies.stream()
                             // Directed match.
                             .anyMatch(dep -> dep.getHead() == cHead && cArgs.stream()
                                     .allMatch(dep.getArguments()::contains));

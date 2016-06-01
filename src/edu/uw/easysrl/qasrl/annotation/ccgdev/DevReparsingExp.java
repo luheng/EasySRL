@@ -63,6 +63,7 @@ public class DevReparsingExp {
                 avgChange.add(CcgEvaluation.evaluate(baselineParse.dependencies, baselineParse.dependencies));
                 continue;
             }
+            System.out.println(sentenceId);
             final Set<Constraint> allConstraints = new HashSet<>();
 
             for (AnnotatedQuery annotation : annotations.get(sentenceId)) {
