@@ -40,10 +40,10 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
 
     private void initializeConstraints(final Set<Constraint> constraints) {
         mustLinks = HashBasedTable.create();
-        cannotLinks = HashBasedTable.create();
-        disjunctiveLinks = HashBasedTable.create();
         mustSupertags = HashBasedTable.create();
+        cannotLinks = HashBasedTable.create();
         cannotSupertags = HashBasedTable.create();
+        disjunctiveLinks = HashBasedTable.create();
 
         // Positive attachment constraints.
         constraints.stream()
@@ -54,11 +54,12 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                 .forEach(c -> mustLinks.put(c.getHeadId(), c.getArgId(), c.getStrength()));
 
         // Positive supertag constraints.
+        /*
         constraints.stream()
                 .filter(Constraint::isPositive)
                 .filter(Constraint.SupertagConstraint.class::isInstance)
                 .map(c -> (Constraint.SupertagConstraint) c)
-                .forEach(c -> mustSupertags.put(c.getPredId(), c.getCategory(), c.getStrength()));
+                .forEach(c -> mustSupertags.put(c.getPredId(), c.getCategory(), c.getStrength())); */
 
         // Positive evidence can override negative evidence.
         constraints.stream()
@@ -80,25 +81,25 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
         // Positive/negative constraints can override disjunctive.
         ImmutableSet<Constraint.DisjunctiveAttachmentConstraint> disjunctiveConstraints =
                 constraints.stream()
-                        .filter(Constraint::isPositive)
+                        .filter(Constraint::isPositive) // distjunctive constraints are always positive.
                         .filter(Constraint.DisjunctiveAttachmentConstraint.class::isInstance)
                         .map(c -> (Constraint.DisjunctiveAttachmentConstraint) c)
                         .filter(c -> {
                             final int cHead = c.getHeadId();
+                            // Should not overlay with any existing positive or negative constraints.
                             return !c.getArgIds().stream()
                                     .anyMatch(argId -> mustLinks.contains(cHead, argId)
-                                            || mustLinks.contains(argId, cHead)
-                                            || cannotLinks.contains(cHead, argId));
+                                                    || mustLinks.contains(argId, cHead)
+                                                    || cannotLinks.contains(cHead, argId));
                         })
                         .collect(GuavaCollectors.toImmutableSet());
 
         disjunctiveConstraints.forEach(c -> {
-            //final double amortizedPenalty = 1.0 * c.getStrength() / c.getArgIds().size();
-            final ImmutableList<Integer> argIds = c.getArgIds().stream()
-                    .filter(argId -> argId != c.getHeadId())
-                    .collect(GuavaCollectors.toImmutableList());
-            disjunctiveLinks.put(c.getHeadId(), argIds, c.getStrength());
-            argIds.forEach(argId -> mustLinks.put(c.getHeadId(), argId, c.getStrength()));
+            final double penalty  = c.getStrength(); // 1.0 * c.getStrength() / c.getArgIds().size();
+            // Add disjunctive penalty to avoid double-counting in case of appositives.
+            disjunctiveLinks.put(c.getHeadId(), c.getArgIds(), penalty);
+            // Treat as conjunctive positive constraint.
+            c.getArgIds().forEach(argId -> mustLinks.put(c.getHeadId(), argId, penalty));
         });
 
         if (kNormalizePositiveConstraints) {
@@ -134,10 +135,11 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
             for (final Tagger.ScoredCategory cat : tagsForWords.get(i)) {
                 final Category category = cat.getCategory();
                 double supertagPenalty = .0;
+                /*
                 if (mustSupertags.containsRow(i) && !mustSupertags.row(i).containsKey(category)) {
                     // Get arbitrary penalty value.
                     supertagPenalty += mustSupertags.row(i).values().iterator().next();
-                }
+                }*/
                 if (cannotSupertags.contains(i, cat.getCategory())) {
                     supertagPenalty += cannotSupertags.get(i, category);
                 }
