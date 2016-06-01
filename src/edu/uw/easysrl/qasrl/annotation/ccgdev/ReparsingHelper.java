@@ -211,18 +211,19 @@ public class ReparsingHelper {
                     if (skipOps.contains(opId2)) {
                         continue;
                     }
-                    if (config.fixPronouns && rel.startsWith("coref") && votes + votes2 >= config.positiveConstraintMinAgreement) {
+                    if (config.fixPronouns && rel.startsWith("coref") && votes + votes2 >= config.positiveConstraintMinAgreement && votes2 > 0) {
                         System.out.println("### coref:\t" + rel);
-                        addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
+                        //addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
+                        addConstraints(constraints, query, ImmutableList.of(opId2), true, config);
                         appliedHeuristic = true;
                         skipOps.add(opId2);
                         break;
                     }
                     if (config.fixAppositves && rel.equals("appositive") && votes >= config.positiveConstraintMinAgreement) {
                         System.out.println("### appositives");
-                        addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
-                        //addConstraints(constraints, query, ImmutableList.of(opId1), true, config);
-                        //addConstraints(constraints, query, ImmutableList.of(opId2), true, config);
+                        //addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
+                        addConstraints(constraints, query, ImmutableList.of(opId1), true, config);
+                        addConstraints(constraints, query, ImmutableList.of(opId2), true, config);
                         appliedHeuristic = true;
                         skipOps.add(opId2);
                         break;
