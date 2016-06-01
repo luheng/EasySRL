@@ -158,8 +158,6 @@ public class FixerNewStanford {
                         });
                 // OP1 = X of OP2 / X and OP2
                 boolean hasXofY = answer1.endsWith(" of " + answer2);
-
-
                 if (isPronoun) {
                     relations.put(opId1, opId2, "coref:pronoun");
                 } else if (hasRelative && hasAppositive) {
