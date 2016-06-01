@@ -47,8 +47,13 @@ public class BioinferReparsing {
     public static void printTestSetOriginalOneBest(String[] args) {
         BioinferCCGCorpus corpus = BioinferCCGCorpus.readTest().get();
         Map<Integer, NBestList> nbestLists = NBestList.loadNBestListsFromFile("bioinfer.test.100best.out", 1).get();
+        BaseCcgParser.AStarParser baseParser = new BaseCcgParser.AStarParser(BaseCcgParser.longModelFolder, 1,
+                                                                             1e-6, 1e-6, 250000, 100);
+        baseParser.cacheSupertags(corpus.getInputSentences());
         for (int sentenceId : nbestLists.keySet().stream().sorted().collect(Collectors.toList())) {
-            System.out.println(ParsePrinter.CCGBANK_PRINTER.print(nbestLists.get(sentenceId).getParse(0).syntaxTree, sentenceId) + "\n");
+            final ImmutableList<InputReader.InputWord> inputSentence = corpus.getInputSentence(sentenceId);
+            final Parse baselineParse = baseParser.parse(sentenceId, inputSentence);
+            System.out.println(ParsePrinter.CCGBANK_PRINTER.print(baselineParse.syntaxTree, sentenceId));
         }
     }
 
@@ -165,6 +170,6 @@ public class BioinferReparsing {
     }
 
     public static void main(String[] args) {
-        printTestSetCrowdFlowerReparsed(args);
+        printTestSetOriginalOneBest(args);
     }
 }
