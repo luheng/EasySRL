@@ -158,7 +158,11 @@ public class FixerNewStanford {
                         });
                 // OP1 = X of OP2 / X and OP2
                 boolean hasXofY = answer1.endsWith(" of " + answer2);
-                if (isPronoun) {
+                boolean isSubspan = answer1.endsWith(" " + answer2) || answer1.startsWith(answer2 + " ");
+                if (isSubspan) {
+                    //else if (hasXofY) {
+                    relations.put(opId1, opId2, "subspan");
+                } else if (isPronoun) {
                     relations.put(opId1, opId2, "coref:pronoun");
                 } else if (hasRelative && hasAppositive) {
                     relations.put(opId1, opId2, "relative");
@@ -166,8 +170,6 @@ public class FixerNewStanford {
                     relations.put(opId1, opId2, "relative:copula");
                 } else if (hasAppositive) {
                     relations.put(opId1, opId2, "appositive");
-                } else if (hasXofY) {
-                    relations.put(opId1, opId2, "subspan");
                 }
             }
         }

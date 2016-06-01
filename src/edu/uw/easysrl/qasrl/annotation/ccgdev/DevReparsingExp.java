@@ -18,6 +18,7 @@ import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.*;
+import java.util.stream.IntStream;
 
 /**
  * Created by luheng on 5/26/16.
@@ -91,9 +92,15 @@ public class DevReparsingExp {
                         query, matchedResponses, nbestLists.get(sentenceId), config);
                 allConstraints.addAll(constraints);
 
+                int unsure = (int) IntStream.range(0, query.getQAPairSurfaceForms().size())
+                        .filter(i -> optionDist[i] == 2 || optionDist[i] == 3)
+                        .count();
+
                 history.addEntry(sentenceId, query, parser.getUserOptions(query, optionDist), constraints);
-                if (history.lastIsWorsened() /*&& constraints.stream()
-                        .anyMatch(Constraint.DisjunctiveAttachmentConstraint.class::isInstance)*/) {
+                //if (unsure >= 2) {
+                if (history.lastIsWorsened()) {
+                //if ( constraints.stream()
+                //        .anyMatch(Constraint.DisjunctiveAttachmentConstraint.class::isInstance)) {
                     history.printLatestHistory();
                     System.out.println(query.toString(sentence, 'G', parser.getGoldOptions(query), '*', optionDist));
                     constraints.forEach(c -> System.out.println(c.toString(sentence)));
