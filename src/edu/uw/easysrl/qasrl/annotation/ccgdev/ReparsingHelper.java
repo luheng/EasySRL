@@ -212,7 +212,8 @@ public class ReparsingHelper {
                     if (skipOps.contains(opId2)) {
                         continue;
                     }
-                    if (config.fixPronouns && rel.startsWith("coref") && votes + votes2 >= config.positiveConstraintMinAgreement) {
+                    if (config.fixPronouns && rel.startsWith("coref") && votes + votes2 >= config.positiveConstraintMinAgreement
+													&& votes2 > 0) {
                         System.out.println("### coref:\t" + rel);
                         /*
                         if (votes2 > 0) {
