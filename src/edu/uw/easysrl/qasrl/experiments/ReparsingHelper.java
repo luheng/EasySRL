@@ -196,7 +196,7 @@ public class ReparsingHelper {
             final int votes = optionDist[opId1];
             boolean appliedHeuristic = false;
             if (relations.containsRow(opId1)) {
-                for (int opId2 = 0; opId2 > numQA; opId2++) {
+                for (int opId2 = 0; opId2 < numQA; opId2++) {
                     if (skipOps.contains(opId2) || !relations.contains(opId1, opId2)) {
                         continue;
                     }
@@ -211,15 +211,21 @@ public class ReparsingHelper {
                         appliedHeuristic = true;
                         skipOps.add(opId2);
                         break;
-                    }
-                    else if (config.fixRelatives && (rel.startsWith("appositive") || rel.startsWith("relative"))) {
+                    } else if (config.fixAppositves && rel.startsWith("appositive")) {
+                        System.out.println("### appositives");
+                        addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
+                        appliedHeuristic = true;
+                        skipOps.add(opId2);
+                        break;
+                    } else if (config.fixRelatives && rel.startsWith("relative")) {
                         System.out.println("### relatives");
                         addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
                         appliedHeuristic = true;
                         skipOps.add(opId2);
                         break;
                     }
-                    if (config.fixSubspans && rel.equals("subspan") && votes > 1 && votes2 > 1 && Math.abs(votes - votes2) <= 1) {
+                    else if (config.fixSubspans && rel.equals("subspan") && votes > 1 && votes2 > 1
+                            && Math.abs(votes - votes2) <= 1) {
                         System.out.println("### subspans");
                         addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
                         appliedHeuristic = true;

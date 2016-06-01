@@ -46,7 +46,8 @@ public class HeuristicHelper {
                                                                      final ScoredQuery<QAStructureSurfaceForm> query) {
         Table<Integer, Integer, String> relations = HashBasedTable.create();
         final int predicateId = query.getPredicateId().getAsInt();
-        final int headId = query.getPrepositionIndex().isPresent() ? query.getPrepositionIndex().getAsInt() : predicateId;
+        final int headId = query.getPrepositionIndex().isPresent() ?
+                query.getPrepositionIndex().getAsInt() : predicateId;
         if (sentenceId != cachedSentenceId) {
             cacheDependenciesAndCoref(sentenceId, sentence);
         }
@@ -57,6 +58,7 @@ public class HeuristicHelper {
                     .flatMap(ans -> ans.argumentIndices.stream())
                     .distinct().sorted().collect(GuavaCollectors.toImmutableList());
             final String answer1 = qa1.getAnswer().toLowerCase();
+            final int dist1 = Math.abs(headId - args1.get(0));
 
             for (int opId2 = 0; opId2 < numQAs; opId2++) {
                 if (opId2 == opId1 || relations.contains(opId1, opId2) || relations.contains(opId2, opId1)) {
@@ -67,10 +69,12 @@ public class HeuristicHelper {
                         .flatMap(ans -> ans.argumentIndices.stream())
                         .distinct().sorted().collect(GuavaCollectors.toImmutableList());
                 final String answer2 = qa2.getAnswer().toLowerCase();
+                final int dist2 = Math.abs(headId - args2.get(0));
 
+                boolean isSubspan = answer1.endsWith(" " + answer2) || answer1.startsWith(answer2 + " ");
+                
                 final boolean isPronoun = PronounList.nonPossessivePronouns.contains(qa2.getAnswer().toLowerCase())
-                        && !answer1.contains(" " + answer2)
-                        && !IntStream.range(args2.get(0), headId).mapToObj(sentence::get).anyMatch(","::equals);
+                        && dist2 < dist1;
 
                 final boolean hasAppositive = !answer1.contains(" of ") && cachedDependencies.stream()
                         .filter(dep -> dep.reln().toString().equals("appos"))
@@ -98,8 +102,6 @@ public class HeuristicHelper {
                             return args2.contains(head) && args1.contains(child);
                         });
 
-                // OP1 = X of OP2 / X and OP2
-                boolean isSubspan = answer1.endsWith(" " + answer2) || answer1.startsWith(answer2 + " ");
                 if (isSubspan) {
                     relations.put(opId1, opId2, "subspan");
                 } else if (isPronoun) {

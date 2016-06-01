@@ -91,7 +91,7 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                                             || cannotLinks.contains(cHead, argId));
                         })
                         .collect(GuavaCollectors.toImmutableSet());
-        
+
         disjunctiveConstraints.forEach(c -> {
             //final double amortizedPenalty = 1.0 * c.getStrength() / c.getArgIds().size();
             final ImmutableList<Integer> argIds = c.getArgIds().stream()
