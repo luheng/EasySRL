@@ -177,7 +177,8 @@ public class ReparsingHelper {
         final int numQA = query.getQAPairSurfaceForms().size();
 
         // Add supertag constraints.
-        if (IntStream.range(0, numQA).map(i -> optionDist[i]).sum() <= config.negativeConstraintMaxAgreement) {
+        //if (IntStream.range(0, numQA).map(i -> optionDist[i]).sum() <= config.negativeConstraintMaxAgreement) {
+        if (optionDist[query.getBadQuestionOptionId().getAsInt()] >= config.positiveConstraintMinAgreement) {
             query.getQAPairSurfaceForms().stream()
                     .flatMap(qa -> qa.getQuestionStructures().stream())
                     .distinct()
@@ -229,14 +230,16 @@ public class ReparsingHelper {
                         break;
                     } else if (config.fixRelatives && rel.startsWith("relative") && votes + votes2 >= config.positiveConstraintMinAgreement) {
                         System.out.println("### relatives");
-                        addConstraints(constraints, query, ImmutableList.of(opId1), false, config);
-                        addConstraints(constraints, query, ImmutableList.of(opId2), true, config);
+                        addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
+                        //addConstraints(constraints, query, ImmutableList.of(opId1), false, config);
+                        //addConstraints(constraints, query, ImmutableList.of(opId2), true, config);
                         appliedHeuristic = true;
                         skipOps.add(opId2);
                         break;
                     }
                     if (config.fixSubspans
-                            && rel.equals("subspan")  && votes + votes2 >= config.positiveConstraintMinAgreement) {
+                            && rel.equals("subspan")  && votes + votes2 >= config.positiveConstraintMinAgreement
+                            && votes > 1 && votes2 > 1) {
                         System.out.println("### X of Y");
                         addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
                         appliedHeuristic = true;
