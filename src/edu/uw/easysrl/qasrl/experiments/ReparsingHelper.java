@@ -174,7 +174,7 @@ public class ReparsingHelper {
         matchedResponses.forEach(r -> r.stream().forEach(op -> optionDist[op] ++));
 
         final Set<Constraint> constraints = new HashSet<>();
-        final int numQA = query.getQAPairSurfaceForms().size();
+        final int numQAs = query.getQAPairSurfaceForms().size();
 
         // Add supertag constraints.
         if (optionDist[query.getBadQuestionOptionId().getAsInt()] >= config.positiveConstraintMinAgreement) {
@@ -186,62 +186,63 @@ public class ReparsingHelper {
             return ImmutableSet.copyOf(constraints);
         }
 
+        // Order option from highest votes.
+        final ImmutableList<Integer> optionOrders = IntStream.range(0, numQAs)
+                .boxed()
+                .sorted((i, j) -> Integer.compare(-optionDist[i], -optionDist[j]))
+                .collect(GuavaCollectors.toImmutableList());
+
         // Apply heuristics.
         Table<Integer, Integer, String> relations = HeuristicHelper.getOptionRelations(sentenceId, sentence, query);
         Set<Integer> skipOps = new HashSet<>();
-        for (int opId1 = 0; opId1 < numQA; opId1++) {
+        for (int opId1 : optionOrders) {
             if (skipOps.contains(opId1)) {
                 continue;
             }
             skipOps.add(opId1);
             final int votes = optionDist[opId1];
             boolean appliedHeuristic = false;
-            if (relations.containsRow(opId1)) {
-                for (int opId2 = 0; opId2 < numQA; opId2++) {
-                    if (skipOps.contains(opId2) || !relations.contains(opId1, opId2)) {
-                        continue;
-                    }
-                    final String rel = relations.get(opId1, opId2);
-                    final int votes2 = optionDist[opId2];
-                    if (votes + votes2 < config.positiveConstraintMinAgreement) {
-                        continue;
-                    }
-                    if (config.fixPronouns && rel.startsWith("pronoun")) {
-                        System.out.println("### coref:\t" + rel);
-                        addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
-                        appliedHeuristic = true;
-                        skipOps.add(opId2);
-                        break;
-                    }
-                    if (config.fixAppositves && rel.startsWith("appositive")) {
-                        System.out.println("### appositives");
-                        addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
-                        appliedHeuristic = true;
-                        skipOps.add(opId2);
-                        break;
-                    }
-                    if (config.fixRelatives && rel.startsWith("relative")) {
-                        System.out.println("### relatives");
-                        addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
-                        appliedHeuristic = true;
-                        skipOps.add(opId2);
-                        break;
-                    }
-                    if (config.fixSubspans && rel.equals("subspan")
-                            && votes > 1 && votes2 > 1
-                            && Math.abs(votes - votes2) <= 1) {
-                        System.out.println("### subspans");
-                        addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
-                        appliedHeuristic = true;
-                        skipOps.add(opId2);
-                        break;
-                    }
+            for (int opId2 : optionOrders) {
+                if (skipOps.contains(opId2) || !relations.contains(opId1, opId2)) {
+                    continue;
+                }
+                final String rel = relations.get(opId1, opId2);
+                final int votes2 = optionDist[opId2];
+                if (votes + votes2 < config.positiveConstraintMinAgreement) {
+                    continue;
+                }
+                if (config.fixPronouns && rel.startsWith("pronoun")) {
+                    System.out.println("### coref:\t" + rel);
+                    addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
+                    appliedHeuristic = true;
+                    skipOps.add(opId2);
+                    break;
+                }
+                if (config.fixAppositves && rel.startsWith("appositive")) {
+                    System.out.println("### appositives");
+                    addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
+                    appliedHeuristic = true;
+                    skipOps.add(opId2);
+                    break;
+                }
+                if (config.fixRelatives && rel.startsWith("relative")) {
+                    System.out.println("### relatives");
+                    addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
+                    appliedHeuristic = true;
+                    skipOps.add(opId2);
+                    break;
+                }
+                if (config.fixSubspans && rel.equals("subspan") && Math.abs(votes - votes2) <= 1) {
+                    System.out.println("### subspans");
+                    addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
+                    appliedHeuristic = true;
+                    skipOps.add(opId2);
+                    break;
                 }
             }
             if (appliedHeuristic) {
                 continue;
             }
-
             // Normal positive/negative constraints.
             if (votes >= config.positiveConstraintMinAgreement) {
                 addConstraints(constraints, query, ImmutableList.of(opId1), true, config);
