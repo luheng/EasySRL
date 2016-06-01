@@ -210,35 +210,37 @@ public class ReparsingHelper {
                     if (skipOps.contains(opId2)) {
                         continue;
                     }
-                    if (rel.startsWith("coref") && votes + votes2 >= config.positiveConstraintMinAgreement) {
+                    if (config.fixPronouns
+                            && rel.startsWith("coref") && votes + votes2 >= config.positiveConstraintMinAgreement) {
                         System.out.println("### coref:\t" + rel);
                         addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
-                        //addConstraints(constraints, query, ImmutableList.of(opId1), false, config);
-                        //addConstraints(constraints, query, ImmutableList.of(opId2), true, config);
                         skipOps.add(opId2);
                         appliedHeuristic = true;
                     }
-                    if (rel.equals("pronoun") && votes + votes2 >= config.positiveConstraintMinAgreement) {
-                        System.out.println("### pronoun");
-                        addConstraints(constraints, query, ImmutableList.of(opId2), true, config);
-                        skipOps.add(opId2);
-                        appliedHeuristic = true;
-                    } else if (rel.equals("appositive") && votes >= config.positiveConstraintMinAgreement) {
+                    else if (config.fixAppositves
+                            && rel.equals("appositive") && votes >= config.positiveConstraintMinAgreement) {
                         System.out.println("### appositives");
-                        addConstraints(constraints, query, ImmutableList.of(opId1), true, config);
-                        addConstraints(constraints, query, ImmutableList.of(opId2), true, config);
+                        addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
+                        //addConstraints(constraints, query, ImmutableList.of(opId1), true, config);
+                        //addConstraints(constraints, query, ImmutableList.of(opId2), true, config);
                         skipOps.add(opId2);
                         appliedHeuristic = true;
-                    } else if (rel.equals("relative") && votes + votes2 >= config.positiveConstraintMinAgreement) {
+                    } else if (config.fixRelatives
+                            && rel.startsWith("relative") && votes + votes2 >= config.positiveConstraintMinAgreement) {
                         System.out.println("### relatives");
                         addConstraints(constraints, query, ImmutableList.of(opId1), false, config);
                         addConstraints(constraints, query, ImmutableList.of(opId2), true, config);
                         skipOps.add(opId2);
                         appliedHeuristic = true;
+                    } else if (config.fixSubspans
+                            && rel.equals("subspan")  && votes + votes2 >= config.positiveConstraintMinAgreement) {
+                        System.out.println("### X of Y");
+                        addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
+                        skipOps.add(opId2);
+                        appliedHeuristic = true;
                     }
                 }
             }
-
             if (appliedHeuristic) {
                 continue;
             }

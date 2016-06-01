@@ -63,7 +63,6 @@ public class DevReparsingExp {
                 avgChange.add(CcgEvaluation.evaluate(baselineParse.dependencies, baselineParse.dependencies));
                 continue;
             }
-            System.out.println(sentenceId);
             final Set<Constraint> allConstraints = new HashSet<>();
 
             for (AnnotatedQuery annotation : annotations.get(sentenceId)) {
@@ -89,10 +88,6 @@ public class DevReparsingExp {
                 ///// Heuristics
                 final int[] optionDist = new int[query.getOptions().size()];
                 matchedResponses.forEach(response -> response.stream().forEach(r -> optionDist[r] ++));
-                //final int[] newOptionDist = ReparsingHelper.getNewOptionDist2(sentenceId, sentence, query, matchedResponses,
-                 //       nbestLists.get(sentenceId), config);
-                //final ImmutableSet<Constraint> constraints = ReparsingHelper.getConstraints(query, newOptionDist,
-                //        nbestLists.get(sentenceId), config);
                 final ImmutableSet<Constraint> constraints = ReparsingHelper.getConstraints2(sentenceId, sentence,
                         query, matchedResponses, nbestLists.get(sentenceId), config);
                 allConstraints.addAll(constraints);

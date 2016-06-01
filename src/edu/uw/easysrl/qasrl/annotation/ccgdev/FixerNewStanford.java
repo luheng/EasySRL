@@ -101,7 +101,7 @@ public class FixerNewStanford {
         final int predicateId = query.getPredicateId().getAsInt();
         final int headId = query.getPrepositionIndex().isPresent() ? query.getPrepositionIndex().getAsInt() : predicateId;
         if (sentenceId != cachedSentenceId) {
-            //cacheDependenciesAndCoref(sentenceId, sentence);
+            cacheDependenciesAndCoref(sentenceId, sentence);
         }
         final int numQAs = query.getQAPairSurfaceForms().size();
         for (int opId1 = 0; opId1 < numQAs; opId1++) {
@@ -131,7 +131,6 @@ public class FixerNewStanford {
                             corefChain.getMentionsInTextualOrder().stream()
                                 .anyMatch(m -> m.startIndex - 1 <= args2.get(0) && args2.get(0) < m.endIndex)); */
 
-                /*
                 final boolean hasAppositive = cachedDependencies.stream()
                         .filter(dep -> dep.reln().toString().equals("appos"))
                         .anyMatch(dep -> {
@@ -157,22 +156,19 @@ public class FixerNewStanford {
                             final int head = dep.gov().index() - 1, child = dep.dep().index() - 1;
                             return args2.contains(head) && args1.contains(child);
                         });
-                */
                 // OP1 = X of OP2 / X and OP2
                 boolean hasXofY = answer1.endsWith(" of " + answer2);
 
 
                 if (isPronoun) {
-                //if (isCoref && isPronoun && dist2 < dist1) {
                     relations.put(opId1, opId2, "coref:pronoun");
-                }/* else if (hasRelative && hasAppositive) {
+                } else if (hasRelative && hasAppositive) {
                     relations.put(opId1, opId2, "relative");
                 } else if (hasRelative && hasCopula) {
                     relations.put(opId1, opId2, "relative:copula");
-                } if (hasAppositive) {
+                } else if (hasAppositive) {
                     relations.put(opId1, opId2, "appositive");
-                } */
-                else if (hasXofY) {
+                } else if (hasXofY) {
                     relations.put(opId1, opId2, "subspan");
                 }
             }
