@@ -1,9 +1,6 @@
 package edu.uw.easysrl.qasrl.annotation.ccgdev;
 
-import com.google.common.collect.HashMultiset;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Multiset;
+import com.google.common.collect.*;
 import edu.uw.easysrl.qasrl.NBestList;
 import edu.uw.easysrl.qasrl.model.Constraint;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
@@ -11,10 +8,7 @@ import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.util.GuavaCollectors;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -66,44 +60,6 @@ public class ReparsingHelper {
             for (ImmutableList<Integer> response : matchedResponses) {
                 response.stream().forEach(op -> newOptionDist[op] ++);
             }
-        }
-        return newOptionDist;
-    }
-
-    public static int[] getNewOptionDist2(final int sentenceId,
-                                          final ImmutableList<String> sentence,
-                                          final ScoredQuery<QAStructureSurfaceForm> query,
-                                          final ImmutableList<ImmutableList<Integer>> matchedResponses,
-                                          final NBestList nBestList,
-                                          final ReparsingConfig config) {
-        final int[] optionDist = new int[query.getOptions().size()];
-        int[] newOptionDist = new int[optionDist.length];
-        Arrays.fill(optionDist, 0);
-        Arrays.fill(newOptionDist, 0);
-        matchedResponses.forEach(r -> r.stream().forEach(op -> optionDist[op] ++));
-        final Multiset<Integer> votes = HashMultiset.create(matchedResponses.stream()
-                .flatMap(List::stream)
-                .collect(Collectors.toList()));
-        final ImmutableList<Integer> agreedOptions = votes.entrySet().stream()
-                .filter(e -> e.getCount() >= config.positiveConstraintMinAgreement)
-                .map(e -> e.getElement()).distinct().sorted()
-                .collect(GuavaCollectors.toImmutableList());
-
-        final ImmutableList<Integer> pronounFix = FixerNewStanford.pronounFixer(sentenceId, sentence, query, agreedOptions, optionDist);
-        final ImmutableList<Integer> appositiveFix = FixerNewStanford.appositiveFixer(sentenceId, sentence, query, agreedOptions, optionDist);
-
-        List<Integer> fixedResponse = null;
-        if (config.fixPronouns && !pronounFix.isEmpty()) {
-            fixedResponse = pronounFix;
-        } else if (config.fixAppositves && !appositiveFix.isEmpty()) {
-            fixedResponse = appositiveFix;
-        }
-        if (fixedResponse != null) {
-            fixedResponse.stream().forEach(op -> newOptionDist[op] =
-                            //config.positiveConstraintMinAgreement
-                    Math.max(optionDist[op], config.negativeConstraintMaxAgreement + 1));
-        } else {
-            matchedResponses.forEach(r -> r.stream().forEach(op -> newOptionDist[op] ++));
         }
         return newOptionDist;
     }
@@ -220,12 +176,15 @@ public class ReparsingHelper {
         final Set<Constraint> constraints = new HashSet<>();
         final int numQA = query.getQAPairSurfaceForms().size();
 
-        /*
+        // Add supertag constraints.
         if (IntStream.range(0, numQA).map(i -> optionDist[i]).sum() <= config.negativeConstraintMaxAgreement) {
-            questionStructures.forEach(qstr -> constraints.add(new Constraint.SupertagConstraint(qstr.predicateIndex,
-                    qstr.category, false, config.supertagPenalty)));
+            query.getQAPairSurfaceForms().stream()
+                    .flatMap(qa -> qa.getQuestionStructures().stream())
+                    .distinct()
+                    .forEach(qstr -> constraints.add(new Constraint.SupertagConstraint(qstr.predicateIndex,
+                            qstr.category, false, config.supertagPenalty)));
             return ImmutableSet.copyOf(constraints);
-        }*/
+        }
 
         final ImmutableList<Integer> numVotes = IntStream.range(0, numQA)
                 .mapToObj(i -> optionDist[i]).collect(GuavaCollectors.toImmutableList());
@@ -233,29 +192,56 @@ public class ReparsingHelper {
                 .sorted((i, j) -> Integer.compare(-numVotes.get(i), -numVotes.get(j)))
                 .collect(GuavaCollectors.toImmutableList());
 
-        Set<Integer> processedOptions = new HashSet<>();
-        for (int opId1 : optionOrder) {
-            if (processedOptions.contains(opId1)) {
+        Table<Integer, Integer, String> relations = FixerNewStanford.getOptionRelations(sentenceId, sentence, query);
+        Set<Integer> skipOps = new HashSet<>();
+        for (int opId1 = 0; opId1 < numQA; opId1++) {
+            if (skipOps.contains(opId1)) {
                 continue;
             }
+            skipOps.add(opId1);
             final int votes = numVotes.get(opId1);
-            final QAStructureSurfaceForm qa = query.getQAPairSurfaceForms().get(opId1);
-            final ImmutableList<Integer> argIds1 = qa.getAnswerStructures().stream()
-                    .flatMap(ans -> ans.argumentIndices.stream())
-                    .distinct().sorted()
-                    .collect(GuavaCollectors.toImmutableList());
-            final String op1 = qa.getAnswer().toLowerCase();
+            boolean appliedHeuristic = false;
 
-            /*
-            final int pronounOpt = FixerNewStanford.getPronounOption(sentenceId, sentence, query, optionDist);
-            if (pronounOpt >= 0 && !processedOptions.contains(pronounOpt)) {
-                addConstraints(constraints, query,opId1, false, config);
-                addConstraints(constraints, query, ImmutableList.of(pronounOpt), true, config);
-                processedOptions.add(opId1);
-                processedOptions.add(pronounOpt);
+            if (relations.containsRow(opId1)) {
+                for (Map.Entry<Integer, String> e : relations.row(opId1).entrySet()) {
+                    final int opId2 = e.getKey();
+                    final String rel = e.getValue();
+                    final int votes2 = numVotes.get(opId2);
+                    if (skipOps.contains(opId2)) {
+                        continue;
+                    }
+                    if (rel.startsWith("coref") && votes + votes2 >= config.positiveConstraintMinAgreement) {
+                        System.out.println("### coref:\t" + rel);
+                        addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
+                        //addConstraints(constraints, query, ImmutableList.of(opId1), false, config);
+                        //addConstraints(constraints, query, ImmutableList.of(opId2), true, config);
+                        skipOps.add(opId2);
+                        appliedHeuristic = true;
+                    }
+                    if (rel.equals("pronoun") && votes + votes2 >= config.positiveConstraintMinAgreement) {
+                        System.out.println("### pronoun");
+                        addConstraints(constraints, query, ImmutableList.of(opId2), true, config);
+                        skipOps.add(opId2);
+                        appliedHeuristic = true;
+                    } else if (rel.equals("appositive") && votes >= config.positiveConstraintMinAgreement) {
+                        System.out.println("### appositives");
+                        addConstraints(constraints, query, ImmutableList.of(opId1), true, config);
+                        addConstraints(constraints, query, ImmutableList.of(opId2), true, config);
+                        skipOps.add(opId2);
+                        appliedHeuristic = true;
+                    } else if (rel.equals("relative") && votes + votes2 >= config.positiveConstraintMinAgreement) {
+                        System.out.println("### relatives");
+                        addConstraints(constraints, query, ImmutableList.of(opId1), false, config);
+                        addConstraints(constraints, query, ImmutableList.of(opId2), true, config);
+                        skipOps.add(opId2);
+                        appliedHeuristic = true;
+                    }
+                }
+            }
+
+            if (appliedHeuristic) {
                 continue;
             }
-            */
             if (votes >= config.positiveConstraintMinAgreement) {
                 addConstraints(constraints, query, ImmutableList.of(opId1), true, config);
             } else if (votes <= config.negativeConstraintMaxAgreement) {

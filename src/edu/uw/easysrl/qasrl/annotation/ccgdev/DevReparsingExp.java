@@ -7,22 +7,18 @@ import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.ParseData;
 import edu.uw.easysrl.qasrl.ParseDataLoader;
 import edu.uw.easysrl.qasrl.annotation.AnnotatedQuery;
-import edu.uw.easysrl.qasrl.annotation.CrowdFlowerDataUtils;
 import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
 import edu.uw.easysrl.qasrl.experiments.ReparsingHistory;
 import edu.uw.easysrl.qasrl.model.*;
 import edu.uw.easysrl.qasrl.model.Constraint;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
-import edu.uw.easysrl.qasrl.qg.syntax.QuestionStructure;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
 import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
-import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Created by luheng on 5/26/16.
@@ -54,8 +50,8 @@ public class DevReparsingExp {
         int numChangedSentence = 0;
         Results avgChange = new Results();
 
-        for (int sentenceId : CrowdFlowerDataUtils.getNewCoreArgAnnotatedSentenceIds()) {
-            //for (int sentenceId : annotations.keySet()) {
+        //for (int sentenceId : CrowdFlowerDataUtils.getNewCoreArgAnnotatedSentenceIds()) {
+        for (int sentenceId : annotations.keySet()) {
             history.addSentence(sentenceId);
 
             final ImmutableList<String> sentence = parser.getSentence(sentenceId);
@@ -67,6 +63,7 @@ public class DevReparsingExp {
                 avgChange.add(CcgEvaluation.evaluate(baselineParse.dependencies, baselineParse.dependencies));
                 continue;
             }
+            final Set<Constraint> allConstraints = new HashSet<>();
 
             for (AnnotatedQuery annotation : annotations.get(sentenceId)) {
                 final Optional<ScoredQuery<QAStructureSurfaceForm>> matchQueryOpt =
@@ -91,25 +88,25 @@ public class DevReparsingExp {
                 ///// Heuristics
                 final int[] optionDist = new int[query.getOptions().size()];
                 matchedResponses.forEach(response -> response.stream().forEach(r -> optionDist[r] ++));
-                final int[] newOptionDist = ReparsingHelper.getNewOptionDist2(sentenceId, sentence, query, matchedResponses,
-                        nbestLists.get(sentenceId), config);
+                //final int[] newOptionDist = ReparsingHelper.getNewOptionDist2(sentenceId, sentence, query, matchedResponses,
+                 //       nbestLists.get(sentenceId), config);
                 //final ImmutableSet<Constraint> constraints = ReparsingHelper.getConstraints(query, newOptionDist,
                 //        nbestLists.get(sentenceId), config);
                 final ImmutableSet<Constraint> constraints = ReparsingHelper.getConstraints2(sentenceId, sentence,
                         query, matchedResponses, nbestLists.get(sentenceId), config);
+                allConstraints.addAll(constraints);
 
-                history.addEntry(sentenceId, query, parser.getUserOptions(query, newOptionDist), constraints);
+                history.addEntry(sentenceId, query, parser.getUserOptions(query, optionDist), constraints);
                 if (history.lastIsWorsened()) {
                     history.printLatestHistory();
                     System.out.println(query.toString(sentence, 'G', parser.getGoldOptions(query), '*', optionDist));
-                    //System.out.println("Fixed:\t" + fixType);
-                    System.out.println(query.toString(sentence, 'G', parser.getGoldOptions(query), '*', newOptionDist));
+                    allConstraints.forEach(c -> System.out.println(c.toString(sentence)));
                     System.out.println();
                 }
             }
             Parse baselineParse = parser.getNBestList(sentenceId).getParse(0);
             Parse lastReparsed = history.getLastReparsed(sentenceId).orElse(baselineParse);
-             Results change = CcgEvaluation.evaluate(lastReparsed.dependencies, baselineParse.dependencies);
+            Results change = CcgEvaluation.evaluate(lastReparsed.dependencies, baselineParse.dependencies);
             if (change.getF1() < 0.999) {
                 ++ numChangedSentence;
             }

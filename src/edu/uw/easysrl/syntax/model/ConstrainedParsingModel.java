@@ -1,6 +1,7 @@
 package edu.uw.easysrl.syntax.model;
 
 import com.google.common.collect.HashBasedTable;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Table;
 import edu.uw.easysrl.dependencies.UnlabelledDependency;
@@ -14,7 +15,6 @@ import edu.uw.easysrl.syntax.tagger.Tagger;
 import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.*;
-import java.util.stream.IntStream;
 
 /**
  * A more general constrained parsing model compared to ConstrainedSupertagFactoredModel.
@@ -27,6 +27,7 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
     private static final boolean kNormalizeNegativeConstraints = false;
     private final List<List<Tagger.ScoredCategory>> tagsForWords;
     private Table<Integer, Integer, Double> mustLinks, cannotLinks;
+    private Table<Integer, ImmutableList<Integer>, Double> disjunctiveLinks;
     private Table<Integer, Category, Double> mustSupertags, cannotSupertags;
 
     public ConstrainedParsingModel(final List<List<Tagger.ScoredCategory>> tagsForWords,
@@ -40,6 +41,7 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
     private void initializeConstraints(final Set<Constraint> constraints) {
         mustLinks = HashBasedTable.create();
         cannotLinks = HashBasedTable.create();
+        disjunctiveLinks = HashBasedTable.create();
         mustSupertags = HashBasedTable.create();
         cannotSupertags = HashBasedTable.create();
 
@@ -50,14 +52,23 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                 .filter(c -> c.getHeadId() != c.getArgId())
                 .forEach(c -> mustLinks.put(c.getHeadId(), c.getArgId(), c.getStrength()));
 
-        // Disjunctive attachment constraint
         constraints.stream()
                 .filter(Constraint::isPositive)
                 .filter(Constraint.DisjunctiveAttachmentConstraint.class::isInstance)
                 .map(c -> (Constraint.DisjunctiveAttachmentConstraint) c)
                 .forEach(c -> {
-                    final double amortizedPenalty = 1.0 * c.getStrength() / c.getArgId().size();
-                    c.getArgId().stream()
+                    final double amortizedPenalty = 1.0 * c.getStrength() / c.getArgIds().size();
+                    disjunctiveLinks.put(c.getHeadId(), c.getArgIds(), amortizedPenalty);
+                });
+
+        // Amortized disjunctive attachment constraint
+        constraints.stream()
+                .filter(Constraint::isPositive)
+                .filter(Constraint.DisjunctiveAttachmentConstraint.class::isInstance)
+                .map(c -> (Constraint.DisjunctiveAttachmentConstraint) c)
+                .forEach(c -> {
+                    final double amortizedPenalty = 1.0 * c.getStrength() / c.getArgIds().size();
+                    c.getArgIds().stream()
                             .filter(argId -> argId != c.getHeadId())
                             .forEach(argId -> {
                                 if (!mustLinks.contains(c.getHeadId(), argId)) {
@@ -181,6 +192,39 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                 })
                 .mapToDouble(Table.Cell::getValue)
                 .sum();
+
+        // Penalize disjunctive link for getting both dependencies.
+        constraintsPenalty += disjunctiveLinks.cellSet().stream()
+                .filter(c -> {
+                    final int cHead = c.getRowKey();
+                    final ImmutableList<Integer> cArgs = c.getColumnKey();
+                    return !dependencies.stream()
+                            // Directed match.
+                            .anyMatch(dep -> dep.getHead() == cHead && cArgs.stream()
+                                    .allMatch(dep.getArguments()::contains));
+                })
+                .mapToDouble(Table.Cell::getValue)
+                .sum();
+
+        // Penalize missed disjunctive-links.
+        /*
+        constraintsPenalty += disjunctiveLinks.cellSet().stream()
+                .filter(c -> {
+                    final int cHead = c.getRowKey();
+                    final ImmutableList<Integer> cArgs = c.getColumnKey();
+                    return (indexInSpan(cHead, leftChild) && cArgs.stream().allMatch(a -> indexInSpan(a, rightChild)))
+                        || (indexInSpan(cHead, rightChild) && cArgs.stream().allMatch(a -> indexInSpan(a, leftChild)));
+                })
+                .filter(c -> {
+                    final int cHead = c.getRowKey();
+                    final ImmutableList<Integer> cArgs = c.getColumnKey();
+                    return !dependencies.stream()
+                            // Directed match.
+                            .anyMatch(dep -> dep.getHead() == cHead && cArgs.stream().anyMatch(dep.getArguments()::contains));
+                })
+                .mapToDouble(Table.Cell::getValue)
+                .sum();
+        */
 
         return new AgendaItem(node,
             leftChild.getInsideScore() + rightChild.getInsideScore() - lengthPenalty - constraintsPenalty, /* inside */
