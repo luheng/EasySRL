@@ -186,6 +186,7 @@ public class ReparsingHelper {
             return ImmutableSet.copyOf(constraints);
         }
 
+        // Apply heuristics.
         Table<Integer, Integer, String> relations = HeuristicHelper.getOptionRelations(sentenceId, sentence, query);
         Set<Integer> skipOps = new HashSet<>();
         for (int opId1 = 0; opId1 < numQA; opId1++) {
@@ -211,20 +212,23 @@ public class ReparsingHelper {
                         appliedHeuristic = true;
                         skipOps.add(opId2);
                         break;
-                    } else if (config.fixAppositves && rel.startsWith("appositive")) {
+                    }
+                    if (config.fixAppositves && rel.startsWith("appositive")) {
                         System.out.println("### appositives");
                         addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
                         appliedHeuristic = true;
                         skipOps.add(opId2);
                         break;
-                    } else if (config.fixRelatives && rel.startsWith("relative")) {
+                    }
+                    if (config.fixRelatives && rel.startsWith("relative")) {
                         System.out.println("### relatives");
                         addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
                         appliedHeuristic = true;
                         skipOps.add(opId2);
                         break;
                     }
-                    else if (config.fixSubspans && rel.equals("subspan") && votes > 1 && votes2 > 1
+                    if (config.fixSubspans && rel.equals("subspan")
+                            && votes > 1 && votes2 > 1
                             && Math.abs(votes - votes2) <= 1) {
                         System.out.println("### subspans");
                         addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
@@ -237,6 +241,8 @@ public class ReparsingHelper {
             if (appliedHeuristic) {
                 continue;
             }
+
+            // Normal positive/negative constraints.
             if (votes >= config.positiveConstraintMinAgreement) {
                 addConstraints(constraints, query, ImmutableList.of(opId1), true, config);
             } else if (votes <= config.negativeConstraintMaxAgreement) {

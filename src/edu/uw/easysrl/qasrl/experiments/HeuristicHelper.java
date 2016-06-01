@@ -72,11 +72,12 @@ public class HeuristicHelper {
                 final int dist2 = Math.abs(headId - args2.get(0));
 
                 boolean isSubspan = answer1.endsWith(" " + answer2) || answer1.startsWith(answer2 + " ");
-                
+
                 final boolean isPronoun = PronounList.nonPossessivePronouns.contains(qa2.getAnswer().toLowerCase())
                         && dist2 < dist1;
 
-                final boolean hasAppositive = !answer1.contains(" of ") && cachedDependencies.stream()
+                final boolean hasAppositive = !answer1.contains(" of ")
+                        && cachedDependencies.stream()
                         .filter(dep -> dep.reln().toString().equals("appos"))
                         .anyMatch(dep -> {
                             final int head = dep.gov().index() - 1, child = dep.dep().index() - 1;
@@ -95,7 +96,8 @@ public class HeuristicHelper {
                         .anyMatch(dep -> {
                             final int head = dep.gov().index() - 1, child = dep.dep().index() - 1;
                             return args2.contains(head) && args1.get(0) < child && child < args2.get(0);
-                        }) && cachedDependencies.stream()
+                        })
+                        && cachedDependencies.stream()
                         .filter(dep -> dep.reln().toString().equals("nsubj"))
                         .anyMatch(dep -> {
                             final int head = dep.gov().index() - 1, child = dep.dep().index() - 1;
