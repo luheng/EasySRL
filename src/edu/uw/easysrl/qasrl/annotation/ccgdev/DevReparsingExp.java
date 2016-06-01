@@ -1,7 +1,6 @@
 package edu.uw.easysrl.qasrl.annotation.ccgdev;
 
 import com.google.common.collect.*;
-import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.qasrl.NBestList;
 import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.ParseData;

@@ -44,7 +44,7 @@ public class FixerNewStanford {
     private final static double minMarginToFix = 0.33;
 
     private final static LexicalizedParser parser = LexicalizedParser.loadModel(
-            "./lib/stanford-english-corenlp-2016-01-10-models/edu/stanford/nlp/models/lexparser/englishPCFG.ser.gz",
+            "./edu/stanford/nlp/models/lexparser/englishPCFG.ser.gz",
             "-maxLength", "100", "-retainTmpSubcategories");
     private final static TreebankLanguagePack tlp = new PennTreebankLanguagePack();
     private final static GrammaticalStructureFactory gsf = tlp.grammaticalStructureFactory();
@@ -55,7 +55,7 @@ public class FixerNewStanford {
         props.setProperty("annotators", "tokenize,ssplit,pos,lemma,ner,parse,mention,coref");
         props.setProperty("tokenize.whitespace", "true");
     }
-    private final static StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
+    //private final static StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
 
     private static final ImmutableSet<String> salientDependencies =
             ImmutableSet.of("appos", "acl", "acl:relcl", "nsubj", "cop");
