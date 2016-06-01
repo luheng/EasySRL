@@ -191,8 +191,8 @@ public abstract class BaseCcgParser {
         private ConstrainedParserAStar parser;
         private Tagger batchTagger = null;
         private ImmutableList<List<List<Tagger.ScoredCategory>>> taggedSentences = null;
-        private final double supertaggerBeam = 0.000001;
-        private final int maxChartSize = 1000000;
+        private final double supertaggerBeam = 1e-4; // 0.000001;
+        private final int maxChartSize = 250000; //1000000;
         private final int maxSentenceLength = 100;
 
         public ConstrainedCcgParser(String modelFolderPath, int nBest) {

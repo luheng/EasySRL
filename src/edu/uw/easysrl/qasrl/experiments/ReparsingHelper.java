@@ -196,7 +196,7 @@ public class ReparsingHelper {
         Table<Integer, Integer, String> relations = (config.fixAppositves || config.fixRelatives) ?
                 HeuristicHelper.getOptionRelations(sentenceId, sentence, query) :
                 HeuristicHelper.getOptionRelationsNoDep(query);
-        
+
         Set<Integer> skipOps = new HashSet<>();
         for (int opId1 : optionOrders) {
             if (skipOps.contains(opId1)) {

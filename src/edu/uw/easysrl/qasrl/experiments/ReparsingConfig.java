@@ -33,7 +33,7 @@ public class ReparsingConfig {
     public int positiveConstraintMinAgreement = 3;
 
     @Option(name="-neg_threshold",usage="")
-    public int negativeConstraintMaxAgreement = 1;
+    public int negativeConstraintMaxAgreement = 0;
 
     @Option(name="-pos_penalty",usage="")
     public double positiveConstraintPenalty = 2.0;

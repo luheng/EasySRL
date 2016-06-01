@@ -6,6 +6,7 @@ import edu.uw.easysrl.qasrl.Parse;
 import edu.uw.easysrl.qasrl.ParseData;
 import edu.uw.easysrl.qasrl.ParseDataLoader;
 import edu.uw.easysrl.qasrl.annotation.AnnotatedQuery;
+import edu.uw.easysrl.qasrl.annotation.Annotation;
 import edu.uw.easysrl.qasrl.annotation.ccgdev.AnnotationFileLoader;
 import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
@@ -42,16 +43,19 @@ public class CcgReparsingExperiment {
 
         ParseData corpus;
         Map<Integer, NBestList> nbestLists;
+        Map<Integer, List<AnnotatedQuery>> annotations;
         if (!config.runTest) {
             corpus = ParseDataLoader.loadFromDevPool().get();
             nbestLists = NBestList.loadNBestListsFromFile("parses.tagged.dev.100best.out", 100).get();
+            annotations = AnnotationFileLoader.loadDev();
         } else {
             corpus = ParseDataLoader.loadFromTestPool(true).get();
             nbestLists = NBestList.loadNBestListsFromFile("parses.tagged.test.gold.100best.out", 100).get();
+            annotations = AnnotationFileLoader.loadTest();
         }
         final HITLParser parser = new HITLParser(corpus, nbestLists);
         final ReparsingHistory history =  new ReparsingHistory(parser);
-        final Map<Integer, List<AnnotatedQuery>> annotations = AnnotationFileLoader.loadDev();
+
         parser.setQueryPruningParameters(queryPruningParameters);
 
         int numMatchedAnnotations = 0;
