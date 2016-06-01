@@ -131,7 +131,7 @@ public class FixerNewStanford {
                             corefChain.getMentionsInTextualOrder().stream()
                                 .anyMatch(m -> m.startIndex - 1 <= args2.get(0) && args2.get(0) < m.endIndex)); */
 
-                final boolean hasAppositive = cachedDependencies.stream()
+                final boolean hasAppositive = !answer1.contains(" of ") && cachedDependencies.stream()
                         .filter(dep -> dep.reln().toString().equals("appos"))
                         .anyMatch(dep -> {
                             final int head = dep.gov().index() - 1, child = dep.dep().index() - 1;
@@ -171,11 +171,11 @@ public class FixerNewStanford {
                 }
             }
         }
-        relations.cellSet().forEach(c -> {
+        /*relations.cellSet().forEach(c -> {
             System.out.println(query.getOptions().get(c.getRowKey()) + "\t"
                     + query.getOptions().get(c.getColumnKey()) + "\t"
                     + c.getValue());
-        });
+        });*/
         return relations;
     }
 

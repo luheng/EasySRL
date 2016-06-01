@@ -92,8 +92,8 @@ public class DevReparsingExp {
                 allConstraints.addAll(constraints);
 
                 history.addEntry(sentenceId, query, parser.getUserOptions(query, optionDist), constraints);
-                if (history.lastIsWorsened() && constraints.stream()
-                        .anyMatch(Constraint.DisjunctiveAttachmentConstraint.class::isInstance)) {
+                if (history.lastIsWorsened() /*&& constraints.stream()
+                        .anyMatch(Constraint.DisjunctiveAttachmentConstraint.class::isInstance)*/) {
                     history.printLatestHistory();
                     System.out.println(query.toString(sentence, 'G', parser.getGoldOptions(query), '*', optionDist));
                     constraints.forEach(c -> System.out.println(c.toString(sentence)));

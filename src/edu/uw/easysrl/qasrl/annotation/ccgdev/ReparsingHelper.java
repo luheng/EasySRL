@@ -177,7 +177,8 @@ public class ReparsingHelper {
         final int numQA = query.getQAPairSurfaceForms().size();
 
         // Add supertag constraints.
-        if (IntStream.range(0, numQA).map(i -> optionDist[i]).sum() <= config.negativeConstraintMaxAgreement) {
+        //if (IntStream.range(0, numQA).map(i -> optionDist[i]).sum() <= config.negativeConstraintMaxAgreement) {
+        if (optionDist[query.getBadQuestionOptionId().getAsInt()] >= config.positiveConstraintMinAgreement) {
             query.getQAPairSurfaceForms().stream()
                     .flatMap(qa -> qa.getQuestionStructures().stream())
                     .distinct()
@@ -220,9 +221,11 @@ public class ReparsingHelper {
                     }
                     if (config.fixAppositves && rel.equals("appositive") && votes >= config.positiveConstraintMinAgreement) {
                         System.out.println("### appositives");
-                        addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
-                        //addConstraints(constraints, query, ImmutableList.of(opId1), true, config);
-                        //addConstraints(constraints, query, ImmutableList.of(opId2), true, config);
+                        //addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
+                        addConstraints(constraints, query, ImmutableList.of(opId1), true, config);
+                        if (votes2 > 0) {
+                            addConstraints(constraints, query, ImmutableList.of(opId2), true, config);
+                        }
                         appliedHeuristic = true;
                         skipOps.add(opId2);
                         break;
