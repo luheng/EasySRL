@@ -85,7 +85,7 @@ public abstract class BaseCcgParser {
         private ImmutableList<List<List<Tagger.ScoredCategory>>> taggedSentences = null;
 
         public AStarParser(String modelFolderPath, int nBest)  {
-            this(modelFolderPath, nBest, 1e-6, 1e-6, 1000000, 70);
+            this(modelFolderPath, nBest, 1e-4, 1e-6, 1000000, 70);
         }
 
         public Parser getParser() {
@@ -194,7 +194,7 @@ public abstract class BaseCcgParser {
         private ImmutableList<List<List<Tagger.ScoredCategory>>> taggedSentences = null;
         private final double supertaggerBeam = 1e-6; // 0.000001;
         private final int maxChartSize = 1000000;
-        private final int maxSentenceLength = 100;
+        private final int maxSentenceLength = 70;
 
         public ConstrainedCcgParser(String modelFolderPath, int nBest) {
             final File modelFolder = Util.getFile(modelFolderPath);

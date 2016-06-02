@@ -43,7 +43,7 @@ public class BioinferDataWriter {
             "./Crowdflower_data/f914096.csv",
     };
 
-    private static final String outputFilePath = "bioinfer.qa.tsv";
+    private static final String outputFilePath = "bioinfer2.qa.tsv";
 
     private static QueryPruningParameters queryPruningParameters;
     static {
@@ -124,5 +124,6 @@ public class BioinferDataWriter {
         }
         writer.close();
         System.out.println(String.format("Wrote %d annotations to file %s.", numWrittenAnnotations, outputFilePath));
+        System.out.println(String.format("Covered %d sentences\t", sentenceIds.size()));
     }
 }

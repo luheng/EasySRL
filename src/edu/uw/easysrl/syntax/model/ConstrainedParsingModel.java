@@ -84,8 +84,7 @@ public class ConstrainedParsingModel extends SupertagFactoredModel {
                         .collect(GuavaCollectors.toImmutableSet());
 
         disjunctiveConstraints.forEach(c -> {
-            // TODO: sanity-check only.
-            final double penalty  = /* c.getStrength(); */ 1.0 * c.getStrength() / c.getArgIds().size();
+            final double penalty  = c.getStrength(); // 1.0 * c.getStrength() / c.getArgIds().size();
             // Add disjunctive penalty to avoid double-counting in case of appositives.
             disjunctiveLinks.put(c.getHeadId(), c.getArgIds(), penalty);
             // Treat as conjunctive positive constraint.

@@ -17,7 +17,7 @@ import java.util.*;
 public class AnnotationFileLoader {
 
     private static final String devAnnotationFilePath = "ccgdev2.qa.tsv";
-    private static final String testAnnotationFilePath = "ccgtest.qa.tsv";
+    private static final String testAnnotationFilePath = "ccgtest2.qa.tsv";
     private static final String bioinferAnnotationFilePath = "bioinfer.qa.tsv";
 
     public static Map<Integer, List<AnnotatedQuery>> loadDev() {

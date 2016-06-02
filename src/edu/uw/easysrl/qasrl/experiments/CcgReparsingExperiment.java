@@ -1,4 +1,4 @@
-package edu.uw.easysrl.qasrl.experiments;
+    package edu.uw.easysrl.qasrl.experiments;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.*;
@@ -65,7 +65,6 @@ public class CcgReparsingExperiment {
         baseParser.cacheSupertags(parser.getParseData());
         BaseCcgParser.ConstrainedCcgParser reParser = new BaseCcgParser.ConstrainedCcgParser(BaseCcgParser.modelFolder,
                 1 /* one best */);
-
         reParser.cacheSupertags(parser.getParseData());
         Results avgBaseline = new Results(),
                 avgReranked = new Results(),
@@ -135,7 +134,13 @@ public class CcgReparsingExperiment {
                 avgUnlabeledReparsed.add(unlabeledBaselineF1);
             } else {
                 final NBestList nBestList = parser.getNBestList(sentenceId);
-                final Parse reparsed = parser.getReparsed(sentenceId, allConstraintsForSentence);
+                Parse reparsed = reParser.parseWithConstraint(sentenceId,
+                        corpus.getSentenceInputWords().get(sentenceId),
+                        allConstraintsForSentence); //parser.getReparsed(sentenceId, allConstraintsForSentence);
+                if (reparsed == null) {
+                    System.err.println("Reparsing failed, using baseline.");
+                    reparsed = baselineParse;
+                }
                 final int rerankedId = parser.getRerankedParseId(sentenceId, allConstraintsForSentence);
                 Results rerankedF1 = nBestList.getResults(rerankedId);
                 Results unlabeledRerankedF1 = CcgEvaluation.evaluateUnlabeled(

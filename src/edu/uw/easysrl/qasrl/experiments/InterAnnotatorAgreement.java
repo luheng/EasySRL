@@ -21,8 +21,6 @@ public class InterAnnotatorAgreement {
         for  (int sentenceId : annotations.keySet()) {
             for (AnnotatedQuery annotation : annotations.get(sentenceId)) {
                 numTotalAnnotations ++;
-
-
                 int[] optionDist = new int[annotation.optionStrings.size()];
                 Arrays.fill(optionDist, 0);
                 annotation.responses.forEach(res -> res.forEach(r -> optionDist[r] ++));
