@@ -146,7 +146,7 @@ public abstract class Constraint {
             return headId;
         }
 
-        public ImmutableList<Integer> getArgId() {
+        public ImmutableList<Integer> getArgIds() {
             return argIds;
         }
 

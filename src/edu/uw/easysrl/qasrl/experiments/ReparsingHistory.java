@@ -266,7 +266,6 @@ public class ReparsingHistory {
     public ImmutableList<Integer> getModifiedSentences(final Map<Integer, List<Parse>> parsesMap) {
         return sentenceIds.stream()
                 .filter(sid -> CcgEvaluation.evaluate(getLast(parsesMap.get(sid)).dependencies,
-                                                      //hitlParser.getNBestList(sid).getParse(0).dependencies).getF1() < 1.0 - 1e-6)
                         parsesMap.get(sid).get(0).dependencies).getF1() < 1.0 - 1e-6)
                 .collect(GuavaCollectors.toImmutableList());
     }

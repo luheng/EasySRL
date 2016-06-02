@@ -1,4 +1,4 @@
-package edu.uw.easysrl.qasrl.annotation.ccgdev;
+package edu.uw.easysrl.qasrl.experiments;
 
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
@@ -8,6 +8,9 @@ import org.kohsuke.args4j.Option;
  * Created by luheng on 5/29/16.
  */
 public class ReparsingConfig {
+    @Option(name="-test",usage="Ccg test")
+    public boolean runTest = false;
+
     @Option(name="-pronoun",usage="Fix pronoun")
     public boolean fixPronouns = false;
 
@@ -30,7 +33,7 @@ public class ReparsingConfig {
     public int positiveConstraintMinAgreement = 3;
 
     @Option(name="-neg_threshold",usage="")
-    public int negativeConstraintMaxAgreement = 1;
+    public int negativeConstraintMaxAgreement = 0;
 
     @Option(name="-pos_penalty",usage="")
     public double positiveConstraintPenalty = 2.0;
@@ -56,7 +59,8 @@ public class ReparsingConfig {
 
     public String toString() {
         return new StringBuilder()
-                .append("Fix pronouns=\t").append(fixPronouns)
+                .append("Run on test=\t").append(runTest)
+                .append("\nFix pronouns=\t").append(fixPronouns)
                 .append("\nFix subspans=\t").append(fixSubspans)
                 .append("\nFix appositives=\t").append(fixAppositves)
                 .append("\nFix relatives=\t").append(fixRelatives)

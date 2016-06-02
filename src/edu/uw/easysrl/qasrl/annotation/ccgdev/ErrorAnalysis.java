@@ -164,7 +164,7 @@ public class ErrorAnalysis {
 
                 //////////////////////////// old stuff
                 /*
-                ImmutableSet<Constraint> constraints = parser.getConstraints(query, newOptionDist),
+                ImmutableSet<Constraint> constraints = parser.getConstraintsOld(query, newOptionDist),
                         oracleConstraints = parser.getOracleConstraints(query);
                 allConstraints.addAll(constraints);
                 allOracleConstraints.addAll(oracleConstraints);

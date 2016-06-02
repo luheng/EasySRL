@@ -10,6 +10,8 @@ import edu.uw.easysrl.qasrl.annotation.AnnotatedQuery;
 import edu.uw.easysrl.qasrl.annotation.CrowdFlowerDataUtils;
 import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
+import edu.uw.easysrl.qasrl.experiments.ReparsingConfig;
+import edu.uw.easysrl.qasrl.experiments.ReparsingHelper;
 import edu.uw.easysrl.qasrl.experiments.ReparsingHistory;
 import edu.uw.easysrl.qasrl.model.*;
 import edu.uw.easysrl.qasrl.model.Constraint;
@@ -93,7 +95,7 @@ public class DevReparsing {
                 matchedResponses.forEach(response -> response.stream().forEach(r -> optionDist[r] ++));
                 final int[] newOptionDist = ReparsingHelper.getNewOptionDist(sentence, query, matchedResponses,
                         nbestLists.get(sentenceId), config);
-                final ImmutableSet<Constraint> constraints = ReparsingHelper.getConstraints(query, newOptionDist,
+                final ImmutableSet<Constraint> constraints = ReparsingHelper.getConstraintsOld(query, newOptionDist,
                         nbestLists.get(sentenceId), config);
 
                 history.addEntry(sentenceId, query, parser.getUserOptions(query, newOptionDist), constraints);

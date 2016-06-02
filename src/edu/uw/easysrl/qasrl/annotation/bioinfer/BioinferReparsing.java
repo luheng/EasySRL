@@ -10,13 +10,11 @@ import edu.uw.easysrl.main.InputReader;
 import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.annotation.AnnotatedQuery;
 import edu.uw.easysrl.qasrl.annotation.ccgdev.AnnotationFileLoader;
-import edu.uw.easysrl.qasrl.annotation.ccgdev.ReparsingConfig;
-import edu.uw.easysrl.qasrl.annotation.ccgdev.ReparsingHelper;
+import edu.uw.easysrl.qasrl.experiments.ReparsingConfig;
+import edu.uw.easysrl.qasrl.experiments.ReparsingHelper;
 import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
 import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
-import edu.uw.easysrl.qasrl.experiments.ReparsingHistory;
 import edu.uw.easysrl.qasrl.model.Constraint;
-import edu.uw.easysrl.qasrl.model.HITLParser;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
@@ -142,7 +140,7 @@ public class BioinferReparsing {
                     ///// Heuristics and constraints.
                     final int[] newOptionDist = ReparsingHelper.getNewOptionDist(sentence, query, matchedResponses,
                                                                                  nBestList, config);
-                    constraints.addAll(ReparsingHelper.getConstraints(query, newOptionDist, nBestList, config));
+                    constraints.addAll(ReparsingHelper.getConstraintsOld(query, newOptionDist, nBestList, config));
                 }
             }
             final Parse reparsed = constraints.isEmpty() ? baselineParse

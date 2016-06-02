@@ -3,18 +3,16 @@ package edu.uw.easysrl.qasrl.annotation.ccgdev;
 import com.google.common.collect.ImmutableList;
 import edu.uw.easysrl.qasrl.NBestList;
 import edu.uw.easysrl.qasrl.TextGenerationHelper;
+import edu.uw.easysrl.qasrl.experiments.ReparsingHelper;
 import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
 import edu.uw.easysrl.qasrl.qg.util.Prepositions;
 import edu.uw.easysrl.qasrl.qg.util.PronounList;
 import edu.uw.easysrl.qasrl.qg.util.VerbHelper;
 import edu.uw.easysrl.qasrl.query.ScoredQuery;
-import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.util.GuavaCollectors;
 
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 /**
  * Pronoun:    if exists a pronoun A and votes(pronoun) > 0: C+(A), C-(everything else)
