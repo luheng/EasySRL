@@ -101,8 +101,8 @@ public class TestReparsing {
                 numMatchedAnnotations ++;
                 // Filter ditransitives.
                 if (query.getQAPairSurfaceForms().stream().flatMap(qa -> qa.getQuestionStructures().stream())
-                        .allMatch(q -> (q.category == Category.valueOf("((S[dcl]\\NP)/NP)/NP") && q.targetArgNum > 1)
-                                || (q.category == Category.valueOf("((S[b]\\NP)/NP)/NP") && q.targetArgNum > 1))) {
+                        .allMatch(q -> (q.category == Category.valueOf("((S\\NP)/NP)/NP") && q.targetArgNum > 1))) {
+                                //|| (q.category == Category.valueOf("((S[b]\\NP)/NP)/NP") && q.targetArgNum > 1))) {
                     continue;
                 }
                 ///// Heuristics and constraints.

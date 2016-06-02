@@ -164,6 +164,7 @@ public abstract class BaseCcgParser {
                     new InputReader.InputToParser(sentence, null, taggedSentences.get(sentenceId), true);
             List<Scored<SyntaxTreeNode>> parses = parser.doParsing(input);
             if (parses == null || parses.size() == 0) {
+                System.err.println("Unable to parse:\t" + taggedSentences);
                 return null;
             }
             return getParse(sentence, parses.get(0), dependencyGenerator);
@@ -191,8 +192,8 @@ public abstract class BaseCcgParser {
         private ConstrainedParserAStar parser;
         private Tagger batchTagger = null;
         private ImmutableList<List<List<Tagger.ScoredCategory>>> taggedSentences = null;
-        private final double supertaggerBeam = 1e-4; // 0.000001;
-        private final int maxChartSize = 250000; //1000000;
+        private final double supertaggerBeam = 1e-6; // 0.000001;
+        private final int maxChartSize = 1000000;
         private final int maxSentenceLength = 100;
 
         public ConstrainedCcgParser(String modelFolderPath, int nBest) {
