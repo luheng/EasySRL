@@ -1,10 +1,7 @@
 package edu.uw.easysrl.qasrl.experiments;
 
 import com.google.common.collect.*;
-import edu.uw.easysrl.qasrl.NBestList;
-import edu.uw.easysrl.qasrl.Parse;
-import edu.uw.easysrl.qasrl.ParseData;
-import edu.uw.easysrl.qasrl.ParseDataLoader;
+import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.annotation.AnnotatedQuery;
 import edu.uw.easysrl.qasrl.annotation.Annotation;
 import edu.uw.easysrl.qasrl.annotation.ccgdev.AnnotationFileLoader;
@@ -62,22 +59,48 @@ public class CcgReparsingExperiment {
         int numChangedSentence = 0;
         Results avgChange = new Results();
 
+        BaseCcgParser.AStarParser baseParser = new BaseCcgParser.AStarParser(BaseCcgParser.modelFolder, 1);
+        baseParser.cacheSupertags(parser.getParseData());
+        BaseCcgParser.ConstrainedCcgParser reParser = new BaseCcgParser.ConstrainedCcgParser(BaseCcgParser.modelFolder, 1);
+        reParser.cacheSupertags(parser.getParseData());
+        Results avgBaseline = new Results(),
+                avgReranked = new Results(),
+                avgReparsed = new Results(),
+                avgUnlabeledBaseline = new Results(),
+                avgUnlabeledReranked = new Results(),
+                avgUnlabeledReparsed = new Results();
+
+        int sentenceCounter = 0;
         for (int sentenceId = 0; sentenceId < corpus.getSentences().size(); sentenceId++) {
             if (!config.runTest && !nbestLists.containsKey(sentenceId)) {
                 continue;
             }
+            sentenceCounter ++;
             history.addSentence(sentenceId);
             final ImmutableList<String> sentence = parser.getSentence(sentenceId);
             ImmutableList<ScoredQuery<QAStructureSurfaceForm>> queries = null;
             if (annotations.containsKey(sentenceId)) {
-                queries = !config.runTest ? parser.getAllCoreArgQueriesForSentence(sentenceId) :
+                queries = !config.runTest ?
+                        parser.getAllCoreArgQueriesForSentence(sentenceId) :
                         parser.getNewCoreArgQueriesForSentence(sentenceId);
             }
+            //// Sanity check.
+            final Parse goldParse = parser.getGoldParse(sentenceId);
+            final Parse baselineParse = baseParser.parse(sentenceId, parser.getInputSentence(sentenceId));
+            final Results baselineF1 = CcgEvaluation.evaluate(baselineParse.dependencies, goldParse.dependencies);
+            final Results unlabeledBaselineF1 = CcgEvaluation.evaluateUnlabeled(baselineParse.dependencies, goldParse.dependencies);
+            avgBaseline.add(baselineF1);
+            avgUnlabeledBaseline.add(unlabeledBaselineF1);
             if (queries == null || queries.isEmpty() || !annotations.containsKey(sentenceId)) {
-                Parse baselineParse = parser.getNBestList(sentenceId).getParse(0);
+                avgReparsed.add(baselineF1);
+                avgReranked.add(baselineF1);
+                avgUnlabeledReranked.add(unlabeledBaselineF1);
+                avgUnlabeledReparsed.add(unlabeledBaselineF1);
                 avgChange.add(CcgEvaluation.evaluate(baselineParse.dependencies, baselineParse.dependencies));
                 continue;
             }
+
+            final Set<Constraint> allConstraintsForSentence = new HashSet<>();
             for (AnnotatedQuery annotation : annotations.get(sentenceId)) {
                 final Optional<ScoredQuery<QAStructureSurfaceForm>> matchQueryOpt =
                         ExperimentUtils.getBestAlignedQuery(annotation, queries);
@@ -99,9 +122,12 @@ public class CcgReparsingExperiment {
                 // Get constraints.
                 final ImmutableSet<Constraint> constraints = ReparsingHelper.getConstraints(sentenceId, sentence,
                         query, matchedResponses, config);
+                allConstraintsForSentence.addAll(constraints);
+
                 final int[] optionDist = new int[query.getOptions().size()];
                 matchedResponses.forEach(response -> response.stream().forEach(r -> optionDist[r] ++));
                 history.addEntry(sentenceId, query, parser.getUserOptions(query, optionDist), constraints);
+
                 // Debug for dev.
                 if (!config.runTest && history.lastIsWorsened()) {
                     history.printLatestHistory();
@@ -110,18 +136,48 @@ public class CcgReparsingExperiment {
                     System.out.println();
                 }
             }
-            Parse baselineParse = parser.getNBestList(sentenceId).getParse(0);
             Parse lastReparsed = history.getLastReparsed(sentenceId).orElse(baselineParse);
             Results change = CcgEvaluation.evaluate(lastReparsed.dependencies, baselineParse.dependencies);
             if (change.getF1() < 0.999) {
                 ++ numChangedSentence;
             }
             avgChange.add(change);
+
+            if (allConstraintsForSentence.isEmpty()) {
+                avgReparsed.add(baselineF1);
+                avgReranked.add(baselineF1);
+                avgUnlabeledReranked.add(unlabeledBaselineF1);
+                avgUnlabeledReparsed.add(unlabeledBaselineF1);
+            } else {
+                final NBestList nBestList = parser.getNBestList(sentenceId);
+                final Parse reparsed = parser.getReparsed(sentenceId, allConstraintsForSentence);
+                final int rerankedId = parser.getRerankedParseId(sentenceId, allConstraintsForSentence);
+                Results rerankedF1 = nBestList.getResults(rerankedId);
+                Results unlabeledRerankedF1 = CcgEvaluation.evaluateUnlabeled(nBestList.getParse(rerankedId).dependencies,
+                        goldParse.dependencies);
+                Results reparsedF1 = CcgEvaluation.evaluate(reparsed.dependencies, goldParse.dependencies);
+                Results unlabeledReparsedF1 = CcgEvaluation.evaluateUnlabeled(reparsed.dependencies, goldParse.dependencies);
+                avgReparsed.add(reparsedF1);
+                avgReranked.add(rerankedF1);
+                avgUnlabeledReranked.add(unlabeledRerankedF1);
+                avgUnlabeledReparsed.add(unlabeledReparsedF1);
+            }
+            if (sentenceCounter % 100 == 0) {
+                System.out.println("Parsed " + sentenceCounter + " sentences ...");
+            }
         }
         System.out.println("Num. matched annotation:\t" + numMatchedAnnotations);
         System.out.println(config.toString());
         System.out.println("Num. changed sentences:\t" + numChangedSentence);
         System.out.println("Avg. change:\t" + avgChange);
         history.printSummary();
+
+        System.out.println("Num. matched annotation:\t" + numMatchedAnnotations);
+        System.out.println("Labeled baseline:\n" + avgBaseline);
+        System.out.println("Labeled reranked:\n" + avgReranked);
+        System.out.println("Labeled reparsed:\n" + avgReparsed);
+        System.out.println("Unlabeled baseline:\n" + avgUnlabeledBaseline);
+        System.out.println("Unlabeled reranked:\n" + avgUnlabeledReranked);
+        System.out.println("Unlabeled reparsed:\n" + avgUnlabeledReparsed);
     }
 }

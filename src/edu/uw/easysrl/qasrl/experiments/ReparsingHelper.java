@@ -215,28 +215,28 @@ public class ReparsingHelper {
                     continue;
                 }
                 if (config.fixPronouns && rel.startsWith("pronoun")) {
-                    System.out.println("### coref:\t" + rel);
+                    //System.out.println("### coref:\t" + rel);
                     addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
                     appliedHeuristic = true;
                     skipOps.add(opId2);
                     break;
                 }
                 if (config.fixAppositves && rel.startsWith("appositive")) {
-                    System.out.println("### appositives");
+                    //System.out.println("### appositives");
                     addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
                     appliedHeuristic = true;
                     skipOps.add(opId2);
                     break;
                 }
                 if (config.fixRelatives && rel.startsWith("relative")) {
-                    System.out.println("### relatives");
+                    //System.out.println("### relatives");
                     addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
                     appliedHeuristic = true;
                     skipOps.add(opId2);
                     break;
                 }
                 if (config.fixSubspans && rel.equals("subspan") && Math.abs(votes - votes2) <= 1) {
-                    System.out.println("### subspans");
+                    //System.out.println("### subspans");
                     addConstraints(constraints, query, ImmutableList.of(opId1, opId2), true, config);
                     appliedHeuristic = true;
                     skipOps.add(opId2);
