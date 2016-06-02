@@ -1,32 +1,18 @@
 package edu.uw.easysrl.qasrl.experiments;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.*;
-import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.annotation.AnnotatedQuery;
-import edu.uw.easysrl.qasrl.annotation.Annotation;
 import edu.uw.easysrl.qasrl.annotation.ccgdev.AnnotationFileLoader;
-import edu.uw.easysrl.qasrl.evaluation.CcgEvaluation;
-import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
-import edu.uw.easysrl.qasrl.experiments.ReparsingConfig;
-import edu.uw.easysrl.qasrl.experiments.ReparsingHelper;
-import edu.uw.easysrl.qasrl.experiments.ReparsingHistory;
-import edu.uw.easysrl.qasrl.model.*;
-import edu.uw.easysrl.qasrl.model.Constraint;
-import edu.uw.easysrl.qasrl.qg.surfaceform.QAStructureSurfaceForm;
-import edu.uw.easysrl.qasrl.query.QueryPruningParameters;
-import edu.uw.easysrl.qasrl.query.ScoredQuery;
-import edu.uw.easysrl.syntax.evaluation.Results;
-import edu.uw.easysrl.syntax.grammar.Category;
+
 
 import java.util.*;
-import java.util.stream.IntStream;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
 
 public class InterAnnotatorAgreement {
 
     public static void main(String[] args) {
-        ParseData corpus;
-        Map<Integer, List<AnnotatedQuery>> annotations = AnnotationFileLoader.loadDev();
+        Map<Integer, List<AnnotatedQuery>> annotations = AnnotationFileLoader.loadTest();
         int[] agreementCount = new int[6],
                 strictAgreementCount = new int[6];
         Arrays.fill(agreementCount, 0);
@@ -34,7 +20,24 @@ public class InterAnnotatorAgreement {
         int numTotalAnnotations = 0;
         for  (int sentenceId : annotations.keySet()) {
             for (AnnotatedQuery annotation : annotations.get(sentenceId)) {
+                numTotalAnnotations ++;
 
+
+                int[] optionDist = new int[annotation.optionStrings.size()];
+                Arrays.fill(optionDist, 0);
+                annotation.responses.forEach(res -> res.forEach(r -> optionDist[r] ++));
+
+                int maxAgree = 0;
+                for (int agr : optionDist) {
+                    maxAgree = Math.max(maxAgree, agr);
+                }
+                agreementCount[maxAgree] ++;
+                final int strictAgreement = annotation.responses.stream()
+                        .collect(Collectors.groupingBy(Function.identity()))
+                        .values().stream()
+                        .map(Collection::size)
+                        .max(Integer::compare).get();
+                strictAgreementCount[strictAgreement] ++;
             }
         }
 

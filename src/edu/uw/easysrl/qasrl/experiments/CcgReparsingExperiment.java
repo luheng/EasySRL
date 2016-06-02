@@ -20,6 +20,8 @@ import edu.uw.easysrl.syntax.evaluation.Results;
 import edu.uw.easysrl.syntax.grammar.Category;
 
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class CcgReparsingExperiment {
@@ -76,7 +78,6 @@ public class CcgReparsingExperiment {
                 avgReparsedOnChanged = new Results();
 
         int sentenceCounter = 0;
-        //for (int sentenceId = 0; sentenceId < corpus.getSentences().size(); sentenceId++) {
         for  (int sentenceId : parser.getAllSentenceIds()) {
             if (!config.runTest && !nbestLists.containsKey(sentenceId)) {
                 continue;
@@ -120,15 +121,8 @@ public class CcgReparsingExperiment {
                 final ScoredQuery<QAStructureSurfaceForm> query = matchQueryOpt.get();
                 final ImmutableList<ImmutableList<Integer>> matchedResponses = annotation.getResponses(query);
                 Preconditions.checkArgument(matchedResponses.stream().filter(r -> r.size() > 0).count() == 5);
-
-                // Filter ditransitives.
-                /*
-                if (query.getQAPairSurfaceForms().stream().flatMap(qa -> qa.getQuestionStructures().stream())
-                        .anyMatch(q -> (q.category == Category.valueOf("((S\\NP)/NP)/NP") && q.targetArgNum > 1))) {
-                    continue;
-                }*/
-
                 numMatchedAnnotations ++;
+
                 // Get constraints.
                 final ImmutableSet<Constraint> constraints = ReparsingHelper.getConstraints(sentenceId, sentence,
                         query, matchedResponses, config);
