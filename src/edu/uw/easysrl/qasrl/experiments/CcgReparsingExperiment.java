@@ -122,10 +122,11 @@ public class CcgReparsingExperiment {
                 Preconditions.checkArgument(matchedResponses.stream().filter(r -> r.size() > 0).count() == 5);
 
                 // Filter ditransitives.
+                /*
                 if (query.getQAPairSurfaceForms().stream().flatMap(qa -> qa.getQuestionStructures().stream())
                         .anyMatch(q -> (q.category == Category.valueOf("((S\\NP)/NP)/NP") && q.targetArgNum > 1))) {
                     continue;
-                }
+                }*/
 
                 numMatchedAnnotations ++;
                 // Get constraints.
@@ -179,8 +180,6 @@ public class CcgReparsingExperiment {
         System.out.println("Unlabeled baseline:\n" + avgUnlabeledBaseline);
         System.out.println("Unlabeled reranked:\n" + avgUnlabeledReranked);
         System.out.println("Unlabeled reparsed:\n" + avgUnlabeledReparsed);
-
-
 
         System.out.println("Sanity check:\t" + avgBaseline.getFrequency() + "\t"
                 + avgReranked.getFrequency() + "\t" + avgReparsed.getFrequency());
