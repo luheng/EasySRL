@@ -21,7 +21,7 @@ import static edu.uw.easysrl.util.GuavaCollectors.toImmutableList;
 /**
  * Created by luheng on 5/24/16.
  */
-public class ParseDataLoader {
+public class    ParseDataLoader {
 
     private static ParseData makeParseData(List<List<InputReader.InputWord>> sentenceInputWords,
                                            List<Parse> goldParses) {

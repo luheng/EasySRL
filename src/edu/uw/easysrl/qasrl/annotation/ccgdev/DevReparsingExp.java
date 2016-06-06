@@ -99,8 +99,8 @@ public class DevReparsingExp {
                         .count();
 
                 history.addEntry(sentenceId, query, parser.getUserOptions(query, optionDist), constraints);
-                //if (unsure >= 2) {
-                if (history.lastIsWorsened()) {
+                if (unsure >= 2) {
+                //if (history.lastIsWorsened()) {
                 //if ( constraints.stream()
                 //        .anyMatch(Constraint.DisjunctiveAttachmentConstraint.class::isInstance)) {
                     history.printLatestHistory();
