@@ -4,6 +4,10 @@ import edu.uw.easysrl.qasrl.*;
 import edu.uw.easysrl.qasrl.query.*;
 import edu.uw.easysrl.qasrl.qg.surfaceform.*;
 
+import edu.uw.easysrl.qasrl.annotation.ccgdev.AnnotationFileLoader;
+import edu.uw.easysrl.qasrl.annotation.AnnotatedQuery;
+import edu.uw.easysrl.qasrl.experiments.ExperimentUtils;
+
 import edu.uw.easysrl.dependencies.ResolvedDependency;
 import edu.uw.easysrl.syntax.grammar.Category;
 import edu.uw.easysrl.qasrl.qg.util.*;
@@ -897,7 +901,7 @@ public class QuestionGenerator {
 
         final ParseData devData = getDevData();
         if(args.length == 0 || (!args[0].equalsIgnoreCase("gold") && !args[0].equalsIgnoreCase("compare") &&
-                                !args[0].equalsIgnoreCase("queries"))) {
+                                !args[0].equalsIgnoreCase("queries") && !args[0].equalsIgnoreCase("assess"))) {
             System.err.println("requires argument: \"gold\" or \"compare\" or \"queries\"");
         } else if(args[0].equalsIgnoreCase("gold")) {
             printGoldQAPairs(devData, qgPipeline);
@@ -918,6 +922,8 @@ public class QuestionGenerator {
             ImmutableList<Integer> allSentences = IntStream.range(0, devData.getSentences().size()).boxed().collect(toImmutableList());
             printQueries(devData, allSentences, qgPipeline);
             // printStringAggregatedQueries(devData, allSentences, qgPipeline);
+        } else if(args[0].equalsIgnoreCase("assess")) {
+            assessAnnotations();
         }
     }
 
@@ -1019,6 +1025,170 @@ public class QuestionGenerator {
                 }
             }
         }
+    }
+
+    private static void assessAnnotations() {
+        QueryPruningParameters queryPruningParameters = new QueryPruningParameters();
+        queryPruningParameters.maxNumOptionsPerQuery = 6;
+        queryPruningParameters.skipPPQuestions = true;
+        queryPruningParameters.skipSAdjQuestions = true;
+        queryPruningParameters.minOptionConfidence = 0.05;
+        queryPruningParameters.minOptionEntropy = -1;
+        queryPruningParameters.minPromptConfidence = 0.1;
+
+        final Map<Integer, List<AnnotatedQuery>> allAnnotations = AnnotationFileLoader.loadDev();
+
+        int numAnnotationInstances = 0, numAnnotationCheckboxInstances = 0;
+        int numAnnotationsCorrect = 0, numAnnotationCheckingsCorrect = 0;
+
+        int numQueryInstances = 0, numCheckboxInstances = 0;
+        int numOneBestCorrect = 0, numOneBestCheckingsCorrect = 0;
+
+        int numAggregatePositiveCheckboxInstances = 0;
+        int numAggregateNegativeCheckboxInstances = 0;
+        int numUndecidedCheckboxes = 0;
+        int numAggregateBothCorrect = 0;
+        int numAggregatePositiveCorrect = 0, numAggregatePositiveCheckboxCorrect = 0;
+        int numAggregateNegativeCorrect = 0, numAggregateNegativeCheckboxCorrect = 0;
+        int positiveThreshold = 5, negativeThreshold = 0;
+
+        HITLParser hitlParser = new HITLParser(100);
+
+        for(Map.Entry<Integer, List<AnnotatedQuery>> e : allAnnotations.entrySet()) {
+            final int sentenceId = e.getKey();
+            final List<AnnotatedQuery> annotations = e.getValue();
+
+            final NBestList nBestList = hitlParser.getNBestList(sentenceId);
+
+            List<ScoredQuery<QAStructureSurfaceForm>> queries = QuestionGenerationPipeline.coreArgQGPipeline
+                .setQueryPruningParameters(queryPruningParameters)
+                .generateAllQueries(sentenceId, nBestList);
+
+            for(AnnotatedQuery annotation : annotations) {
+                final Optional<ScoredQuery<QAStructureSurfaceForm>> matchQueryOpt =
+                    ExperimentUtils.getBestAlignedQuery(annotation, queries);
+                if (!matchQueryOpt.isPresent()) {
+                    System.err.println("missing query for annotation on sentence " + sentenceId);
+                    continue;
+                }
+                final ScoredQuery<QAStructureSurfaceForm> query = matchQueryOpt.get();
+                final ImmutableList<ImmutableList<Integer>> matchedResponses = annotation.getResponses(query);
+                if (matchedResponses.stream().filter(r -> r.size() > 0).count() < 5) {
+                    continue;
+                }
+                if (query.getQAPairSurfaceForms().stream().flatMap(qa -> qa.getQuestionStructures().stream())
+                    .allMatch(q -> (q.category == Category.valueOf("((S[dcl]\\NP)/NP)/NP") && q.targetArgNum > 1)
+                              || (q.category == Category.valueOf("((S[b]\\NP)/NP)/NP") && q.targetArgNum > 1))) {
+                    continue;
+                }
+
+                ImmutableList<Integer> goldResponse = hitlParser.getGoldOptions(query);
+                ImmutableList<Integer> oneBestResponse = hitlParser.getOneBestOptions(query);
+                ImmutableList<Integer> positiveAggregateResponse = IntStream.range(0, annotation.optionStrings.size())
+                    .filter(i -> matchedResponses.stream().filter(r -> r.contains(i)).collect(counting()) >= positiveThreshold)
+                    .boxed()
+                    .collect(toImmutableList());
+                ImmutableList<Integer> negativeAggregateResponse = IntStream.range(0, annotation.optionStrings.size())
+                    .filter(i -> matchedResponses.stream().filter(r -> r.contains(i)).collect(counting()) > negativeThreshold)
+                    .boxed()
+                    .collect(toImmutableList());
+
+                for(ImmutableList<Integer> annotatorResponse : matchedResponses) {
+                    numAnnotationInstances++;
+                    if(annotatorResponse.containsAll(goldResponse) && goldResponse.containsAll(annotatorResponse)) {
+                        numAnnotationsCorrect++;
+                    }
+                    for(int i = 0; i < annotation.optionStrings.size(); i++) {
+                        numAnnotationCheckboxInstances++;
+                        if(annotatorResponse.contains(i) == goldResponse.contains(i)) {
+                            numAnnotationCheckingsCorrect++;
+                        }
+                    }
+                }
+                numQueryInstances++;
+                if(oneBestResponse.containsAll(goldResponse) && goldResponse.containsAll(oneBestResponse)) {
+                    numOneBestCorrect++;
+                }
+                if(goldResponse.containsAll(positiveAggregateResponse)) {
+                    numAggregatePositiveCorrect++;
+                }
+                if(negativeAggregateResponse.containsAll(goldResponse)) {
+                    numAggregateNegativeCorrect++;
+                }
+                if(negativeAggregateResponse.containsAll(goldResponse) && goldResponse.containsAll(positiveAggregateResponse)) {
+                    numAggregateBothCorrect++;
+                }
+
+                for(int i = 0; i < annotation.optionStrings.size(); i++) {
+                    numCheckboxInstances++;
+                    if(oneBestResponse.contains(i) == goldResponse.contains(i)) {
+                        numOneBestCheckingsCorrect++;
+                    }
+                    if(positiveAggregateResponse.contains(i)) {
+                        numAggregatePositiveCheckboxInstances++;
+                        if(goldResponse.contains(i)) {
+                            numAggregatePositiveCheckboxCorrect++;
+                        }
+                    } else if(!negativeAggregateResponse.contains(i)) {
+                        numAggregateNegativeCheckboxInstances++;
+                        if(!goldResponse.contains(i)) {
+                            numAggregateNegativeCheckboxCorrect++;
+                        }
+                    } else {
+                        numUndecidedCheckboxes++;
+                    }
+                }
+            }
+        }
+
+        System.out.println("\nAccuracy:\n");
+        System.out.println(String.format("Total annotation instances: %d", numAnnotationInstances));
+        System.out.println(String.format("Number annotations correct: %d (%.2f%%)",
+                                         numAnnotationsCorrect,
+                                         100.0 * numAnnotationsCorrect / numAnnotationInstances));
+        System.out.println(String.format("Total annotation checkbox instances: %d", numAnnotationCheckboxInstances));
+        System.out.println(String.format("Number annotation checkbox correct: %d (%.2f%%)",
+                                         numAnnotationCheckingsCorrect,
+                                         100.0 * numAnnotationCheckingsCorrect / numAnnotationCheckboxInstances));
+        System.out.println();
+        System.out.println(String.format("Total query instances: %d", numQueryInstances));
+        System.out.println();
+        System.out.println(String.format("Number one-best correct: %d (%.2f%%)",
+                                         numOneBestCorrect,
+                                         100.0 * numOneBestCorrect / numQueryInstances));
+        System.out.println(String.format("Total one-best checkbox instances: %d", numCheckboxInstances));
+        System.out.println(String.format("Number one-best checkbox correct: %d (%.2f%%)",
+                                         numOneBestCheckingsCorrect,
+                                         100.0 * numOneBestCheckingsCorrect / numCheckboxInstances));
+
+        System.out.println();
+        System.out.println(String.format("positive threshold: %d; negative threshold: %d", positiveThreshold, negativeThreshold));
+
+        System.out.println();
+        System.out.println(String.format("Number aggregate positive correct: %d (%.2f%%)",
+                                         numAggregatePositiveCorrect,
+                                         100.0 * numAggregatePositiveCorrect / numQueryInstances));
+        System.out.println(String.format("Total aggregate positive checkbox instances: %d", numAggregatePositiveCheckboxInstances));
+        System.out.println(String.format("Number aggregate positive checkbox correct: %d (%.2f%%)",
+                                         numAggregatePositiveCheckboxCorrect,
+                                         100.0 * numAggregatePositiveCheckboxCorrect / numAggregatePositiveCheckboxInstances));
+
+        System.out.println();
+        System.out.println(String.format("Number aggregate negative correct: %d (%.2f%%)",
+                                         numAggregateNegativeCorrect,
+                                         100.0 * numAggregateNegativeCorrect / numQueryInstances));
+        System.out.println(String.format("Total aggregate negative checkbox instances: %d", numAggregateNegativeCheckboxInstances));
+        System.out.println(String.format("Number aggregate negative checkbox correct: %d (%.2f%%)",
+                                         numAggregateNegativeCheckboxCorrect,
+                                         100.0 * numAggregateNegativeCheckboxCorrect / numAggregateNegativeCheckboxInstances));
+
+        System.out.println();
+        System.out.println(String.format("Number aggregate positive and negative correct: %d (%.2f%%)",
+                                         numAggregateBothCorrect,
+                                         100.0 * numAggregateBothCorrect / numQueryInstances));
+        System.out.println(String.format("Number of undecided checkboxes: %d (%.2f%%)",
+                                         numUndecidedCheckboxes,
+                                         100.0 * numUndecidedCheckboxes / numCheckboxInstances));
     }
 }
 

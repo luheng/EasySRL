@@ -37,13 +37,15 @@ import java.util.stream.IntStream;
  */
 public class BioinferDataWriter {
     private static final int nBest = 100;
-    private static Map<Integer, List<AlignedAnnotation>> annotations;
-
-    private static final String[] annotationFiles = {
+    private static final String[] crowdFlowerAnnotationFiles = {
             "./Crowdflower_data/f914096.csv",
     };
+    private static final String[] upworkAnnotationFiles = {
+        "./Crowdflower_bioinfer/upwork-test-annotations.csv",
+    };
 
-    private static final String outputFilePath = "bioinfer.qa.tsv";
+    private static final String crowdFlowerOutputFilePath = "bioinfer.qa.tsv";
+    private static final String upworkOutputFilePath = "bioinfer.upwork.qa.tsv";
 
     private static QueryPruningParameters queryPruningParameters;
     static {
@@ -57,17 +59,84 @@ public class BioinferDataWriter {
     }
 
     public static void main(String[] args) {
-        annotations = ExperimentUtils.loadCrowdflowerAnnotation(annotationFiles);
-        assert annotations != null;
-
         try {
-            writeAggregatedAnnotation();
+            writeAggregatedUpworkAnnotation();
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    private static void writeAggregatedAnnotation() throws IOException {
+    private static void writeAggregatedUpworkAnnotation() throws IOException {
+        final Map<Integer, List<AlignedAnnotation>> annotations = ExperimentUtils
+            .loadCrowdflowerAnnotation(upworkAnnotationFiles);
+        assert annotations != null;
+        final String outputFilePath = upworkOutputFilePath;
+        BioinferCCGCorpus corpus = BioinferCCGCorpus.readTest().get();
+        Map<Integer, NBestList> nbestLists = NBestList.loadNBestListsFromFile("bioinfer.test.100best.out", nBest).get();
+        System.out.println(String.format("Load pre-parsed %d-best lists for %d sentences.", nBest, nbestLists.size()));
+        List<Integer> sentenceIds = annotations.keySet().stream().sorted().collect(Collectors.toList());
+
+        System.out.println(sentenceIds.stream().map(String::valueOf).collect(Collectors.joining(", ")));
+        System.out.println("Queried " + sentenceIds.size() + " sentences. Total number of questions:\t" +
+                annotations.entrySet().stream().mapToInt(e -> e.getValue().size()).sum());
+
+        int numMatchedAnnotations = 0, numNewQuestions = 0;
+
+       // Output file writer
+        BufferedWriter writer = new BufferedWriter(new FileWriter(new File(outputFilePath)));
+
+        int counter = 0, numWrittenAnnotations = 0;
+        TicToc.tic();
+        for (int sentenceId : sentenceIds) {
+
+            if (++counter % 100 == 0) {
+                System.out.println(String.format("Processed %d sentences ... in %d seconds", counter, TicToc.toc()));
+                TicToc.tic();
+            }
+            final ImmutableList<String> sentence = corpus.getSentence(sentenceId);
+            final NBestList nBestList = nbestLists.get(sentenceId);
+
+            final List<AlignedAnnotation> annotated = annotations.get(sentenceId);
+            if (annotated == null || annotated.isEmpty()) {
+                continue;
+            }
+
+            List<ScoredQuery<QAStructureSurfaceForm>> queryList = QuestionGenerationPipeline.coreArgQGPipeline
+                    .setQueryPruningParameters(queryPruningParameters)
+                    .generateAllQueries(sentenceId, nBestList);
+
+            for (AlignedAnnotation annotation : annotations.get(sentenceId)) {
+                Optional<ScoredQuery<QAStructureSurfaceForm>> queryOpt =
+                        ExperimentUtils.getQueryForAlignedAnnotation(annotation, queryList);
+                if (!queryOpt.isPresent()) {
+                    continue;
+                }
+                final ScoredQuery<QAStructureSurfaceForm> query = queryOpt.get();
+                if (Prepositions.prepositionWords.contains(sentence.get(query.getPredicateId().getAsInt())
+                        .toLowerCase())) {
+                    continue;
+                }
+                // only take the responses from annotators we want
+                ImmutableList<ImmutableList<Integer>> responses = new ImmutableList.Builder<ImmutableList<Integer>>()
+                    .add(annotation.annotatorToAnswerIds.get("37973746")) // jessica
+                    .add(annotation.annotatorToAnswerIds.get("38026552")) // sean
+                    .build();
+                // ImmutableList<ImmutableList<Integer>> responses = AnnotationUtils.getAllUserResponses(query, annotation);
+
+                // Write to output file.
+                writer.write(query.toAnnotationString(sentence, responses) + "\n");
+                numWrittenAnnotations ++;
+            }
+        }
+        writer.close();
+        System.out.println(String.format("Wrote %d annotations to file %s.", numWrittenAnnotations, outputFilePath));
+    }
+
+    private static void writeAggregatedCrowdFlowerAnnotation() throws IOException {
+        final Map<Integer, List<AlignedAnnotation>> annotations = ExperimentUtils
+            .loadCrowdflowerAnnotation(crowdFlowerAnnotationFiles);
+        assert annotations != null;
+        final String outputFilePath = crowdFlowerOutputFilePath;
         BioinferCCGCorpus corpus = BioinferCCGCorpus.readTest().get();
         Map<Integer, NBestList> nbestLists = NBestList.loadNBestListsFromFile("bioinfer.test.100best.out", nBest).get();
         System.out.println(String.format("Load pre-parsed %d-best lists for %d sentences.", nBest, nbestLists.size()));
@@ -125,4 +194,5 @@ public class BioinferDataWriter {
         writer.close();
         System.out.println(String.format("Wrote %d annotations to file %s.", numWrittenAnnotations, outputFilePath));
     }
+
 }

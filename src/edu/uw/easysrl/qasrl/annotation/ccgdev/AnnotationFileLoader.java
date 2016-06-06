@@ -19,6 +19,7 @@ public class AnnotationFileLoader {
     private static final String devAnnotationFilePath = "ccgdev2.qa.tsv";
     private static final String testAnnotationFilePath = "ccgtest.qa.tsv";
     private static final String bioinferAnnotationFilePath = "bioinfer.qa.tsv";
+    private static final String bioinferUpworkAnnotationFilePath = "bioinfer.upwork.qa.tsv";
 
     public static Map<Integer, List<AnnotatedQuery>> loadDev() {
         return loadFromFile(devAnnotationFilePath);
@@ -30,6 +31,10 @@ public class AnnotationFileLoader {
 
     public static Map<Integer, List<AnnotatedQuery>> loadBioinfer() {
         return loadFromFile(bioinferAnnotationFilePath);
+    }
+
+    public static Map<Integer, List<AnnotatedQuery>> loadBioinferUpwork() {
+        return loadFromFile(bioinferUpworkAnnotationFilePath);
     }
 
     private static Map<Integer, List<AnnotatedQuery>> loadFromFile(final String annotationFilePath) {

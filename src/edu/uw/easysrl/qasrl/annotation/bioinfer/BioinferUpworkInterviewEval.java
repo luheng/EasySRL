@@ -96,8 +96,6 @@ public class BioinferUpworkInterviewEval {
                     final AlignedAnnotation annot = annotations.get(annotId);
                     if (annot.predicateId == predId &&
                         query.getPrompt().equals(annot.queryPrompt)) {
-                        HashMultiset<ImmutableList<Integer>> responses =
-                                HashMultiset.create(AnnotationUtils.getAllUserResponses(query, annot));
                         String comment = annot.annotatorToComment.get(annotatorId);
                         // these are the person's annotations
                         ImmutableList<Integer> annotatorResponse = Optional
@@ -162,6 +160,6 @@ public class BioinferUpworkInterviewEval {
             System.err.println("must pass an annotator name (Jessica|Rhonda|Tamir|Sean)");
             System.exit(1);
         }
-        printAnswersByAnnotator(args[0], interviewDataFile);
+        printAnswersByAnnotator(args[0], fullTestDataFile);
     }
 }
