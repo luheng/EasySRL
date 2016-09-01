@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
+import com.google.common.collect.Lists;
 import com.google.common.collect.Table;
 import com.google.common.collect.Table.Cell;
 import com.google.common.collect.TreeBasedTable;
@@ -290,4 +291,109 @@ public class ParallelCorpusReader {
 
 	}
 
+	// HITL Stuff.
+	public Iterator<Sentence> readCcgCorpus(final boolean isDev) throws IOException {
+		System.err.println("Reading CcgBank...");
+		synchronized (this) {
+			if (PTB == null) {
+				PTB = new PennTreebank().readCorpus(treebank);
+			}
+			if (CoNLL == null) {
+				CoNLL = new DependencyTreebank().readCorpus(treebank);
+			}
+		}
+		List<SyntaxTreeNode> parses;
+		List<DependencyParse> depParses;
+		if (isDev) {
+			synchronized (ccgbank) {
+				if (parsesDev == null) {
+					parsesDev = CCGBankParseReader.loadCorpus(ccgbank, true);
+				}
+				if (depParsesDev == null) {
+					depParsesDev = CCGBankDependencies.loadCorpus(ccgbank, Partition.DEV);
+				}
+				parses = parsesDev;
+				depParses = depParsesDev;
+			}
+		} else {
+			synchronized (ccgbank) {
+				if (parsesTrain == null) {
+					parsesTrain = CCGBankParseReader.loadCorpus(ccgbank, false);
+				}
+				if (depParsesTrain == null) {
+					depParsesTrain = CCGBankDependencies.loadCorpus(ccgbank, Partition.TRAIN);
+				}
+				parses = parsesTrain;
+				depParses = depParsesTrain;
+			}
+		}
+
+		return new Iterator<Sentence>() {
+			int i = 0;
+
+			@Override
+			public boolean hasNext() {
+				return i < parses.size();
+			}
+
+			@Override
+			public Sentence next() {
+				final SyntaxTreeNode parse = parses.get(i);
+				final DependencyParse depParse = depParses.get(i);
+				final SyntacticDependencyParse conll = CoNLL.get(
+						depParse.getFile(), depParse.getSentenceNumber());
+				i++;
+				return new Sentence(parse, depParse, conll, null /* SRL */,
+						PTB.get(depParse.getFile(), depParse.getSentenceNumber()));
+			}
+		};
+	}
+
+    private static List<SyntaxTreeNode> parsesTest;
+    private static List<DependencyParse> depParsesTest;
+
+    public Iterator<Sentence> readCcgTestSet() throws IOException {
+        System.err.println("Reading CcgBank Test Set...");
+        synchronized (this) {
+            if (PTB == null) {
+                PTB = new PennTreebank().readCorpus(treebank);
+            }
+            if (CoNLL == null) {
+                CoNLL = new DependencyTreebank().readCorpus(treebank);
+            }
+        }
+        List<SyntaxTreeNode> parses;
+        List<DependencyParse> depParses;
+        synchronized (ccgbank) {
+            if (parsesTest == null) {
+                parsesTest = Lists.newArrayList(CCGBankParseReader.loadCorpus(ccgbank,
+                        CCGBankParseReader.testRegex + ".*.auto"));
+            }
+            if (depParsesTest == null) {
+                depParsesTest = CCGBankDependencies.loadCorpus(ccgbank, Partition.TEST);
+            }
+            parses = parsesTest;
+            depParses = depParsesTest;
+        }
+
+        return new Iterator<Sentence>() {
+            int i = 0;
+
+            @Override
+            public boolean hasNext() {
+                return i < parses.size();
+            }
+
+            @Override
+            public Sentence next() {
+                final SyntaxTreeNode parse = parses.get(i);
+                final DependencyParse depParse = depParses.get(i);
+                final SyntacticDependencyParse conll = CoNLL.get(
+                        depParse.getFile(), depParse.getSentenceNumber());
+                i++;
+                return new Sentence(parse, depParse, conll, null /* SRL */,
+                        PTB.get(depParse.getFile(), depParse.getSentenceNumber()));
+            }
+        };
+    }
 }

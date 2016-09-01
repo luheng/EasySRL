@@ -227,6 +227,8 @@ public abstract class Category implements Serializable, Comparable<Category> {
 
 	public abstract Category dropPPandPRfeatures();
 
+	public abstract Category dropFeatures();
+
 	private static class FunctorCategory extends Category {
 
 		private static final long serialVersionUID = 2140839570125932441L;
@@ -392,6 +394,11 @@ public abstract class Category implements Serializable, Comparable<Category> {
 		@Override
 		public Category dropPPandPRfeatures() {
 			return Category.make(left.dropPPandPRfeatures(), slash, right.dropPPandPRfeatures());
+		}
+
+		@Override
+		public Category dropFeatures() {
+			return Category.make(left.dropFeatures(), slash, right.dropFeatures());
 		}
 
 		@Override
@@ -576,6 +583,11 @@ public abstract class Category implements Serializable, Comparable<Category> {
 			} else {
 				return this;
 			}
+		}
+
+		@Override
+		public Category dropFeatures() {
+			return valueOf(type);
 		}
 
 		@Override
